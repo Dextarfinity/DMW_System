@@ -1,0 +1,29 @@
+{
+  "name": "procurement-plan-system",
+  "version": "1.0.0",
+  "description": "Procurement Plan Management System",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.dmwfad.procurement",
+    "productName": "Procurement Plan System",
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "keywords": ["procurement", "planning", "management"],
+  "author": "DMW FAD",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}

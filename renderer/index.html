@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procurement Plan System - DMW FAD</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i class="fas fa-clipboard-list"></i>
+          <span>PPS</span>
+        </div>
+        <h2>Procurement Plan System</h2>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <ul>
+          <li class="nav-item active" data-page="dashboard">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Dashboard</span>
+          </li>
+          <li class="nav-item" data-page="procurement-plans">
+            <i class="fas fa-file-alt"></i>
+            <span>Procurement Plans</span>
+          </li>
+          <li class="nav-item" data-page="purchase-requests">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Purchase Requests</span>
+          </li>
+          <li class="nav-item" data-page="purchase-orders">
+            <i class="fas fa-file-invoice-dollar"></i>
+            <span>Purchase Orders</span>
+          </li>
+          <li class="nav-item" data-page="items">
+            <i class="fas fa-boxes"></i>
+            <span>Items Catalog</span>
+          </li>
+          <li class="nav-item" data-page="suppliers">
+            <i class="fas fa-truck"></i>
+            <span>Suppliers</span>
+          </li>
+          <li class="nav-item" data-page="departments">
+            <i class="fas fa-building"></i>
+            <span>Departments</span>
+          </li>
+          <li class="nav-item" data-page="users">
+            <i class="fas fa-users"></i>
+            <span>User Management</span>
+          </li>
+          <li class="nav-item" data-page="reports">
+            <i class="fas fa-chart-bar"></i>
+            <span>Reports</span>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">
+            <i class="fas fa-user-circle"></i>
+          </div>
+          <div class="user-details">
+            <span class="user-name">Admin User</span>
+            <span class="user-role">Administrator</span>
+          </div>
+        </div>
+        <button class="logout-btn" id="logoutBtn">
+          <i class="fas fa-sign-out-alt"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <button class="toggle-sidebar" id="toggleSidebar">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="header-title">
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="header-actions">
+          <div class="notification-bell">
+            <i class="fas fa-bell"></i>
+            <span class="notification-count">3</span>
+          </div>
+          <div class="current-date">
+            <i class="fas fa-calendar-alt"></i>
+            <span id="currentDate"></span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="page-content">
+        <!-- Dashboard Page -->
+        <section class="page active" id="page-dashboard">
+          <div class="dashboard-stats">
+            <div class="stat-card">
+              <div class="stat-icon bg-primary">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <div class="stat-info">
+                <h3>45</h3>
+                <p>Total Plans</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-warning">
+                <i class="fas fa-clock"></i>
+              </div>
+              <div class="stat-info">
+                <h3>12</h3>
+                <p>Pending Approval</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-success">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <div class="stat-info">
+                <h3>28</h3>
+                <p>Approved</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-info">
+                <i class="fas fa-shopping-cart"></i>
+              </div>
+              <div class="stat-info">
+                <h3>15</h3>
+                <p>Purchase Orders</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3>Recent Procurement Plans</h3>
+                <button class="btn btn-sm btn-primary">View All</button>
+              </div>
+              <div class="card-body">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Plan ID</th>
+                      <th>Item</th>
+                      <th>Department</th>
+                      <th>Total Qty</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>PP-2026-001</td>
+                      <td>Office Supplies</td>
+                      <td>Admin</td>
+                      <td>500</td>
+                      <td><span class="status-badge approved">Approved</span></td>
+                    </tr>
+                    <tr>
+                      <td>PP-2026-002</td>
+                      <td>IT Equipment</td>
+                      <td>IT Dept</td>
+                      <td>25</td>
+                      <td><span class="status-badge pending">Pending</span></td>
+                    </tr>
+                    <tr>
+                      <td>PP-2026-003</td>
+                      <td>Furniture</td>
+                      <td>HR</td>
+                      <td>10</td>
+                      <td><span class="status-badge draft">Draft</span></td>
+                    </tr>
+                    <tr>
+                      <td>PP-2026-004</td>
+                      <td>Cleaning Materials</td>
+                      <td>General Services</td>
+                      <td>200</td>
+                      <td><span class="status-badge approved">Approved</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3>Quarterly Overview</h3>
+              </div>
+              <div class="card-body">
+                <div class="quarter-stats">
+                  <div class="quarter-item">
+                    <span class="quarter-label">Q1</span>
+                    <div class="quarter-bar">
+                      <div class="quarter-fill" style="width: 75%"></div>
+                    </div>
+                    <span class="quarter-value">₱1.2M</span>
+                  </div>
+                  <div class="quarter-item">
+                    <span class="quarter-label">Q2</span>
+                    <div class="quarter-bar">
+                      <div class="quarter-fill" style="width: 50%"></div>
+                    </div>
+                    <span class="quarter-value">₱850K</span>
+                  </div>
+                  <div class="quarter-item">
+                    <span class="quarter-label">Q3</span>
+                    <div class="quarter-bar">
+                      <div class="quarter-fill" style="width: 30%"></div>
+                    </div>
+                    <span class="quarter-value">₱500K</span>
+                  </div>
+                  <div class="quarter-item">
+                    <span class="quarter-label">Q4</span>
+                    <div class="quarter-bar">
+                      <div class="quarter-fill" style="width: 10%"></div>
+                    </div>
+                    <span class="quarter-value">₱150K</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Procurement Plans Page -->
+        <section class="page" id="page-procurement-plans">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newPlanBtn">
+              <i class="fas fa-plus"></i> New Procurement Plan
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search plans...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select">
+                <option value="">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select class="form-select">
+                <option value="">All Quarters</option>
+                <option value="q1">Q1</option>
+                <option value="q2">Q2</option>
+                <option value="q3">Q3</option>
+                <option value="q4">Q4</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Plan ID</th>
+                  <th>Item Name</th>
+                  <th>Department</th>
+                  <th>Q1 Qty</th>
+                  <th>Q2 Qty</th>
+                  <th>Q3 Qty</th>
+                  <th>Q4 Qty</th>
+                  <th>Total Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PP-2026-001</td>
+                  <td>Bond Paper A4</td>
+                  <td>Admin Department</td>
+                  <td>100</td>
+                  <td>100</td>
+                  <td>150</td>
+                  <td>150</td>
+                  <td>₱25,000.00</td>
+                  <td><span class="status-badge approved">Approved</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PP-2026-002</td>
+                  <td>Computer Desktop</td>
+                  <td>IT Department</td>
+                  <td>5</td>
+                  <td>10</td>
+                  <td>5</td>
+                  <td>5</td>
+                  <td>₱625,000.00</td>
+                  <td><span class="status-badge pending">Pending</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PP-2026-003</td>
+                  <td>Office Chair</td>
+                  <td>HR Department</td>
+                  <td>5</td>
+                  <td>5</td>
+                  <td>0</td>
+                  <td>0</td>
+                  <td>₱50,000.00</td>
+                  <td><span class="status-badge draft">Draft</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Purchase Requests Page -->
+        <section class="page" id="page-purchase-requests">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newPRBtn">
+              <i class="fas fa-plus"></i> New Purchase Request
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search requests...">
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>PR No.</th>
+                  <th>Purpose</th>
+                  <th>Department</th>
+                  <th>Requested By</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PR-2026-001</td>
+                  <td>Office Supplies for Q1</td>
+                  <td>Admin Department</td>
+                  <td>Juan Dela Cruz</td>
+                  <td>Jan 15, 2026</td>
+                  <td><span class="status-badge approved">Processed</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PR-2026-002</td>
+                  <td>IT Equipment Upgrade</td>
+                  <td>IT Department</td>
+                  <td>Maria Santos</td>
+                  <td>Jan 20, 2026</td>
+                  <td><span class="status-badge pending">Pending</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon success" title="Approve"><i class="fas fa-check"></i></button>
+                      <button class="btn-icon danger" title="Reject"><i class="fas fa-times"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Purchase Orders Page -->
+        <section class="page" id="page-purchase-orders">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newPOBtn">
+              <i class="fas fa-plus"></i> New Purchase Order
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search orders...">
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>PO No.</th>
+                  <th>PR Reference</th>
+                  <th>Supplier</th>
+                  <th>Total Amount</th>
+                  <th>Payment Mode</th>
+                  <th>Date Approved</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PO-2026-001</td>
+                  <td>PR-2026-001</td>
+                  <td>ABC Trading Corp.</td>
+                  <td>₱25,000.00</td>
+                  <td>Check</td>
+                  <td>Jan 25, 2026</td>
+                  <td><span class="status-badge approved">Completed</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Items Catalog Page -->
+        <section class="page" id="page-items">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newItemBtn">
+              <i class="fas fa-plus"></i> Add New Item
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search items...">
+            </div>
+            <select class="form-select">
+              <option value="">All Categories</option>
+              <option value="office">Office Supplies</option>
+              <option value="it">IT Equipment</option>
+              <option value="furniture">Furniture</option>
+              <option value="cleaning">Cleaning Materials</option>
+            </select>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Item ID</th>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Unit</th>
+                  <th>Est. Unit Price</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ITM-001</td>
+                  <td>Bond Paper A4 (500 sheets)</td>
+                  <td>Office Supplies</td>
+                  <td>Ream</td>
+                  <td>₱250.00</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>ITM-002</td>
+                  <td>Computer Desktop i5</td>
+                  <td>IT Equipment</td>
+                  <td>Unit</td>
+                  <td>₱25,000.00</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>ITM-003</td>
+                  <td>Executive Office Chair</td>
+                  <td>Furniture</td>
+                  <td>Piece</td>
+                  <td>₱5,000.00</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Suppliers Page -->
+        <section class="page" id="page-suppliers">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newSupplierBtn">
+              <i class="fas fa-plus"></i> Add Supplier
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search suppliers...">
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Supplier ID</th>
+                  <th>Company Name</th>
+                  <th>Address</th>
+                  <th>Contact</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>SUP-001</td>
+                  <td>ABC Trading Corporation</td>
+                  <td>123 Main St., Baguio City</td>
+                  <td>+63 74 123 4567</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>SUP-002</td>
+                  <td>XYZ Computer Solutions</td>
+                  <td>456 Session Rd., Baguio City</td>
+                  <td>+63 74 987 6543</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Departments Page -->
+        <section class="page" id="page-departments">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newDeptBtn">
+              <i class="fas fa-plus"></i> Add Department
+            </button>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Dept Code</th>
+                  <th>Department Name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ADM</td>
+                  <td>Administrative Department</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>IT</td>
+                  <td>Information Technology Department</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>HR</td>
+                  <td>Human Resources Department</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>FIN</td>
+                  <td>Finance Department</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>GS</td>
+                  <td>General Services</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Users Page -->
+        <section class="page" id="page-users">
+          <div class="page-actions">
+            <button class="btn btn-primary" id="newUserBtn">
+              <i class="fas fa-plus"></i> Add User
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search users...">
+            </div>
+            <select class="form-select">
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="officer">Procurement Officer</option>
+              <option value="viewer">Viewer</option>
+              <option value="auditor">Auditor</option>
+            </select>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>User ID</th>
+                  <th>Username</th>
+                  <th>Full Name</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>USR-001</td>
+                  <td>admin</td>
+                  <td>System Administrator</td>
+                  <td><span class="role-badge admin">Admin</span></td>
+                  <td>IT Department</td>
+                  <td><span class="status-badge approved">Active</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" title="Reset Password"><i class="fas fa-key"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>USR-002</td>
+                  <td>manager1</td>
+                  <td>Juan Dela Cruz</td>
+                  <td><span class="role-badge manager">Manager</span></td>
+                  <td>Admin Department</td>
+                  <td><span class="status-badge approved">Active</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" title="Reset Password"><i class="fas fa-key"></i></button>
+                      <button class="btn-icon danger" title="Deactivate"><i class="fas fa-ban"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>USR-003</td>
+                  <td>officer1</td>
+                  <td>Maria Santos</td>
+                  <td><span class="role-badge officer">Procurement Officer</span></td>
+                  <td>Admin Department</td>
+                  <td><span class="status-badge approved">Active</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" title="Reset Password"><i class="fas fa-key"></i></button>
+                      <button class="btn-icon danger" title="Deactivate"><i class="fas fa-ban"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>USR-004</td>
+                  <td>viewer1</td>
+                  <td>Pedro Reyes</td>
+                  <td><span class="role-badge viewer">Viewer</span></td>
+                  <td>Finance Department</td>
+                  <td><span class="status-badge approved">Active</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" title="Reset Password"><i class="fas fa-key"></i></button>
+                      <button class="btn-icon danger" title="Deactivate"><i class="fas fa-ban"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>USR-005</td>
+                  <td>auditor1</td>
+                  <td>Ana Garcia</td>
+                  <td><span class="role-badge auditor">Auditor</span></td>
+                  <td>Finance Department</td>
+                  <td><span class="status-badge approved">Active</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" title="Reset Password"><i class="fas fa-key"></i></button>
+                      <button class="btn-icon danger" title="Deactivate"><i class="fas fa-ban"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Reports Page -->
+        <section class="page" id="page-reports">
+          <div class="reports-grid">
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <h3>Procurement Plans Report</h3>
+              <p>Generate quarterly or annual procurement plans summary</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-shopping-cart"></i>
+              </div>
+              <h3>Purchase Requests Report</h3>
+              <p>View all purchase requests by date range</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-file-invoice-dollar"></i>
+              </div>
+              <h3>Purchase Orders Report</h3>
+              <p>Summary of all purchase orders and suppliers</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-chart-pie"></i>
+              </div>
+              <h3>Budget Utilization Report</h3>
+              <p>Track budget spending by department/quarter</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-history"></i>
+              </div>
+              <h3>Audit Trail Report</h3>
+              <p>View system activity logs and user actions</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon">
+                <i class="fas fa-truck"></i>
+              </div>
+              <h3>Supplier Performance</h3>
+              <p>Analyze supplier transactions and performance</p>
+              <button class="btn btn-primary">Generate</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Template -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="formModal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Form Title</h3>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Dynamic form content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-modal">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="fas fa-clipboard-list"></i>
+        </div>
+        <h2>Procurement Plan System</h2>
+        <p>Sign in to your account</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <div class="input-icon">
+            <i class="fas fa-user"></i>
+            <input type="text" id="username" placeholder="Enter username" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="input-icon">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" placeholder="Enter password" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="roleSelect">Role (Demo)</label>
+          <select id="roleSelect" class="form-select">
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="officer">Procurement Officer</option>
+            <option value="viewer">Viewer</option>
+            <option value="auditor">Auditor</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <i class="fas fa-sign-in-alt"></i> Sign In
+        </button>
+      </form>
+      <div class="login-footer">
+        <p>Demo Mode - Select any role to continue</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="scripts/app.js"></script>
+</body>
+</html>

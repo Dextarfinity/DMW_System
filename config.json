@@ -1,0 +1,6 @@
+{
+  "API_BASE_URL": "http://localhost:3000/api",
+  "APP_NAME": "Procurement Plan System",
+  "VERSION": "1.0.0",
+  "NOTES": "Change API_BASE_URL to your server IP when backend is ready"
+}
