@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DMW Caraga - Procurement Plan System (As-Is)</title>
+  <title>DMW Caraga - Procurement System</title>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -14,20 +14,20 @@
       <div class="sidebar-header">
         <div class="logo">
           <i class="fas fa-landmark"></i>
-          <span>DMW</span>
+          <span>DMW Caraga</span>
         </div>
-        <h2>Procurement Plan System</h2>
-        <p class="region-label">Caraga Region • ISO 9001:2015</p>
+        <h2>Procurement System</h2>
+        <p class="region-label">Region XIII</p>
       </div>
       
       <nav class="sidebar-nav">
         <ul>
           <li class="nav-item active" data-page="dashboard">
-            <i class="fas fa-tachometer-alt"></i>
+            <i class="fas fa-home"></i>
             <span>Dashboard</span>
           </li>
           
-          <li class="nav-section">Planning (PLAN)</li>
+          <li class="nav-section">Planning</li>
           <li class="nav-item" data-page="ppmp">
             <i class="fas fa-clipboard-list"></i>
             <span>PPMP</span>
@@ -37,21 +37,21 @@
             <span>APP</span>
           </li>
           
-          <li class="nav-section">SVP Transaction (DO)</li>
+          <li class="nav-section">Transactions</li>
           <li class="nav-item" data-page="purchase-requests">
-            <i class="fas fa-file-signature"></i>
+            <i class="fas fa-file-alt"></i>
             <span>Purchase Requests</span>
           </li>
           <li class="nav-item" data-page="rfq">
-            <i class="fas fa-paper-plane"></i>
+            <i class="fas fa-file-invoice"></i>
             <span>RFQ</span>
           </li>
           <li class="nav-item" data-page="abstract">
             <i class="fas fa-table"></i>
-            <span>Abstract of Quotations</span>
+            <span>Abstract</span>
           </li>
           <li class="nav-item" data-page="post-qual">
-            <i class="fas fa-user-check"></i>
+            <i class="fas fa-check-circle"></i>
             <span>Post-Qualification</span>
           </li>
           <li class="nav-item" data-page="bac-resolution">
@@ -63,17 +63,17 @@
             <span>Notice of Award</span>
           </li>
           <li class="nav-item" data-page="purchase-orders">
-            <i class="fas fa-file-invoice-dollar"></i>
+            <i class="fas fa-receipt"></i>
             <span>Purchase Orders</span>
           </li>
           
-          <li class="nav-section">Inspection (CHECK)</li>
+          <li class="nav-section">Inspection</li>
           <li class="nav-item" data-page="iar">
             <i class="fas fa-clipboard-check"></i>
-            <span>IAR (Appendix 62)</span>
+            <span>IAR</span>
           </li>
           
-          <li class="nav-section">Submission (ACT)</li>
+          <li class="nav-section">Submission</li>
           <li class="nav-item" data-page="coa">
             <i class="fas fa-file-export"></i>
             <span>COA Submission</span>
@@ -81,11 +81,11 @@
           
           <li class="nav-section">Master Data</li>
           <li class="nav-item" data-page="items">
-            <i class="fas fa-boxes"></i>
-            <span>Items Catalog</span>
+            <i class="fas fa-box"></i>
+            <span>Items</span>
           </li>
           <li class="nav-item" data-page="suppliers">
-            <i class="fas fa-truck"></i>
+            <i class="fas fa-building"></i>
             <span>Suppliers</span>
           </li>
           <li class="nav-item" data-page="divisions">
@@ -93,11 +93,11 @@
             <span>Divisions</span>
           </li>
           <li class="nav-item" data-page="users">
-            <i class="fas fa-users-cog"></i>
-            <span>User Management</span>
+            <i class="fas fa-users"></i>
+            <span>Users</span>
           </li>
           
-          <li class="nav-section">Reports & KPIs</li>
+          <li class="nav-section">Reports</li>
           <li class="nav-item" data-page="reports">
             <i class="fas fa-chart-bar"></i>
             <span>Reports</span>
@@ -188,9 +188,9 @@
             </div>
           </div>
 
-          <!-- SVP Workflow Pipeline (As-Is Canonical Statuses) -->
+          <!-- SVP Workflow Pipeline -->
           <div class="workflow-overview">
-            <h3><i class="fas fa-project-diagram"></i> SVP Transaction Lifecycle (As-Is Status Machine)</h3>
+            <h3><i class="fas fa-stream"></i> Transaction Pipeline</h3>
             <div class="workflow-pipeline">
               <div class="pipeline-stage">
                 <div class="stage-count">2</div>
@@ -256,17 +256,16 @@
 
           <!-- Timeline KPIs -->
           <div class="info-banner kpi-banner">
-            <i class="fas fa-stopwatch"></i>
-            <strong>Timeline KPIs (Per Memo 14 Nov 2025):</strong>
-            PR ≥15 days prior | PR Approval ≤5 days | RFQ 1-3 days | Abstract ≤1 day | NOA ≤1 day | PO Approval ≤1 day | Supplier Sign ≤7 days | COA ≤5 days from PO
+            <i class="fas fa-clock"></i>
+            <strong>SLA Targets:</strong> PR Approval 5d | RFQ 3d | Abstract 1d | NOA 1d | PO Approval 1d | Supplier Sign 7d | COA 5d
           </div>
 
           <div class="dashboard-grid">
             <!-- Recent Procurement Cases -->
             <div class="dashboard-card">
               <div class="card-header">
-                <h3>Active Procurement Cases</h3>
-                <button class="btn btn-sm btn-primary">View All</button>
+                <h3>Active Cases</h3>
+                <button class="btn btn-sm btn-secondary">View All</button>
               </div>
               <div class="card-body">
                 <table class="data-table">
@@ -321,7 +320,7 @@
             <!-- Division PPMP Submission Status -->
             <div class="dashboard-card">
               <div class="card-header">
-                <h3>Division PPMP Status (FY 2026)</h3>
+                <h3>PPMP Status by Division</h3>
               </div>
               <div class="card-body">
                 <div class="division-stats">
