@@ -3,29 +3,28 @@
 -- Run this after schema.sql to populate initial data
 -- ============================================================
 
--- Create default admin password (admin123)
--- You can generate new hash at: https://bcrypt-generator.com/
--- Or use: node -e "console.log(require('bcrypt').hashSync('admin123', 10))"
+-- Default password for all users: admin123
+-- Passwords are stored as plain text for development purposes
 
 -- Insert Admin User (password: admin123)
 INSERT INTO users (username, password_hash, full_name, email, role, dept_id) VALUES
-('admin', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'System Administrator', 'admin@dmw.gov.ph', 'admin', 1)
+('admin', 'admin123', 'System Administrator', 'admin@dmw.gov.ph', 'admin', 1)
 ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- Insert Department Managers
 INSERT INTO users (username, password_hash, full_name, email, role, dept_id) VALUES
-('fad_manager', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'FAD Division Chief', 'fad@dmw.gov.ph', 'manager', 1),
-('wrsd_manager', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'WRSD Division Chief', 'wrsd@dmw.gov.ph', 'manager', 2),
-('mwpd_manager', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'MWPD Division Chief', 'mwpd@dmw.gov.ph', 'manager', 3),
-('mwprod_manager', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'MWProD Division Chief', 'mwprod@dmw.gov.ph', 'manager', 4),
-('ord_manager', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'ORD Executive', 'ord@dmw.gov.ph', 'manager', 5)
+('fad_manager', 'admin123', 'FAD Division Chief', 'fad@dmw.gov.ph', 'manager', 1),
+('wrsd_manager', 'admin123', 'WRSD Division Chief', 'wrsd@dmw.gov.ph', 'manager', 2),
+('mwpd_manager', 'admin123', 'MWPD Division Chief', 'mwpd@dmw.gov.ph', 'manager', 3),
+('mwprod_manager', 'admin123', 'MWProD Division Chief', 'mwprod@dmw.gov.ph', 'manager', 4),
+('ord_manager', 'admin123', 'ORD Executive', 'ord@dmw.gov.ph', 'manager', 5)
 ON CONFLICT (username) DO NOTHING;
 
 -- Insert Sample Officers
 INSERT INTO users (username, password_hash, full_name, email, role, dept_id) VALUES
-('officer1', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'John Dela Cruz', 'john@dmw.gov.ph', 'officer', 1),
-('officer2', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'Maria Santos', 'maria@dmw.gov.ph', 'officer', 2),
-('auditor1', '$2b$10$EEyYQ5HFqZxHp8mGq3jHfuZlK5JX8mCnV9jKq5nMwZ5lGzFq2rOGe', 'COA Auditor', 'auditor@dmw.gov.ph', 'auditor', 1)
+('officer1', 'admin123', 'John Dela Cruz', 'john@dmw.gov.ph', 'officer', 1),
+('officer2', 'admin123', 'Maria Santos', 'maria@dmw.gov.ph', 'officer', 2),
+('auditor1', 'admin123', 'COA Auditor', 'auditor@dmw.gov.ph', 'auditor', 1)
 ON CONFLICT (username) DO NOTHING;
 
 -- Insert Additional Items
@@ -70,12 +69,12 @@ INSERT INTO suppliers (name, contact_person, phone, email, address, tin) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Insert Sample Procurement Plans for 2026
-INSERT INTO procurementplans (item_id, dept_id, fiscal_year, q1_qty, q2_qty, q3_qty, q4_qty, total_amount, status, created_by) VALUES
-(1, 1, 2026, 2, 1, 1, 1, 175000.00, 'approved', 1),
-(2, 1, 2026, 3, 2, 2, 1, 360000.00, 'approved', 1),
-(4, 1, 2026, 50, 50, 50, 50, 50000.00, 'draft', 1),
-(5, 2, 2026, 10, 10, 10, 10, 6000.00, 'submitted', 1),
-(7, 3, 2026, 5, 3, 2, 2, 66000.00, 'draft', 1)
+INSERT INTO procurementplans (dept_id, fiscal_year, total_amount, status, created_by) VALUES
+(1, 2026, 175000.00, 'approved', 1),
+(1, 2026, 360000.00, 'approved', 1),
+(2, 2026, 50000.00, 'draft', 1),
+(3, 2026, 6000.00, 'submitted', 1),
+(4, 2026, 66000.00, 'draft', 1)
 ON CONFLICT DO NOTHING;
 
 -- ============================================================

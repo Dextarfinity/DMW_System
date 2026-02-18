@@ -597,10 +597,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 
 -- ============================================================
 -- GRANT PERMISSIONS TO APP USER
+-- (Commented out - using postgres user directly)
 -- ============================================================
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO dmw_app;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO dmw_app;
+-- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO dmw_app;
+-- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO dmw_app;
 
 -- ============================================================
 -- SAMPLE DATA (Optional - for testing)

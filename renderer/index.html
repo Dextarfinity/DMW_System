@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -27,80 +27,162 @@
             <span>Dashboard</span>
           </li>
           
-          <li class="nav-section">Planning</li>
-          <li class="nav-item" data-page="ppmp">
+          <li class="nav-section" data-section="planning">Planning</li>
+          <li class="nav-item" data-page="ppmp" data-section-item="planning">
             <i class="fas fa-clipboard-list"></i>
             <span>PPMP</span>
           </li>
-          <li class="nav-item" data-page="app">
+          <li class="nav-item" data-page="app" data-section-item="planning">
             <i class="fas fa-calendar-alt"></i>
             <span>APP</span>
           </li>
           
-          <li class="nav-section">Transactions</li>
-          <li class="nav-item" data-page="purchase-requests">
+          <li class="nav-section" data-section="transactions">Transactions</li>
+          <li class="nav-item" data-page="purchase-requests" data-section-item="transactions">
             <i class="fas fa-file-alt"></i>
             <span>Purchase Requests</span>
           </li>
-          <li class="nav-item" data-page="rfq">
+          <li class="nav-item" data-page="rfq" data-section-item="transactions">
             <i class="fas fa-file-invoice"></i>
             <span>RFQ</span>
           </li>
-          <li class="nav-item" data-page="abstract">
+          <li class="nav-item" data-page="abstract" data-section-item="transactions">
             <i class="fas fa-table"></i>
             <span>Abstract</span>
           </li>
-          <li class="nav-item" data-page="post-qual">
+          <li class="nav-item" data-page="post-qual" data-section-item="transactions">
             <i class="fas fa-check-circle"></i>
             <span>Post-Qualification</span>
           </li>
-          <li class="nav-item" data-page="bac-resolution">
+          <li class="nav-item" data-page="bac-resolution" data-section-item="transactions">
             <i class="fas fa-gavel"></i>
             <span>BAC Resolution</span>
           </li>
-          <li class="nav-item" data-page="noa">
+          <li class="nav-item" data-page="noa" data-section-item="transactions">
             <i class="fas fa-award"></i>
             <span>Notice of Award</span>
           </li>
-          <li class="nav-item" data-page="purchase-orders">
+          <li class="nav-item" data-page="purchase-orders" data-section-item="transactions">
             <i class="fas fa-receipt"></i>
             <span>Purchase Orders</span>
           </li>
           
-          <li class="nav-section">Inspection</li>
-          <li class="nav-item" data-page="iar">
+          <li class="nav-section" data-section="inspection">Inspection</li>
+          <li class="nav-item" data-page="iar" data-section-item="inspection">
             <i class="fas fa-clipboard-check"></i>
             <span>IAR</span>
           </li>
           
-          <li class="nav-section">Submission</li>
-          <li class="nav-item" data-page="coa">
+          <li class="nav-section" data-section="signing">Signing & Submission</li>
+          <li class="nav-item" data-page="po-packet" data-section-item="signing">
+            <i class="fas fa-folder-open"></i>
+            <span>PO Packet</span>
+          </li>
+          <li class="nav-item" data-page="coa" data-section-item="signing">
             <i class="fas fa-file-export"></i>
             <span>COA Submission</span>
           </li>
           
-          <li class="nav-section">Master Data</li>
-          <li class="nav-item" data-page="items">
-            <i class="fas fa-box"></i>
-            <span>Items</span>
+          <li class="nav-section" data-section="inventory">Inventory Management</li>
+          <li class="nav-item" data-page="stock-cards" data-section-item="inventory">
+            <i class="fas fa-layer-group"></i>
+            <span>Stock Cards</span>
           </li>
-          <li class="nav-item" data-page="suppliers">
+          <li class="nav-item" data-page="property-cards" data-section-item="inventory">
+            <i class="fas fa-id-card"></i>
+            <span>Property Cards</span>
+          </li>
+          <li class="nav-item" data-page="ics" data-section-item="inventory">
+            <i class="fas fa-exchange-alt"></i>
+            <span>ICS</span>
+          </li>
+          <li class="nav-item" data-page="par" data-section-item="inventory">
+            <i class="fas fa-file-signature"></i>
+            <span>PAR</span>
+          </li>
+          <li class="nav-item" data-page="ptr" data-section-item="inventory">
+            <i class="fas fa-people-arrows"></i>
+            <span>PTR</span>
+          </li>
+          <li class="nav-item" data-page="ris" data-section-item="inventory">
+            <i class="fas fa-clipboard-list"></i>
+            <span>RIS</span>
+          </li>
+          <li class="nav-item" data-page="supplies-ledger" data-section-item="inventory">
+            <i class="fas fa-book"></i>
+            <span>Supplies Ledger Cards</span>
+          </li>
+          <li class="nav-item" data-page="semi-expendable" data-section-item="inventory">
+            <i class="fas fa-tools"></i>
+            <span>Semi-Expendable Items</span>
+          </li>
+          <li class="nav-item" data-page="capital-outlay" data-section-item="inventory">
+            <i class="fas fa-landmark"></i>
+            <span>Capital Outlay Items</span>
+          </li>
+
+          <li class="nav-section" data-section="transport">Transportation</li>
+          <li class="nav-item" data-page="trip-tickets" data-section-item="transport">
+            <i class="fas fa-car"></i>
+            <span>Trip Tickets</span>
+          </li>
+
+          <li class="nav-section" data-section="master">Master Data</li>
+          <li class="nav-item" data-page="items" data-section-item="master">
+            <i class="fas fa-box"></i>
+            <span>Items Catalog</span>
+          </li>
+          <li class="nav-item" data-page="suppliers" data-section-item="master">
             <i class="fas fa-building"></i>
             <span>Suppliers</span>
           </li>
-          <li class="nav-item" data-page="divisions">
+          <li class="nav-item" data-page="employees" data-section-item="master">
+            <i class="fas fa-user-tie"></i>
+            <span>Employees</span>
+          </li>
+          <li class="nav-item" data-page="divisions" data-section-item="master">
             <i class="fas fa-sitemap"></i>
             <span>Divisions</span>
           </li>
-          <li class="nav-item" data-page="users">
+          <li class="nav-item" data-page="users" data-section-item="master">
             <i class="fas fa-users"></i>
             <span>Users</span>
           </li>
+          <li class="nav-item" data-page="offices" data-section-item="master">
+            <i class="fas fa-building"></i>
+            <span>Offices</span>
+          </li>
+          <li class="nav-item" data-page="designations" data-section-item="master">
+            <i class="fas fa-id-badge"></i>
+            <span>Designations</span>
+          </li>
+          <li class="nav-item" data-page="fund-clusters" data-section-item="master">
+            <i class="fas fa-wallet"></i>
+            <span>Fund Clusters</span>
+          </li>
+          <li class="nav-item" data-page="procurement-modes" data-section-item="master">
+            <i class="fas fa-gavel"></i>
+            <span>Procurement Modes</span>
+          </li>
+          <li class="nav-item" data-page="uacs-codes" data-section-item="master">
+            <i class="fas fa-barcode"></i>
+            <span>UACS Codes</span>
+          </li>
+          <li class="nav-item" data-page="uoms" data-section-item="master">
+            <i class="fas fa-ruler"></i>
+            <span>Units of Measure</span>
+          </li>
           
-          <li class="nav-section">Reports</li>
-          <li class="nav-item" data-page="reports">
+          <li class="nav-section" data-section="reports">Reports</li>
+          <li class="nav-item" data-page="reports" data-section-item="reports">
             <i class="fas fa-chart-bar"></i>
             <span>Reports</span>
+          </li>
+
+          <li class="nav-section" data-section="settings">System</li>
+          <li class="nav-item" data-page="settings" data-section-item="settings">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
           </li>
         </ul>
       </nav>
@@ -133,7 +215,7 @@
           <h1 id="pageTitle">Dashboard</h1>
         </div>
         <div class="header-actions">
-          <div class="notification-bell">
+          <div class="notification-bell" onclick="showNotificationPanel()">
             <i class="fas fa-bell"></i>
             <span class="notification-count">5</span>
           </div>
@@ -148,116 +230,157 @@
       <div class="page-content">
         <!-- Dashboard Page -->
         <section class="page active" id="dashboard">
-          <!-- KPI Summary Cards -->
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Procurement Management Dashboard</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <!-- Procurement Stats -->
           <div class="dashboard-stats">
             <div class="stat-card">
               <div class="stat-icon bg-primary">
                 <i class="fas fa-clipboard-list"></i>
               </div>
               <div class="stat-info">
-                <h3>24</h3>
-                <p>PPMP Items</p>
+                <h3 id="statTotalPlans">0</h3>
+                <p>PPMP Plans</p>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-icon bg-info">
-                <i class="fas fa-calendar-alt"></i>
+                <i class="fas fa-shopping-cart"></i>
               </div>
               <div class="stat-info">
-                <h3>18</h3>
-                <p>APP Projects</p>
+                <h3 id="statTotalPOs">0</h3>
+                <p>Purchase Orders</p>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-icon bg-warning">
-                <i class="fas fa-clock"></i>
+                <i class="fas fa-truck"></i>
               </div>
               <div class="stat-info">
-                <h3>7</h3>
-                <p>Active Cases</p>
+                <h3 id="statPendingIARs">0</h3>
+                <p>Pending IARs</p>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-icon bg-success">
-                <i class="fas fa-check-circle"></i>
+                <i class="fas fa-users"></i>
               </div>
               <div class="stat-info">
-                <h3>12</h3>
-                <p>COA Submitted</p>
+                <h3 id="statTotalSuppliers">0</h3>
+                <p>Suppliers</p>
               </div>
             </div>
           </div>
 
-          <!-- SVP Workflow Pipeline -->
+          <!-- Inventory Stats -->
+          <div class="dashboard-stats">
+            <div class="stat-card">
+              <div class="stat-icon bg-info">
+                <i class="fas fa-boxes"></i>
+              </div>
+              <div class="stat-info">
+                <h3 id="statTotalItems">0</h3>
+                <p>Total Items</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <div class="stat-info">
+                <h3 id="statLowStock">0</h3>
+                <p>Low Stock</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-success">
+                <i class="fas fa-id-card"></i>
+              </div>
+              <div class="stat-info">
+                <h3 id="statPropertyCards">0</h3>
+                <p>Property Cards</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon bg-primary">
+                <i class="fas fa-exchange-alt"></i>
+              </div>
+              <div class="stat-info">
+                <h3 id="statICS">0</h3>
+                <p>ICS Issued</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Pipeline -->
           <div class="workflow-overview">
             <h3><i class="fas fa-stream"></i> Transaction Pipeline</h3>
             <div class="workflow-pipeline">
               <div class="pipeline-stage">
-                <div class="stage-count">2</div>
-                <div class="stage-label">Draft PR</div>
-              </div>
-              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">PR for Approval</div>
-              </div>
-              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
                 <div class="stage-count">3</div>
-                <div class="stage-label">PR Approved</div>
+                <div class="stage-label">PR</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">2</div>
-                <div class="stage-label">RFQ Posted</div>
+                <div class="stage-label">RFQ</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">1</div>
-                <div class="stage-label">Quotes Received</div>
+                <div class="stage-label">AOQ</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">1</div>
-                <div class="stage-label">Abstract</div>
-              </div>
-              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">BAC Res</div>
+                <div class="stage-label">TWG</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">2</div>
-                <div class="stage-label">NOA Issued</div>
-              </div>
-              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">PO Approved</div>
+                <div class="stage-label">BAC</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">2</div>
-                <div class="stage-label">PO Signed</div>
+                <div class="stage-label">NOA</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage">
                 <div class="stage-count">1</div>
-                <div class="stage-label">IAR Complete</div>
+                <div class="stage-label">PO</div>
+              </div>
+              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
+              <div class="pipeline-stage warning">
+                <div class="stage-count">2</div>
+                <div class="stage-label">Awaiting</div>
+              </div>
+              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
+              <div class="pipeline-stage warning">
+                <div class="stage-count">1</div>
+                <div class="stage-label">For Payment</div>
+              </div>
+              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
+              <div class="pipeline-stage">
+                <div class="stage-count">1</div>
+                <div class="stage-label">For Signing</div>
               </div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
               <div class="pipeline-stage completed">
-                <div class="stage-count">8</div>
-                <div class="stage-label">COA Submitted</div>
+                <div class="stage-count">5</div>
+                <div class="stage-label">COA</div>
               </div>
             </div>
           </div>
 
-          <!-- Timeline KPIs -->
-          <div class="info-banner kpi-banner">
+          <!-- SLA Targets -->
+          <div class="info-banner kpi-banner" style="margin-bottom: 16px;">
             <i class="fas fa-clock"></i>
-            <strong>SLA Targets:</strong> PR Approval 5d | RFQ 3d | Abstract 1d | NOA 1d | PO Approval 1d | Supplier Sign 7d | COA 5d
+            <strong>SLA Targets:</strong> PR Approval 5d &nbsp;|&nbsp; RFQ 3d &nbsp;|&nbsp; Abstract 1d &nbsp;|&nbsp; NOA 1d &nbsp;|&nbsp; PO Approval 1d &nbsp;|&nbsp; Supplier Sign 7d &nbsp;|&nbsp; COA 5d
           </div>
 
           <div class="dashboard-grid">
@@ -265,7 +388,7 @@
             <div class="dashboard-card">
               <div class="card-header">
                 <h3>Active Cases</h3>
-                <button class="btn btn-sm btn-secondary">View All</button>
+                <button class="btn btn-sm btn-secondary" onclick="navigateTo('pr')">View All</button>
               </div>
               <div class="card-body">
                 <table class="data-table">
@@ -274,42 +397,37 @@
                       <th>Case No.</th>
                       <th>Project</th>
                       <th>Division</th>
-                      <th>Mode</th>
-                      <th>Status</th>
+                      <th>Workflow</th>
                       <th>Timeline</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>SVP-2026-001</td>
+                      <td>PR-2026-001</td>
                       <td>Security Services Q1</td>
                       <td>FAD</td>
-                      <td><span class="mode-badge svp">SVP</span></td>
-                      <td><span class="status-badge noa-issued">NOA Issued</span></td>
+                      <td><span class="status-badge paid-ada">Paid (ADA)</span></td>
                       <td><span class="timeline-badge on-track">On Track</span></td>
                     </tr>
                     <tr>
-                      <td>SVP-2026-002</td>
+                      <td>PR-2026-002</td>
                       <td>Office Supplies Q1</td>
                       <td>FAD</td>
-                      <td><span class="mode-badge svp">SVP</span></td>
-                      <td><span class="status-badge rfq-posted">RFQ Posted</span></td>
+                      <td><span class="status-badge awaiting-delivery">Awaiting Delivery</span></td>
                       <td><span class="timeline-badge on-track">On Track</span></td>
                     </tr>
                     <tr>
-                      <td>SVP-2026-003</td>
+                      <td>PR-2026-003</td>
                       <td>Training Meals - OWWA</td>
                       <td>WRSD</td>
-                      <td><span class="mode-badge svp">SVP</span></td>
-                      <td><span class="status-badge pr-for-approval">PR for Approval</span></td>
+                      <td><span class="status-badge on-process">On Process</span></td>
                       <td><span class="timeline-badge at-risk">At Risk</span></td>
                     </tr>
                     <tr>
-                      <td>DC-2026-001</td>
+                      <td>PR-2026-004</td>
                       <td>Internet Subscription</td>
                       <td>ORD</td>
-                      <td><span class="mode-badge dc">DC</span></td>
-                      <td><span class="status-badge po-approved">PO Approved</span></td>
+                      <td><span class="status-badge for-signing">For Signing</span></td>
                       <td><span class="timeline-badge on-track">On Track</span></td>
                     </tr>
                   </tbody>
@@ -323,41 +441,41 @@
                 <h3>PPMP Status by Division</h3>
               </div>
               <div class="card-body">
-                <div class="division-stats">
+                <div class="division-stats" id="ppmpDivisionStats">
                   <div class="division-item">
                     <span class="division-name">FAD</span>
                     <div class="progress-bar">
-                      <div class="progress-fill" style="width: 100%"></div>
+                      <div class="progress-fill" style="width: 0%"></div>
                     </div>
-                    <span class="progress-value">100%</span>
+                    <span class="progress-value">-</span>
                   </div>
                   <div class="division-item">
                     <span class="division-name">WRSD</span>
                     <div class="progress-bar">
-                      <div class="progress-fill" style="width: 80%"></div>
+                      <div class="progress-fill" style="width: 0%"></div>
                     </div>
-                    <span class="progress-value">80%</span>
+                    <span class="progress-value">-</span>
                   </div>
                   <div class="division-item">
                     <span class="division-name">MWPSD</span>
                     <div class="progress-bar">
-                      <div class="progress-fill" style="width: 65%"></div>
+                      <div class="progress-fill" style="width: 0%"></div>
                     </div>
-                    <span class="progress-value">65%</span>
+                    <span class="progress-value">-</span>
                   </div>
                   <div class="division-item">
                     <span class="division-name">MWPTD</span>
                     <div class="progress-bar">
-                      <div class="progress-fill" style="width: 90%"></div>
+                      <div class="progress-fill" style="width: 0%"></div>
                     </div>
-                    <span class="progress-value">90%</span>
+                    <span class="progress-value">-</span>
                   </div>
                   <div class="division-item">
                     <span class="division-name">ORD</span>
                     <div class="progress-bar">
-                      <div class="progress-fill" style="width: 100%"></div>
+                      <div class="progress-fill" style="width: 0%"></div>
                     </div>
-                    <span class="progress-value">100%</span>
+                    <span class="progress-value">-</span>
                   </div>
                 </div>
               </div>
@@ -367,14 +485,21 @@
 
         <!-- PPMP Page -->
         <section class="page" id="ppmp">
-          <div class="info-banner">
-            <i class="fas fa-info-circle"></i>
-            <strong>PPMP Fields (per NGPA Form):</strong> Project, Type, Quantity/Size, Recommended Mode, Timeline, Source of Fund, Estimated Budget
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Project Procurement Management Plan (PPMP)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
           
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-ppmp" onclick="showNewPPMPModal()">
               <i class="fas fa-plus"></i> New PPMP Entry
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PPMP')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -406,93 +531,25 @@
             <table class="data-table full-width">
               <thead>
                 <tr>
-                  <th>PPMP Code</th>
-                  <th>Project Title</th>
-                  <th>Division</th>
-                  <th>Type</th>
-                  <th>Qty/Size</th>
-                  <th>Mode</th>
-                  <th>Timeline</th>
-                  <th>Est. Budget</th>
-                  <th>Fund Source</th>
+                  <th>PPMP No.</th>
+                  <th>General Description and Objective of the Project to be Procured</th>
+                  <th>Type of Project<br><small>(Goods, Infrastructure, Consulting Services)</small></th>
+                  <th>Quantity and Size</th>
+                  <th>Recommended Mode of Procurement</th>
+                  <th>Pre-Procurement Conference<br><small>(Yes/No)</small></th>
+                  <th>Start of Procurement Activity<br><small>(MM/YYYY)</small></th>
+                  <th>End of Procurement Activity<br><small>(MM/YYYY)</small></th>
+                  <th>Expected Delivery / Implementation Period</th>
+                  <th>Source of Funds</th>
+                  <th>Estimated Budget / ABC (₱)</th>
+                  <th>Attached Supporting Documents</th>
+                  <th>Remarks</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>PPMP-FAD-2026-001</td>
-                  <td>Security Services (12 months)</td>
-                  <td>FAD</td>
-                  <td>Services</td>
-                  <td>12 mos</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>Jan - Dec 2026</td>
-                  <td>₱480,000.00</td>
-                  <td>GAA-MOOE</td>
-                  <td><span class="status-badge in-app">In APP</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PPMP-FAD-2026-002</td>
-                  <td>Janitorial Services (12 months)</td>
-                  <td>FAD</td>
-                  <td>Services</td>
-                  <td>12 mos</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>Jan - Dec 2026</td>
-                  <td>₱360,000.00</td>
-                  <td>GAA-MOOE</td>
-                  <td><span class="status-badge in-app">In APP</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PPMP-WRSD-2026-001</td>
-                  <td>Training Meals - OWWA Reintegration</td>
-                  <td>WRSD</td>
-                  <td>Catering</td>
-                  <td>200 pax</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>Feb 2026</td>
-                  <td>₱45,000.00</td>
-                  <td>GAA-MOOE</td>
-                  <td><span class="status-badge draft">Draft</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon success" title="Submit to APP"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PPMP-ORD-2026-001</td>
-                  <td>Internet Subscription (12 months)</td>
-                  <td>ORD</td>
-                  <td>Utilities</td>
-                  <td>12 mos</td>
-                  <td><span class="mode-badge dc">DC</span></td>
-                  <td>Jan - Dec 2026</td>
-                  <td>₱120,000.00</td>
-                  <td>GAA-MOOE</td>
-                  <td><span class="status-badge in-app">In APP</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
+              <tbody id="ppmpTableBody">
+                <tr><td colspan="15" class="text-center">Loading PPMP data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -500,9 +557,10 @@
 
         <!-- APP Page -->
         <section class="page" id="app">
-          <div class="info-banner">
-            <i class="fas fa-info-circle"></i>
-            <strong>APP Versions:</strong> Indicative → Final → Updated (versioned). BAC Secretariat consolidates from PPMP.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Annual Procurement Plan (APP)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
@@ -510,40 +568,61 @@
               <i class="fas fa-layer-group"></i> Consolidate from PPMP
             </button>
             <div class="filter-group">
-              <select class="form-select" id="appVersionFilter">
-                <option value="indicative">Indicative APP</option>
-                <option value="final">Final APP</option>
-                <option value="updated">Updated APP (v1)</option>
-              </select>
               <select class="form-select">
                 <option value="2026">FY 2026</option>
                 <option value="2025">FY 2025</option>
               </select>
             </div>
-            <button class="btn btn-secondary">
+            <button class="btn btn-secondary" data-action="export-reports" onclick="exportToExcel('APP')">
               <i class="fas fa-file-export"></i> Export to Excel
             </button>
-            <button class="btn btn-secondary">
+            <button class="btn btn-secondary" onclick="printCurrentPage()">
               <i class="fas fa-print"></i> Print APP
             </button>
+          </div>
+
+          <!-- APP Version Status Banner -->
+          <div class="app-version-banner" id="appVersionBanner">
+            <div class="version-steps">
+              <div class="version-step" id="stepIndicative">
+                <div class="step-icon"><i class="fas fa-circle"></i></div>
+                <div class="step-label">Indicative</div>
+              </div>
+              <div class="version-connector"></div>
+              <div class="version-step" id="stepFinal">
+                <div class="step-icon"><i class="fas fa-circle"></i></div>
+                <div class="step-label">Final</div>
+              </div>
+              <div class="version-connector"></div>
+              <div class="version-step" id="stepUpdated">
+                <div class="step-icon"><i class="fas fa-circle"></i></div>
+                <div class="step-label">Updated <span id="updateCountBadge" style="display:none" class="update-count-badge">v0</span></div>
+              </div>
+            </div>
+            <div class="version-actions">
+              <span class="current-version-label" id="currentVersionLabel">Indicative APP</span>
+              <button class="btn btn-sm btn-outline" onclick="showSetAPPStatusModal()" title="Set APP Status">
+                <i class="fas fa-cog"></i> Set Status
+              </button>
+            </div>
           </div>
 
           <div class="app-summary">
             <div class="summary-card">
               <h4>Total ABC</h4>
-              <p class="summary-value">₱2,450,000.00</p>
+              <p class="summary-value">₱0.00</p>
             </div>
             <div class="summary-card">
               <h4>Total Projects</h4>
-              <p class="summary-value">18</p>
+              <p class="summary-value">0</p>
             </div>
             <div class="summary-card">
               <h4>SVP Projects</h4>
-              <p class="summary-value">15</p>
+              <p class="summary-value">0</p>
             </div>
             <div class="summary-card">
               <h4>DC/Shopping</h4>
-              <p class="summary-value">3</p>
+              <p class="summary-value">0</p>
             </div>
           </div>
 
@@ -551,70 +630,27 @@
             <table class="data-table full-width">
               <thead>
                 <tr>
-                  <th>Project Code</th>
+                  <th>PAP Code</th>
+                  <th>Object Code<br><small>(Funding code per Technical GAA)</small></th>
                   <th>Project Title</th>
-                  <th>End-User</th>
-                  <th>Mode</th>
-                  <th>Criteria</th>
-                  <th>Proc. Start</th>
-                  <th>Proc. End</th>
-                  <th>ABC</th>
-                  <th>Funding</th>
+                  <th>End-User or Implementing Unit</th>
+                  <th>General Description of the Project</th>
+                  <th>General Description of the Procurement Project<br><small>(IRR of RA 12009 Sec 7.7.2c)</small></th>
+                  <th>Mode of Procurement</th>
+                  <th>Early Procurement Activity?<br><small>(Yes/No)</small></th>
+                  <th>Criteria for Bid Evaluation</th>
+                  <th>Start of Procurement Activity</th>
+                  <th>End of Procurement Activity</th>
+                  <th>Source of Fund</th>
+                  <th>Estimated Budget / Approved Budget (₱)</th>
+                  <th>Procurement Strategy or Tools</th>
+                  <th>APP Version</th>
+                  <th>Remarks</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>APP-2026-001</td>
-                  <td>Security Services (12 months)</td>
-                  <td>FAD</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>LCRB</td>
-                  <td>Jan 2026</td>
-                  <td>Dec 2026</td>
-                  <td>₱480,000.00</td>
-                  <td>GAA</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Create PR"><i class="fas fa-file-signature"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>APP-2026-002</td>
-                  <td>Janitorial Services (12 months)</td>
-                  <td>FAD</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>LCRB</td>
-                  <td>Jan 2026</td>
-                  <td>Dec 2026</td>
-                  <td>₱360,000.00</td>
-                  <td>GAA</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Create PR"><i class="fas fa-file-signature"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>APP-2026-003</td>
-                  <td>Internet Subscription</td>
-                  <td>ORD</td>
-                  <td><span class="mode-badge dc">DC</span></td>
-                  <td>N/A</td>
-                  <td>Jan 2026</td>
-                  <td>Dec 2026</td>
-                  <td>₱120,000.00</td>
-                  <td>GAA</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Create PR"><i class="fas fa-file-signature"></i></button>
-                    </div>
-                  </td>
-                </tr>
+              <tbody id="appTableBody">
+                <tr><td colspan="16" class="text-center">Loading APP data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -622,15 +658,21 @@
 
         <!-- Purchase Requests Page -->
         <section class="page" id="purchase-requests">
-          <div class="info-banner warning-banner">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Timeline Requirement:</strong> PR must be submitted at least <strong>15 calendar days</strong> before the activity. 
-            <strong>Attachments Required:</strong> Route Slip (Annex 1), Technical Specs/SOW/TOR, and applicable conditional requirements.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Purchase Request (PR)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-pr" onclick="showNewPRModal()">
               <i class="fas fa-plus"></i> New Purchase Request
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PR')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -660,72 +702,74 @@
                 <tr>
                   <th>PR No.</th>
                   <th>Date</th>
-                  <th>Project/Purpose</th>
-                  <th>Division</th>
-                  <th>APP Ref</th>
-                  <th>Amount</th>
-                  <th>Requested By</th>
-                  <th>Approved By</th>
+                  <th>Office/Section</th>
+                  <th>Responsibility Center Code</th>
+                  <th>Item Description</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Unit Cost</th>
+                  <th>Total Amount</th>
                   <th>Status</th>
-                  <th>Annex 1</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="prTableBody">
                 <tr>
                   <td>PR-JAN-2026-001</td>
                   <td>Jan 10, 2026</td>
-                  <td>Security Services - Q1</td>
-                  <td>FAD</td>
-                  <td>APP-2026-001</td>
-                  <td>₱120,000.00</td>
-                  <td>End-User (FAD)</td>
-                  <td>HoPE</td>
+                  <td>DMW Caraga</td>
+                  <td>-</td>
+                  <td>Security Guard (4 pax)<br><small>Duration: 11.5 months</small></td>
+                  <td>1</td>
+                  <td>Lot</td>
+                  <td>₱1,066,000.00</td>
+                  <td>₱1,066,000.00</td>
                   <td><span class="status-badge pr-approved">PR Approved</span></td>
                   <td><i class="fas fa-check-circle text-success"></i></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Create RFQ"><i class="fas fa-paper-plane"></i></button>
+                      <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal('PR-JAN-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" data-action="view-pr" title="Print" onclick="printRecord('PR', 'PR-JAN-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" data-action="create-rfq" title="Create RFQ" onclick="showCreateRFQFromPRModal('PR-JAN-2026-001')"><i class="fas fa-paper-plane"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td>PR-JAN-2026-002</td>
                   <td>Jan 15, 2026</td>
-                  <td>Office Supplies - Q1</td>
-                  <td>FAD</td>
-                  <td>APP-2026-005</td>
-                  <td>₱85,000.00</td>
-                  <td>End-User (FAD)</td>
+                  <td>DMW Caraga</td>
                   <td>-</td>
+                  <td>Tarpaulin Printing<br><small>Duration: 1 year, Billing: Bi-weekly</small></td>
+                  <td>1500</td>
+                  <td>Sq.ft</td>
+                  <td>₱20.00</td>
+                  <td>₱30,000.00</td>
                   <td><span class="status-badge pr-for-approval">PR for Approval</span></td>
-                  <td><i class="fas fa-check-circle text-success"></i></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Approve (HoPE)"><i class="fas fa-check"></i></button>
-                      <button class="btn-icon danger" title="Return"><i class="fas fa-undo"></i></button>
+                      <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal('PR-JAN-2026-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon success" data-action="approve-pr" title="Approve (HoPE)" onclick="showApprovePRModal('PR-JAN-2026-002')"><i class="fas fa-check"></i></button>
+                      <button class="btn-icon danger" data-action="approve-pr" title="Return" onclick="showReturnPRModal('PR-JAN-2026-002')"><i class="fas fa-undo"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td>PR-JAN-2026-003</td>
                   <td>Jan 20, 2026</td>
-                  <td>Training Meals - OWWA Orientation</td>
-                  <td>WRSD</td>
-                  <td>APP-2026-010</td>
-                  <td>₱45,000.00</td>
-                  <td>End-User (WRSD)</td>
+                  <td>DMW Caraga</td>
                   <td>-</td>
+                  <td>Purified Drinking Water<br><small>Duration: 1 year, Billing: Monthly</small></td>
+                  <td>850</td>
+                  <td>Gal</td>
+                  <td>₱50.00</td>
+                  <td>₱42,500.00</td>
                   <td><span class="status-badge draft-pr">Draft PR</span></td>
                   <td><i class="fas fa-times-circle text-danger"></i></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon" title="Attach Annex 1"><i class="fas fa-paperclip"></i></button>
-                      <button class="btn-icon success" title="Submit for Approval"><i class="fas fa-paper-plane"></i></button>
+                      <button class="btn-icon" data-action="edit-pr" title="Edit" onclick="showEditPRModal('PR-JAN-2026-003')"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-pr" title="Attach Annex 1" onclick="showAttachAnnex1Modal('PR-JAN-2026-003')"><i class="fas fa-paperclip"></i></button>
+                      <button class="btn-icon success" data-action="create-pr" title="Submit for Approval" onclick="showSubmitPRForApprovalModal('PR-JAN-2026-003')"><i class="fas fa-paper-plane"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -736,14 +780,21 @@
 
         <!-- RFQ Page -->
         <section class="page" id="rfq">
-          <div class="info-banner warning-banner">
-            <i class="fas fa-globe"></i>
-            <strong>PhilGEPS Requirement:</strong> RFQs with ABC ≥ ₱200,000 must be posted on PhilGEPS for at least <strong>3 calendar days</strong>.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Request for Quotation (RFQ)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-rfq" onclick="showNewRFQModal()">
               <i class="fas fa-plus"></i> Issue RFQ
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('RFQ')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -764,49 +815,49 @@
               <thead>
                 <tr>
                   <th>RFQ No.</th>
+                  <th>Date</th>
                   <th>PR Reference</th>
-                  <th>Project</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Item (with specification)</th>
                   <th>ABC</th>
-                  <th>PhilGEPS?</th>
-                  <th>Posted Date</th>
                   <th>Deadline</th>
-                  <th>Quotes</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="rfqTableBody">
                 <tr>
-                  <td>RFQ-2026-001</td>
+                  <td>RFQ-2026-01-0001</td>
+                  <td>Jan 5, 2026</td>
                   <td>PR-JAN-2026-001</td>
-                  <td>Security Services - Q1</td>
-                  <td>₱120,000.00</td>
-                  <td><span class="status-badge not-required">Not Required</span></td>
-                  <td>Jan 12, 2026</td>
-                  <td>Jan 17, 2026</td>
-                  <td><span class="quote-count">3</span></td>
+                  <td>1800</td>
+                  <td>Ltrs</td>
+                  <td>Gas<br><small>Open Holidays/Weekends, 5AM-9PM, Flood Free, Monthly Billing, PhilGEPS Registered</small></td>
+                  <td>₱129,600.00</td>
+                  <td>Jan 9, 2026</td>
                   <td><span class="status-badge quotations-received">Quotations Received</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Create Abstract"><i class="fas fa-table"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewRFQModal('RFQ-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Create Abstract" onclick="showCreateAbstractFromRFQModal('RFQ-2026-001')"><i class="fas fa-table"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr>
-                  <td>RFQ-2026-002</td>
-                  <td>PR-JAN-2026-004</td>
-                  <td>IT Equipment Upgrade</td>
-                  <td>₱320,000.00</td>
-                  <td><span class="status-badge philgeps-posted">PhilGEPS Posted</span></td>
-                  <td>Jan 18, 2026</td>
-                  <td>Jan 23, 2026</td>
-                  <td><span class="quote-count">2</span></td>
+                  <td>RFQ-2026-02-0013</td>
+                  <td>Feb 2, 2026</td>
+                  <td>PR-FEB-2026-001</td>
+                  <td>38</td>
+                  <td>Pcs</td>
+                  <td>PVC ID</td>
+                  <td>₱6,480.00</td>
+                  <td>Feb 5, 2026</td>
                   <td><span class="status-badge rfq-posted">RFQ Posted</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Add Quotation"><i class="fas fa-plus"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewRFQModal('RFQ-2026-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Add Quotation" onclick="showAddQuotationModal('RFQ-2026-002')"><i class="fas fa-plus"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -817,14 +868,21 @@
 
         <!-- Abstract of Quotations Page -->
         <section class="page" id="abstract">
-          <div class="info-banner">
-            <i class="fas fa-clock"></i>
-            <strong>Timeline:</strong> Abstract of Quotations must be prepared within <strong>1 calendar day</strong> after deadline.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Abstract of Quotations (AOQ)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-abstract" onclick="showNewAbstractModal()">
               <i class="fas fa-plus"></i> Create Abstract
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Abstract')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -836,32 +894,34 @@
             <table class="data-table full-width">
               <thead>
                 <tr>
-                  <th>Abstract No.</th>
+                  <th>AOQ No.</th>
+                  <th>Date</th>
                   <th>RFQ Ref</th>
-                  <th>Project</th>
-                  <th>Bidders</th>
-                  <th>Lowest Compliant</th>
-                  <th>Bid Amount</th>
-                  <th>Date Prepared</th>
+                  <th>Purpose</th>
+                  <th>ABC</th>
+                  <th>No. of Bidders</th>
+                  <th>LCRB Supplier</th>
+                  <th>LCRB Amount</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="abstractTableBody">
                 <tr>
-                  <td>ABS-2026-001</td>
+                  <td>AOQ-2026-001</td>
+                  <td>Jan 18, 2026</td>
                   <td>RFQ-2026-001</td>
-                  <td>Security Services - Q1</td>
+                  <td>Security Guard Services - Q1 2026</td>
+                  <td>₱129,600.00</td>
                   <td>3</td>
                   <td>ABC Security Agency</td>
                   <td>₱115,000.00</td>
-                  <td>Jan 18, 2026</td>
                   <td><span class="status-badge abstract-prepared">Abstract Prepared</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Proceed to Post-Qual"><i class="fas fa-user-check"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewAbstractModal('ABS-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('Abstract', 'ABS-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" title="Proceed to Post-Qual" onclick="showNewPostQualModal()"><i class="fas fa-user-check"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -872,14 +932,21 @@
 
         <!-- Post-Qualification Page (Optional) -->
         <section class="page" id="post-qual">
-          <div class="info-banner">
-            <i class="fas fa-info-circle"></i>
-            <strong>Post-Qualification (Optional):</strong> BAC/TWG validates eligibility documents (ITR, Omnibus Sworn Statement, Permits, PhilGEPS/Platinum, BIR COR, etc.)
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Post-Qualification Report</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-postqual" onclick="showNewPostQualModal()">
               <i class="fas fa-plus"></i> Start Post-Qualification
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PostQual')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -891,33 +958,31 @@
             <table class="data-table full-width">
               <thead>
                 <tr>
-                  <th>Post-Qual No.</th>
+                  <th>TWG Report No.</th>
+                  <th>Date</th>
                   <th>Abstract Ref</th>
-                  <th>Bidder</th>
-                  <th>ITR</th>
-                  <th>Omnibus</th>
-                  <th>PhilGEPS</th>
-                  <th>BIR COR</th>
-                  <th>Permits</th>
+                  <th>Subject</th>
+                  <th>Bidders Evaluated</th>
+                  <th>Documents</th>
+                  <th>Price Evaluation</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="postQualTableBody">
                 <tr>
-                  <td>PQ-2026-001</td>
-                  <td>ABS-2026-001</td>
-                  <td>ABC Security Agency</td>
-                  <td><i class="fas fa-check text-success"></i></td>
-                  <td><i class="fas fa-check text-success"></i></td>
-                  <td><i class="fas fa-check text-success"></i></td>
-                  <td><i class="fas fa-check text-success"></i></td>
-                  <td><i class="fas fa-check text-success"></i></td>
+                  <td>TWG-2026-001</td>
+                  <td>Jan 19, 2026</td>
+                  <td>AOQ-2026-001</td>
+                  <td>Security Guard Services</td>
+                  <td>3</td>
+                  <td><span class="status-badge approved">All Passed</span></td>
+                  <td><span class="status-badge approved">Completed</span></td>
                   <td><span class="status-badge post-qual-passed">Passed</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View Documents"><i class="fas fa-folder-open"></i></button>
-                      <button class="btn-icon" title="Create BAC Resolution"><i class="fas fa-gavel"></i></button>
+                      <button class="btn-icon" title="View Documents" onclick="showViewPostQualModal('PQ-2026-001')"><i class="fas fa-folder-open"></i></button>
+                      <button class="btn-icon" title="Create BAC Resolution" onclick="showNewBACResolutionModal()"><i class="fas fa-gavel"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -928,14 +993,21 @@
 
         <!-- BAC Resolution Page -->
         <section class="page" id="bac-resolution">
-          <div class="info-banner">
-            <i class="fas fa-gavel"></i>
-            <strong>BAC Resolution:</strong> Recommends award to the Lowest Calculated Responsive Bid (LCRB). Approved by BAC Chairperson.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">BAC Resolution</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-bacres" onclick="showNewBACResolutionModal()">
               <i class="fas fa-plus"></i> Create BAC Resolution
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('BACRes')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -948,29 +1020,31 @@
               <thead>
                 <tr>
                   <th>Resolution No.</th>
+                  <th>Series of</th>
                   <th>Date</th>
-                  <th>Abstract Ref</th>
-                  <th>Project</th>
+                  <th>Subject / Description</th>
                   <th>Recommended Awardee</th>
-                  <th>Amount</th>
+                  <th>Contract Price</th>
+                  <th>ABC</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="bacResolutionTableBody">
                 <tr>
                   <td>BAC-RES-2026-001</td>
+                  <td>2026</td>
                   <td>Jan 19, 2026</td>
-                  <td>ABS-2026-001</td>
-                  <td>Security Services - Q1</td>
+                  <td>Security Guard Services - Q1 2026</td>
                   <td>ABC Security Agency</td>
                   <td>₱115,000.00</td>
+                  <td>₱129,600.00</td>
                   <td><span class="status-badge bac-resolution-approved">BAC Resolution Approved</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Issue NOA"><i class="fas fa-award"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewBACResolutionModal('BAC-RES-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('BAC Resolution', 'BAC-RES-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" title="Issue NOA" onclick="showNewNOAModal()"><i class="fas fa-award"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -981,14 +1055,21 @@
 
         <!-- NOA Page -->
         <section class="page" id="noa">
-          <div class="info-banner">
-            <i class="fas fa-award"></i>
-            <strong>NOA:</strong> Issued by HoPE within <strong>1 calendar day</strong> from BAC Resolution. References RFQ and requires bidder conformity receipt.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Notice of Award (NOA)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-noa" onclick="showNewNOAModal()">
               <i class="fas fa-plus"></i> Issue NOA
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('NOA')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1002,46 +1083,46 @@
                 <tr>
                   <th>NOA No.</th>
                   <th>Date Issued</th>
-                  <th>BAC Res Ref</th>
-                  <th>Project</th>
                   <th>Winning Bidder</th>
+                  <th>Address</th>
+                  <th>RFQ Reference</th>
                   <th>Contract Amount</th>
                   <th>Received by Bidder</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="noaTableBody">
                 <tr>
                   <td>NOA-2026-001</td>
                   <td>Jan 20, 2026</td>
-                  <td>BAC-RES-2026-001</td>
-                  <td>Security Services - Q1</td>
                   <td>ABC Security Agency</td>
+                  <td>Butuan City, Agusan del Norte</td>
+                  <td>RFQ-2026-001</td>
                   <td>₱115,000.00</td>
                   <td>Jan 21, 2026</td>
                   <td><span class="status-badge noa-issued">NOA Issued</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Create PO"><i class="fas fa-file-invoice-dollar"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewNOAModal('NOA-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('NOA', 'NOA-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" title="Create PO" onclick="showNewPOModal()"><i class="fas fa-file-invoice-dollar"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td>NOA-2026-002</td>
                   <td>Jan 25, 2026</td>
-                  <td>BAC-RES-2026-002</td>
-                  <td>Internet Subscription</td>
                   <td>PLDT Enterprise</td>
+                  <td>Butuan City</td>
+                  <td>RFQ-2026-002</td>
                   <td>₱10,000.00/mo</td>
                   <td>-</td>
                   <td><span class="status-badge pending">Pending Receipt</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Mark Received by Bidder"><i class="fas fa-check"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewNOAModal('NOA-2026-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon success" title="Mark Received by Bidder" onclick="showMarkNOAReceivedModal('NOA-2026-002')"><i class="fas fa-check"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1052,14 +1133,21 @@
 
         <!-- Purchase Orders Page -->
         <section class="page" id="purchase-orders">
-          <div class="info-banner">
-            <i class="fas fa-file-invoice-dollar"></i>
-            <strong>PO Timeline:</strong> Approved within <strong>1 calendar day</strong> from NOA. Supplier signs within <strong>7 calendar days</strong> from PO approval.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Purchase Order (PO)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-po" onclick="showNewPOModal()">
-              <i class="fas fa-plus"></i> Create Purchase Order
+              <i class="fas fa-plus"></i> Create PO
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PO')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1068,8 +1156,11 @@
             <div class="filter-group">
               <select class="form-select">
                 <option value="">All Status</option>
-                <option value="po-approved">PO Approved</option>
-                <option value="po-signed">PO Signed by Supplier</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="awaiting-delivery">Awaiting Delivery</option>
+                <option value="for-payment">For Payment</option>
+                <option value="paid-ada">Paid (ADA)</option>
               </select>
             </div>
           </div>
@@ -1080,49 +1171,78 @@
                 <tr>
                   <th>PO No.</th>
                   <th>Date</th>
-                  <th>NOA Ref</th>
+                  <th>Mode of Procurement</th>
                   <th>Supplier</th>
-                  <th>Mode</th>
-                  <th>Delivery Term</th>
-                  <th>Payment Term</th>
-                  <th>Amount</th>
+                  <th>Place of Delivery</th>
+                  <th>Date of Delivery</th>
+                  <th>Total Amount</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="poTableBody">
                 <tr>
                   <td>PO-JAN-2026-001</td>
                   <td>Jan 22, 2026</td>
-                  <td>NOA-2026-001</td>
+                  <td>SVP - Shopping</td>
                   <td>ABC Security Agency</td>
-                  <td><span class="mode-badge svp">SVP</span></td>
-                  <td>Within 15 days</td>
-                  <td>Upon Delivery</td>
+                  <td>DMW RO XIII</td>
+                  <td>Feb 1, 2026</td>
                   <td>₱115,000.00</td>
-                  <td><span class="status-badge po-signed">PO Signed by Supplier</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Create IAR"><i class="fas fa-clipboard-check"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-JAN-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('PO', 'PO-JAN-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon success" title="Create Packet" onclick="showCompilePacketModal()"><i class="fas fa-folder-plus"></i></button>
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td>PO-JAN-2026-002</td>
                   <td>Jan 28, 2026</td>
-                  <td>NOA-2026-002</td>
+                  <td>Direct Contracting</td>
                   <td>PLDT Enterprise</td>
-                  <td><span class="mode-badge dc">DC</span></td>
-                  <td>Monthly</td>
-                  <td>Monthly</td>
+                  <td>DMW RO XIII</td>
+                  <td>Feb 15, 2026</td>
                   <td>₱10,000.00</td>
-                  <td><span class="status-badge po-approved">PO Approved</span></td>
+                  <td><span class="status-badge awaiting-delivery">Awaiting Delivery</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Mark Supplier Signed"><i class="fas fa-signature"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-JAN-2026-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon success" title="Mark Delivered" onclick="showMarkDeliveredModal()"><i class="fas fa-truck"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PO-FEB-2026-001</td>
+                  <td>Feb 5, 2026</td>
+                  <td>SVP - Shopping</td>
+                  <td>Office Pro Supplies</td>
+                  <td>DMW RO XIII</td>
+                  <td>Feb 20, 2026</td>
+                  <td>₱45,000.00</td>
+                  <td><span class="status-badge for-payment">For Payment</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-FEB-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon success" title="Mark Paid" onclick="showMarkPaidModal()"><i class="fas fa-money-check"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PO-FEB-2026-002</td>
+                  <td>Feb 8, 2026</td>
+                  <td>SVP - Shopping</td>
+                  <td>Quick Print Services</td>
+                  <td>DMW RO XIII</td>
+                  <td>Feb 25, 2026</td>
+                  <td>₱25,000.00</td>
+                  <td><span class="status-badge pending">Pending</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-FEB-2026-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Approve" onclick="showApprovePOModal('PO-FEB-2026-002')"><i class="fas fa-check"></i></button>
+                      <button class="btn-icon success" title="Accept PO" onclick="showAcceptPOModal()"><i class="fas fa-handshake"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1133,15 +1253,21 @@
 
         <!-- IAR Page -->
         <section class="page" id="iar">
-          <div class="info-banner">
-            <i class="fas fa-clipboard-check"></i>
-            <strong>IAR (Appendix 62):</strong> References PO No./Date, Supplier, Invoice No., Requisitioning Office, RCC, Inspection Date, Receipt Date. 
-            Signed by Inspection Officer and Property Custodian.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Inspection and Acceptance Report (IAR)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-iar" onclick="showNewIARModal()">
               <i class="fas fa-plus"></i> New IAR
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('IAR')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1162,32 +1288,34 @@
                 <tr>
                   <th>IAR No.</th>
                   <th>Date</th>
-                  <th>PO Ref</th>
                   <th>Supplier</th>
+                  <th>PO No./Date</th>
                   <th>Invoice No.</th>
-                  <th>Req. Office</th>
+                  <th>Requisitioning Office</th>
+                  <th>Fund Cluster</th>
                   <th>Inspection</th>
                   <th>Acceptance</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="iarTableBody">
                 <tr>
                   <td>IAR-2026-001</td>
                   <td>Feb 1, 2026</td>
-                  <td>PO-JAN-2026-001</td>
                   <td>ABC Security Agency</td>
+                  <td>PO-JAN-2026-001 / Jan 22, 2026</td>
                   <td>INV-12345</td>
                   <td>FAD</td>
+                  <td>01 101 101</td>
                   <td><span class="status-badge approved">Inspected</span></td>
                   <td><span class="status-badge approved">Complete</span></td>
                   <td><span class="status-badge iar-completed">IAR Completed</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print Appendix 62"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Submit to COA"><i class="fas fa-file-export"></i></button>
+                      <button class="btn-icon" title="View" onclick="showViewIARModal('IAR-2026-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" title="Print Appendix 62" onclick="printRecord('IAR', 'IAR-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" title="Submit to COA" onclick="showNewCOASubmissionModal()"><i class="fas fa-file-export"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1196,16 +1324,132 @@
           </div>
         </section>
 
+        <!-- PO Packet / Signing Page -->
+        <section class="page" id="po-packet">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Purchase Order Packet</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="compile-packet" onclick="showCompilePacketModal()">
+              <i class="fas fa-plus"></i> Compile Packet
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('POPacket')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search packets...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select">
+                <option value="">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="for-signing">For Signing</option>
+                <option value="signed">Signed</option>
+                <option value="submitted">Submitted to COA</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Packet ID</th>
+                  <th>PO Reference</th>
+                  <th>Project</th>
+                  <th>Amount</th>
+                  <th>Compiled</th>
+                  <th>Chief Signed</th>
+                  <th>Director Signed</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="poPacketTableBody">
+                <tr>
+                  <td>PKT-2026-001</td>
+                  <td>PO-JAN-2026-001</td>
+                  <td>Security Services Q1</td>
+                  <td>₱115,000.00</td>
+                  <td>Feb 2, 2026</td>
+                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></td>
+                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></td>
+                  <td><span class="status-badge signed">Signed</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View Checklist" onclick="showViewPacketModal('PKT-2026-001')"><i class="fas fa-list-check"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('Packet', 'PKT-2026-001')"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon success" title="Submit to COA" onclick="showSubmitToCOAModal('PKT-2026-001')"><i class="fas fa-file-export"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>PKT-2026-002</td>
+                  <td>PO-JAN-2026-002</td>
+                  <td>Office Supplies Q1</td>
+                  <td>₱45,000.00</td>
+                  <td>Feb 5, 2026</td>
+                  <td><span class="status-badge pending">Pending</span></td>
+                  <td><span class="status-badge pending">Pending</span></td>
+                  <td><span class="status-badge for-signing">For Signing</span></td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="btn-icon" title="View Checklist" onclick="showViewPacketModal('PKT-2026-002')"><i class="fas fa-list-check"></i></button>
+                      <button class="btn-icon" title="Chief Sign" onclick="showChiefSignModal()"><i class="fas fa-signature"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Supporting Documents Checklist Section -->
+          <div class="dashboard-card" style="margin-top: 20px;">
+            <div class="card-header">
+              <h3>Supporting Documents Checklist</h3>
+            </div>
+            <div class="card-body">
+              <div class="checklist-grid">
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Purchase Request (PR)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Request for Quotation (RFQ)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Abstract of Quotation (AOQ)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Post-Qualification Report</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> BAC Resolution</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Notice of Award (NOA)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Purchase Order (PO)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Conforme</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> IAR (Appendix 62)</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Delivery Receipt</div>
+                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Invoice</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- COA Submission Page -->
         <section class="page" id="coa">
-          <div class="info-banner warning-banner">
-            <i class="fas fa-clock"></i>
-            <strong>COA Timeline:</strong> PO with complete attachments must be submitted to COA on or before <strong>5 calendar days</strong> from date of approval.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">COA Submission</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-coa" onclick="showNewCOASubmissionModal()">
-              <i class="fas fa-plus"></i> New COA Submission
+              <i class="fas fa-plus"></i> Submit to COA
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('COA')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1214,8 +1458,9 @@
             <div class="filter-group">
               <select class="form-select">
                 <option value="">All Status</option>
-                <option value="pending">Pending Submission</option>
-                <option value="submitted">COA Endorsed/Submitted</option>
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="received">Received by COA</option>
               </select>
             </div>
           </div>
@@ -1226,31 +1471,27 @@
                 <tr>
                   <th>Submission No.</th>
                   <th>PO Ref</th>
-                  <th>IAR Ref</th>
-                  <th>Project</th>
+                  <th>Packet</th>
                   <th>Amount</th>
-                  <th>Attachments Complete?</th>
-                  <th>Submitted Date</th>
+                  <th>Submitted</th>
                   <th>Received by COA</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="coaTableBody">
                 <tr>
                   <td>COA-2026-001</td>
                   <td>PO-JAN-2026-001</td>
-                  <td>IAR-2026-001</td>
-                  <td>Security Services - Q1</td>
+                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></td>
                   <td>₱115,000.00</td>
-                  <td><i class="fas fa-check-circle text-success"></i> Complete</td>
                   <td>Feb 3, 2026</td>
                   <td>Feb 3, 2026</td>
-                  <td><span class="status-badge coa-submitted">COA Submitted</span></td>
+                  <td><span class="status-badge submitted-to-coa">COA Submitted</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View Packet"><i class="fas fa-folder-open"></i></button>
-                      <button class="btn-icon" title="Print Checklist"><i class="fas fa-print"></i></button>
+                      <button class="btn-icon" title="View Packet" onclick="showViewCOAModal('COA-2026-001')"><i class="fas fa-folder-open"></i></button>
+                      <button class="btn-icon" title="Print" onclick="printRecord('COA', 'COA-2026-001')"><i class="fas fa-print"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1275,21 +1516,40 @@
           </div>
         </section>
 
-        <!-- Items Catalog Page -->
+        <!-- Items Catalog Page (Enhanced for Inventory Integration) -->
         <section class="page" id="items">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Items Catalog</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-item" onclick="showNewItemModal()">
               <i class="fas fa-plus"></i> Add New Item
             </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Items')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search items...">
+              <input type="text" placeholder="Search items..." oninput="filterItemsTable(this.value)">
             </div>
-            <select class="form-select">
+            <select class="form-select" id="itemCategoryFilter" onchange="filterItemsByCategory(this.value)">
               <option value="">All Categories</option>
-              <option value="services">Services</option>
-              <option value="supplies">Supplies</option>
-              <option value="equipment">Equipment</option>
+              <option value="EXPENDABLE">Expendable</option>
+              <option value="SEMI-EXPENDABLE">Semi-Expendable</option>
+              <option value="CAPITAL OUTLAY">Capital Outlay</option>
+              <option value="Services">Services</option>
+            </select>
+            <select class="form-select" id="itemStockFilter" onchange="filterItemsByStock(this.value)">
+              <option value="">All Stock Status</option>
+              <option value="in-stock">In Stock</option>
+              <option value="low-stock">Low Stock</option>
+              <option value="out-of-stock">Out of Stock</option>
             </select>
           </div>
 
@@ -1298,53 +1558,20 @@
               <thead>
                 <tr>
                   <th>Item Code</th>
+                  <th>Stock No.</th>
                   <th>Description</th>
                   <th>Category</th>
                   <th>Unit</th>
-                  <th>Est. Unit Price</th>
+                  <th>Unit Price</th>
+                  <th>Qty on Hand</th>
+                  <th>Reorder Pt</th>
+                  <th>Stock Status</th>
+                  <th>UACS Code</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>SVC-001</td>
-                  <td>Security Guard Services</td>
-                  <td>Services</td>
-                  <td>Month</td>
-                  <td>₱40,000.00</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>SVC-002</td>
-                  <td>Janitorial Services</td>
-                  <td>Services</td>
-                  <td>Month</td>
-                  <td>₱30,000.00</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>SUP-001</td>
-                  <td>Bond Paper A4 (500 sheets)</td>
-                  <td>Supplies</td>
-                  <td>Ream</td>
-                  <td>₱250.00</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon danger" title="Delete"><i class="fas fa-trash"></i></button>
-                    </div>
-                  </td>
-                </tr>
+              <tbody id="itemsTableBody">
+                <!-- Populated by JS from API -->
               </tbody>
             </table>
           </div>
@@ -1355,6 +1582,12 @@
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-supplier" onclick="showNewSupplierModal()">
               <i class="fas fa-plus"></i> Add Supplier
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Suppliers')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1375,7 +1608,7 @@
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="suppliersTableBody">
                 <tr>
                   <td>SUP-001</td>
                   <td>ABC Security Agency</td>
@@ -1385,8 +1618,8 @@
                   <td>123-456-789-000</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View Profile"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="view-supplier" title="View Profile" onclick="showViewSupplierModal('SUP-001')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" data-action="edit-supplier" title="Edit" onclick="showEditSupplierModal('SUP-001')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1399,8 +1632,8 @@
                   <td>000-123-456-789</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View Profile"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="view-supplier" title="View Profile" onclick="showViewSupplierModal('SUP-002')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" data-action="edit-supplier" title="Edit" onclick="showEditSupplierModal('SUP-002')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1413,8 +1646,8 @@
                   <td>789-456-123-000</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="View Profile"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="view-supplier" title="View Profile" onclick="showViewSupplierModal('SUP-003')"><i class="fas fa-eye"></i></button>
+                      <button class="btn-icon" data-action="edit-supplier" title="Edit" onclick="showEditSupplierModal('SUP-003')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1425,9 +1658,10 @@
 
         <!-- Divisions Page -->
         <section class="page" id="divisions">
-          <div class="info-banner">
-            <i class="fas fa-sitemap"></i>
-            <strong>5 End-User Divisions:</strong> Each Division prepares PPMP and initiates PRs. Division Head is accountable for PPMP and PR initiation.
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Divisions</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="divisions-grid">
@@ -1501,18 +1735,45 @@
               </div>
             </div>
           </div>
+
+          <div class="page-actions" style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="showNewDivisionModal()"><i class="fas fa-plus"></i> Add Division</button>
+            <button class="btn btn-outline" onclick="exportToExcel('Divisions')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+          </div>
+          <div class="data-card" style="margin-top: 10px;">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="divisionsTableBody"></tbody>
+            </table>
+          </div>
         </section>
 
         <!-- Users Page -->
         <section class="page" id="users">
-          <div class="info-banner">
-            <i class="fas fa-users-cog"></i>
-            <strong>System Roles:</strong> Division End-Users, Division Heads, BAC Secretariat, BAC/TWG, HoPE, Supply/Procurement Officer, Inspection/Property Custodian, System Admin
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">User Management</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-user" onclick="showNewUserModal()">
               <i class="fas fa-plus"></i> Add User
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Users')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
@@ -1522,13 +1783,17 @@
               <option value="">All Roles</option>
               <option value="admin">System Admin</option>
               <option value="hope">HoPE (Regional Director)</option>
-              <option value="bac-chair">BAC Chairperson</option>
-              <option value="bac-sec">BAC Secretariat</option>
-              <option value="twg">TWG Member</option>
-              <option value="div-head">Division Head</option>
-              <option value="end-user">End User</option>
-              <option value="supply">Supply/Procurement Officer</option>
+              <option value="bac_chair">BAC Chairperson</option>
+              <option value="bac_secretariat">BAC Secretariat</option>
+              <option value="twg_member">TWG Member</option>
+              <option value="division_head">Division Head</option>
+              <option value="end_user">End User</option>
+              <option value="supply_officer">Supply/Procurement Officer</option>
               <option value="inspector">Inspection/Property Custodian</option>
+              <option value="manager">Manager</option>
+              <option value="officer">Officer</option>
+              <option value="viewer">Viewer</option>
+              <option value="auditor">Auditor</option>
             </select>
           </div>
 
@@ -1545,7 +1810,7 @@
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="usersTableBody">
                 <tr>
                   <td>USR-001</td>
                   <td>admin</td>
@@ -1555,7 +1820,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-001')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1568,7 +1833,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-002')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1581,7 +1846,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-003')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1594,7 +1859,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-004')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1607,7 +1872,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-005')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1620,7 +1885,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-006')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1633,7 +1898,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-007')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1646,7 +1911,7 @@
                   <td><span class="status-badge approved">Active</span></td>
                   <td>
                     <div class="action-buttons">
-                      <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-008')"><i class="fas fa-edit"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -1655,12 +1920,212 @@
           </div>
         </section>
 
+        <!-- Stock Cards Page -->
+        <section class="page" id="stock-cards">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Stock Cards</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="create-stock-card" onclick="showNewStockCardModal()">
+              <i class="fas fa-plus"></i> New Stock Entry
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('StockCards')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search stock cards...">
+            </div>
+            <select class="form-select" id="stockCardItemFilter">
+              <option value="">All Items</option>
+            </select>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Trans No.</th>
+                  <th>Date</th>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th>Reference</th>
+                  <th>Receipt Qty</th>
+                  <th>Receipt Cost</th>
+                  <th>Issue Qty</th>
+                  <th>Issue Cost</th>
+                  <th>Balance Qty</th>
+                  <th>Balance Cost</th>
+                </tr>
+              </thead>
+              <tbody id="stockCardsTableBody">
+                <!-- Populated by JS from API -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Property Cards Page -->
+        <section class="page" id="property-cards">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Property Cards</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="create-property-card" onclick="showNewPropertyCardModal()">
+              <i class="fas fa-plus"></i> New Property Card
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PropertyCards')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search property cards...">
+            </div>
+            <select class="form-select" id="propertyStatusFilter" onchange="filterPropertyCards(this.value)">
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="disposed">Disposed</option>
+              <option value="transferred">Transferred</option>
+              <option value="for_repair">For Repair</option>
+            </select>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Property No.</th>
+                  <th>Description</th>
+                  <th>Acquisition Cost</th>
+                  <th>Acquisition Date</th>
+                  <th>Issued To</th>
+                  <th>Department</th>
+                  <th>ICS No.</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="propertyCardsTableBody">
+                <!-- Populated by JS from API -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ICS (Inventory Custodian Slips) Page -->
+        <section class="page" id="ics">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Inventory Custodian Slips (ICS)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="create-ics" onclick="showNewICSModal()">
+              <i class="fas fa-plus"></i> New ICS
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('ICS')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search ICS...">
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ICS No.</th>
+                  <th>Date of Issue</th>
+                  <th>Property No.</th>
+                  <th>Description</th>
+                  <th>Inventory No.</th>
+                  <th>Issued To</th>
+                  <th>Received By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="icsTableBody">
+                <!-- Populated by JS from API -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Employees Page -->
+        <section class="page" id="employees">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Employee Records</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="create-employee" onclick="showNewEmployeeModal()">
+              <i class="fas fa-plus"></i> Add Employee
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Employees')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search employees...">
+            </div>
+            <select class="form-select" id="employeeStatusFilter">
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Employee Code</th>
+                  <th>Full Name</th>
+                  <th>Designation</th>
+                  <th>Department</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="employeesTableBody">
+                <!-- Populated by JS from API -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <!-- Reports Page -->
         <section class="page" id="reports">
-          <div class="info-banner">
-            <i class="fas fa-chart-line"></i>
-            <strong>KPIs (ISO 9001:2015 Clause 9.1.1):</strong> 
-            % PRs ≥15 days prior | % ABC≥200K PhilGEPS posted | Avg days PR-to-NOA | % Complete IARs | % COA ≤5 days post-PO
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Reports</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
           </div>
 
           <div class="reports-grid">
@@ -1670,7 +2135,7 @@
               </div>
               <h3>PPMP Summary Report</h3>
               <p>Division-level PPMP consolidation per NGPA form</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generatePPMPReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1678,7 +2143,7 @@
               </div>
               <h3>APP Report</h3>
               <p>Annual Procurement Plan (Indicative/Final/Updated)</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generateAPPReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1686,7 +2151,7 @@
               </div>
               <h3>PR Status Report</h3>
               <p>Purchase Requests by status and timeline compliance</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generatePRStatusReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1694,7 +2159,7 @@
               </div>
               <h3>SVP Lifecycle Report</h3>
               <p>Transaction status from PR to COA by stage</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generateSVPLifecycleReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1702,15 +2167,15 @@
               </div>
               <h3>Timeline KPI Report</h3>
               <p>Compliance with Memo 14 Nov 2025 timelines</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generateTimelineKPIReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
                 <i class="fas fa-globe"></i>
               </div>
               <h3>PhilGEPS Compliance</h3>
-              <p>ABC≥200K posting compliance report</p>
-              <button class="btn btn-primary">Generate</button>
+              <p>ABC‰¥200K posting compliance report</p>
+              <button class="btn btn-primary" onclick="generatePhilGEPSReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1718,7 +2183,7 @@
               </div>
               <h3>COA Submission Report</h3>
               <p>COA packet completeness and timeline tracking</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generateCOASubmissionReport()">Generate</button>
             </div>
             <div class="report-card">
               <div class="report-icon">
@@ -1726,10 +2191,489 @@
               </div>
               <h3>Audit Trail</h3>
               <p>System activity logs for COA compliance</p>
-              <button class="btn btn-primary">Generate</button>
+              <button class="btn btn-primary" onclick="generateAuditTrailReport()">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon" style="background: #059669;">
+                <i class="fas fa-boxes"></i>
+              </div>
+              <h3>Current Stock Levels</h3>
+              <p>Real-time stock levels for expendable items with low stock alerts</p>
+              <button class="btn btn-primary" onclick="generateStockLevelReport()">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon" style="background: #6b46c1;">
+                <i class="fas fa-id-card"></i>
+              </div>
+              <h3>Property Accountability</h3>
+              <p>Active property with current custodian accountability report</p>
+              <button class="btn btn-primary" onclick="generatePropertyAccountabilityReport()">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon" style="background: #c05621;">
+                <i class="fas fa-exchange-alt"></i>
+              </div>
+              <h3>ICS Summary</h3>
+              <p>Inventory Custodian Slip issuance and transfer history</p>
+              <button class="btn btn-primary" onclick="generateICSSummaryReport()">Generate</button>
+            </div>
+            <div class="report-card">
+              <div class="report-icon" style="background: #c53030;">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <h3>Low Stock / Reorder Alert</h3>
+              <p>Items at or below reorder point requiring procurement action</p>
+              <button class="btn btn-primary" onclick="generateLowStockReport()">Generate</button>
             </div>
           </div>
         </section>
+
+        <!-- PAR (Property Acknowledgement Receipts) Page -->
+        <section class="page" id="par">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Property Acknowledgement Receipt (PAR)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewPARModal()"><i class="fas fa-plus"></i> New PAR</button>
+            <button class="btn btn-outline" onclick="exportToExcel('PAR')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search PARs..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>PAR No.</th>
+                  <th>Date</th>
+                  <th>Property No.</th>
+                  <th>Description</th>
+                  <th>Quantity</th>
+                  <th>Unit Cost</th>
+                  <th>Total Cost</th>
+                  <th>Received By</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="parTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- PTR (Property Transfer Reports) Page -->
+        <section class="page" id="ptr">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Property Transfer Report (PTR)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewPTRModal()"><i class="fas fa-plus"></i> New PTR</button>
+            <button class="btn btn-outline" onclick="exportToExcel('PTR')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search PTRs..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>PTR No.</th>
+                  <th>Date</th>
+                  <th>Property No.</th>
+                  <th>Description</th>
+                  <th>From (Officer)</th>
+                  <th>To (Officer)</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ptrTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- RIS (Requisition & Issue Slips) Page -->
+        <section class="page" id="ris">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Requisition and Issue Slip (RIS)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewRISModal()"><i class="fas fa-plus"></i> New RIS</button>
+            <button class="btn btn-outline" onclick="exportToExcel('RIS')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search RIS..."></div>
+            <select class="form-select" id="risStatusFilter" onchange="filterRIS(this.value)">
+              <option value="">All Status</option>
+              <option value="draft">Draft</option>
+              <option value="posted">Posted</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>RIS No.</th>
+                  <th>Date</th>
+                  <th>Division</th>
+                  <th>Office</th>
+                  <th>Purpose</th>
+                  <th>Requested By</th>
+                  <th>Approved By</th>
+                  <th>Issued By</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="risTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Supplies Ledger Cards Page -->
+        <section class="page" id="supplies-ledger">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Supplies Ledger Cards</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-outline" onclick="exportToExcel('SuppliesLedger')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search ledger cards..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Description</th>
+                  <th>Unit</th>
+                  <th>Date</th>
+                  <th>Reference</th>
+                  <th>Receipt Qty</th>
+                  <th>Issue Qty</th>
+                  <th>Balance Qty</th>
+                  <th>Unit Cost</th>
+                  <th>Balance Cost</th>
+                </tr>
+              </thead>
+              <tbody id="suppliesLedgerTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Semi-Expendable Items Page -->
+        <section class="page" id="semi-expendable">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Semi-Expendable Items Received</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-outline" onclick="exportToExcel('SemiExpendable')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search semi-expendable items..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>IAR No.</th>
+                  <th>Item Description</th>
+                  <th>Semi-Exp. Class</th>
+                  <th>Quantity</th>
+                  <th>Unit Cost</th>
+                  <th>Total Cost</th>
+                  <th>Property No.</th>
+                  <th>ICS No.</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="semiExpendableTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Capital Outlay Items Page -->
+        <section class="page" id="capital-outlay">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Capital Outlay Items Received</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-outline" onclick="exportToExcel('CapitalOutlay')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search capital outlay items..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>IAR No.</th>
+                  <th>Item Description</th>
+                  <th>GAM Classification</th>
+                  <th>Quantity</th>
+                  <th>Unit Cost</th>
+                  <th>Total Cost</th>
+                  <th>Property No.</th>
+                  <th>PAR No.</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="capitalOutlayTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Trip Tickets Page -->
+        <section class="page" id="trip-tickets">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Trip Tickets</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewTripTicketModal()"><i class="fas fa-plus"></i> New Trip Ticket</button>
+            <button class="btn btn-outline" onclick="exportToExcel('TripTickets')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search trip tickets..."></div>
+            <select class="form-select" id="tripStatusFilter" onchange="filterTripTickets(this.value)">
+              <option value="">All Status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Ticket No.</th>
+                  <th>Date</th>
+                  <th>Driver</th>
+                  <th>Vehicle</th>
+                  <th>Destination</th>
+                  <th>Purpose</th>
+                  <th>Departure</th>
+                  <th>Arrival</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tripTicketsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Offices Page -->
+        <section class="page" id="offices">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Offices</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewOfficeModal()"><i class="fas fa-plus"></i> Add Office</button>
+            <button class="btn btn-outline" onclick="exportToExcel('Offices')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search offices..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Office Name</th>
+                  <th>Division</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="officesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Designations Page -->
+        <section class="page" id="designations">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Designations</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewDesignationModal()"><i class="fas fa-plus"></i> Add Designation</button>
+            <button class="btn btn-outline" onclick="exportToExcel('Designations')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search designations..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Designation Title</th>
+                  <th>Description</th>
+                  <th>Salary Grade</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="designationsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Fund Clusters Page -->
+        <section class="page" id="fund-clusters">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Fund Clusters</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewFundClusterModal()"><i class="fas fa-plus"></i> Add Fund Cluster</button>
+            <button class="btn btn-outline" onclick="exportToExcel('FundClusters')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search fund clusters..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="fundClustersTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Procurement Modes Page -->
+        <section class="page" id="procurement-modes">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Procurement Modes</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewProcurementModeModal()"><i class="fas fa-plus"></i> Add Mode</button>
+            <button class="btn btn-outline" onclick="exportToExcel('ProcurementModes')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search procurement modes..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Code</th>
+                  <th>Mode Name</th>
+                  <th>Description</th>
+                  <th>Threshold</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="procurementModesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- UACS Codes Page -->
+        <section class="page" id="uacs-codes">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">UACS Codes</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewUACSCodeModal()"><i class="fas fa-plus"></i> Add UACS Code</button>
+            <button class="btn btn-outline" onclick="exportToExcel('UACSCodes')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search UACS codes..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Code</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="uacsCodesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- UOMs (Units of Measure) Page -->
+        <section class="page" id="uoms">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Units of Measure (UOM)</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewUOMModal()"><i class="fas fa-plus"></i> Add UOM</button>
+            <button class="btn btn-outline" onclick="exportToExcel('UOMs')"><i class="fas fa-file-excel"></i> Export</button>
+            <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search UOMs..."></div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Abbreviation</th>
+                  <th>Full Name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="uomsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Settings Page -->
+        <section class="page" id="settings">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">System Settings</div>
+            <div class="form-subtitle">Fiscal Year 2026</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="saveAllSettings()"><i class="fas fa-save"></i> Save All Settings</button>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Setting Key</th>
+                  <th>Current Value</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="settingsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>
@@ -1757,6 +2701,8 @@
         <h2>DMW Caraga</h2>
         <p>Procurement Plan System (As-Is)</p>
       </div>
+      
+      <!-- Login Form -->
       <form id="loginForm">
         <div class="form-group">
           <label for="username">Username</label>
@@ -1772,36 +2718,67 @@
             <input type="password" id="password" placeholder="Enter password" required>
           </div>
         </div>
+        <div id="loginError" class="login-error" style="display: none; color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
+        <button type="button" class="btn btn-primary btn-block" onclick="doLogin()" id="loginBtn">
+          <i class="fas fa-sign-in-alt"></i> Sign In
+        </button>
+        <p style="text-align: center; margin-top: 15px; color: #666;">
+          Don't have an account? <a href="#" onclick="toggleAuthForm('signup')" style="color: #1e88e5; text-decoration: none;">Sign Up</a>
+        </p>
+      </form>
+      
+      <!-- Signup Form -->
+      <form id="signupForm" style="display: none;">
         <div class="form-group">
-          <label for="roleSelect">Role (Demo Mode)</label>
-          <select id="roleSelect" class="form-select">
-            <option value="admin">System Admin</option>
-            <option value="hope">HoPE (Regional Director)</option>
-            <option value="bac_chair">BAC Chairperson</option>
-            <option value="bac_sec">BAC Secretariat</option>
-            <option value="twg">TWG Member</option>
-            <option value="div_head">Division Head</option>
-            <option value="end_user">End User</option>
-            <option value="supply">Supply/Procurement Officer</option>
-            <option value="inspector">Inspection/Property Custodian</option>
-          </select>
+          <label for="signupFullName">Full Name</label>
+          <div class="input-icon">
+            <i class="fas fa-user"></i>
+            <input type="text" id="signupFullName" placeholder="Enter your full name" required>
+          </div>
         </div>
         <div class="form-group">
-          <label for="divisionSelect">Division</label>
-          <select id="divisionSelect" class="form-select">
+          <label for="signupUsername">Username</label>
+          <div class="input-icon">
+            <i class="fas fa-at"></i>
+            <input type="text" id="signupUsername" placeholder="Choose a username" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signupEmail">Email (Optional)</label>
+          <div class="input-icon">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="signupEmail" placeholder="Enter your email">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <div class="input-icon">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="signupPassword" placeholder="Create a password" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signupDivision">Division</label>
+          <select id="signupDivision" class="form-select">
             <option value="FAD">Finance & Administrative Division (FAD)</option>
             <option value="WRSD">Welfare Reintegration Services Division (WRSD)</option>
-            <option value="MWPSD">Migrant Workers Protection Services Division (MWPSD)</option>
-            <option value="MWPTD">Migrant Workers Protection Training Division (MWPTD)</option>
+            <option value="MWPD">Migrant Workers Protection Division (MWPD)</option>
+            <option value="MWProD">Migrant Workers Processing Division (MWProD)</option>
             <option value="ORD">Office of the Regional Director (ORD)</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">
-          <i class="fas fa-sign-in-alt"></i> Sign In
+        <div id="signupError" class="login-error" style="display: none; color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
+        <div id="signupSuccess" style="display: none; color: #28a745; background: #d4edda; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
+        <button type="button" class="btn btn-primary btn-block" onclick="doSignup()" id="signupBtn">
+          <i class="fas fa-user-plus"></i> Create Account
         </button>
+        <p style="text-align: center; margin-top: 15px; color: #666;">
+          Already have an account? <a href="#" onclick="toggleAuthForm('login')" style="color: #1e88e5; text-decoration: none;">Sign In</a>
+        </p>
       </form>
+      
       <div class="login-footer">
-        <p>ISO 9001:2015 Compliant • Per Memo 14 Nov 2025</p>
+        <p>ISO 9001:2015 Compliant €¢ Per Memo 14 Nov 2025</p>
       </div>
     </div>
   </div>

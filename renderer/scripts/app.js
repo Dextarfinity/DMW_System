@@ -1,5 +1,1644 @@
-// DMW Caraga Procurement System - Frontend Application
-// Static template version (no backend required)
+﻿// DMW Caraga Procurement System - Frontend Application
+// Dynamic backend integration with PostgreSQL
+
+// API Configuration
+const API_URL = 'http://localhost:3000/api';
+let authToken = null;
+
+// API Helper Functions
+async function apiRequest(endpoint, method = 'GET', data = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  
+  const options = { method, headers };
+  if (data && method !== 'GET') options.body = JSON.stringify(data);
+  
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, options);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Network error' }));
+      throw new Error(error.error || 'Request failed');
+    }
+    return await response.json();
+  } catch (err) {
+    console.error(`API Error (${endpoint}):`, err);
+    throw err;
+  }
+}
+
+// Data loading functions
+async function loadDashboardStats() {
+  try {
+    const stats = await apiRequest('/dashboard/stats');
+    updateDashboardStats(stats);
+  } catch (err) {
+    console.log('Using demo dashboard stats');
+  }
+  // Load PPMP division stats for dashboard
+  try {
+    const ppmp = await apiRequest('/ppmp');
+    updatePPMPDivisionStats(ppmp);
+  } catch (err) {
+    console.log('Could not load PPMP division stats');
+  }
+}
+
+async function loadItems() {
+  try {
+    const items = await apiRequest('/items');
+    renderItemsTable(items);
+    return items;
+  } catch (err) {
+    console.log('Using demo items data');
+    return [];
+  }
+}
+
+async function loadSuppliers() {
+  try {
+    const suppliers = await apiRequest('/suppliers');
+    renderSuppliersTable(suppliers);
+    return suppliers;
+  } catch (err) {
+    console.log('Using demo suppliers data');
+    return [];
+  }
+}
+
+async function loadUsers() {
+  try {
+    const users = await apiRequest('/users');
+    renderUsersTable(users);
+    return users;
+  } catch (err) {
+    console.log('Using demo users data');
+    return [];
+  }
+}
+
+async function loadPPMP() {
+  try {
+    const ppmp = await apiRequest('/ppmp');
+    renderPPMPTable(ppmp);
+    
+    // Update PPMP page UI based on role
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const isChief = chiefRoles.includes(currentUser.role);
+    
+    // Show/hide division filter - chiefs only see their own division (no filter needed)
+    const divFilter = document.getElementById('ppmpDivisionFilter');
+    if (divFilter) {
+      divFilter.style.display = isChief ? 'none' : '';
+    }
+    
+    // Show division-specific banner for chiefs
+    let banner = document.getElementById('ppmpDivisionBanner');
+    if (isChief) {
+      const divName = currentUser.division || currentUser.department_code || '';
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ppmpDivisionBanner';
+        banner.className = 'ppmp-division-banner';
+        const ppmpSection = document.getElementById('ppmp');
+        const pageActions = ppmpSection?.querySelector('.page-actions');
+        if (pageActions) {
+          pageActions.parentNode.insertBefore(banner, pageActions);
+        }
+      }
+      banner.innerHTML = `<i class="fas fa-building"></i> Showing PPMP for <strong>${divName}</strong> Division Only`;
+      banner.style.display = '';
+    } else if (banner) {
+      banner.style.display = 'none';
+    }
+    
+    return ppmp;
+  } catch (err) {
+    console.log('Using demo PPMP data');
+    return [];
+  }
+}
+
+async function loadAPP() {
+  try {
+    const items = await apiRequest('/plan-items');
+    const appStatus = await loadAPPStatus(2026);
+    renderAPPTable(items, appStatus);
+    updateAPPSummary(items);
+    updateAPPVersionBanner(appStatus);
+    return items;
+  } catch (err) {
+    console.log('Using demo APP data');
+    return [];
+  }
+}
+
+async function loadAPPStatus(year) {
+  try {
+    const status = await apiRequest('/app-settings/' + year);
+    window._appStatus = status;
+    return status;
+  } catch (err) {
+    console.log('Could not load APP status');
+    return { fiscal_year: year, app_type: 'indicative', update_count: 0 };
+  }
+}
+
+async function loadPR() {
+  try {
+    const pr = await apiRequest('/pr');
+    renderPRTable(pr);
+    return pr;
+  } catch (err) {
+    console.log('Using demo PR data');
+    return [];
+  }
+}
+
+async function loadRFQ() {
+  try {
+    const rfq = await apiRequest('/rfq');
+    renderRFQTable(rfq);
+    return rfq;
+  } catch (err) {
+    console.log('Using demo RFQ data');
+    return [];
+  }
+}
+
+async function loadAbstract() {
+  try {
+    const abstract = await apiRequest('/abstract');
+    renderAbstractTable(abstract);
+    return abstract;
+  } catch (err) {
+    console.log('Using demo Abstract data');
+    return [];
+  }
+}
+
+async function loadPostQual() {
+  try {
+    const postQual = await apiRequest('/postqual');
+    renderPostQualTable(postQual);
+    return postQual;
+  } catch (err) {
+    console.log('Using demo PostQual data');
+    return [];
+  }
+}
+
+async function loadBACResolution() {
+  try {
+    const bacRes = await apiRequest('/bac-resolution');
+    renderBACResolutionTable(bacRes);
+    return bacRes;
+  } catch (err) {
+    console.log('Using demo BAC Resolution data');
+    return [];
+  }
+}
+
+async function loadNOA() {
+  try {
+    const noa = await apiRequest('/noa');
+    renderNOATable(noa);
+    return noa;
+  } catch (err) {
+    console.log('Using demo NOA data');
+    return [];
+  }
+}
+
+async function loadPO() {
+  try {
+    const po = await apiRequest('/po');
+    renderPOTable(po);
+    return po;
+  } catch (err) {
+    console.log('Using demo PO data');
+    return [];
+  }
+}
+
+async function loadIAR() {
+  try {
+    const iar = await apiRequest('/iar');
+    renderIARTable(iar);
+    return iar;
+  } catch (err) {
+    console.log('Using demo IAR data');
+    return [];
+  }
+}
+
+async function loadPOPacket() {
+  try {
+    const packet = await apiRequest('/po-packet');
+    renderPOPacketTable(packet);
+    return packet;
+  } catch (err) {
+    console.log('Using demo PO Packet data');
+    return [];
+  }
+}
+
+async function loadCOA() {
+  try {
+    const coa = await apiRequest('/coa');
+    renderCOATable(coa);
+    return coa;
+  } catch (err) {
+    console.log('Using demo COA data');
+    return [];
+  }
+}
+
+// ==================== INVENTORY MODULE LOADERS ====================
+
+async function loadStockCards() {
+  try {
+    const cards = await apiRequest('/stock-cards');
+    renderStockCardsTable(cards);
+    return cards;
+  } catch (err) {
+    console.log('Using demo stock cards data');
+    return [];
+  }
+}
+
+async function loadPropertyCards() {
+  try {
+    const cards = await apiRequest('/property-cards');
+    renderPropertyCardsTable(cards);
+    return cards;
+  } catch (err) {
+    console.log('Using demo property cards data');
+    return [];
+  }
+}
+
+async function loadICS() {
+  try {
+    const ics = await apiRequest('/ics');
+    renderICSTable(ics);
+    return ics;
+  } catch (err) {
+    console.log('Using demo ICS data');
+    return [];
+  }
+}
+
+async function loadEmployees() {
+  try {
+    const employees = await apiRequest('/employees');
+    renderEmployeesTable(employees);
+    return employees;
+  } catch (err) {
+    console.log('Using demo employees data');
+    return [];
+  }
+}
+
+async function loadDepartments() {
+  try {
+    return await apiRequest('/departments');
+  } catch (err) {
+    console.log('Using demo departments');
+    return [
+      { id: 1, code: 'FAD', name: 'Finance & Administrative Division' },
+      { id: 2, code: 'WRSD', name: 'Workers Resource Services Division' },
+      { id: 3, code: 'MWPSD', name: 'Migrant Workers Protection Services Division' },
+      { id: 4, code: 'MWPTD', name: 'Migrant Workers Programs & Training Division' },
+      { id: 5, code: 'ORD', name: 'Office of the Regional Director' }
+    ];
+  }
+}
+
+// ==================== NEW INVENTORY & MASTER DATA LOADERS ====================
+
+async function loadPAR() {
+  try {
+    const pars = await apiRequest('/pars');
+    renderPARTable(pars);
+    return pars;
+  } catch (err) { console.log('Using demo PAR data'); return []; }
+}
+
+async function loadPTR() {
+  try {
+    const ptrs = await apiRequest('/ptrs');
+    renderPTRTable(ptrs);
+    return ptrs;
+  } catch (err) { console.log('Using demo PTR data'); return []; }
+}
+
+async function loadRIS() {
+  try {
+    const ris = await apiRequest('/ris');
+    renderRISTable(ris);
+    return ris;
+  } catch (err) { console.log('Using demo RIS data'); return []; }
+}
+
+async function loadSuppliesLedger() {
+  try {
+    const cards = await apiRequest('/supplies-ledger-cards');
+    renderSuppliesLedgerTable(cards);
+    return cards;
+  } catch (err) { console.log('Using demo supplies ledger data'); return []; }
+}
+
+async function loadSemiExpendable() {
+  try {
+    const items = await apiRequest('/received-semi-expendable');
+    renderSemiExpendableTable(items);
+    return items;
+  } catch (err) { console.log('Using demo semi-expendable data'); return []; }
+}
+
+async function loadCapitalOutlay() {
+  try {
+    const items = await apiRequest('/received-capital-outlay');
+    renderCapitalOutlayTable(items);
+    return items;
+  } catch (err) { console.log('Using demo capital outlay data'); return []; }
+}
+
+async function loadTripTickets() {
+  try {
+    const tickets = await apiRequest('/trip-tickets');
+    renderTripTicketsTable(tickets);
+    return tickets;
+  } catch (err) { console.log('Using demo trip tickets data'); return []; }
+}
+
+async function loadOffices() {
+  try {
+    const offices = await apiRequest('/offices');
+    renderOfficesTable(offices);
+    return offices;
+  } catch (err) { console.log('Using demo offices data'); return []; }
+}
+
+async function loadDesignations() {
+  try {
+    const designations = await apiRequest('/designations');
+    renderDesignationsTable(designations);
+    return designations;
+  } catch (err) { console.log('Using demo designations data'); return []; }
+}
+
+async function loadDivisions() {
+  try {
+    const divisions = await apiRequest('/divisions');
+    renderDivisionsTable(divisions);
+    return divisions;
+  } catch (err) { console.log('Using demo divisions data'); return []; }
+}
+
+async function loadFundClusters() {
+  try {
+    const fc = await apiRequest('/fund-clusters');
+    renderFundClustersTable(fc);
+    return fc;
+  } catch (err) { console.log('Using demo fund clusters data'); return []; }
+}
+
+async function loadProcurementModes() {
+  try {
+    const modes = await apiRequest('/procurement-modes');
+    renderProcurementModesTable(modes);
+    return modes;
+  } catch (err) { console.log('Using demo procurement modes data'); return []; }
+}
+
+async function loadUACSCodes() {
+  try {
+    const codes = await apiRequest('/uacs-codes');
+    renderUACSCodesTable(codes);
+    return codes;
+  } catch (err) { console.log('Using demo UACS codes data'); return []; }
+}
+
+async function loadUOMs() {
+  try {
+    const uoms = await apiRequest('/uoms');
+    renderUOMsTable(uoms);
+    return uoms;
+  } catch (err) { console.log('Using demo UOMs data'); return []; }
+}
+
+async function loadSettings() {
+  try {
+    const settings = await apiRequest('/settings');
+    renderSettingsTable(settings);
+    return settings;
+  } catch (err) { console.log('Using demo settings data'); return []; }
+}
+
+// Dashboard stats update
+function updateDashboardStats(stats) {
+  // Procurement stat cards (by ID)
+  const statPlans = document.getElementById('statTotalPlans');
+  const statPOs = document.getElementById('statTotalPOs');
+  const statPendingIARs = document.getElementById('statPendingIARs');
+  const statSuppliers = document.getElementById('statTotalSuppliers');
+  if (statPlans) statPlans.textContent = stats.totalPlans || 0;
+  if (statPOs) statPOs.textContent = stats.totalPOs || 0;
+  if (statPendingIARs) statPendingIARs.textContent = stats.pendingIARs || 0;
+  if (statSuppliers) statSuppliers.textContent = stats.totalSuppliers || 0;
+
+  // Inventory stat cards (by ID)
+  const invTotalItems = document.getElementById('statTotalItems');
+  const invLowStock = document.getElementById('statLowStock');
+  const invPropertyCards = document.getElementById('statPropertyCards');
+  const invICS = document.getElementById('statICS');
+  if (invTotalItems) invTotalItems.textContent = stats.totalItems || 0;
+  if (invLowStock) invLowStock.textContent = stats.lowStockItems || 0;
+  if (invPropertyCards) invPropertyCards.textContent = stats.totalPropertyCards || 0;
+  if (invICS) invICS.textContent = stats.totalICS || 0;
+}
+
+function updatePPMPDivisionStats(plans) {
+  const container = document.getElementById('ppmpDivisionStats');
+  if (!container) return;
+
+  function getDeptCode(name) {
+    if (!name) return 'DMW';
+    const lower = name.toLowerCase();
+    if (lower.includes('finance')) return 'FAD';
+    if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+    if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+    if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+    if (lower.includes('director')) return 'ORD';
+    return name.substring(0,3).toUpperCase();
+  }
+
+  const divisions = ['FAD', 'WRSD', 'MWPSD', 'MWPTD', 'ORD'];
+  const divStats = {};
+  divisions.forEach(d => { divStats[d] = { total: 0, approved: 0 }; });
+  
+  plans.forEach(p => {
+    const code = getDeptCode(p.department_name);
+    if (divStats[code]) {
+      divStats[code].total++;
+      if (p.status === 'approved') divStats[code].approved++;
+    }
+  });
+
+  const items = container.querySelectorAll('.division-item');
+  items.forEach(item => {
+    const nameEl = item.querySelector('.division-name');
+    const fillEl = item.querySelector('.progress-fill');
+    const valueEl = item.querySelector('.progress-value');
+    if (!nameEl || !fillEl || !valueEl) return;
+    const deptName = nameEl.textContent.trim();
+    const stat = divStats[deptName];
+    if (stat) {
+      const pct = stat.total > 0 ? Math.round((stat.approved / stat.total) * 100) : 0;
+      fillEl.style.width = pct + '%';
+      if (stat.total === 0) {
+        valueEl.textContent = 'No Plans';
+      } else {
+        valueEl.textContent = pct + '% (' + stat.approved + '/' + stat.total + ')';
+      }
+    }
+  });
+}
+
+// Table rendering functions
+function renderItemsTable(items) {
+  const tbody = document.getElementById('itemsTableBody');
+  if (!tbody || !items.length) return;
+  
+  tbody.innerHTML = items.map(item => {
+    const qty = parseInt(item.quantity) || 0;
+    const reorder = parseInt(item.reorder_point) || 0;
+    const isService = (item.category || '').toLowerCase() === 'services';
+    let stockStatus = 'na';
+    let stockLabel = 'N/A';
+    if (!isService) {
+      if (qty === 0) { stockStatus = 'out-of-stock'; stockLabel = 'Out of Stock'; }
+      else if (qty <= reorder) { stockStatus = 'low-stock'; stockLabel = 'Low Stock'; }
+      else { stockStatus = 'in-stock'; stockLabel = 'In Stock'; }
+    }
+    const isSemiOrCapital = ['SEMI-EXPENDABLE', 'CAPITAL OUTLAY'].includes(item.category);
+    return `
+    <tr>
+      <td>${item.code || ''}</td>
+      <td>${item.stock_no || '-'}</td>
+      <td>${item.name || ''}</td>
+      <td>${item.category || ''}</td>
+      <td>${item.unit || ''}</td>
+      <td>₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${isService ? '-' : qty}</td>
+      <td>${isService ? '-' : reorder}</td>
+      <td><span class="stock-badge ${stockStatus}">${stockLabel}</span></td>
+      <td>${item.uacs_code || '-'}</td>
+      <td>
+        <div class="action-buttons">
+          ${item.category === 'EXPENDABLE' ? `<button class="btn-icon" title="View Stock Card" onclick="viewItemStockCard(${item.id})"><i class="fas fa-layer-group"></i></button>` : ''}
+          ${isSemiOrCapital ? `<button class="btn-icon" title="View Property Card" onclick="viewItemPropertyCard(${item.id})"><i class="fas fa-id-card"></i></button>` : ''}
+          <button class="btn-icon" data-action="edit-item" title="Edit" onclick="showEditItemModal(${item.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" data-action="delete-item" title="Delete" onclick="showDeleteConfirmModal('Item', ${item.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `}).join('');
+}
+
+function renderSuppliersTable(suppliers) {
+  const tbody = document.getElementById('suppliersTableBody');
+  if (!tbody || !suppliers.length) return;
+  
+  tbody.innerHTML = suppliers.map(s => `
+    <tr>
+      <td>SUP-${String(s.id).padStart(3, '0')}</td>
+      <td>${s.name || ''}</td>
+      <td>${s.address || ''}</td>
+      <td>${s.phone || ''}</td>
+      <td><span class="status-badge philgeps-platinum">Active</span></td>
+      <td>${s.tin || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" data-action="edit-supplier" title="Edit" onclick="showEditSupplierModal(${s.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" data-action="delete-supplier" title="Delete" onclick="showDeleteConfirmModal('Supplier', ${s.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderUsersTable(users) {
+  const tbody = document.getElementById('usersTableBody');
+  if (!tbody || !users.length) return;
+  
+  const roleBadges = {
+    admin: '<span class="role-badge admin">Admin</span>',
+    hope: '<span class="role-badge hope">HoPE</span>',
+    bac_chair: '<span class="role-badge bac">BAC Chair</span>',
+    bac_secretariat: '<span class="role-badge bac">BAC Sec</span>',
+    twg_member: '<span class="role-badge twg">TWG</span>',
+    division_head: '<span class="role-badge div">Div Head</span>',
+    end_user: '<span class="role-badge user">End User</span>',
+    supply_officer: '<span class="role-badge supply">Supply</span>',
+    inspector: '<span class="role-badge inspector">Inspector</span>',
+    ord_manager: '<span class="role-badge admin">ORD Mgr</span>',
+    chief_fad: '<span class="role-badge div">Chief FAD</span>',
+    chief_wrsd: '<span class="role-badge div">Chief WRSD</span>',
+    chief_mwpsd: '<span class="role-badge div">Chief MWPSD</span>',
+    chief_mwptd: '<span class="role-badge div">Chief MWPTD</span>'
+  };
+  
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>USR-${String(u.id).padStart(3, '0')}</td>
+      <td>${u.username || ''}</td>
+      <td>${u.full_name || ''}</td>
+      <td>${roleBadges[u.role] || u.role}</td>
+      <td>${u.department_code || ''}</td>
+      <td><span class="status-badge ${u.is_active ? 'approved' : 'rejected'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal(${u.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" data-action="delete-user" title="Delete" onclick="showDeleteConfirmModal('User', ${u.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPPMPTable(ppmp) {
+  const tbody = document.getElementById('ppmpTableBody');
+  if (!tbody) return;
+  if (!ppmp.length) { tbody.innerHTML = '<tr><td colspan="15" class="text-center">No PPMP entries found</td></tr>'; return; }
+  
+  // Determine department code from name or code field
+  function getDeptCode(plan) {
+    if (plan.department_code) return plan.department_code;
+    const name = plan.department_name;
+    if (!name) return 'DMW';
+    const lower = name.toLowerCase();
+    if (lower.includes('finance')) return 'FAD';
+    if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+    if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+    if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+    if (lower.includes('director')) return 'ORD';
+    return name.substring(0,3).toUpperCase();
+  }
+
+  tbody.innerHTML = ppmp.map(p => {
+    const deptCode = getDeptCode(p);
+    const ppmpNo = `PPMP-${deptCode}-${p.fiscal_year}-${String(p.id).padStart(3, '0')}`;
+    const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'draft' ? 'draft' : p.status;
+    return `
+    <tr>
+      <td>${ppmpNo}</td>
+      <td>${p.remarks || 'Annual Procurement Plan FY ' + p.fiscal_year}</td>
+      <td>Goods/Services</td>
+      <td>Multiple Items</td>
+      <td><span class="mode-badge svp">Small Value Procurement</span></td>
+      <td>NO</td>
+      <td>Jan ${p.fiscal_year}</td>
+      <td>Dec ${p.fiscal_year}</td>
+      <td>Jan - Dec ${p.fiscal_year}</td>
+      <td>GAA ${p.fiscal_year}</td>
+      <td>₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><i class="fas fa-check-circle text-success"></i></td>
+      <td>${deptCode} - FY ${p.fiscal_year}</td>
+      <td><span class="status-badge ${statusClass}">${p.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" data-action="view-ppmp" title="View" onclick="showViewPPMPModal(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" data-action="edit-ppmp" title="Edit" onclick="showEditPPMPModal(${p.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon success" data-action="approve-ppmp" title="Approve" onclick="showApprovePPMPModal(${p.id})"><i class="fas fa-check"></i></button>
+        </div>
+      </td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function renderAPPTable(items, appStatus) {
+  const tbody = document.getElementById('appTableBody');
+  if (!tbody) return;
+  if (!items.length) { tbody.innerHTML = '<tr><td colspan="17" class="text-center">No APP entries found</td></tr>'; return; }
+
+  function getDeptCode(name) {
+    if (!name) return 'DMW';
+    const lower = name.toLowerCase();
+    if (lower.includes('finance')) return 'FAD';
+    if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+    if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+    if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+    if (lower.includes('director')) return 'ORD';
+    return name.substring(0,3).toUpperCase();
+  }
+
+  function getProcMode(remarks) {
+    if (!remarks) return { label: 'Small Value Procurement', css: 'svp' };
+    const r = remarks.toLowerCase();
+    if (r.includes('direct contracting')) return { label: 'Direct Contracting', css: 'dc' };
+    if (r.includes('agency-to-agency') || r.includes('agency to agency')) return { label: 'Agency-To-Agency', css: 'others' };
+    if (r.includes('shopping')) return { label: 'Shopping', css: 'shopping' };
+    return { label: 'Small Value Procurement', css: 'svp' };
+  }
+
+  function getMonthFromRemarks(remarks) {
+    if (!remarks) return '-';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    for (let m of months) {
+      if (remarks.includes(m)) return m + ' ' + (remarks.match(/\\d{4}/) || ['2026'])[0];
+    }
+    return '-';
+  }
+
+  // Build version tag based on current APP status
+  const st = appStatus || window._appStatus || { app_type: 'indicative', update_count: 0 };
+  let versionTag = '';
+  if (st.app_type === 'indicative') {
+    versionTag = '<span class="version-tag indicative">Indicative</span>';
+  } else if (st.app_type === 'final') {
+    versionTag = '<span class="version-tag final">Final</span>';
+  } else if (st.app_type === 'updated') {
+    versionTag = '<span class="version-tag updated">Updated v' + (st.update_count || 1) + '</span>';
+  }
+
+  // Store items globally for modals
+  window._appItems = items;
+
+  tbody.innerHTML = items.map(item => {
+    const deptCode = getDeptCode(item.department_name);
+    const mode = getProcMode(item.remarks);
+    const startMonth = getMonthFromRemarks(item.remarks);
+    const category = (item.category || 'EXPENDABLE').toUpperCase();
+    let projectType = 'Goods';
+    if (category === 'SERVICES') projectType = 'Services';
+    else if (category === 'CAPITAL OUTLAY') projectType = 'Capital Outlay';
+    const unitPrice = parseFloat(item.unit_price || 0);
+
+    return `
+    <tr>
+      <td>${item.item_code || '-'}</td>
+      <td>-</td>
+      <td>${item.item_name || '-'}</td>
+      <td>${deptCode}</td>
+      <td>${item.item_description || '-'}</td>
+      <td>${projectType}</td>
+      <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
+      <td>No</td>
+      <td>LCRB</td>
+      <td>${startMonth}</td>
+      <td>${startMonth}</td>
+      <td>GAA ${item.fiscal_year || '2026'}</td>
+      <td>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>-</td>
+      <td class="app-version-col">${versionTag}</td>
+      <td>-</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewAPPModal(${item.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Create PR" onclick="showCreatePRFromAPPModal(${item.id})"><i class="fas fa-file-signature"></i></button>
+        </div>
+      </td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function updateAPPSummary(items) {
+  const totalABC = items.reduce((sum, i) => sum + parseFloat(i.unit_price || 0), 0);
+  const totalProjects = items.length;
+  const svpCount = items.filter(i => !(i.remarks || '').toLowerCase().includes('direct contracting') && !(i.remarks || '').toLowerCase().includes('agency')).length;
+  const otherCount = totalProjects - svpCount;
+  
+  const summaryCards = document.querySelectorAll('#app .summary-value');
+  if (summaryCards.length >= 4) {
+    summaryCards[0].textContent = '₱' + totalABC.toLocaleString('en-PH', {minimumFractionDigits: 2});
+    summaryCards[1].textContent = totalProjects;
+    summaryCards[2].textContent = svpCount;
+    summaryCards[3].textContent = otherCount;
+  }
+}
+
+function updateAPPVersionBanner(status) {
+  const st = status || { app_type: 'indicative', update_count: 0 };
+  const stepIndicative = document.getElementById('stepIndicative');
+  const stepFinal = document.getElementById('stepFinal');
+  const stepUpdated = document.getElementById('stepUpdated');
+  const connectors = document.querySelectorAll('.app-version-banner .version-connector');
+  const label = document.getElementById('currentVersionLabel');
+  const countBadge = document.getElementById('updateCountBadge');
+
+  // Reset all steps
+  [stepIndicative, stepFinal, stepUpdated].forEach(s => {
+    if (s) { s.classList.remove('active', 'completed'); }
+  });
+  if (connectors.length >= 2) {
+    connectors[0].classList.remove('completed');
+    connectors[1].classList.remove('completed');
+  }
+
+  if (st.app_type === 'indicative') {
+    if (stepIndicative) {
+      stepIndicative.classList.add('active');
+      stepIndicative.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (label) label.textContent = 'Indicative APP';
+    if (countBadge) countBadge.style.display = 'none';
+  } else if (st.app_type === 'final') {
+    if (stepIndicative) {
+      stepIndicative.classList.add('completed');
+      stepIndicative.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (connectors[0]) connectors[0].classList.add('completed');
+    if (stepFinal) {
+      stepFinal.classList.add('active');
+      stepFinal.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (label) label.textContent = 'Final APP';
+    if (countBadge) countBadge.style.display = 'none';
+  } else if (st.app_type === 'updated') {
+    if (stepIndicative) {
+      stepIndicative.classList.add('completed');
+      stepIndicative.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (connectors[0]) connectors[0].classList.add('completed');
+    if (stepFinal) {
+      stepFinal.classList.add('completed');
+      stepFinal.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (connectors[1]) connectors[1].classList.add('completed');
+    if (stepUpdated) {
+      stepUpdated.classList.add('active');
+      stepUpdated.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    }
+    if (label) label.textContent = 'Updated APP (v' + (st.update_count || 1) + ')';
+    if (countBadge) {
+      countBadge.textContent = 'v' + (st.update_count || 1);
+      countBadge.style.display = 'inline-block';
+    }
+  }
+
+  // Also sync the dropdown filter
+  const filter = document.getElementById('appVersionFilter');
+  if (filter) filter.value = st.app_type;
+}
+
+function renderPRTable(pr) {
+  const tbody = document.getElementById('prTableBody');
+  if (!tbody) return;
+  if (!pr.length) { tbody.innerHTML = '<tr><td colspan="11" class="text-center">No PRs found</td></tr>'; return; }
+  
+  tbody.innerHTML = pr.map(p => `
+    <tr>
+      <td>${p.pr_number || ''}</td>
+      <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
+      <td>${p.department_name || 'DMW Caraga'}</td>
+      <td>-</td>
+      <td>${p.purpose || ''}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><span class="status-badge ${p.status}">${p.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('PR', '${p.pr_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderRFQTable(rfq) {
+  const tbody = document.getElementById('rfqTableBody');
+  if (!tbody) return;
+  if (!rfq.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No RFQs found</td></tr>'; return; }
+  
+  tbody.innerHTML = rfq.map(r => `
+    <tr>
+      <td>${r.rfq_number || ''}</td>
+      <td>${r.date_prepared ? new Date(r.date_prepared).toLocaleDateString() : ''}</td>
+      <td>${r.pr_number || ''}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>₱${parseFloat(r.abc_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${r.submission_deadline ? new Date(r.submission_deadline).toLocaleDateString() : ''}</td>
+      <td><span class="status-badge ${r.status}">${r.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewRFQModal(${r.id})"><i class="fas fa-eye"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderAbstractTable(abstract) {
+  const tbody = document.getElementById('abstractTableBody');
+  if (!tbody) return;
+  if (!abstract.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No Abstracts found</td></tr>'; return; }
+  
+  tbody.innerHTML = abstract.map(a => `
+    <tr>
+      <td>${a.abstract_number || ''}</td>
+      <td>${a.date_prepared ? new Date(a.date_prepared).toLocaleDateString() : ''}</td>
+      <td>${a.rfq_number || ''}</td>
+      <td>${a.purpose || ''}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>${a.recommended_supplier_name || ''}</td>
+      <td>₱${parseFloat(a.recommended_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><span class="status-badge ${a.status}">${a.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewAbstractModal(${a.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('Abstract', '${a.abstract_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPostQualTable(postQual) {
+  const tbody = document.getElementById('postQualTableBody');
+  if (!tbody) return;
+  if (!postQual.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No TWG Reports found</td></tr>'; return; }
+  
+  tbody.innerHTML = postQual.map(p => `
+    <tr>
+      <td>${p.postqual_number || ''}</td>
+      <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
+      <td>${p.abstract_number || ''}</td>
+      <td>${p.bidder_name || ''}</td>
+      <td>-</td>
+      <td><span class="status-badge ${p.documents_verified ? 'approved' : 'pending'}">${p.documents_verified ? 'Passed' : 'Pending'}</span></td>
+      <td><span class="status-badge ${p.financial_validation ? 'approved' : 'pending'}">${p.financial_validation ? 'Completed' : 'Pending'}</span></td>
+      <td><span class="status-badge ${p.status}">${p.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewPostQualModal(${p.id})"><i class="fas fa-folder-open"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('TWG Report', '${p.postqual_number || p.twg_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderBACResolutionTable(bacRes) {
+  const tbody = document.getElementById('bacResolutionTableBody');
+  if (!tbody) return;
+  if (!bacRes.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No BAC Resolutions found</td></tr>'; return; }
+  
+  tbody.innerHTML = bacRes.map(b => `
+    <tr>
+      <td>${b.resolution_number || ''}</td>
+      <td>${b.resolution_date ? new Date(b.resolution_date).getFullYear() : new Date().getFullYear()}</td>
+      <td>${b.resolution_date ? new Date(b.resolution_date).toLocaleDateString() : ''}</td>
+      <td>${b.procurement_mode || ''}</td>
+      <td>${b.supplier_name || b.recommended_awardee_name || ''}</td>
+      <td>₱${parseFloat(b.bid_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>₱${parseFloat(b.abc_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><span class="status-badge ${b.status}">${b.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewBACResolutionModal(${b.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('BAC Resolution', '${b.resolution_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderNOATable(noa) {
+  const tbody = document.getElementById('noaTableBody');
+  if (!tbody) return;
+  if (!noa.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No NOAs found</td></tr>'; return; }
+  
+  tbody.innerHTML = noa.map(n => `
+    <tr>
+      <td>${n.noa_number || ''}</td>
+      <td>${n.date_issued ? new Date(n.date_issued).toLocaleDateString() : ''}</td>
+      <td>${n.supplier_name || ''}</td>
+      <td>-</td>
+      <td>${n.resolution_number || ''}</td>
+      <td>₱${parseFloat(n.contract_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${n.bidder_receipt_date ? new Date(n.bidder_receipt_date).toLocaleDateString() : '-'}</td>
+      <td><span class="status-badge ${n.status}">${n.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewNOAModal(${n.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('NOA', '${n.noa_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPOTable(po) {
+  const tbody = document.getElementById('poTableBody');
+  if (!tbody) return;
+  if (!po.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No POs found</td></tr>'; return; }
+  
+  tbody.innerHTML = po.map(p => `
+    <tr>
+      <td>${p.po_number || ''}</td>
+      <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
+      <td>${p.mode_of_procurement || 'SVP - Shopping'}</td>
+      <td>${p.supplier_name || ''}</td>
+      <td>${p.place_of_delivery || 'DMW RO XIII'}</td>
+      <td>${p.delivery_date ? new Date(p.delivery_date).toLocaleDateString() : ''}</td>
+      <td>₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><span class="status-badge ${p.status}">${p.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewPOModal(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('PO', '${p.po_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderIARTable(iar) {
+  const tbody = document.getElementById('iarTableBody');
+  if (!tbody) return;
+  if (!iar.length) { tbody.innerHTML = '<tr><td colspan="11" class="text-center">No IARs found</td></tr>'; return; }
+  
+  tbody.innerHTML = iar.map(i => `
+    <tr>
+      <td>${i.iar_number || ''}</td>
+      <td>${i.inspection_date ? new Date(i.inspection_date).toLocaleDateString() : ''}</td>
+      <td>${i.supplier_name || ''}</td>
+      <td>${i.po_number || ''}</td>
+      <td>${i.invoice_number || ''}</td>
+      <td>${i.purpose || 'FAD'}</td>
+      <td>-</td>
+      <td><span class="status-badge ${i.inspection_result || 'pending'}">${i.inspection_result || 'Pending'}</span></td>
+      <td><span class="status-badge approved">Complete</span></td>
+      <td><span class="status-badge ${i.status}">${i.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewIARModal(${i.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('IAR', '${i.iar_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPOPacketTable(packets) {
+  const tbody = document.getElementById('poPacketTableBody');
+  if (!tbody) return;
+  if (!packets.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No Packets found</td></tr>'; return; }
+  
+  tbody.innerHTML = packets.map(p => `
+    <tr>
+      <td>PKT-${String(p.id).padStart(3, '0')}</td>
+      <td>${p.po_number || ''}</td>
+      <td>Project</td>
+      <td>-</td>
+      <td>${p.compiled_at ? new Date(p.compiled_at).toLocaleDateString() : ''}</td>
+      <td>${p.chief_signed_at ? `<span class="status-badge signed"><i class="fas fa-check"></i></span>` : '<span class="status-badge pending">Pending</span>'}</td>
+      <td>${p.director_signed_at ? `<span class="status-badge signed"><i class="fas fa-check"></i></span>` : '<span class="status-badge pending">Pending</span>'}</td>
+      <td><span class="status-badge ${p.status}">${p.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewPacketModal(${p.id})"><i class="fas fa-list-check"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('Packet', 'PKT-${String(p.id).padStart(3, '0')}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderCOATable(coa) {
+  const tbody = document.getElementById('coaTableBody');
+  if (!tbody) return;
+  if (!coa.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">No COA Submissions found</td></tr>'; return; }
+  
+  tbody.innerHTML = coa.map(c => `
+    <tr>
+      <td>${c.submission_number || ''}</td>
+      <td>${c.po_number || ''}</td>
+      <td><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></td>
+      <td>-</td>
+      <td>${c.submission_date ? new Date(c.submission_date).toLocaleDateString() : ''}</td>
+      <td>${c.coa_receipt_date ? new Date(c.coa_receipt_date).toLocaleDateString() : '-'}</td>
+      <td><span class="status-badge ${c.status}">${c.status}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewCOAModal(${c.id})"><i class="fas fa-folder-open"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('COA', '${c.submission_number}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ==================== INVENTORY MODULE RENDERERS ====================
+
+function renderStockCardsTable(cards) {
+  const tbody = document.getElementById('stockCardsTableBody');
+  if (!tbody) return;
+  if (!cards.length) { tbody.innerHTML = '<tr><td colspan="11" class="text-center">No stock card entries found</td></tr>'; return; }
+
+  tbody.innerHTML = cards.map(c => `
+    <tr>
+      <td>${c.transaction_no || ''}</td>
+      <td>${c.date ? new Date(c.date).toLocaleDateString() : ''}</td>
+      <td>${c.item_code || ''}</td>
+      <td>${c.item_name || ''}</td>
+      <td>${c.reference || ''}</td>
+      <td>${c.receipt_qty || 0}</td>
+      <td>₱${parseFloat(c.receipt_total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${c.issue_qty || 0}</td>
+      <td>₱${parseFloat(c.issue_total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td><strong>${c.balance_qty || 0}</strong></td>
+      <td>₱${parseFloat(c.balance_total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+    </tr>
+  `).join('');
+}
+
+function renderPropertyCardsTable(cards) {
+  const tbody = document.getElementById('propertyCardsTableBody');
+  if (!tbody) return;
+  if (!cards.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No property cards found</td></tr>'; return; }
+
+  const statusBadgeClass = { active: 'approved', disposed: 'rejected', transferred: 'pending', for_repair: 'draft' };
+  tbody.innerHTML = cards.map(c => `
+    <tr>
+      <td>${c.property_number || ''}</td>
+      <td>${c.description || ''}</td>
+      <td>₱${parseFloat(c.acquisition_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${c.acquisition_date ? new Date(c.acquisition_date).toLocaleDateString() : '-'}</td>
+      <td>${c.custodian_name || c.issued_to || '-'}</td>
+      <td>${c.department_name || '-'}</td>
+      <td>${c.ics_no || '-'}</td>
+      <td><span class="status-badge ${statusBadgeClass[c.status] || 'draft'}">${(c.status || 'active').replace('_', ' ')}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View Ledger" onclick="showViewPropertyLedgerModal(${c.id})"><i class="fas fa-book"></i></button>
+          <button class="btn-icon" title="Issue ICS" onclick="showNewICSFromPropertyModal('${c.property_number}')"><i class="fas fa-exchange-alt"></i></button>
+          <button class="btn-icon" data-action="edit-property" title="Edit" onclick="showEditPropertyCardModal(${c.id})"><i class="fas fa-edit"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderICSTable(ics) {
+  const tbody = document.getElementById('icsTableBody');
+  if (!tbody) return;
+  if (!ics.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">No ICS records found</td></tr>'; return; }
+
+  tbody.innerHTML = ics.map(i => `
+    <tr>
+      <td>${i.ics_no || ''}</td>
+      <td>${i.date_of_issue ? new Date(i.date_of_issue).toLocaleDateString() : ''}</td>
+      <td>${i.property_number || ''}</td>
+      <td>${i.description || ''}</td>
+      <td>${i.inventory_no || '-'}</td>
+      <td>${i.issued_to_name || i.issued_to || '-'}</td>
+      <td>${i.received_by_name || '-'}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewICSModal(${i.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRecord('ICS', '${i.ics_no}')"><i class="fas fa-print"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderEmployeesTable(employees) {
+  const tbody = document.getElementById('employeesTableBody');
+  if (!tbody) return;
+  if (!employees.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">No employees found</td></tr>'; return; }
+
+  const statusClass = { active: 'approved', inactive: 'rejected', retired: 'draft' };
+  tbody.innerHTML = employees.map(e => `
+    <tr>
+      <td>${e.employee_code || '-'}</td>
+      <td>${e.full_name || ''}</td>
+      <td>${e.designation_name || '-'}</td>
+      <td>${e.department_name || '-'}</td>
+      <td>${e.email || '-'}</td>
+      <td>${e.phone || '-'}</td>
+      <td><span class="status-badge ${statusClass[e.status] || 'draft'}">${e.status || 'active'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View Property" onclick="viewEmployeeProperty(${e.id})"><i class="fas fa-id-card"></i></button>
+          <button class="btn-icon" data-action="edit-employee" title="Edit" onclick="showEditEmployeeModal(${e.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" data-action="delete-employee" title="Delete" onclick="showDeleteConfirmModal('Employee', ${e.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ==================== INVENTORY FILTER FUNCTIONS ====================
+
+function filterItemsTable(searchTerm) {
+  const tbody = document.getElementById('itemsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  const term = searchTerm.toLowerCase();
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(term) ? '' : 'none';
+  });
+}
+
+function filterItemsByCategory(category) {
+  const tbody = document.getElementById('itemsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!category) { row.style.display = ''; return; }
+    const cells = row.querySelectorAll('td');
+    if (cells.length > 3) {
+      const cat = cells[3].textContent.trim();
+      row.style.display = cat === category ? '' : 'none';
+    }
+  });
+}
+
+function filterItemsByStock(status) {
+  const tbody = document.getElementById('itemsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!status) { row.style.display = ''; return; }
+    const badge = row.querySelector('.stock-badge');
+    if (badge) {
+      const hasClass = badge.classList.contains(status);
+      row.style.display = hasClass ? '' : 'none';
+    }
+  });
+}
+
+function filterPropertyCards(status) {
+  const tbody = document.getElementById('propertyCardsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!status) { row.style.display = ''; return; }
+    const badge = row.querySelector('.status-badge');
+    if (badge) {
+      const text = badge.textContent.trim().toLowerCase().replace(' ', '_');
+      row.style.display = text === status ? '' : 'none';
+    }
+  });
+}
+
+// ==================== NEW RENDER FUNCTIONS ====================
+
+function renderPARTable(pars) {
+  const tbody = document.getElementById('parTableBody');
+  if (!tbody) return;
+  if (!pars.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No PAR entries found</td></tr>'; return; }
+  tbody.innerHTML = pars.map(p => `
+    <tr>
+      <td>${p.par_no || ''}</td>
+      <td>${p.date_of_issue ? new Date(p.date_of_issue).toLocaleDateString() : ''}</td>
+      <td>${p.ppe_no || ''}</td>
+      <td>${p.description || ''}</td>
+      <td>1</td>
+      <td>-</td>
+      <td>-</td>
+      <td>${p.received_by_name || ''}</td>
+      <td><span class="status-badge approved">Active</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewPARModal(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Edit" onclick="showEditPARModal(${p.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PAR', ${p.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPTRTable(ptrs) {
+  const tbody = document.getElementById('ptrTableBody');
+  if (!tbody) return;
+  if (!ptrs.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No PTR entries found</td></tr>'; return; }
+  tbody.innerHTML = ptrs.map(p => `
+    <tr>
+      <td>${p.ptr_no || ''}</td>
+      <td>${p.date ? new Date(p.date).toLocaleDateString() : ''}</td>
+      <td>${p.property_number || ''}</td>
+      <td>${p.description || ''}</td>
+      <td>${p.from_officer_name || p.from_accountable_officer_name || ''}</td>
+      <td>${p.to_officer_name || p.to_accountable_officer_name || ''}</td>
+      <td>-</td>
+      <td><span class="status-badge ${(p.status || 'Pending').toLowerCase()}">${p.status || 'Pending'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewPTRModal(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Edit" onclick="showEditPTRModal(${p.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PTR', ${p.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderRISTable(ris) {
+  const tbody = document.getElementById('risTableBody');
+  if (!tbody) return;
+  if (!ris.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No RIS entries found</td></tr>'; return; }
+  tbody.innerHTML = ris.map(r => `
+    <tr>
+      <td>${r.ris_no || ''}</td>
+      <td>${r.ris_date ? new Date(r.ris_date).toLocaleDateString() : ''}</td>
+      <td>${r.division || ''}</td>
+      <td>${r.division || ''}</td>
+      <td>${r.purpose || ''}</td>
+      <td>${r.requested_by_name || ''}</td>
+      <td>${r.approved_by_name || ''}</td>
+      <td>${r.issued_by_name || ''}</td>
+      <td><span class="status-badge ${r.status || 'draft'}">${r.status || 'draft'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewRISModal(${r.id})"><i class="fas fa-eye"></i></button>
+          ${r.status === 'draft' ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ''}
+          <button class="btn-icon" title="Edit" onclick="showEditRISModal(${r.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RIS', ${r.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderSuppliesLedgerTable(cards) {
+  const tbody = document.getElementById('suppliesLedgerTableBody');
+  if (!tbody) return;
+  if (!cards.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No supplies ledger entries found</td></tr>'; return; }
+  tbody.innerHTML = cards.map(c => `
+    <tr>
+      <td>${c.item_code || ''}</td>
+      <td>${c.item_name || ''}</td>
+      <td>${c.unit || ''}</td>
+      <td>${c.date ? new Date(c.date).toLocaleDateString() : ''}</td>
+      <td>${c.reference || ''}</td>
+      <td>${c.receipt_qty || 0}</td>
+      <td>${c.issue_qty || 0}</td>
+      <td><strong>${c.balance_qty || 0}</strong></td>
+      <td>₱${parseFloat(c.balance_unit_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>₱${parseFloat(c.balance_total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+    </tr>
+  `).join('');
+}
+
+function renderSemiExpendableTable(items) {
+  const tbody = document.getElementById('semiExpendableTableBody');
+  if (!tbody) return;
+  if (!items.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No semi-expendable items found</td></tr>'; return; }
+  tbody.innerHTML = items.map(i => `
+    <tr>
+      <td>${i.generated_item_id || ''}</td>
+      <td>${i.item_description || i.item_name || ''}</td>
+      <td>-</td>
+      <td>1</td>
+      <td>₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${i.ppe_no || '-'}</td>
+      <td>${i.ics_no || '-'}</td>
+      <td><span class="status-badge ${(i.status || 'Available').toLowerCase()}">${i.status || 'Available'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewSemiExpModal(${i.id})"><i class="fas fa-eye"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderCapitalOutlayTable(items) {
+  const tbody = document.getElementById('capitalOutlayTableBody');
+  if (!tbody) return;
+  if (!items.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No capital outlay items found</td></tr>'; return; }
+  tbody.innerHTML = items.map(i => `
+    <tr>
+      <td>${i.generated_item_id || ''}</td>
+      <td>${i.item_description || i.item_name || ''}</td>
+      <td>-</td>
+      <td>1</td>
+      <td>₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td>${i.ppe_no || '-'}</td>
+      <td>-</td>
+      <td><span class="status-badge ${(i.status || 'Available').toLowerCase()}">${i.status || 'Available'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewCapitalOutlayModal(${i.id})"><i class="fas fa-eye"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderTripTicketsTable(tickets) {
+  const tbody = document.getElementById('tripTicketsTableBody');
+  if (!tbody) return;
+  if (!tickets.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No trip tickets found</td></tr>'; return; }
+  tbody.innerHTML = tickets.map(t => `
+    <tr>
+      <td>${t.trip_ticket_no || ''}</td>
+      <td>${t.date_of_travel ? new Date(t.date_of_travel).toLocaleDateString() : ''}</td>
+      <td>${t.requested_by_employee || ''}</td>
+      <td>${t.destination || ''}</td>
+      <td>${t.destination || ''}</td>
+      <td>${t.purpose || ''}</td>
+      <td>${t.time_of_departure || ''}</td>
+      <td>${t.return_date ? new Date(t.return_date).toLocaleDateString() : '-'}</td>
+      <td><span class="status-badge ${(t.status || 'Pending').toLowerCase()}">${t.status || 'Pending'}</span></td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="View" onclick="showViewTripTicketModal(${t.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Edit" onclick="showEditTripTicketModal(${t.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('TripTicket', ${t.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderOfficesTable(offices) {
+  const tbody = document.getElementById('officesTableBody');
+  if (!tbody) return;
+  if (!offices.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">No offices found</td></tr>'; return; }
+  tbody.innerHTML = offices.map(o => `
+    <tr>
+      <td>${o.id}</td>
+      <td>${o.name || ''}</td>
+      <td>-</td>
+      <td>${o.description || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditOfficeModal(${o.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Office', ${o.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderDesignationsTable(designations) {
+  const tbody = document.getElementById('designationsTableBody');
+  if (!tbody) return;
+  if (!designations.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">No designations found</td></tr>'; return; }
+  tbody.innerHTML = designations.map(d => `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.name || ''}</td>
+      <td>${d.code || '-'}</td>
+      <td>${d.description || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditDesignationModal(${d.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Designation', ${d.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderDivisionsTable(divisions) {
+  const tbody = document.getElementById('divisionsTableBody');
+  if (!tbody) return;
+  if (!divisions.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">No divisions found</td></tr>'; return; }
+  tbody.innerHTML = divisions.map(d => `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.code || ''}</td>
+      <td>${d.name || ''}</td>
+      <td>${d.description || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditDivisionModal(${d.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Division', ${d.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderFundClustersTable(fc) {
+  const tbody = document.getElementById('fundClustersTableBody');
+  if (!tbody) return;
+  if (!fc.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">No fund clusters found</td></tr>'; return; }
+  tbody.innerHTML = fc.map(f => `
+    <tr>
+      <td>${f.id}</td>
+      <td>${f.code || ''}</td>
+      <td>${f.name || ''}</td>
+      <td>${f.description || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditFundClusterModal(${f.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('FundCluster', ${f.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderProcurementModesTable(modes) {
+  const tbody = document.getElementById('procurementModesTableBody');
+  if (!tbody) return;
+  if (!modes.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">No procurement modes found</td></tr>'; return; }
+  tbody.innerHTML = modes.map(m => `
+    <tr>
+      <td>${m.id}</td>
+      <td>${m.code || ''}</td>
+      <td>${m.name || ''}</td>
+      <td>${m.description || ''}</td>
+      <td>-</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditProcurementModeModal(${m.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('ProcurementMode', ${m.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderUACSCodesTable(codes) {
+  const tbody = document.getElementById('uacsCodesTableBody');
+  if (!tbody) return;
+  if (!codes.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">No UACS codes found</td></tr>'; return; }
+  tbody.innerHTML = codes.map(c => `
+    <tr>
+      <td>${c.id}</td>
+      <td>${c.code || ''}</td>
+      <td>${c.description || ''}</td>
+      <td>${c.category || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditUACSCodeModal(${c.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('UACSCode', ${c.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderUOMsTable(uoms) {
+  const tbody = document.getElementById('uomsTableBody');
+  if (!tbody) return;
+  if (!uoms.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-center">No units of measure found</td></tr>'; return; }
+  tbody.innerHTML = uoms.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td>${u.abbreviation || u.code || ''}</td>
+      <td>${u.name || u.description || ''}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon" title="Edit" onclick="showEditUOMModal(${u.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('UOM', ${u.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderSettingsTable(settings) {
+  const tbody = document.getElementById('settingsTableBody');
+  if (!tbody) return;
+  if (!settings.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-center">No settings found</td></tr>'; return; }
+  tbody.innerHTML = settings.map(s => {
+    const dataStr = typeof s.data === 'object' ? JSON.stringify(s.data) : (s.data || '{}');
+    return `
+    <tr>
+      <td><code>${s.id || ''}</code></td>
+      <td><input type="text" class="form-input settings-value" data-id="${s.id}" value='${dataStr.replace(/'/g, "&apos;")}' style="width: 100%;"></td>
+      <td>-</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon success" title="Save" onclick="saveSetting('${s.id}')"><i class="fas fa-save"></i></button>
+        </div>
+      </td>
+    </tr>
+  `}).join('');
+}
+
+// Filter functions for new modules
+function filterRIS(status) {
+  const tbody = document.getElementById('risTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!status) { row.style.display = ''; return; }
+    const badge = row.querySelector('.status-badge');
+    if (badge) {
+      const text = badge.textContent.trim().toLowerCase();
+      row.style.display = text === status ? '' : 'none';
+    }
+  });
+}
+
+function filterTripTickets(status) {
+  const tbody = document.getElementById('tripTicketsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!status) { row.style.display = ''; return; }
+    const badge = row.querySelector('.status-badge');
+    if (badge) {
+      const text = badge.textContent.trim().toLowerCase().replace(' ', '_');
+      row.style.display = text === status ? '' : 'none';
+    }
+  });
+}
+
+// Load all data when navigating to a page
+async function loadPageData(pageId) {
+  switch(pageId) {
+    case 'dashboard': loadDashboardStats(); break;
+    case 'items': loadItems(); break;
+    case 'suppliers': loadSuppliers(); break;
+    case 'users': loadUsers(); break;
+    case 'ppmp': loadPPMP(); break;
+    case 'app': loadAPP(); break;
+    case 'purchase-requests': loadPR(); break;
+    case 'rfq': loadRFQ(); break;
+    case 'abstract': loadAbstract(); break;
+    case 'post-qual': loadPostQual(); break;
+    case 'bac-resolution': loadBACResolution(); break;
+    case 'noa': loadNOA(); break;
+    case 'purchase-orders': loadPO(); break;
+    case 'iar': loadIAR(); break;
+    case 'po-packet': loadPOPacket(); break;
+    case 'coa': loadCOA(); break;
+    case 'stock-cards': loadStockCards(); break;
+    case 'property-cards': loadPropertyCards(); break;
+    case 'ics': loadICS(); break;
+    case 'employees': loadEmployees(); break;
+    case 'par': loadPAR(); break;
+    case 'ptr': loadPTR(); break;
+    case 'ris': loadRIS(); break;
+    case 'supplies-ledger': loadSuppliesLedger(); break;
+    case 'semi-expendable': loadSemiExpendable(); break;
+    case 'capital-outlay': loadCapitalOutlay(); break;
+    case 'trip-tickets': loadTripTickets(); break;
+    case 'offices': loadOffices(); break;
+    case 'designations': loadDesignations(); break;
+    case 'divisions': loadDivisions(); break;
+    case 'fund-clusters': loadFundClusters(); break;
+    case 'procurement-modes': loadProcurementModes(); break;
+    case 'uacs-codes': loadUACSCodes(); break;
+    case 'uoms': loadUOMs(); break;
+    case 'settings': loadSettings(); break;
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   // DOM Elements
@@ -33,22 +1672,54 @@ document.addEventListener('DOMContentLoaded', () => {
   // Page titles mapping (As-Is System)
   const pageTitles = {
     dashboard: 'Dashboard',
-    ppmp: 'Project Procurement Management Plan (PPMP)',
-    app: 'Annual Procurement Plan (APP)',
+    ppmp: 'PPMP',
+    app: 'Annual Procurement Plan',
     'purchase-requests': 'Purchase Requests',
-    rfq: 'Request for Quotations (RFQ)',
-    abstract: 'Abstract of Quotations',
-    'post-qual': 'Post-Qualification (Optional)',
+    rfq: 'Request for Quotation',
+    abstract: 'Abstract of Quotation',
+    'post-qual': 'Post-Qualification',
     'bac-resolution': 'BAC Resolution',
-    noa: 'Notice of Award (NOA)',
+    noa: 'Notice of Award',
     'purchase-orders': 'Purchase Orders',
-    iar: 'Inspection & Acceptance Report (IAR) - Appendix 62',
+    iar: 'Inspection & Acceptance Report',
+    'po-packet': 'PO Packet / Signing',
     coa: 'COA Submission',
     items: 'Items Catalog',
-    suppliers: 'Suppliers Directory',
-    divisions: 'DMW Caraga Divisions (5 End-Users)',
-    users: 'User Management',
-    reports: 'Reports & KPIs'
+    suppliers: 'Suppliers',
+    divisions: 'Divisions',
+    users: 'Users',
+    employees: 'Employees',
+    'stock-cards': 'Stock Cards',
+    'property-cards': 'Property Cards',
+    ics: 'Inventory Custodian Slips',
+    par: 'Property Acknowledgement Receipts',
+    ptr: 'Property Transfer Reports',
+    ris: 'Requisition & Issue Slips',
+    'supplies-ledger': 'Supplies Ledger Cards',
+    'semi-expendable': 'Semi-Expendable Items',
+    'capital-outlay': 'Capital Outlay Items',
+    'trip-tickets': 'Trip Tickets',
+    offices: 'Offices',
+    designations: 'Designations',
+    'fund-clusters': 'Fund Clusters',
+    'procurement-modes': 'Procurement Modes',
+    'uacs-codes': 'UACS Codes',
+    uoms: 'Units of Measure',
+    settings: 'System Settings',
+    reports: 'Reports'
+  };
+
+  // Workflow Status Badges (per spec v1.2)
+  const WORKFLOW_STATUS_BADGES = {
+    pending: { label: 'Pending', class: 'pending' },
+    on_process: { label: 'On Process', class: 'on-process' },
+    awaiting_delivery: { label: 'Awaiting Delivery', class: 'awaiting-delivery' },
+    for_payment: { label: 'For Payment', class: 'for-payment' },
+    paid_ada: { label: 'Paid (ADA)', class: 'paid-ada' },
+    for_signing: { label: 'For Signing', class: 'for-signing' },
+    signed: { label: 'Signed', class: 'signed' },
+    submitted_to_coa: { label: 'COA Submitted', class: 'submitted-to-coa' },
+    cancelled: { label: 'Cancelled', class: 'rejected' }
   };
 
   // Initialize the app
@@ -116,38 +1787,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check if user has a session
   function checkSession() {
-    const savedUser = localStorage.getItem('dmwUser');
-    if (savedUser) {
-      currentUser = JSON.parse(savedUser);
-      showApp();
-    }
+    // For wireframe: skip session check, always show login
+    console.log('App initialized - showing login screen');
   }
 
-  // Handle login
+  // Handle login - redirect form submit to doLogin
   function handleLogin(e) {
     e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const role = document.getElementById('roleSelect').value;
-    const division = document.getElementById('divisionSelect')?.value || 'FAD';
-
-    // Static demo - accept any login
-    if (username && password && role) {
-      currentUser = {
-        name: username,
-        role: role,
-        division: division
-      };
-      localStorage.setItem('dmwUser', JSON.stringify(currentUser));
-      showApp();
-    } else {
-      alert('Please fill in all fields');
+    console.log('Login form submitted');
+    // Call the real API-based login function
+    if (typeof window.doLogin === 'function') {
+      window.doLogin();
     }
   }
 
   // Show the main app
   function showApp() {
+    console.log('Showing main app');
     if (loginOverlay) {
+      loginOverlay.style.display = 'none';
       loginOverlay.classList.add('hidden');
     }
 
@@ -170,14 +1828,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function formatRole(role) {
     const roleLabels = {
       admin: 'System Administrator',
+      manager: 'Division Manager',
+      officer: 'Procurement Officer',
+      viewer: 'Viewer',
+      auditor: 'COA Auditor',
       hope: 'HoPE (Regional Director)',
       bac_chair: 'BAC Chairperson',
-      bac_sec: 'BAC Secretariat',
-      twg: 'TWG Member',
-      div_head: 'Division Head',
+      bac_secretariat: 'BAC Secretariat',
+      twg_member: 'TWG Member',
+      division_head: 'Division Head',
       end_user: 'End User',
-      supply: 'Supply/Procurement Officer',
-      inspector: 'Inspection/Property Custodian'
+      supply_officer: 'Supply/Procurement Officer',
+      inspector: 'Inspection/Property Custodian',
+      ord_manager: 'ORD Manager',
+      chief_fad: 'Chief - FAD',
+      chief_wrsd: 'Chief - WRSD',
+      chief_mwpsd: 'Chief - MWPSD',
+      chief_mwptd: 'Chief - MWPTD'
     };
     return roleLabels[role] || role;
   }
@@ -186,9 +1853,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const roleActionPermissions = {
     admin: {
       // Admin can do everything
-      canCreatePPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
       canCreateAPP: true, canApproveAPP: true, canConsolidateAPP: true, canViewAPP: true,
-      canCreatePR: true, canApprovePR: true, canViewPR: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: true, canViewAbstract: true,
       canCreatePostQual: true, canApprovePostQual: true, canViewPostQual: true,
@@ -203,11 +1870,87 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: true, canExportReports: true,
       canManageDivisions: true
     },
+    manager: {
+      // Manager/Division Chief: Approves division PPMP, approves PR, views most items
+      canCreatePPMP: false, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: true, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: true, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: true,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
+    officer: {
+      // Officer: Creates PPMP, PR, handles procurement transactions
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: false, canViewPR: true,
+      canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
+      canCreateAbstract: true, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: true, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: true, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: true, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: true, canApprovePO: false, canViewPO: true,
+      canCreateIAR: true, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: true, canSubmitCOA: true, canViewCOA: true,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: true, canEditSupplier: true, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
+    viewer: {
+      // Viewer: Read-only access to most modules
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: false,
+      canManageDivisions: false
+    },
+    auditor: {
+      // Auditor: COA Auditor - read access to all for audit purposes
+      canCreatePPMP: false, canEditPPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
     hope: {
       // HoPE: Approvals for NOA, PO, final oversight
-      canCreatePPMP: false, canApprovePPMP: true, canViewPPMP: true,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: true, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: true, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: true, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
       canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
@@ -224,9 +1967,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     bac_chair: {
       // BAC Chair: Approves BAC resolutions, signs abstracts
-      canCreatePPMP: false, canApprovePPMP: false, canViewPPMP: false,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: false,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
       canCreateAbstract: false, canApproveAbstract: true, canViewAbstract: true,
       canCreatePostQual: false, canApprovePostQual: true, canViewPostQual: true,
@@ -241,11 +1984,11 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: true, canExportReports: false,
       canManageDivisions: false
     },
-    bac_sec: {
+    bac_secretariat: {
       // BAC Secretariat: Creates RFQ, Abstract, BAC Res, NOA, prepares documents
-      canCreatePPMP: false, canApprovePPMP: false, canViewPPMP: true,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: true, canViewAPP: true,
-      canCreatePR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: false, canViewAbstract: true,
       canCreatePostQual: true, canApprovePostQual: false, canViewPostQual: true,
@@ -260,11 +2003,11 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: true, canExportReports: true,
       canManageDivisions: false
     },
-    twg: {
+    twg_member: {
       // TWG: Technical evaluation, post-qualification
-      canCreatePPMP: false, canApprovePPMP: false, canViewPPMP: false,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: false,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
       canCreatePostQual: true, canApprovePostQual: false, canViewPostQual: true,
@@ -279,11 +2022,13 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: true, canExportReports: false,
       canManageDivisions: false
     },
-    div_head: {
-      // Division Head: Approves division PPMP, approves PR for their division
-      canCreatePPMP: false, canApprovePPMP: true, canViewPPMP: true,
+    division_head: {
+      // Division Head EXCLUSIVE: Approves division PPMP, approves PR, manages division items
+      // Features ONLY accessible by Division Head (not end_user):
+      // - Approve PPMP, Approve PR, View APP, Edit PPMP, View Reports, Export division data
+      canCreatePPMP: true, canApprovePPMP: true, canEditPPMP: true, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canApprovePR: true, canViewPR: true,
+      canCreatePR: true, canApprovePR: true, canEditPR: true, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
       canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
@@ -292,17 +2037,19 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: false,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
-      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
-      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
-      canViewReports: true, canExportReports: false,
-      canManageDivisions: false
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: true
     },
     end_user: {
-      // End User: Creates PPMP, creates PR
-      canCreatePPMP: true, canApprovePPMP: false, canViewPPMP: true,
+      // End User: Can ONLY create/view own PPMP and PR - NO approval or edit rights
+      // These features are RESTRICTED to Division Head only:
+      // - NO Approve PPMP, NO Approve PR, NO View APP, NO Edit, NO Reports, NO Export
+      canCreatePPMP: true, canApprovePPMP: false, canEditPPMP: false, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: false,
-      canCreatePR: true, canApprovePR: false, canViewPR: true,
+      canCreatePR: true, canApprovePR: false, canEditPR: false, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
       canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
@@ -317,11 +2064,11 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: false, canExportReports: false,
       canManageDivisions: false
     },
-    supply: {
+    supply_officer: {
       // Supply/Procurement Officer: Manages procurement process, creates PO, RFQ
-      canCreatePPMP: false, canApprovePPMP: false, canViewPPMP: false,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: false,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: false, canViewAbstract: true,
       canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
@@ -338,9 +2085,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     inspector: {
       // Inspection/Property Custodian: IAR, delivery inspection
-      canCreatePPMP: false, canApprovePPMP: false, canViewPPMP: false,
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: false,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: false,
-      canCreatePR: false, canApprovePR: false, canViewPR: false,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: false,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
       canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
@@ -353,6 +2100,101 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: false,
+      canManageDivisions: false
+    },
+    ord_manager: {
+      // ORD Manager: Can view ALL divisions PPMP, similar to admin for PPMP viewing
+      canCreatePPMP: false, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: true, canConsolidateAPP: true, canViewAPP: true,
+      canCreatePR: false, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: true,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: true
+    },
+    chief_fad: {
+      // Chief FAD: Can create PPMP, only sees FAD division PPMP
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
+    chief_wrsd: {
+      // Chief WRSD: Can create PPMP, only sees WRSD division PPMP
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
+    chief_mwpsd: {
+      // Chief MWPSD: Can create PPMP, only sees MWPSD division PPMP
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
+    chief_mwptd: {
+      // Chief MWPTD: Can create PPMP, only sees MWPTD division PPMP
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
+      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
       canManageDivisions: false
     }
   };
@@ -368,6 +2210,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return perms[permissionName] === true;
   }
 
+  // Expose permission functions globally for inline event handlers
+  window.hasPermission = hasPermission;
+  window.getUserPermissions = getUserPermissions;
+
   // Apply role-based UI visibility (As-Is Permissions)
   function applyRoleVisibility() {
     const role = currentUser.role;
@@ -380,17 +2226,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Show/hide nav items based on role permissions (As-Is)
+    const chiefPages = ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ris', 'reports'];
     const rolePermissions = {
-      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'coa', 'items', 'suppliers', 'divisions', 'users', 'reports'],
-      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'coa', 'items', 'suppliers', 'divisions', 'reports'],
-      bac_chair: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'reports'],
-      bac_sec: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'coa', 'items', 'suppliers', 'reports'],
-      twg: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'items', 'suppliers', 'reports'],
-      div_head: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'items', 'reports'],
-      end_user: ['dashboard', 'ppmp', 'purchase-requests', 'items'],
-      supply: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'noa', 'purchase-orders', 'iar', 'coa', 'items', 'suppliers', 'reports'],
-      inspector: ['dashboard', 'purchase-orders', 'iar', 'coa', 'items', 'reports'],
-      auditor: ['dashboard', 'ppmp', 'app', 'pr', 'rfq', 'abstract', 'noa', 'po', 'iar', 'reports']
+      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'reports'],
+      manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      officer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      viewer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      auditor: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      bac_chair: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'items', 'suppliers', 'stock-cards', 'property-cards', 'reports'],
+      bac_secretariat: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'reports'],
+      twg_member: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'items', 'suppliers', 'reports'],
+      division_head: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'items', 'stock-cards', 'property-cards', 'ris', 'reports'],
+      end_user: ['dashboard', 'ppmp', 'purchase-requests', 'items', 'ris'],
+      supply_officer: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      inspector: ['dashboard', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'reports'],
+      chief_fad: chiefPages,
+      chief_wrsd: chiefPages,
+      chief_mwpsd: chiefPages,
+      chief_mwptd: chiefPages
     };
 
     const allowedPages = rolePermissions[role] || [];
@@ -401,6 +2256,15 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         item.style.display = '';
       }
+    });
+
+    // Hide section headers when all items in the section are hidden
+    const sections = document.querySelectorAll('.nav-section[data-section]');
+    sections.forEach(section => {
+      const sectionName = section.dataset.section;
+      const sectionItems = document.querySelectorAll(`[data-section-item="${sectionName}"]`);
+      const hasVisibleItems = Array.from(sectionItems).some(item => item.style.display !== 'none');
+      section.style.display = hasVisibleItems ? '' : 'none';
     });
 
     // Apply action-based button visibility
@@ -415,14 +2279,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const permissionButtonMap = {
       // PPMP
       canCreatePPMP: ['[data-action="create-ppmp"]', '.btn-create-ppmp'],
+      canEditPPMP: ['[data-action="edit-ppmp"]', '.btn-edit-ppmp'],
       canApprovePPMP: ['[data-action="approve-ppmp"]', '.btn-approve-ppmp'],
+      canViewPPMP: ['[data-action="view-ppmp"]'],
       // APP
       canCreateAPP: ['[data-action="create-app"]'],
       canConsolidateAPP: ['[data-action="consolidate-app"]', '.btn-consolidate-app'],
       canApproveAPP: ['[data-action="approve-app"]'],
       // PR
       canCreatePR: ['[data-action="create-pr"]', '.btn-create-pr'],
+      canEditPR: ['[data-action="edit-pr"]', '.btn-edit-pr'],
       canApprovePR: ['[data-action="approve-pr"]', '.btn-approve-pr'],
+      canViewPR: ['[data-action="view-pr"]'],
       // RFQ
       canCreateRFQ: ['[data-action="create-rfq"]', '.btn-create-rfq'],
       canSendRFQ: ['[data-action="send-rfq"]'],
@@ -452,6 +2320,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canEditItem: ['[data-action="edit-item"]', '.btn-edit-item'],
       canDeleteItem: ['[data-action="delete-item"]', '.btn-delete-item'],
       // Suppliers
+      canViewSupplier: ['[data-action="view-supplier"]'],
       canCreateSupplier: ['[data-action="create-supplier"]', '.btn-create-supplier'],
       canEditSupplier: ['[data-action="edit-supplier"]', '.btn-edit-supplier'],
       canDeleteSupplier: ['[data-action="delete-supplier"]', '.btn-delete-supplier'],
@@ -526,8 +2395,39 @@ document.addEventListener('DOMContentLoaded', () => {
     mainContent.classList.toggle('expanded');
   }
 
-  // Navigate to page
+  // Navigate to page with RBAC access control
   function navigateTo(pageId) {
+    // RBAC: Check if user has access to this page
+    const chiefNavPages = ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ris', 'reports'];
+    const rolePermissions = {
+      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'reports'],
+      manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      officer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      viewer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      auditor: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      bac_chair: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'items', 'suppliers', 'stock-cards', 'property-cards', 'reports'],
+      bac_secretariat: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'reports'],
+      twg_member: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'items', 'suppliers', 'reports'],
+      division_head: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'items', 'stock-cards', 'property-cards', 'ris', 'reports'],
+      end_user: ['dashboard', 'ppmp', 'purchase-requests', 'items', 'ris'],
+      supply_officer: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
+      inspector: ['dashboard', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'reports'],
+      chief_fad: chiefNavPages,
+      chief_wrsd: chiefNavPages,
+      chief_mwpsd: chiefNavPages,
+      chief_mwptd: chiefNavPages
+    };
+    
+    const allowedPages = rolePermissions[currentUser.role] || ['dashboard'];
+    
+    // Block access if user doesn't have permission
+    if (!allowedPages.includes(pageId)) {
+      showAccessDeniedMessage(pageId);
+      return;
+    }
+
     // Update active nav item
     navItems.forEach(item => {
       item.classList.remove('active');
@@ -549,23 +2449,36 @@ document.addEventListener('DOMContentLoaded', () => {
       pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
     }
 
+    // Load data from API for this page
+    loadPageData(pageId);
+
     // Re-apply action permissions for the current page
     setTimeout(() => {
       applyActionPermissions();
     }, 50);
   }
+  
+  // Show access denied message
+  function showAccessDeniedMessage(pageId) {
+    const pageName = pageTitles[pageId] || pageId;
+    alert(`⛔ Access Denied\n\nYou do not have permission to access "${pageName}".\n\nYour role: ${formatRole(currentUser.role)}\n\nContact your administrator if you need access.`);
+  }
 
   // Handle logout
   function handleLogout() {
-    localStorage.removeItem('dmwUser');
     currentUser = { name: '', role: '', division: '' };
+    authToken = null;
     if (loginOverlay) {
+      loginOverlay.style.display = 'flex';
       loginOverlay.classList.remove('hidden');
     }
     // Reset form
     if (loginForm) {
       loginForm.reset();
     }
+    // Clear any error messages
+    const loginError = document.getElementById('loginError');
+    if (loginError) loginError.style.display = 'none';
   }
 
   // Open modal with content
@@ -580,6 +2493,9 @@ document.addEventListener('DOMContentLoaded', () => {
       modalOverlay.classList.add('show');
     }
   }
+
+  // Alias for report functions that use showModal
+  const showModal = openModal;
 
   // Close modal
   function closeModal() {
@@ -651,134 +2567,134 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Modal Templates (As-Is PPMP per NGPA Form)
   window.showNewPPMPModal = function() {
+    // Determine if user is a chief (auto-select their division)
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const isChief = chiefRoles.includes(currentUser.role);
+    const chiefDivision = currentUser.division || currentUser.department_code || '';
+    
     const html = `
       <form id="ppmpForm">
         <div class="info-banner" style="margin-bottom: 15px;">
           <i class="fas fa-info-circle"></i>
-          PPMP Fields per NGPA Form: Project, Type, Qty/Size, Mode, Timeline, Fund Source, Budget
+          <strong>PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</strong> — Per NGPA Form (RA 12009 IRR Section 7.7.2)
         </div>
         <div class="form-row">
+          <div class="form-group">
+            <label>PPMP No.</label>
+            <input type="text" value="PPMP-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+          </div>
           <div class="form-group">
             <label>Fiscal Year</label>
             <select class="form-select" required>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
+              <option value="2026">CY 2026</option>
+              <option value="2025">CY 2025</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Division (End-User)</label>
-            <select class="form-select" required>
-              <option value="FAD">FAD - Finance & Administrative</option>
-              <option value="WRSD">WRSD - Welfare Reintegration Services</option>
-              <option value="MWPSD">MWPSD - Migrant Workers Protection Services</option>
-              <option value="MWPTD">MWPTD - Migrant Workers Protection Training</option>
-              <option value="ORD">ORD - Office of Regional Director</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Project Title</label>
-          <input type="text" placeholder="Enter project/procurement title" required>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Type</label>
+            <label><input type="checkbox" id="ppmpIndicative"> INDICATIVE</label>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="ppmpFinal"> FINAL</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>End-User or Implementing Unit</label>
+          <select class="form-select" id="ppmpDivisionSelect" required ${isChief ? 'disabled' : ''}>
+            <option value="">-- Select --</option>
+            <option value="FAD" ${isChief && chiefDivision === 'FAD' ? 'selected' : ''}>FAD - Procurement and Supplies Unit</option>
+            <option value="WRSD" ${isChief && chiefDivision === 'WRSD' ? 'selected' : ''}>WRSD - Welfare Reintegration Services Division</option>
+            <option value="MWPSD" ${isChief && chiefDivision === 'MWPSD' ? 'selected' : ''}>MWPSD - Migrant Workers Protection Services Division</option>
+            <option value="MWPTD" ${isChief && chiefDivision === 'MWPTD' ? 'selected' : ''}>MWPTD - Migrant Workers Protection Training Division</option>
+            <option value="ORD" ${isChief && chiefDivision === 'ORD' ? 'selected' : ''}>ORD - Office of Regional Director</option>
+          </select>
+          ${isChief ? '<input type="hidden" name="division" value="' + chiefDivision + '">' : ''}
+        </div>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">PROCUREMENT PROJECT DETAILS</h4>
+        <div class="form-group">
+          <label><strong>Column 1:</strong> General Description and Objective of the Project to be Procured</label>
+          <textarea rows="2" placeholder="E.g., Hiring of Security Guard Services" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label><strong>Column 2:</strong> Type of Project<br><small>(Goods, Infrastructure, Consulting Services)</small></label>
             <select class="form-select" required>
-              <option value="Services">Services</option>
               <option value="Goods">Goods</option>
-              <option value="Supplies">Supplies</option>
-              <option value="Equipment">Equipment</option>
-              <option value="Catering">Catering</option>
-              <option value="Utilities">Utilities</option>
               <option value="Infrastructure">Infrastructure</option>
+              <option value="Consulting Services">Consulting Services</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Quantity/Size</label>
-            <input type="text" placeholder="e.g., 12 months, 200 pax, 10 units" required>
+            <label><strong>Column 3:</strong> Quantity and Size of the Project to be Procured</label>
+            <input type="text" placeholder="E.g., 4 Pax, 1 Lot, 850 Gal" required>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Description/Specifications</label>
-          <textarea rows="2" placeholder="Describe the procurement items/services"></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Recommended Mode</label>
+            <label><strong>Column 4:</strong> Recommended Mode of Procurement</label>
             <select class="form-select" required>
-              <option value="SVP">Small Value Procurement (SVP)</option>
-              <option value="DC">Direct Contracting</option>
+              <option value="Small Value Procurement">Small Value Procurement</option>
+              <option value="Direct Contracting">Direct Contracting</option>
               <option value="Shopping">Shopping</option>
-              <option value="NP-Emergency">NP-Emergency Purchase</option>
+              <option value="Competitive Bidding">Competitive Bidding</option>
+              <option value="NP-Emergency Purchase">NP-Emergency Purchase</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Estimated Budget (ABC)</label>
+            <label><strong>Column 5:</strong> Pre-Procurement Conference, if applicable</label>
+            <select class="form-select" required>
+              <option value="NO">NO</option>
+              <option value="YES">YES</option>
+            </select>
+          </div>
+        </div>
+        <h4 style="margin: 15px 0 10px; color: #1a365d;">PROJECTED TIMELINE (MM/YYYY)</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label><strong>Column 6:</strong> Start of Procurement Activity</label>
+            <input type="month" required>
+          </div>
+          <div class="form-group">
+            <label><strong>Column 7:</strong> End of Procurement Activity</label>
+            <input type="month" required>
+          </div>
+          <div class="form-group">
+            <label><strong>Column 8:</strong> Expected Delivery / Implementation Period</label>
+            <input type="month" required>
+          </div>
+        </div>
+        <h4 style="margin: 15px 0 10px; color: #1a365d;">FUNDING DETAILS</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label><strong>Column 9:</strong> Source of Funds</label>
+            <select class="form-select" required>
+              <option value="GAA">GAA</option>
+              <option value="GAA 2026">GAA 2026</option>
+              <option value="Special Fund">Special Fund</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><strong>Column 10:</strong> Estimated Budget / Authorized Budgetary Allocation (₱)</label>
             <input type="number" placeholder="0.00" step="0.01" min="0" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Source of Fund</label>
-            <select class="form-select" required>
-              <option value="GAA-MOOE">GAA - MOOE</option>
-              <option value="GAA-CO">GAA - Capital Outlay</option>
-              <option value="GAA-PS">GAA - Personnel Services</option>
-              <option value="Special">Special Fund</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Fund Code/Charge</label>
-            <input type="text" placeholder="e.g., 101-101-001">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Timeline Start</label>
-            <select class="form-select" required>
-              <option value="1">January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Timeline End</label>
-            <select class="form-select" required>
-              <option value="12">December</option>
-              <option value="1">January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
-          <div class="attachment-box" style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 2px dashed #ffc107;">
-            <div style="margin-bottom: 10px;">
+            <label><strong>Column 11:</strong> Attached Supporting Documents</label>
+            <div class="attachment-box" style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 2px dashed #ffc107;">
               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                 <input type="file" id="ppmpAttachment" accept=".pdf,.doc,.docx,.xls,.xlsx" required style="display: none;" onchange="updateFileLabel(this, 'ppmpFileLabel')">
-                <span class="btn btn-sm btn-warning"><i class="fas fa-upload"></i> Upload PPMP Supporting Document</span>
+                <span class="btn btn-sm btn-warning"><i class="fas fa-upload"></i> Upload Supporting Document</span>
                 <span id="ppmpFileLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </label>
+              <small style="color: #856404;"><i class="fas fa-exclamation-triangle"></i> Market Survey, Price Quotation, or PPMP Form</small>
             </div>
-            <small style="color: #856404;"><i class="fas fa-exclamation-triangle"></i> Required: PPMP Form, Market Survey, or Price Quotation (PDF, DOC, XLS)</small>
+          </div>
+          <div class="form-group">
+            <label><strong>Column 12:</strong> Remarks</label>
+            <textarea rows="2" placeholder="Additional remarks"></textarea>
           </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
@@ -793,106 +2709,145 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showNewPRModal = function() {
     const html = `
       <form id="prForm">
-        <div class="info-banner warning-banner">
-          <i class="fas fa-clock"></i>
-          <strong>Timeline KPI:</strong> PRs must be submitted at least <strong>15 calendar days</strong> before scheduled activity. Division Head approval within <strong>5 calendar days</strong>.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-alt"></i>
+          <strong>PURCHASE REQUEST</strong> — Per Government PR Form
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>PR Number</label>
-            <input type="text" value="PR-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>Office/Section</label>
+            <input type="text" value="DMW Caraga" required>
           </div>
+          <div class="form-group">
+            <label>PR No.</label>
+            <input type="text" value="PR-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label>Date</label>
             <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
-            <label>Requesting Division</label>
-            <select class="form-select" required>
-              <option value="">-- Select Division --</option>
-              <option value="FAD">FAD - Finance & Admin Division</option>
-              <option value="WRSD">WRSD - Workers Resource Services Division</option>
-              <option value="MWPSD">MWPSD - Migrant Workers Protection Services Division</option>
-              <option value="MWPTD">MWPTD - Migrant Workers Programs & Training Division</option>
-              <option value="ORD">ORD - Office of the Regional Director</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Requested By (End-User)</label>
-            <input type="text" placeholder="Name of requisitioner" required>
+            <label>Responsibility Center Code</label>
+            <input type="text" placeholder="____________________">
           </div>
         </div>
-        <div class="form-group">
-          <label>Purpose/Justification</label>
-          <textarea rows="2" placeholder="Purpose of the purchase request (ISO 9001:2015 Clause 8.2 - Customer Requirements)" required></textarea>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ITEM DETAILS</h4>
+        <div id="prItemsContainer">
+          <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+            <thead>
+              <tr>
+                <th style="width: 60px;">Item No.</th>
+                <th style="width: 80px;">Unit</th>
+                <th>Item Description</th>
+                <th style="width: 80px;">Quantity</th>
+                <th style="width: 110px;">Unit Cost</th>
+                <th style="width: 110px;">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody id="prItemsBody">
+              <tr>
+                <td><input type="number" value="1" style="width: 50px;" readonly></td>
+                <td>
+                  <select class="form-select" style="width: 75px;">
+                    <option value="Lot">Lot</option>
+                    <option value="Pax">Pax</option>
+                    <option value="Pcs">Pcs</option>
+                    <option value="Unit">Unit</option>
+                    <option value="Sq.ft">Sq.ft</option>
+                    <option value="Gal">Gal</option>
+                    <option value="Ltrs">Ltrs</option>
+                    <option value="Box">Box</option>
+                    <option value="Ream">Ream</option>
+                    <option value="Set">Set</option>
+                  </select>
+                </td>
+                <td><textarea rows="2" placeholder="Item description, specifications, duration, notes..." style="width: 100%;"></textarea></td>
+                <td><input type="number" placeholder="0" style="width: 70px;" min="0" onchange="calculatePRItemTotal(this)"></td>
+                <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" min="0" onchange="calculatePRItemTotal(this)"></td>
+                <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" readonly></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" style="text-align: right; font-weight: bold;">TOTAL AMOUNT</td>
+                <td><strong id="prTotalAmount">₱0.00</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+          <button type="button" class="btn btn-sm btn-outline" onclick="addPRItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Purpose</label>
+          <textarea rows="2" placeholder="Purpose of the purchase request" required></textarea>
         </div>
         <div class="form-group">
-          <label>Linked PPMP Entry (from Consolidated APP)</label>
-          <select class="form-select" required>
-            <option value="">-- Select PPMP/APP Entry --</option>
-            <option value="ppmp-001">PPMP-001 - Office Supplies (FAD) - In APP</option>
-            <option value="ppmp-002">PPMP-002 - IT Equipment (FAD) - In APP</option>
-            <option value="ppmp-003">PPMP-003 - OFW Assistance Materials (WRSD) - In APP</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Procurement Mode</label>
-            <select class="form-select" required>
-              <option value="SVP">Small Value Procurement (≤₱1M)</option>
-              <option value="DC">Direct Contracting</option>
-              <option value="Shopping">Shopping</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Estimated Amount (ABC)</label>
-            <input type="number" placeholder="0.00" step="0.01" min="0" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Scheduled Activity Date</label>
-          <input type="date" required>
-          <small style="color: #666;">PR must be filed 15 calendar days before this date</small>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 2px dashed #ffc107;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Route Slip / Annex 1 (MANDATORY)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Route Slip / Annex 1</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="prRouteSlip" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'prRouteSlipLabel')">
+                <input type="file" id="prRouteSlip" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'prRouteSlipLabel')">
                 <button type="button" class="btn btn-sm btn-warning" onclick="document.getElementById('prRouteSlip').click()"><i class="fas fa-upload"></i> Upload</button>
-                <span id="prRouteSlipLabel" style="font-size: 12px; color: #666;">No file selected</span>
+                <span id="prRouteSlipLabel" style="font-size: 12px; color: #666;">Optional</span>
               </div>
             </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
+            <div>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="prTechSpecs" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'prTechSpecsLabel')">
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('prTechSpecs').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="prTechSpecsLabel" style="font-size: 12px; color: #666;">Optional</span>
               </div>
             </div>
-            <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Market Survey / Price Quotations</label>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="prMarketSurvey" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display: none;" onchange="updateFileLabel(this, 'prMarketSurveyLabel')">
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('prMarketSurvey').click()"><i class="fas fa-upload"></i> Upload</button>
-                <span id="prMarketSurveyLabel" style="font-size: 12px; color: #666;">Optional</span>
-              </div>
-            </div>
           </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-warning" onclick="return validateAttachment('prRouteSlip', 'Route Slip / Annex 1')"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="submit" class="btn btn-warning"><i class="fas fa-save"></i> Save as Draft</button>
           <button type="button" class="btn btn-primary" onclick="submitPRForApproval()"><i class="fas fa-paper-plane"></i> Submit for Approval</button>
         </div>
       </form>
     `;
     openModal('Create Purchase Request (PR)', html);
+  };
+
+  window.addPRItemRow = function() {
+    const tbody = document.getElementById('prItemsBody');
+    const rowCount = tbody.rows.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="number" value="${rowCount}" style="width: 50px;" readonly></td>
+      <td>
+        <select class="form-select" style="width: 75px;">
+          <option value="Lot">Lot</option><option value="Pax">Pax</option><option value="Pcs">Pcs</option>
+          <option value="Unit">Unit</option><option value="Sq.ft">Sq.ft</option><option value="Gal">Gal</option>
+          <option value="Ltrs">Ltrs</option><option value="Box">Box</option><option value="Ream">Ream</option><option value="Set">Set</option>
+        </select>
+      </td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><input type="number" placeholder="0" style="width: 70px;" min="0" onchange="calculatePRItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" min="0" onchange="calculatePRItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" readonly></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.calculatePRItemTotal = function(el) {
+    const row = el.closest('tr');
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const qty = parseFloat(inputs[1].value) || 0;
+    const unitCost = parseFloat(inputs[2].value) || 0;
+    inputs[3].value = (qty * unitCost).toFixed(2);
+    // Update grand total
+    let total = 0;
+    document.querySelectorAll('#prItemsBody tr').forEach(r => {
+      const cells = r.querySelectorAll('input[type="number"]');
+      total += parseFloat(cells[3].value) || 0;
+    });
+    document.getElementById('prTotalAmount').textContent = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits: 2});
   };
 
   window.submitPRForApproval = function() {
@@ -906,64 +2861,79 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showNewRFQModal = function() {
     const html = `
       <form id="rfqForm">
-        <div class="info-banner warning-banner">
-          <i class="fas fa-exclamation-triangle"></i>
-          <strong>PhilGEPS Posting:</strong> ABC ≥ ₱200,000 requires <strong>3 calendar days</strong> posting. Timeline: RFQ preparation within <strong>1-3 calendar days</strong> from PR approval.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-alt"></i>
+          <strong>REQUEST FOR QUOTATION</strong> — Per Government RFQ Form
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>RFQ Number</label>
-            <input type="text" value="RFQ-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>RFQ No.</label>
+            <input type="text" value="RFQ-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
           <div class="form-group">
-            <label>Date Prepared</label>
+            <label>Date</label>
             <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
         </div>
         <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" placeholder="Company Name (to be filled by supplier)">
+        </div>
+        <div class="form-group">
+          <label>Company Address</label>
+          <input type="text" placeholder="Company Address">
+        </div>
+        <div class="form-group">
+          <label>TIN</label>
+          <input type="text" placeholder="Tax Identification Number">
+        </div>
+        <div class="form-group">
           <label>Linked Purchase Request (Approved)</label>
-          <select class="form-select" required onchange="checkPhilGEPSRequirement(this)">
+          <select class="form-select" required>
             <option value="">-- Select Approved PR --</option>
-            <option value="pr-2025-001" data-abc="85000">PR-2025-001 - Office Supplies (₱85,000) - No PhilGEPS</option>
-            <option value="pr-2025-002" data-abc="320000">PR-2025-002 - IT Equipment (₱320,000) - PhilGEPS Required</option>
           </select>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>ABC (Approved Budget for Contract)</label>
-            <input type="number" id="rfqABC" placeholder="0.00" step="0.01" min="0" required onchange="updatePhilGEPSIndicator(this.value)">
-          </div>
-          <div class="form-group">
-            <label>Deadline for Quotation Submission</label>
-            <input type="date" required>
-          </div>
-        </div>
-        <div id="philgepsIndicator" class="form-group" style="display: none;">
-          <div style="background: #d4edda; padding: 10px; border-radius: 4px; border-left: 4px solid #28a745;">
-            <i class="fas fa-globe"></i> <strong>PhilGEPS Posting Required</strong>
-            <p style="margin: 5px 0 0 0; font-size: 12px;">ABC ≥ ₱200,000 - Post for 3 calendar days minimum</p>
-          </div>
-        </div>
         <div class="form-group">
-          <label>Invited Suppliers (minimum 3 for SVP)</label>
-          <select class="form-select" multiple style="height: 120px;">
-            <option value="sup-001" data-philgeps="platinum">🥇 ABC Office Supplies Corp. (PhilGEPS Platinum)</option>
-            <option value="sup-002" data-philgeps="registered">✓ TechMart Solutions Inc. (PhilGEPS Registered)</option>
-            <option value="sup-003" data-philgeps="registered">✓ Best Buy Trading (PhilGEPS Registered)</option>
-            <option value="sup-004" data-philgeps="platinum">🥇 Quality Goods Inc. (PhilGEPS Platinum)</option>
-            <option value="sup-005" data-philgeps="registered">✓ Metro Supplies Corp. (PhilGEPS Registered)</option>
-          </select>
-          <small style="color: #666;">Hold Ctrl/Cmd to select multiple. PhilGEPS registration verified suppliers preferred.</small>
+          <label>Deadline for Quotation Submission</label>
+          <input type="date" required>
+          <small style="color: #666;">3 calendar days from receipt. All bids higher than ABC shall be automatically disqualified.</small>
         </div>
-        <div class="form-group">
-          <label>Special Instructions / Technical Specifications</label>
-          <textarea rows="2" placeholder="Any special instructions for suppliers, delivery requirements, etc."></textarea>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ITEMS</h4>
+        <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th style="width: 80px;">Quantity</th>
+              <th style="width: 80px;">Unit</th>
+              <th>Item (with specification)</th>
+              <th style="width: 110px;">ABC</th>
+              <th style="width: 110px;">Unit Cost<br><small>(Supplier fills)</small></th>
+              <th style="width: 110px;">Total Cost<br><small>(Supplier fills)</small></th>
+            </tr>
+          </thead>
+          <tbody id="rfqItemsBody">
+            <tr>
+              <td><input type="number" placeholder="0" style="width: 70px;" min="0"></td>
+              <td>
+                <select class="form-select" style="width: 75px;">
+                  <option value="Lot">Lot</option><option value="Pax">Pax</option><option value="Pcs">Pcs</option>
+                  <option value="Unit">Unit</option><option value="Sq.ft">Sq.ft</option><option value="Gal">Gal</option>
+                  <option value="Ltrs">Ltrs</option><option value="Box">Box</option><option value="Ream">Ream</option><option value="Set">Set</option>
+                </select>
+              </td>
+              <td><textarea rows="2" placeholder="Item description and specifications..." style="width: 100%;"></textarea></td>
+              <td><input type="number" id="rfqABC" placeholder="0.00" step="0.01" style="width: 100px;" min="0"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addRFQItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <div class="form-group" style="margin-top: 15px;">
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> RFQ Document (Signed)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> RFQ Document (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="rfqDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'rfqDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('rfqDocument').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -971,7 +2941,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="rfqTechSpecs" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'rfqTechSpecsLabel')">
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('rfqTechSpecs').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -988,6 +2958,20 @@ document.addEventListener('DOMContentLoaded', () => {
       </form>
     `;
     openModal('Create Request for Quotation (RFQ)', html);
+  };
+
+  window.addRFQItemRow = function() {
+    const tbody = document.getElementById('rfqItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="number" placeholder="0" style="width: 70px;" min="0"></td>
+      <td><select class="form-select" style="width: 75px;"><option value="Lot">Lot</option><option value="Pax">Pax</option><option value="Pcs">Pcs</option><option value="Unit">Unit</option><option value="Sq.ft">Sq.ft</option><option value="Gal">Gal</option><option value="Ltrs">Ltrs</option><option value="Box">Box</option><option value="Ream">Ream</option><option value="Set">Set</option></select></td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" min="0"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+    `;
+    tbody.appendChild(row);
   };
 
   window.updatePhilGEPSIndicator = function(abc) {
@@ -1018,17 +3002,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showNewAbstractModal = function() {
     const html = `
       <form id="abstractForm">
-        <div class="info-banner kpi-banner">
-          <i class="fas fa-clock"></i>
-          <strong>Timeline KPI:</strong> Abstract preparation within <strong>1 calendar day</strong> from quotation deadline.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-table"></i>
+          <strong>ABSTRACT OF QUOTATIONS</strong> — Per Government AOQ Form
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Abstract Number</label>
-            <input type="text" value="AOQ-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>AOQ No.</label>
+            <input type="text" value="AOQ-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
           <div class="form-group">
-            <label>Date Prepared</label>
+            <label>Date</label>
             <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
         </div>
@@ -1036,91 +3020,88 @@ document.addEventListener('DOMContentLoaded', () => {
           <label>Linked RFQ</label>
           <select class="form-select" required>
             <option value="">-- Select RFQ with Quotations Received --</option>
-            <option value="rfq-001">RFQ-2025-001 - Office Supplies (3 quotations)</option>
-            <option value="rfq-002">RFQ-2025-002 - IT Equipment (4 quotations)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>TWG Technical Evaluation</label>
-          <div style="background: #e3f2fd; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-            <small><i class="fas fa-users"></i> TWG evaluates technical specifications compliance</small>
-          </div>
+          <label>PURPOSE</label>
+          <textarea rows="2" placeholder="State the purpose of the procurement..." required></textarea>
         </div>
-        <div class="form-group">
-          <label>Received Quotations (LCRB Analysis)</label>
-          <table class="data-table" style="font-size: 12px;">
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">PARTICULARS & SUPPLIER QUOTATIONS</h4>
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 900px;">
             <thead>
               <tr>
-                <th>Supplier</th>
-                <th>PhilGEPS</th>
-                <th>Quote Amount</th>
-                <th>Tech Compliant</th>
-                <th>LCRB Rank</th>
+                <th rowspan="2" style="width: 50px;">Qty</th>
+                <th rowspan="2" style="width: 50px;">Unit</th>
+                <th rowspan="2">Items</th>
+                <th rowspan="2" style="width: 100px;">ABC</th>
+                <th colspan="2" style="text-align: center; background: #e3f2fd;">Supplier 1</th>
+                <th colspan="2" style="text-align: center; background: #e8f5e9;">Supplier 2</th>
+                <th colspan="2" style="text-align: center; background: #fff8e1;">Supplier 3</th>
+              </tr>
+              <tr>
+                <th style="width: 90px; background: #e3f2fd;">Unit Price</th>
+                <th style="width: 90px; background: #e3f2fd;">Total Price</th>
+                <th style="width: 90px; background: #e8f5e9;">Unit Price</th>
+                <th style="width: 90px; background: #e8f5e9;">Total Price</th>
+                <th style="width: 90px; background: #fff8e1;">Unit Price</th>
+                <th style="width: 90px; background: #fff8e1;">Total Price</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>ABC Office Supplies</td>
-                <td><span class="badge badge-philgeps-platinum">Platinum</span></td>
-                <td><input type="number" placeholder="0.00" style="width: 100px;"></td>
-                <td><input type="checkbox" checked></td>
-                <td><select style="width: 60px;"><option>1</option><option>2</option><option>3</option></select></td>
+                <td colspan="4" style="padding: 4px;">
+                  <strong>Supplier Names:</strong>
+                </td>
+                <td colspan="2" style="background: #e3f2fd;"><input type="text" placeholder="Supplier 1 Name" style="width: 100%; font-size: 11px;"></td>
+                <td colspan="2" style="background: #e8f5e9;"><input type="text" placeholder="Supplier 2 Name" style="width: 100%; font-size: 11px;"></td>
+                <td colspan="2" style="background: #fff8e1;"><input type="text" placeholder="Supplier 3 Name" style="width: 100%; font-size: 11px;"></td>
               </tr>
+            </tbody>
+            <tbody id="abstractItemsBody">
               <tr>
-                <td>TechMart Solutions</td>
-                <td><span class="badge badge-philgeps-registered">Registered</span></td>
-                <td><input type="number" placeholder="0.00" style="width: 100px;"></td>
-                <td><input type="checkbox" checked></td>
-                <td><select style="width: 60px;"><option>2</option><option>1</option><option>3</option></select></td>
-              </tr>
-              <tr>
-                <td>Best Buy Trading</td>
-                <td><span class="badge badge-philgeps-registered">Registered</span></td>
-                <td><input type="number" placeholder="0.00" style="width: 100px;"></td>
-                <td><input type="checkbox"></td>
-                <td><select style="width: 60px;"><option>3</option><option>2</option><option>1</option></select></td>
+                <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
+                <td>
+                  <select class="form-select" style="width: 50px; font-size: 11px;">
+                    <option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option>
+                  </select>
+                </td>
+                <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
+                <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+                <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+                <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+                <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+                <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+                <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+                <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
               </tr>
             </tbody>
           </table>
-          <small style="color: #666;">LCRB = Lowest Calculated & Responsive Bid. Rank by lowest compliant quote.</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addAbstractItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <div class="form-group">
+          <label>CERTIFICATION / RECOMMENDATION</label>
+          <textarea rows="3" placeholder="We, the undersigned, hereby certify that the above prices are fair and reasonable after canvassing and that the lowest/single calculated and responsive quotation is from [Supplier Name] with a total bid price of [Amount].">${'We, the undersigned, hereby certify that the above prices of the listed articles/items are fair and reasonable after personal canvass and that the lowest/single calculated and responsive quotation is hereby recommended for award.'}</textarea>
         </div>
         <div class="form-group">
-          <label>Requires Post-Qualification?</label>
-          <select class="form-select" id="postQualRequired">
-            <option value="no">No - Proceed to BAC Resolution</option>
-            <option value="yes">Yes - Post-Qualification Required (3-5 days)</option>
-          </select>
-          <small style="color: #666;">Post-qualification recommended for complex procurements or when documentation needs verification.</small>
-        </div>
-        <div class="form-group">
-          <label>BAC Secretariat Recommendation</label>
-          <textarea rows="2" placeholder="LCRB recommendation for BAC Resolution..."></textarea>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #e8f5e9; padding: 12px; border-radius: 6px; border: 2px dashed #4caf50;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Abstract of Quotations (Signed by BAC)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Abstract of Quotations (Signed by BAC)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="abstractDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'abstractDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('abstractDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="abstractDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
             </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Supplier Quotations (Scanned)</label>
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Supplier Quotations (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="supplierQuotations" accept=".pdf,.jpg,.jpeg,.png" required multiple style="display: none;" onchange="updateFileLabel(this, 'supplierQuotationsLabel', true)">
                 <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('supplierQuotations').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
                 <span id="supplierQuotationsLabel" style="font-size: 12px; color: #666;">No files selected</span>
-              </div>
-            </div>
-            <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> TWG Evaluation Report</label>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="twgReport" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'twgReportLabel')">
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('twgReport').click()"><i class="fas fa-upload"></i> Upload</button>
-                <span id="twgReportLabel" style="font-size: 12px; color: #666;">Optional</span>
               </div>
             </div>
           </div>
@@ -1134,77 +3115,130 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Create Abstract of Quotations (AOQ)', html);
   };
 
+  window.addAbstractItemRow = function() {
+    const tbody = document.getElementById('abstractItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
+      <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
+      <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+      <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+      <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.calcAbstractTotal = function(el) {
+    const row = el.closest('tr');
+    const qty = parseFloat(row.cells[0].querySelector('input').value) || 0;
+    const unitPriceInputs = row.querySelectorAll('input[type="number"]');
+    // indices: 0=qty, 1=abc, 2=s1_unit, 3=s1_total, 4=s2_unit, 5=s2_total, 6=s3_unit, 7=s3_total
+    for (let i = 2; i < unitPriceInputs.length; i += 2) {
+      const unitPrice = parseFloat(unitPriceInputs[i].value) || 0;
+      unitPriceInputs[i + 1].value = (qty * unitPrice).toFixed(2);
+    }
+  };
+
   window.showNewNOAModal = function() {
     const html = `
       <form id="noaForm">
-        <div class="info-banner kpi-banner">
-          <i class="fas fa-clock"></i>
-          <strong>Timeline KPI:</strong> NOA issuance within <strong>1 calendar day</strong> from BAC Resolution approval.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-award"></i>
+          <strong>NOTICE OF AWARD</strong> — Per Government NOA Letter Format
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>NOA Number</label>
-            <input type="text" value="NOA-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <input type="text" value="NOA-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
           <div class="form-group">
-            <label>Date Issued</label>
+            <label>Date</label>
             <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
         </div>
+        <hr style="margin: 10px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ADDRESSEE (Winning Bidder)</h4>
+        <div class="form-group">
+          <label>Company/Supplier Name</label>
+          <input type="text" placeholder="Full company name" required>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <textarea rows="2" placeholder="Complete business address" required></textarea>
+        </div>
+        <hr style="margin: 10px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">AWARD DETAILS</h4>
         <div class="form-group">
           <label>Linked BAC Resolution (Approved)</label>
           <select class="form-select" required>
             <option value="">-- Select BAC Resolution --</option>
-            <option value="bacres-001">BAC-RES-2025-001 - Office Supplies (LCRB: ABC Office)</option>
-            <option value="bacres-002">BAC-RES-2025-002 - IT Equipment (LCRB: TechMart)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Awarded Supplier (LCRB Winner)</label>
-          <select class="form-select" required>
-            <option value="">-- Select Winning Supplier --</option>
-            <option value="sup-001">🥇 ABC Office Supplies Corp. (PhilGEPS Platinum)</option>
-            <option value="sup-002">✓ TechMart Solutions Inc. (PhilGEPS Registered)</option>
-          </select>
+          <label>RFQ Reference No.</label>
+          <input type="text" placeholder="e.g., RFQ-2026-001" required>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Contract/Award Amount</label>
-            <input type="number" placeholder="0.00" step="0.01" min="0" required>
+        <div class="form-group">
+          <label>Award Letter Text</label>
+          <textarea rows="4" required>This is to inform you that your quotation dated _____________ for the above-captioned project per RFQ No. _____________ has been accepted. You are hereby required to submit within three (3) calendar days the following post-qualification documents:
+
+1. Latest Income Tax Return (ITR)
+2. Omnibus Sworn Statement
+3. Valid Mayor's/Business Permit
+4. PhilGEPS Registration Number
+
+Failure to submit the above requirements within the prescribed period shall constitute sufficient ground for cancellation of the award. You are likewise required to post the required Performance Security within ten (10) calendar days from receipt hereof.</textarea>
+        </div>
+        <div class="form-group">
+          <label>Contract Amount</label>
+          <input type="number" placeholder="0.00" step="0.01" min="0" required>
+        </div>
+        <hr style="margin: 10px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">SIGNATORIES</h4>
+        <div style="background: #fff8e1; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 12px;">Head of the Procuring Entity (HoPE)</label>
+            <input type="text" placeholder="Name" required>
           </div>
-          <div class="form-group">
-            <label>Delivery Period</label>
-            <input type="text" placeholder="e.g., 15 calendar days from PO" required>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Designation</label>
+            <input type="text" value="Regional Director" placeholder="Designation">
+          </div>
+        </div>
+        <h4 style="margin-bottom: 10px; color: #1a365d;">BIDDER RECEIPT</h4>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Received by (Bidder/Representative)</label>
+              <input type="text" placeholder="Name of Bidder representative">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Date Received</label>
+              <input type="date">
+            </div>
           </div>
         </div>
         <div class="form-group">
-          <label>Approved By</label>
-          <input type="text" value="HoPE / Regional Director" readonly>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #fff8e1; padding: 12px; border-radius: 6px; border: 2px dashed #ff9800;">
-            <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-award"></i> NOA Document (Signed by HoPE)</label>
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-award"></i> NOA Document (Signed by HoPE)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="noaDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'noaDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-warning" onclick="document.getElementById('noaDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="noaDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
             </div>
-            <div>
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> BAC Resolution (Approved)</label>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="noaBacResolution" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'noaBacResolutionLabel')">
-                <button type="button" class="btn btn-sm btn-warning" onclick="document.getElementById('noaBacResolution').click()"><i class="fas fa-upload"></i> Upload</button>
-                <span id="noaBacResolutionLabel" style="font-size: 12px; color: #666;">No file selected</span>
-              </div>
-            </div>
           </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="return validateMultipleAttachments(['noaDocument', 'noaBacResolution'], ['NOA Document', 'BAC Resolution'])"><i class="fas fa-award"></i> Issue NOA</button>
+          <button type="submit" class="btn btn-primary" onclick="return validateAttachment('noaDocument', 'NOA Document')"><i class="fas fa-award"></i> Issue NOA</button>
         </div>
       </form>
     `;
@@ -1214,72 +3248,129 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showNewPOModal = function() {
     const html = `
       <form id="poForm">
-        <div class="info-banner warning-banner">
-          <i class="fas fa-exclamation-triangle"></i>
-          <strong>Timeline KPI:</strong> PO approval within <strong>1 calendar day</strong>. Supplier must sign within <strong>7 calendar days</strong>. COA submission within <strong>5 calendar days</strong> from PO approval.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-contract"></i>
+          <strong>PURCHASE ORDER</strong> — Per Government PO Form
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>PO Number</label>
-            <input type="text" value="PO-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>Supplier</label>
+            <input type="text" placeholder="Supplier Name" required>
           </div>
           <div class="form-group">
-            <label>Date Created</label>
+            <label>P.O. No.</label>
+            <input type="text" value="PO-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" placeholder="Supplier Address" required>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
             <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TIN</label>
+            <input type="text" placeholder="Tax Identification Number">
+          </div>
+          <div class="form-group">
+            <label>Mode of Procurement</label>
+            <select class="form-select" required>
+              <option value="">-- Select Mode --</option>
+              <option value="SVP - Shopping" selected>SVP - Shopping</option>
+              <option value="SVP - NP (53.9)">SVP - NP (Sec. 53.9)</option>
+              <option value="Direct Contracting">Direct Contracting</option>
+              <option value="Competitive Bidding">Competitive Bidding</option>
+              <option value="Repeat Order">Repeat Order</option>
+              <option value="Agency-to-Agency">Agency-to-Agency</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Place of Delivery</label>
+            <input type="text" value="DMW Regional Office XIII (Caraga), Butuan City" required>
+          </div>
+          <div class="form-group">
+            <label>Delivery Term</label>
+            <input type="text" placeholder="e.g., 15 calendar days from receipt of PO">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Delivery</label>
+            <input type="date" required>
+          </div>
+          <div class="form-group">
+            <label>Payment Term</label>
+            <select class="form-select">
+              <option value="Government Terms">Government Terms</option>
+              <option value="COD">Cash on Delivery</option>
+              <option value="30 Days">30 Days from Delivery</option>
+            </select>
           </div>
         </div>
         <div class="form-group">
           <label>Linked NOA (Issued)</label>
           <select class="form-select" required>
             <option value="">-- Select NOA --</option>
-            <option value="noa-001">NOA-2025-001 - ABC Office Supplies (₱85,000)</option>
-            <option value="noa-002">NOA-2025-002 - TechMart Solutions (₱320,000)</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Supplier</label>
-          <input type="text" id="poSupplier" value="" readonly placeholder="Auto-filled from NOA">
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ITEMS</h4>
+        <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th style="width: 60px;">Item No.</th>
+              <th style="width: 60px;">Unit</th>
+              <th>Item Description</th>
+              <th style="width: 70px;">Quantity</th>
+              <th style="width: 100px;">Unit Cost</th>
+              <th style="width: 100px;">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="poItemsBody">
+            <tr>
+              <td><input type="text" value="1" style="width: 50px; text-align: center;"></td>
+              <td>
+                <select class="form-select" style="width: 60px;">
+                  <option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Sq.ft</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option>
+                </select>
+              </td>
+              <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+              <td><input type="number" placeholder="0" style="width: 60px;" min="0" onchange="calcPOItemTotal(this)"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" min="0" onchange="calcPOItemTotal(this)"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" readonly></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addPOItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>PURPOSE</label>
+          <textarea rows="2" placeholder="Purpose of purchase order..." required></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Total PO Amount</label>
-            <input type="number" placeholder="0.00" step="0.01" required>
+            <label>Total Amount (in words)</label>
+            <input type="text" id="poAmountWords" placeholder="e.g., One Hundred Fifteen Thousand Pesos Only" required>
           </div>
           <div class="form-group">
-            <label>Expected Delivery Date</label>
-            <input type="date" required>
+            <label>Total Amount</label>
+            <input type="number" id="poTotalAmount" placeholder="0.00" step="0.01" readonly style="font-weight: bold; font-size: 16px;">
           </div>
         </div>
-        <div class="form-group">
-          <label>Delivery Address</label>
-          <textarea rows="2">DMW Regional Office XIII (Caraga), Butuan City, Agusan del Norte</textarea>
+        <div class="form-group" style="background: #fff3e0; padding: 10px; border-radius: 6px; font-size: 12px;">
+          <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> In case of failure to make the full delivery within the time specified above, a penalty of one-tenth (1/10) of one percent for every day of delay shall be imposed.
         </div>
         <div class="form-group">
-          <label>Payment Terms</label>
-          <select class="form-select">
-            <option value="cod">Cash on Delivery (COD)</option>
-            <option value="30days">30 Days from Delivery</option>
-            <option value="gov">Government Standard Terms</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>PO Status Tracking</label>
-          <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <span class="badge badge-po-approved">PO Approved</span>
-              <span style="color: #ccc;">→</span>
-              <span class="badge" style="background: #e9ecef; color: #666;">Sent to Supplier</span>
-              <span style="color: #ccc;">→</span>
-              <span class="badge" style="background: #e9ecef; color: #666;">PO Signed by Supplier</span>
-            </div>
-            <small style="color: #666; display: block; margin-top: 8px;">Supplier signature deadline: 7 calendar days from PO receipt</small>
-          </div>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-contract"></i> Purchase Order Document (Signed)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-contract"></i> Purchase Order Document (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="poDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'poDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('poDocument').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1287,7 +3378,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-signature"></i> Supplier Conforme / Signed PO</label>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-signature"></i> Supplier Conforme / Signed PO</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="poSupplierConforme" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'poSupplierConformeLabel')">
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('poSupplierConforme').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1306,6 +3397,37 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Create Purchase Order (PO)', html);
   };
 
+  window.addPOItemRow = function() {
+    const tbody = document.getElementById('poItemsBody');
+    const nextNum = tbody.rows.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" value="${nextNum}" style="width: 50px; text-align: center;"></td>
+      <td><select class="form-select" style="width: 60px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Sq.ft</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option></select></td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><input type="number" placeholder="0" style="width: 60px;" min="0" onchange="calcPOItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" min="0" onchange="calcPOItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" readonly></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.calcPOItemTotal = function(el) {
+    const row = el.closest('tr');
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const qty = parseFloat(inputs[0].value) || 0;
+    const unitCost = parseFloat(inputs[1].value) || 0;
+    inputs[2].value = (qty * unitCost).toFixed(2);
+    // Recalculate grand total
+    let grandTotal = 0;
+    document.querySelectorAll('#poItemsBody tr').forEach(r => {
+      const amountInput = r.querySelectorAll('input[type="number"]')[2];
+      grandTotal += parseFloat(amountInput.value) || 0;
+    });
+    const totalEl = document.getElementById('poTotalAmount');
+    if (totalEl) totalEl.value = grandTotal.toFixed(2);
+  };
+
   window.approvePO = function() {
     if(!validateAttachment('poDocument', 'Purchase Order Document')) return;
     if(confirm('Approve this Purchase Order? This will start the COA submission timeline (5 calendar days).')) {
@@ -1317,92 +3439,126 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showNewIARModal = function() {
     const html = `
       <form id="iarForm">
-        <div class="info-banner">
-          <i class="fas fa-file-alt"></i>
-          <strong>IAR (Appendix 62)</strong> - Inspection & Acceptance Report per COA Circular. ISO 9001:2015 Clause 8.6 - Release of Products.
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-clipboard-check"></i>
+          <strong>INSPECTION AND ACCEPTANCE REPORT</strong> — Appendix 62
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>IAR Number (Appendix 62)</label>
-            <input type="text" value="IAR-2025-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>Entity Name</label>
+            <input type="text" value="Department of Migrant Workers - Regional Office XIII" readonly>
           </div>
           <div class="form-group">
-            <label>Date of Inspection</label>
-            <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+            <label>Fund Cluster</label>
+            <input type="text" placeholder="e.g., 01 101 101" required>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Linked Purchase Order (Delivered)</label>
-          <select class="form-select" required>
-            <option value="">-- Select Delivered PO --</option>
-            <option value="po-001">PO-2025-001 - Office Supplies (Delivered: Today)</option>
-            <option value="po-002">PO-2025-002 - IT Equipment (Delivered: Yesterday)</option>
-          </select>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Supplier</label>
-            <input type="text" id="iarSupplier" placeholder="Auto-filled from PO" readonly>
+            <input type="text" id="iarSupplier" placeholder="Supplier Name" required>
           </div>
           <div class="form-group">
-            <label>Invoice Number</label>
-            <input type="text" placeholder="Supplier's Sales Invoice No." required>
+            <label>IAR No.</label>
+            <input type="text" value="IAR-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Delivery Receipt No.</label>
-            <input type="text" placeholder="DR Number" required>
+            <label>PO No. / Date</label>
+            <div style="display: flex; gap: 8px;">
+              <select class="form-select" required style="flex: 2;">
+                <option value="">-- Select PO --</option>
+              </select>
+              <input type="date" style="flex: 1;">
+            </div>
           </div>
           <div class="form-group">
-            <label>Date of Actual Delivery</label>
-            <input type="date" required>
+            <label>Date</label>
+            <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Requisitioning Office/Dept.</label>
+            <input type="text" placeholder="e.g., FAD, OWWA, etc." required>
+          </div>
+          <div class="form-group">
+            <label>Invoice No.</label>
+            <input type="text" placeholder="Supplier's Sales Invoice No." required>
           </div>
         </div>
         <div class="form-group">
-          <label>Inspection Result (ISO 9001:2015 Clause 8.6)</label>
-          <select class="form-select" required id="inspectionResult">
-            <option value="">-- Select Inspection Result --</option>
-            <option value="complete">✓ Complete & Compliant - Accept All</option>
-            <option value="partial">⚠ Partial Delivery - Pending Balance</option>
-            <option value="defect">✗ With Defects - For Replacement</option>
-            <option value="rejected">✗ Rejected - Non-Compliant with Specs</option>
-          </select>
+          <label>Responsibility Center Code</label>
+          <input type="text" placeholder="Responsibility Center Code">
         </div>
-        <div class="form-group">
-          <label>Inspection Findings / Remarks</label>
-          <textarea rows="2" placeholder="Detail inspection findings, quantity verified, specs compliance, etc."></textarea>
-        </div>
-        <div class="form-group">
-          <label><strong>Signatories (per Appendix 62)</strong></label>
-          <div style="background: #f8f9fa; padding: 10px; border-radius: 4px;">
-            <div class="form-row">
-              <div class="form-group" style="margin-bottom: 5px;">
-                <label style="font-size: 12px;">Inspected By (Inspection Officer / Property Custodian)</label>
-                <input type="text" placeholder="Name of Inspector" required>
-              </div>
-              <div class="form-group" style="margin-bottom: 5px;">
-                <label style="font-size: 12px;">Date Inspected</label>
-                <input type="date" required>
-              </div>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ITEMS</h4>
+        <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th style="width: 120px;">Stock/ Property No.</th>
+              <th>Description</th>
+              <th style="width: 70px;">Unit</th>
+              <th style="width: 80px;">Quantity</th>
+            </tr>
+          </thead>
+          <tbody id="iarItemsBody">
+            <tr>
+              <td><input type="text" placeholder="Stock/Prop No." style="width: 110px;"></td>
+              <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+              <td>
+                <select class="form-select" style="width: 65px;">
+                  <option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option>
+                </select>
+              </td>
+              <td><input type="number" placeholder="0" style="width: 70px;" min="0"></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addIARItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">INSPECTION</h4>
+        <div style="background: #e8f5e9; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px;">Date Inspected</label>
+              <input type="date" required>
             </div>
-            <div class="form-row">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label style="font-size: 12px;">Received By (End-User / Supply Officer)</label>
-                <input type="text" placeholder="Name of Receiver" required>
-              </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <label style="font-size: 12px;">Date Received</label>
-                <input type="date" required>
-              </div>
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px;">Inspection Officer / Property Custodian</label>
+              <input type="text" placeholder="Name of Inspector" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0; font-size: 12px;">
+            <label><input type="checkbox" checked> I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</label>
+          </div>
+        </div>
+        <h4 style="margin-bottom: 10px; color: #1a365d;">ACCEPTANCE</h4>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px;">Date Received</label>
+              <input type="date" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px;">Supply and/or Property Custodian</label>
+              <input type="text" placeholder="Name of Receiver" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Acceptance Type</label>
+            <div style="display: flex; gap: 20px; margin-top: 5px;">
+              <label><input type="radio" name="acceptanceType" value="complete" checked> Complete</label>
+              <label><input type="radio" name="acceptanceType" value="partial"> Partial (Pls. specify quantity in the above table)</label>
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+        <div class="form-group" style="margin-top: 15px;">
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #e8f5e9; padding: 12px; border-radius: 6px; border: 2px dashed #4caf50;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-clipboard-check"></i> IAR Document (Signed - Appendix 62)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-clipboard-check"></i> IAR Document (Signed - Appendix 62)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="iarDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'iarDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('iarDocument').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1410,27 +3566,19 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-invoice"></i> Supplier Invoice (Scanned)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-invoice"></i> Supplier Invoice (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="iarInvoice" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'iarInvoiceLabel')">
                 <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('iarInvoice').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="iarInvoiceLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
             </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-truck"></i> Delivery Receipt (Scanned)</label>
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-truck"></i> Delivery Receipt (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="iarDeliveryReceipt" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'iarDeliveryReceiptLabel')">
                 <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('iarDeliveryReceipt').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="iarDeliveryReceiptLabel" style="font-size: 12px; color: #666;">No file selected</span>
-              </div>
-            </div>
-            <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-camera"></i> Photos of Delivered Items</label>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="iarPhotos" accept=".jpg,.jpeg,.png" multiple style="display: none;" onchange="updateFileLabel(this, 'iarPhotosLabel', true)">
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('iarPhotos').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
-                <span id="iarPhotosLabel" style="font-size: 12px; color: #666;">Optional</span>
               </div>
             </div>
           </div>
@@ -1444,38 +3592,63 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Inspection & Acceptance Report (IAR - Appendix 62)', html);
   };
 
+  window.addIARItemRow = function() {
+    const tbody = document.getElementById('iarItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" placeholder="Stock/Prop No." style="width: 110px;"></td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><select class="form-select" style="width: 65px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option></select></td>
+      <td><input type="number" placeholder="0" style="width: 70px;" min="0"></td>
+    `;
+    tbody.appendChild(row);
+  };
+
   window.showNewItemModal = function() {
     const html = `
-      <form id="itemForm">
+      <form id="itemForm" onsubmit="saveNewItem(event)">
         <div class="form-row">
           <div class="form-group">
             <label>Item Code</label>
-            <input type="text" placeholder="Auto-generated" readonly>
+            <input type="text" id="itemCode" placeholder="e.g., ITM-001" required>
           </div>
           <div class="form-group">
+            <label>Stock No.</label>
+            <input type="text" id="itemStockNo" placeholder="e.g., STK-0001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
             <label>Category</label>
-            <select class="form-select" required>
+            <select class="form-select" id="itemCategory" required>
               <option value="">-- Select Category --</option>
-              <option value="office">Office Supplies</option>
-              <option value="it">IT Equipment</option>
-              <option value="furniture">Furniture</option>
-              <option value="services">Services</option>
-              <option value="other">Other</option>
+              <option value="Office Supplies">Office Supplies</option>
+              <option value="IT Equipment">IT Equipment</option>
+              <option value="Furniture">Furniture</option>
+              <option value="Services">Services</option>
+              <option value="EXPENDABLE">Expendable</option>
+              <option value="SEMI-EXPENDABLE">Semi-Expendable</option>
+              <option value="CAPITAL OUTLAY">Capital Outlay</option>
+              <option value="Other">Other</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label>UACS Code</label>
+            <input type="text" id="itemUacsCode" placeholder="e.g., 1-07-05-010">
           </div>
         </div>
         <div class="form-group">
           <label>Item Name</label>
-          <input type="text" placeholder="Enter item name" required>
+          <input type="text" id="itemName" placeholder="Enter item name" required>
         </div>
         <div class="form-group">
           <label>Description</label>
-          <textarea rows="2" placeholder="Detailed description"></textarea>
+          <textarea id="itemDescription" rows="2" placeholder="Detailed description"></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Unit of Measure</label>
-            <select class="form-select" required>
+            <select class="form-select" id="itemUnit" required>
               <option value="pc">Piece (pc)</option>
               <option value="box">Box</option>
               <option value="ream">Ream</option>
@@ -1486,7 +3659,17 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="form-group">
             <label>Unit Price</label>
-            <input type="number" placeholder="0.00" step="0.01" min="0" required>
+            <input type="number" id="itemPrice" placeholder="0.00" step="0.01" min="0" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity on Hand</label>
+            <input type="number" id="itemQuantity" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Reorder Point</label>
+            <input type="number" id="itemReorderPoint" placeholder="0" min="0" value="0">
           </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
@@ -1498,40 +3681,66 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Add New Item', html);
   };
 
+  // Save new item via API
+  window.saveNewItem = async function(e) {
+    e.preventDefault();
+    const data = {
+      code: document.getElementById('itemCode').value,
+      name: document.getElementById('itemName').value,
+      description: document.getElementById('itemDescription').value,
+      category: document.getElementById('itemCategory').value,
+      unit: document.getElementById('itemUnit').value,
+      unit_price: parseFloat(document.getElementById('itemPrice').value) || 0,
+      stock_no: document.getElementById('itemStockNo').value || null,
+      uacs_code: document.getElementById('itemUacsCode').value || null,
+      quantity: parseInt(document.getElementById('itemQuantity').value) || 0,
+      reorder_point: parseInt(document.getElementById('itemReorderPoint').value) || 0
+    };
+    
+    try {
+      await apiRequest('/items', 'POST', data);
+      alert('Item saved successfully!');
+      closeModal();
+      loadItems();
+    } catch (err) {
+      alert('Error saving item: ' + err.message);
+    }
+  };
+
   window.showNewSupplierModal = function() {
     const html = `
-      <form id="supplierForm">
+      <form id="supplierForm" onsubmit="saveNewSupplier(event)">
         <div class="form-group">
           <label>Company Name</label>
-          <input type="text" placeholder="Enter company name" required>
+          <input type="text" id="supplierName" placeholder="Enter company name" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>PhilGEPS Registration No.</label>
-            <input type="text" placeholder="e.g., PG-123456" required>
+            <input type="text" id="supplierPhilgepsNo" placeholder="e.g., PG-123456">
           </div>
           <div class="form-group">
             <label>TIN</label>
-            <input type="text" placeholder="Tax Identification Number" required>
+            <input type="text" id="supplierTin" placeholder="Tax Identification Number">
           </div>
         </div>
         <div class="form-group">
           <label>Contact Person</label>
-          <input type="text" placeholder="Name of contact person" required>
+          <input type="text" id="supplierContact" placeholder="Name of contact person" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Phone</label>
-            <input type="tel" placeholder="Contact number" required>
+            <input type="tel" id="supplierPhone" placeholder="Contact number" required>
           </div>
           <div class="form-group">
             <label>Email</label>
-            <input type="email" placeholder="Email address" required>
+            <input type="email" id="supplierEmail" placeholder="Email address">
           </div>
         </div>
         <div class="form-group">
           <label>Address</label>
-          <textarea rows="2" placeholder="Complete address" required></textarea>
+          <textarea id="supplierAddress" rows="2" placeholder="Complete address" required></textarea>
         </div>
         <div class="form-group">
           <label>Categories</label>
@@ -1573,63 +3782,81 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="return validateMultipleAttachments(['supplierPhilgeps', 'supplierBusinessPermit'], ['PhilGEPS Certificate', 'Business Permit'])"><i class="fas fa-save"></i> Save Supplier</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Supplier</button>
         </div>
       </form>
     `;
     openModal('Add New Supplier', html);
   };
 
+  // Save new supplier via API
+  window.saveNewSupplier = async function(e) {
+    e.preventDefault();
+    const data = {
+      name: document.getElementById('supplierName').value,
+      contact_person: document.getElementById('supplierContact').value,
+      phone: document.getElementById('supplierPhone').value,
+      email: document.getElementById('supplierEmail')?.value || '',
+      address: document.getElementById('supplierAddress').value,
+      tin: document.getElementById('supplierTin')?.value || ''
+    };
+    
+    try {
+      await apiRequest('/suppliers', 'POST', data);
+      alert('Supplier saved successfully!');
+      closeModal();
+      loadSuppliers();
+    } catch (err) {
+      alert('Error saving supplier: ' + err.message);
+    }
+  };
+
   window.showNewUserModal = function() {
     const html = `
-      <form id="userForm">
+      <form id="userForm" onsubmit="saveNewUser(event)">
         <div class="form-row">
           <div class="form-group">
-            <label>First Name</label>
-            <input type="text" placeholder="First name" required>
+            <label>Username</label>
+            <input type="text" id="newUsername" placeholder="Username" required>
           </div>
           <div class="form-group">
-            <label>Last Name</label>
-            <input type="text" placeholder="Last name" required>
+            <label>Password</label>
+            <input type="password" id="newPassword" placeholder="Password" required>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="newFullName" placeholder="Full name" required>
         </div>
         <div class="form-group">
           <label>Email</label>
-          <input type="email" placeholder="Email address" required>
-        </div>
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" placeholder="Username for login" required>
+          <input type="email" id="newEmail" placeholder="Email address">
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Division</label>
-            <select class="form-select" required>
-              <option value="FAD">FAD - Finance & Administrative</option>
-              <option value="WRSD">WRSD - Welfare Reintegration Services</option>
-              <option value="MWPSD">MWPSD - Migrant Workers Protection Services</option>
-              <option value="MWPTD">MWPTD - Migrant Workers Protection Training</option>
-              <option value="ORD">ORD - Office of Regional Director</option>
+            <select class="form-select" id="newDivision" required>
+              <option value="1">FAD - Finance & Administrative</option>
+              <option value="2">WRSD - Welfare Reintegration Services</option>
+              <option value="3">MWPSD - Migrant Workers Protection Services</option>
+              <option value="4">MWPTD - Migrant Workers Protection Training</option>
+              <option value="5">ORD - Office of Regional Director</option>
             </select>
           </div>
           <div class="form-group">
             <label>Role</label>
-            <select class="form-select" required>
+            <select class="form-select" id="newRole" required>
               <option value="end_user">End User</option>
-              <option value="div_head">Division Head</option>
-              <option value="bac_sec">BAC Secretariat</option>
+              <option value="division_head">Division Head</option>
+              <option value="bac_secretariat">BAC Secretariat</option>
               <option value="bac_chair">BAC Chairperson</option>
-              <option value="twg">TWG Member</option>
-              <option value="supply">Supply/Procurement Officer</option>
+              <option value="twg_member">TWG Member</option>
+              <option value="supply_officer">Supply/Procurement Officer</option>
               <option value="inspector">Inspection/Property Custodian</option>
               <option value="hope">HoPE (Regional Director)</option>
               <option value="admin">System Administrator</option>
             </select>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Temporary Password</label>
-          <input type="password" placeholder="Set initial password" required>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -1640,51 +3867,1143 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Create New User', html);
   };
 
+  // Save new user via API
+  window.saveNewUser = async function(e) {
+    e.preventDefault();
+    const data = {
+      username: document.getElementById('newUsername').value,
+      password: document.getElementById('newPassword').value,
+      full_name: document.getElementById('newFullName').value,
+      email: document.getElementById('newEmail')?.value || '',
+      role: document.getElementById('newRole').value,
+      dept_id: parseInt(document.getElementById('newDivision').value)
+    };
+    
+    try {
+      await apiRequest('/users', 'POST', data);
+      alert('User created successfully!');
+      closeModal();
+      loadUsers();
+    } catch (err) {
+      alert('Error creating user: ' + err.message);
+    }
+  };
+
+  // ==================== INVENTORY MODULE MODALS ====================
+
+  // Stock Card Entry Modal
+  window.showNewStockCardModal = function() {
+    const html = `
+      <form id="stockCardForm" onsubmit="saveNewStockCard(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transaction No.</label>
+            <input type="text" id="scTransNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="scDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item</label>
+            <select class="form-select" id="scItemId" required>
+              <option value="">-- Select Item --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Reference</label>
+            <input type="text" id="scReference" placeholder="e.g., IAR-2026-001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Receipt Qty</label>
+            <input type="number" id="scReceiptQty" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Receipt Unit Cost</label>
+            <input type="number" id="scReceiptUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issue Qty</label>
+            <input type="number" id="scIssueQty" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Issue Unit Cost</label>
+            <input type="number" id="scIssueUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea id="scRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Stock Card Entry</button>
+        </div>
+      </form>
+    `;
+    openModal('New Stock Card Entry', html);
+    // Populate items dropdown
+    loadItemsDropdown('scItemId');
+  };
+
+  window.saveNewStockCard = async function(e) {
+    e.preventDefault();
+    const data = {
+      item_id: parseInt(document.getElementById('scItemId').value),
+      date: document.getElementById('scDate').value,
+      reference: document.getElementById('scReference').value,
+      receipt_qty: parseInt(document.getElementById('scReceiptQty').value) || 0,
+      receipt_unit_cost: parseFloat(document.getElementById('scReceiptUnitCost').value) || 0,
+      issue_qty: parseInt(document.getElementById('scIssueQty').value) || 0,
+      issue_unit_cost: parseFloat(document.getElementById('scIssueUnitCost').value) || 0,
+      remarks: document.getElementById('scRemarks').value
+    };
+    try {
+      await apiRequest('/stock-cards', 'POST', data);
+      alert('Stock card entry saved!');
+      closeModal();
+      loadStockCards();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Property Card Modal
+  window.showNewPropertyCardModal = function() {
+    const html = `
+      <form id="propertyCardForm" onsubmit="saveNewPropertyCard(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="pcPropertyNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Acquisition Date</label>
+            <input type="date" id="pcAcqDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="pcDescription" rows="2" placeholder="Property description" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item (from Catalog)</label>
+            <select class="form-select" id="pcItemId">
+              <option value="">-- Select Item --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Serial No.</label>
+            <input type="text" id="pcSerialNo" placeholder="e.g., SN-12345">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Acquisition Cost</label>
+            <input type="number" id="pcAcqCost" placeholder="0.00" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Estimated Useful Life (yrs)</label>
+            <input type="number" id="pcUsefulLife" placeholder="5" min="1" value="5">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issued To (Employee)</label>
+            <select class="form-select" id="pcIssuedTo">
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select class="form-select" id="pcDepartment">
+              <option value="">-- Select --</option>
+              <option value="1">FAD</option>
+              <option value="2">WRSD</option>
+              <option value="3">MWPSD</option>
+              <option value="4">MWPTD</option>
+              <option value="5">ORD</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea id="pcRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Property Card</button>
+        </div>
+      </form>
+    `;
+    openModal('Create Property Card', html);
+    loadItemsDropdown('pcItemId');
+    loadEmployeesDropdown('pcIssuedTo');
+  };
+
+  window.saveNewPropertyCard = async function(e) {
+    e.preventDefault();
+    const data = {
+      description: document.getElementById('pcDescription').value,
+      item_id: parseInt(document.getElementById('pcItemId').value) || null,
+      serial_no: document.getElementById('pcSerialNo').value,
+      acquisition_date: document.getElementById('pcAcqDate').value,
+      acquisition_cost: parseFloat(document.getElementById('pcAcqCost').value) || 0,
+      estimated_useful_life: parseInt(document.getElementById('pcUsefulLife').value) || 5,
+      issued_to: parseInt(document.getElementById('pcIssuedTo').value) || null,
+      department_id: parseInt(document.getElementById('pcDepartment').value) || null,
+      remarks: document.getElementById('pcRemarks').value
+    };
+    try {
+      await apiRequest('/property-cards', 'POST', data);
+      alert('Property card created!');
+      closeModal();
+      loadPropertyCards();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // ICS Modal
+  window.showNewICSModal = function() {
+    const html = `
+      <form id="icsForm" onsubmit="saveNewICS(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>ICS No.</label>
+            <input type="text" id="icsNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Date of Issue</label>
+            <input type="date" id="icsDateOfIssue" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Card</label>
+            <select class="form-select" id="icsPropertyId" required>
+              <option value="">-- Select Property --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Inventory Item No.</label>
+            <input type="text" id="icsInventoryNo" placeholder="e.g., INV-2026-001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issued To (Employee)</label>
+            <select class="form-select" id="icsIssuedTo" required>
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Received By</label>
+            <select class="form-select" id="icsReceivedBy">
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="icsDescription" rows="2" placeholder="Item description"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="icsQty" placeholder="1" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label>Unit Cost</label>
+            <input type="number" id="icsUnitCost" placeholder="0.00" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea id="icsRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Issue ICS</button>
+        </div>
+      </form>
+    `;
+    openModal('Issue Inventory Custodian Slip (ICS)', html);
+    loadPropertyCardsDropdown('icsPropertyId');
+    loadEmployeesDropdown('icsIssuedTo');
+    loadEmployeesDropdown('icsReceivedBy');
+  };
+
+  window.saveNewICS = async function(e) {
+    e.preventDefault();
+    const data = {
+      property_card_id: parseInt(document.getElementById('icsPropertyId').value),
+      date_of_issue: document.getElementById('icsDateOfIssue').value,
+      inventory_no: document.getElementById('icsInventoryNo').value,
+      description: document.getElementById('icsDescription').value,
+      quantity: parseInt(document.getElementById('icsQty').value) || 1,
+      unit_cost: parseFloat(document.getElementById('icsUnitCost').value) || 0,
+      issued_to: parseInt(document.getElementById('icsIssuedTo').value),
+      received_by: parseInt(document.getElementById('icsReceivedBy').value) || null,
+      remarks: document.getElementById('icsRemarks').value
+    };
+    try {
+      await apiRequest('/ics', 'POST', data);
+      alert('ICS issued successfully!');
+      closeModal();
+      loadICS();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Employee Modal
+  window.showNewEmployeeModal = function() {
+    const html = `
+      <form id="employeeForm" onsubmit="saveNewEmployee(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Employee Code</label>
+            <input type="text" id="empCode" placeholder="e.g., EMP-001" required>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="empStatus">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="empFullName" placeholder="Enter full name" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="empEmail" placeholder="Email address">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="empPhone" placeholder="Contact number">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Designation</label>
+            <select class="form-select" id="empDesignation">
+              <option value="">-- Select Designation --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select class="form-select" id="empDepartment">
+              <option value="">-- Select --</option>
+              <option value="1">FAD</option>
+              <option value="2">WRSD</option>
+              <option value="3">MWPSD</option>
+              <option value="4">MWPTD</option>
+              <option value="5">ORD</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Save Employee</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Employee', html);
+    loadDesignationsDropdown('empDesignation');
+  };
+
+  window.saveNewEmployee = async function(e) {
+    e.preventDefault();
+    const data = {
+      employee_code: document.getElementById('empCode').value,
+      full_name: document.getElementById('empFullName').value,
+      email: document.getElementById('empEmail').value,
+      phone: document.getElementById('empPhone').value,
+      designation_id: parseInt(document.getElementById('empDesignation').value) || null,
+      department_id: parseInt(document.getElementById('empDepartment').value) || null,
+      status: document.getElementById('empStatus').value
+    };
+    try {
+      await apiRequest('/employees', 'POST', data);
+      alert('Employee saved!');
+      closeModal();
+      loadEmployees();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Dropdown helper functions for inventory modals
+  window.loadItemsDropdown = async function(selectId) {
+    try {
+      const items = await apiRequest('/items');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      items.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = `${item.code} - ${item.name}`;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading items dropdown:', err); }
+  };
+
+  window.loadEmployeesDropdown = async function(selectId) {
+    try {
+      const employees = await apiRequest('/employees');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      employees.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.id;
+        opt.textContent = emp.full_name;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading employees dropdown:', err); }
+  };
+
+  window.loadPropertyCardsDropdown = async function(selectId) {
+    try {
+      const cards = await apiRequest('/property-cards');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      cards.forEach(card => {
+        const opt = document.createElement('option');
+        opt.value = card.id;
+        opt.textContent = `${card.property_number} - ${card.description}`;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading property cards dropdown:', err); }
+  };
+
+  window.loadDesignationsDropdown = async function(selectId) {
+    try {
+      const designations = await apiRequest('/designations');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      designations.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.title;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading designations dropdown:', err); }
+  };
+
+  // Placeholder functions for inventory actions
+  window.showViewPropertyLedgerModal = function(id) {
+    openModal('Property Ledger', '<div class="view-details"><p>Loading property ledger for ID: ' + id + '...</p></div>');
+  };
+  window.showNewICSFromPropertyModal = function(propertyNo) {
+    showNewICSModal();
+  };
+  window.showEditPropertyCardModal = function(id) {
+    openModal('Edit Property Card', '<div class="view-details"><p>Loading property card ID: ' + id + ' for editing...</p></div>');
+  };
+  window.showViewICSModal = function(id) {
+    openModal('ICS Details', '<div class="view-details"><p>Loading ICS ID: ' + id + '...</p></div>');
+  };
+  window.showEditEmployeeModal = function(id) {
+    openModal('Edit Employee', '<div class="view-details"><p>Loading employee ID: ' + id + ' for editing...</p></div>');
+  };
+  window.viewEmployeeProperty = function(id) {
+    openModal('Employee Property Accountability', '<div class="view-details"><p>Loading property accountability for employee ID: ' + id + '...</p></div>');
+  };
+  window.viewItemStockCard = function(itemId) {
+    openModal('Stock Card History', '<div class="view-details"><p>Loading stock card for item ID: ' + itemId + '...</p></div>');
+  };
+  window.viewItemPropertyCard = function(itemId) {
+    openModal('Property Card', '<div class="view-details"><p>Loading property card for item ID: ' + itemId + '...</p></div>');
+  };
+  window.showDeleteConfirmModal = function(type, id) {
+    const html = `
+      <div class="view-details" style="text-align:center; padding: 20px;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #e74c3c; margin-bottom: 15px;"></i>
+        <h3>Delete ${type}?</h3>
+        <p>This action cannot be undone. Are you sure you want to delete this ${type.toLowerCase()} record?</p>
+        <div style="margin-top: 20px;">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-danger" onclick="deleteRecord('${type}', ${id}); closeModal();"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      </div>
+    `;
+    openModal('Confirm Deletion', html);
+  };
+
+  // ==================== NEW MODULE MODAL FUNCTIONS ====================
+
+  // PAR Modals
+  window.showNewPARModal = function() {
+    const html = `
+      <form id="parForm" onsubmit="saveNewPAR(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date Issued</label>
+            <input type="date" id="parDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Fund Cluster</label>
+            <input type="text" id="parFundCluster" placeholder="e.g., 01">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="parPropertyNo" placeholder="Property number" required>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="parDescription" placeholder="Item description" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="parQty" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label>Unit Cost</label>
+            <input type="number" id="parUnitCost" step="0.01" placeholder="0.00" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Received By</label>
+            <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Issued By</label>
+            <select class="form-select" id="parIssuedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PAR</button>
+        </div>
+      </form>
+    `;
+    openModal('New Property Acknowledgement Receipt', html);
+    loadEmployeesDropdown('parReceivedBy');
+    loadEmployeesDropdown('parIssuedBy');
+  };
+  window.saveNewPAR = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_issued: document.getElementById('parDate').value,
+      fund_cluster: document.getElementById('parFundCluster').value,
+      property_number: document.getElementById('parPropertyNo').value,
+      description: document.getElementById('parDescription').value,
+      quantity: parseInt(document.getElementById('parQty').value),
+      unit_cost: parseFloat(document.getElementById('parUnitCost').value),
+      total_cost: parseInt(document.getElementById('parQty').value) * parseFloat(document.getElementById('parUnitCost').value),
+      received_by: parseInt(document.getElementById('parReceivedBy').value) || null,
+      issued_by: parseInt(document.getElementById('parIssuedBy').value) || null
+    };
+    try { await apiRequest('/pars', 'POST', data); alert('PAR saved!'); closeModal(); loadPAR(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewPARModal = function(id) { openModal('PAR Details', '<div class="view-details"><p>Loading PAR #' + id + '...</p></div>'); };
+  window.showEditPARModal = function(id) { openModal('Edit PAR', '<div class="view-details"><p>Loading PAR #' + id + ' for editing...</p></div>'); };
+
+  // PTR Modals
+  window.showNewPTRModal = function() {
+    const html = `
+      <form id="ptrForm" onsubmit="saveNewPTR(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="ptrDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="ptrPropertyNo" placeholder="Property number" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="ptrDescription" placeholder="Property description" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transfer From</label>
+            <select class="form-select" id="ptrFrom"><option value="">-- Select Employee --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Transfer To</label>
+            <select class="form-select" id="ptrTo"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reason for Transfer</label>
+          <textarea id="ptrReason" rows="3" placeholder="Reason for property transfer"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PTR</button>
+        </div>
+      </form>
+    `;
+    openModal('New Property Transfer Report', html);
+    loadEmployeesDropdown('ptrFrom');
+    loadEmployeesDropdown('ptrTo');
+  };
+  window.saveNewPTR = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_issued: document.getElementById('ptrDate').value,
+      property_number: document.getElementById('ptrPropertyNo').value,
+      description: document.getElementById('ptrDescription').value,
+      from_officer: parseInt(document.getElementById('ptrFrom').value) || null,
+      to_officer: parseInt(document.getElementById('ptrTo').value) || null,
+      reason: document.getElementById('ptrReason').value
+    };
+    try { await apiRequest('/ptrs', 'POST', data); alert('PTR saved!'); closeModal(); loadPTR(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewPTRModal = function(id) { openModal('PTR Details', '<div class="view-details"><p>Loading PTR #' + id + '...</p></div>'); };
+  window.showEditPTRModal = function(id) { openModal('Edit PTR', '<div class="view-details"><p>Loading PTR #' + id + ' for editing...</p></div>'); };
+
+  // RIS Modals
+  window.showNewRISModal = function() {
+    const html = `
+      <form id="risForm" onsubmit="saveNewRIS(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="risDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="risDivision">
+              <option value="">-- Select --</option>
+              <option value="FAD">FAD</option>
+              <option value="WRSD">WRSD</option>
+              <option value="MWPD">MWPD</option>
+              <option value="MWProD">MWProD</option>
+              <option value="ORD">ORD</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Office</label>
+            <input type="text" id="risOffice" placeholder="Office name">
+          </div>
+          <div class="form-group">
+            <label>Purpose</label>
+            <input type="text" id="risPurpose" placeholder="Purpose of requisition" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Requested By</label>
+            <select class="form-select" id="risRequestedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Approved By</label>
+            <select class="form-select" id="risApprovedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <h4 style="margin-top: 15px;">Items</h4>
+        <div id="risItemsContainer">
+          <div class="form-row ris-item-row">
+            <div class="form-group" style="flex:3">
+              <label>Item</label>
+              <select class="form-select ris-item-select"><option value="">-- Select --</option></select>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>Qty</label>
+              <input type="number" class="ris-item-qty" min="1" value="1">
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline" onclick="addRISItemRow()" style="margin-top:5px;"><i class="fas fa-plus"></i> Add Item</button>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save RIS</button>
+        </div>
+      </form>
+    `;
+    openModal('New Requisition & Issue Slip', html);
+    loadEmployeesDropdown('risRequestedBy');
+    loadEmployeesDropdown('risApprovedBy');
+    loadItemsDropdown(document.querySelector('.ris-item-select').id || 'risItemSelect0');
+    // Load items into the first select
+    (async () => {
+      try {
+        const items = await apiRequest('/items');
+        const selects = document.querySelectorAll('.ris-item-select');
+        selects.forEach(sel => {
+          items.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.code + ' - ' + item.name;
+            sel.appendChild(opt);
+          });
+        });
+      } catch(e) {}
+    })();
+  };
+  window.addRISItemRow = function() {
+    const container = document.getElementById('risItemsContainer');
+    const row = document.createElement('div');
+    row.className = 'form-row ris-item-row';
+    row.innerHTML = '<div class="form-group" style="flex:3"><select class="form-select ris-item-select"><option value="">-- Select --</option></select></div><div class="form-group" style="flex:1"><input type="number" class="ris-item-qty" min="1" value="1"></div><div class="form-group" style="flex:0"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'.ris-item-row\').remove()"><i class="fas fa-times"></i></button></div>';
+    container.appendChild(row);
+    (async () => {
+      try {
+        const items = await apiRequest('/items');
+        const sel = row.querySelector('.ris-item-select');
+        items.forEach(item => { const o = document.createElement('option'); o.value = item.id; o.textContent = item.code + ' - ' + item.name; sel.appendChild(o); });
+      } catch(e) {}
+    })();
+  };
+  window.saveNewRIS = async function(e) {
+    e.preventDefault();
+    const itemRows = document.querySelectorAll('.ris-item-row');
+    const items = [];
+    itemRows.forEach(row => {
+      const itemId = row.querySelector('.ris-item-select')?.value;
+      const qty = row.querySelector('.ris-item-qty')?.value;
+      if (itemId) items.push({ item_id: parseInt(itemId), quantity: parseInt(qty) || 1 });
+    });
+    const data = {
+      date_issued: document.getElementById('risDate').value,
+      division: document.getElementById('risDivision').value,
+      office: document.getElementById('risOffice').value,
+      purpose: document.getElementById('risPurpose').value,
+      requested_by: parseInt(document.getElementById('risRequestedBy').value) || null,
+      approved_by: parseInt(document.getElementById('risApprovedBy').value) || null,
+      items: items
+    };
+    try { await apiRequest('/ris', 'POST', data); alert('RIS saved!'); closeModal(); loadRIS(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewRISModal = function(id) { openModal('RIS Details', '<div class="view-details"><p>Loading RIS #' + id + '...</p></div>'); };
+  window.showEditRISModal = function(id) { openModal('Edit RIS', '<div class="view-details"><p>Loading RIS #' + id + ' for editing...</p></div>'); };
+  window.postRIS = async function(id) {
+    if (!confirm('Post this RIS? Stock balances will be deducted.')) return;
+    try { await apiRequest('/ris/' + id + '/post', 'PUT'); alert('RIS posted!'); loadRIS(); } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Trip Ticket Modals
+  window.showNewTripTicketModal = function() {
+    const html = `
+      <form id="tripForm" onsubmit="saveNewTripTicket(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Trip</label>
+            <input type="date" id="tripDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Vehicle</label>
+            <input type="text" id="tripVehicle" placeholder="Vehicle description" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Plate Number</label>
+            <input type="text" id="tripPlate" placeholder="ABC-1234">
+          </div>
+          <div class="form-group">
+            <label>Driver</label>
+            <select class="form-select" id="tripDriver"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Destination</label>
+            <input type="text" id="tripDest" placeholder="Destination" required>
+          </div>
+          <div class="form-group">
+            <label>Purpose</label>
+            <input type="text" id="tripPurpose" placeholder="Purpose of trip" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Departure Time</label>
+            <input type="time" id="tripDepart">
+          </div>
+          <div class="form-group">
+            <label>Arrival Time</label>
+            <input type="time" id="tripArrive">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>KM Before</label>
+            <input type="number" id="tripKmBefore" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>KM After</label>
+            <input type="number" id="tripKmAfter" step="0.1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Passengers</label>
+          <textarea id="tripPassengers" rows="2" placeholder="List of passengers"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Trip Ticket</button>
+        </div>
+      </form>
+    `;
+    openModal('New Trip Ticket', html);
+    loadEmployeesDropdown('tripDriver');
+  };
+  window.saveNewTripTicket = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_of_trip: document.getElementById('tripDate').value,
+      vehicle_description: document.getElementById('tripVehicle').value,
+      plate_number: document.getElementById('tripPlate').value,
+      driver_id: parseInt(document.getElementById('tripDriver').value) || null,
+      destination: document.getElementById('tripDest').value,
+      purpose: document.getElementById('tripPurpose').value,
+      departure_time: document.getElementById('tripDepart').value,
+      arrival_time: document.getElementById('tripArrive').value,
+      km_before: parseFloat(document.getElementById('tripKmBefore').value) || null,
+      km_after: parseFloat(document.getElementById('tripKmAfter').value) || null,
+      passengers: document.getElementById('tripPassengers').value
+    };
+    try { await apiRequest('/trip-tickets', 'POST', data); alert('Trip ticket saved!'); closeModal(); loadTripTickets(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewTripTicketModal = function(id) { openModal('Trip Ticket Details', '<div class="view-details"><p>Loading trip ticket #' + id + '...</p></div>'); };
+  window.showEditTripTicketModal = function(id) { openModal('Edit Trip Ticket', '<div class="view-details"><p>Loading trip ticket #' + id + ' for editing...</p></div>'); };
+
+  // Semi-Expendable & Capital Outlay View Modals
+  window.showViewSemiExpModal = function(id) { openModal('Semi-Expendable Item', '<div class="view-details"><p>Loading semi-expendable item #' + id + '...</p></div>'); };
+  window.showViewCapitalOutlayModal = function(id) { openModal('Capital Outlay Item', '<div class="view-details"><p>Loading capital outlay item #' + id + '...</p></div>'); };
+
+  // Office Modals
+  window.showNewOfficeModal = function() {
+    const html = `
+      <form id="officeForm" onsubmit="saveNewOffice(event)">
+        <div class="form-group"><label>Office Name</label><input type="text" id="officeName" placeholder="Office name" required></div>
+        <div class="form-group"><label>Division</label>
+          <select class="form-select" id="officeDivision">
+            <option value="">-- Select Division --</option>
+            <option value="1">FAD</option><option value="2">WRSD</option><option value="3">MWPSD</option><option value="4">MWPTD</option><option value="5">ORD</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="officeDesc" rows="2" placeholder="Description"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Office</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Office', html);
+  };
+  window.saveNewOffice = async function(e) {
+    e.preventDefault();
+    const data = { name: document.getElementById('officeName').value, division_id: parseInt(document.getElementById('officeDivision').value) || null, description: document.getElementById('officeDesc').value };
+    try { await apiRequest('/offices', 'POST', data); alert('Office saved!'); closeModal(); loadOffices(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditOfficeModal = function(id) { openModal('Edit Office', '<div class="view-details"><p>Loading office #' + id + ' for editing...</p></div>'); };
+
+  // Designation Modals
+  window.showNewDesignationModal = function() {
+    const html = `
+      <form id="designationForm" onsubmit="saveNewDesignation(event)">
+        <div class="form-group"><label>Designation Title</label><input type="text" id="desigTitle" placeholder="e.g., Administrative Officer V" required></div>
+        <div class="form-group"><label>Description</label><textarea id="desigDesc" rows="2" placeholder="Description"></textarea></div>
+        <div class="form-group"><label>Salary Grade</label><input type="text" id="desigSG" placeholder="e.g., SG-18"></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Designation</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Designation', html);
+  };
+  window.saveNewDesignation = async function(e) {
+    e.preventDefault();
+    const data = { title: document.getElementById('desigTitle').value, description: document.getElementById('desigDesc').value, salary_grade: document.getElementById('desigSG').value };
+    try { await apiRequest('/designations', 'POST', data); alert('Designation saved!'); closeModal(); loadDesignations(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditDesignationModal = function(id) { openModal('Edit Designation', '<div class="view-details"><p>Loading designation #' + id + ' for editing...</p></div>'); };
+
+  // Division Modals
+  window.showNewDivisionModal = function() {
+    const html = `
+      <form id="divisionForm" onsubmit="saveNewDivision(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Division Code</label><input type="text" id="divCode" placeholder="e.g., FAD" required></div>
+          <div class="form-group"><label>Division Name</label><input type="text" id="divName" placeholder="Full name" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="divDesc" rows="2"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Division</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Division', html);
+  };
+  window.saveNewDivision = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('divCode').value, name: document.getElementById('divName').value, description: document.getElementById('divDesc').value };
+    try { await apiRequest('/divisions', 'POST', data); alert('Division saved!'); closeModal(); loadDivisions(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditDivisionModal = function(id) { openModal('Edit Division', '<div class="view-details"><p>Loading division #' + id + ' for editing...</p></div>'); };
+
+  // Fund Cluster Modals
+  window.showNewFundClusterModal = function() {
+    const html = `
+      <form id="fcForm" onsubmit="saveNewFundCluster(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="fcCode" placeholder="e.g., 01" required></div>
+          <div class="form-group"><label>Name</label><input type="text" id="fcName" placeholder="e.g., Regular Agency Fund" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="fcDesc" rows="2"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Fund Cluster</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Fund Cluster', html);
+  };
+  window.saveNewFundCluster = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('fcCode').value, name: document.getElementById('fcName').value, description: document.getElementById('fcDesc').value };
+    try { await apiRequest('/fund-clusters', 'POST', data); alert('Fund cluster saved!'); closeModal(); loadFundClusters(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditFundClusterModal = function(id) { openModal('Edit Fund Cluster', '<div class="view-details"><p>Loading fund cluster #' + id + ' for editing...</p></div>'); };
+
+  // Procurement Mode Modals
+  window.showNewProcurementModeModal = function() {
+    const html = `
+      <form id="pmForm" onsubmit="saveNewProcurementMode(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="pmCode" placeholder="e.g., SVP" required></div>
+          <div class="form-group"><label>Mode Name</label><input type="text" id="pmName" placeholder="e.g., Small Value Procurement" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="pmDesc" rows="2"></textarea></div>
+        <div class="form-group"><label>Threshold Amount</label><input type="number" id="pmThreshold" step="0.01" placeholder="e.g., 1000000.00"></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Mode</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Procurement Mode', html);
+  };
+  window.saveNewProcurementMode = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('pmCode').value, name: document.getElementById('pmName').value, description: document.getElementById('pmDesc').value, threshold: parseFloat(document.getElementById('pmThreshold').value) || null };
+    try { await apiRequest('/procurement-modes', 'POST', data); alert('Procurement mode saved!'); closeModal(); loadProcurementModes(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditProcurementModeModal = function(id) { openModal('Edit Procurement Mode', '<div class="view-details"><p>Loading procurement mode #' + id + ' for editing...</p></div>'); };
+
+  // UACS Code Modals
+  window.showNewUACSCodeModal = function() {
+    const html = `
+      <form id="uacsForm" onsubmit="saveNewUACSCode(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="uacsCode" placeholder="e.g., 5020301000" required></div>
+          <div class="form-group"><label>Category</label>
+            <select class="form-select" id="uacsCategory">
+              <option value="">-- Select --</option>
+              <option value="MOOE">MOOE</option>
+              <option value="CO">Capital Outlay</option>
+              <option value="PS">Personal Services</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Description</label><input type="text" id="uacsDesc" placeholder="e.g., Office Supplies Expenses" required></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save UACS Code</button>
+        </div>
+      </form>
+    `;
+    openModal('Add UACS Code', html);
+  };
+  window.saveNewUACSCode = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('uacsCode').value, description: document.getElementById('uacsDesc').value, category: document.getElementById('uacsCategory').value };
+    try { await apiRequest('/uacs-codes', 'POST', data); alert('UACS code saved!'); closeModal(); loadUACSCodes(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditUACSCodeModal = function(id) { openModal('Edit UACS Code', '<div class="view-details"><p>Loading UACS code #' + id + ' for editing...</p></div>'); };
+
+  // UOM Modals
+  window.showNewUOMModal = function() {
+    const html = `
+      <form id="uomForm" onsubmit="saveNewUOM(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="uomAbbr" placeholder="e.g., pc" required></div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="uomName" placeholder="e.g., piece" required></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save UOM</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Unit of Measure', html);
+  };
+  window.saveNewUOM = async function(e) {
+    e.preventDefault();
+    const data = { abbreviation: document.getElementById('uomAbbr').value, name: document.getElementById('uomName').value };
+    try { await apiRequest('/uoms', 'POST', data); alert('UOM saved!'); closeModal(); loadUOMs(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditUOMModal = function(id) { openModal('Edit UOM', '<div class="view-details"><p>Loading UOM #' + id + ' for editing...</p></div>'); };
+
+  // Settings
+  window.saveSetting = async function(id) {
+    const input = document.querySelector(`.settings-value[data-id="${id}"]`);
+    if (!input) return;
+    try { await apiRequest('/settings/' + id, 'PUT', { setting_value: input.value }); alert('Setting saved!'); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.saveAllSettings = async function() {
+    const inputs = document.querySelectorAll('.settings-value');
+    let saved = 0;
+    for (const input of inputs) {
+      const id = input.dataset.id;
+      try { await apiRequest('/settings/' + id, 'PUT', { setting_value: input.value }); saved++; } catch (err) { console.error(err); }
+    }
+    alert(saved + ' settings saved!');
+  };
+
   // BAC Resolution Modal
   window.showNewBACResolutionModal = function() {
     const html = `
       <form id="bacResForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-gavel"></i>
+          <strong>BAC RESOLUTION</strong> — Declaring Winning Bidder
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Resolution No.</label>
             <input type="text" value="BAC-RES-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
           <div class="form-group">
-            <label>Date</label>
-            <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+            <label>Series of</label>
+            <input type="text" value="2026" required>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Subject / Title</label>
+          <textarea rows="2" placeholder="e.g., RESOLUTION DECLARING [Supplier Name] AS THE LOWEST CALCULATED AND RESPONSIVE BIDDER FOR THE PROCUREMENT OF [Item Description]" required></textarea>
         </div>
         <div class="form-group">
           <label>Linked Abstract of Quotation</label>
           <select class="form-select" required>
             <option value="">-- Select Abstract --</option>
-            <option value="abs-001">ABS-2026-001 - Security Services Q1</option>
-            <option value="abs-002">ABS-2026-002 - Office Supplies</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Recommended Awardee (LCRB)</label>
-          <input type="text" placeholder="Lowest Calculated Responsive Bidder" required>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">WHEREAS CLAUSES</h4>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="the Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII conducted a procurement through Small Value Procurement...">the Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII conducted a procurement through Small Value Procurement (SVP) for the above-mentioned requirement;</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="the BAC invited suppliers and received quotations...">the BAC sent Request for Quotations (RFQ) to prospective suppliers and received sealed quotations;</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="after evaluation of the quotations...">after opening and evaluation of the quotations received, the following are the results:</textarea>
+          </div>
         </div>
+        <h4 style="margin-bottom: 10px; color: #1a365d;">BIDDERS COMPARISON</h4>
+        <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th style="width: 40px;">No.</th>
+              <th>Name of Bidder</th>
+              <th style="width: 130px;">Total Bid Amount</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="bacBiddersBody">
+            <tr>
+              <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
+            </tr>
+            <tr>
+              <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+            </tr>
+            <tr>
+              <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addBACBidderRow()"><i class="fas fa-plus"></i> Add Bidder</button>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">AWARD DETAILS</h4>
         <div class="form-row">
           <div class="form-group">
-            <label>Bid Amount</label>
+            <label>ABC (Approved Budget for the Contract)</label>
             <input type="number" placeholder="0.00" step="0.01" required>
           </div>
           <div class="form-group">
-            <label>ABC</label>
+            <label>Contract Price (LCRB Amount)</label>
             <input type="number" placeholder="0.00" step="0.01" required>
           </div>
         </div>
         <div class="form-group">
-          <label>BAC Recommendation</label>
-          <textarea rows="3" placeholder="BAC hereby recommends the award to..." required></textarea>
+          <label>Description of Procurement</label>
+          <textarea rows="2" placeholder="Brief description of items/services procured" required></textarea>
+        </div>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">BAC MEMBERS (Signatories)</h4>
+        <div style="background: #fce4ec; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">BAC Chairperson</label>
+              <input type="text" placeholder="Name" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Vice-Chairperson</label>
+              <input type="text" placeholder="Name">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <input type="text" placeholder="Name">
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <input type="text" placeholder="Name">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            <input type="text" placeholder="Name">
+          </div>
         </div>
         <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #fce4ec; padding: 12px; border-radius: 6px; border: 2px dashed #e91e63;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-gavel"></i> BAC Resolution Document (Signed by BAC Members)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-gavel"></i> BAC Resolution Document (Signed by BAC Members)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="bacResDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'bacResDocumentLabel')">
                 <button type="button" class="btn btn-sm" style="background: #e91e63; color: white;" onclick="document.getElementById('bacResDocument').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1692,7 +5011,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div>
-              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Post-Qualification Report (if applicable)</label>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Post-Qualification Report (if applicable)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="bacResPostQual" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'bacResPostQualLabel')">
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('bacResPostQual').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1710,57 +5029,167 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('Create BAC Resolution', html);
   };
 
-  // Post-Qualification Modal
+  window.addBACBidderRow = function() {
+    const tbody = document.getElementById('bacBiddersBody');
+    const nextNum = tbody.rows.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
+      <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+      <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = function() {
     const html = `
       <form id="postQualForm">
         <div class="info-banner" style="margin-bottom: 15px;">
-          <i class="fas fa-info-circle"></i>
-          Validate eligibility documents per RA 9184 requirements.
+          <i class="fas fa-users"></i>
+          <strong>TWG REPORT</strong> — Technical Working Group Evaluation Report
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px; font-weight: 600;">TO:</label>
+              <input type="text" value="BAC Chairperson" placeholder="BAC Chairperson" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px; font-weight: 600;">DATE:</label>
+              <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">SUBJECT:</label>
+            <input type="text" placeholder="e.g., Procurement of Security Guard Services" required>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Post-Qual No.</label>
-            <input type="text" value="PQ-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
+            <label>TWG Report No.</label>
+            <input type="text" value="TWG-2026-${String(Math.floor(Math.random() * 9000) + 1000)}" readonly>
           </div>
           <div class="form-group">
-            <label>Date</label>
-            <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
+            <label>Linked Abstract</label>
+            <select class="form-select" required>
+              <option value="">-- Select Abstract --</option>
+            </select>
           </div>
         </div>
         <div class="form-group">
-          <label>Linked Abstract</label>
-          <select class="form-select" required>
-            <option value="">-- Select Abstract --</option>
-            <option value="abs-001">ABS-2026-001 - Security Services Q1</option>
-          </select>
+          <label>Reference Text</label>
+          <textarea rows="2">In reference to the above-subject procurement, the Technical Working Group (TWG) hereby submits the following evaluation report on the submitted quotations and eligibility documents:</textarea>
         </div>
-        <div class="form-group">
-          <label>Bidder to Validate</label>
-          <input type="text" placeholder="Company name" required>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">REQUIRED DOCUMENTS VERIFICATION</h4>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Mark as Pass or N/A for each bidder</p>
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 700px;">
+            <thead>
+              <tr>
+                <th>Required Documents</th>
+                <th style="width: 120px; background: #e3f2fd;">Bidder 1</th>
+                <th style="width: 120px; background: #e8f5e9;">Bidder 2</th>
+                <th style="width: 120px; background: #fff8e1;">Bidder 3</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" style="padding: 4px;"><strong>Bidder Names:</strong></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="background: #f5f9ff;"><input type="text" placeholder="Bidder 1" style="width: 100%; font-size: 11px;"></td>
+                <td style="background: #f5fff5;"><input type="text" placeholder="Bidder 2" style="width: 100%; font-size: 11px;"></td>
+                <td style="background: #fffef5;"><input type="text" placeholder="Bidder 3" style="width: 100%; font-size: 11px;"></td>
+              </tr>
+              <tr>
+                <td>Latest Income Tax Return (ITR)</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>Omnibus Sworn Statement</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>Valid Mayor's/Business Permit</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>PhilGEPS Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>BIR Certificate of Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>SEC/DTI Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #f5fff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #fffef5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="form-group">
-          <label>Document Checklist</label>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; background: var(--bg-color); border-radius: 8px;">
-            <label><input type="checkbox"> Income Tax Return (ITR)</label>
-            <label><input type="checkbox"> Omnibus Sworn Statement</label>
-            <label><input type="checkbox"> Business Permits/Registrations</label>
-            <label><input type="checkbox"> PhilGEPS Certificate</label>
-            <label><input type="checkbox"> BIR Certificate of Registration</label>
-            <label><input type="checkbox"> Mayor's Permit</label>
-            <label><input type="checkbox"> SEC/DTI Registration</label>
-            <label><input type="checkbox"> PCAB License (if applicable)</label>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">PRICE COMPARISON</h4>
+        <table class="data-table" style="font-size: 11px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th>Particulars</th>
+              <th style="width: 100px;">ABC</th>
+              <th style="width: 100px; background: #e3f2fd;">Bidder 1</th>
+              <th style="width: 100px; background: #e8f5e9;">Bidder 2</th>
+              <th style="width: 100px; background: #fff8e1;">Bidder 3</th>
+            </tr>
+          </thead>
+          <tbody id="twgPriceBody">
+            <tr>
+              <td><input type="text" placeholder="Item/Service" style="width: 100%; font-size: 11px;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addTWGPriceRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <hr style="margin: 15px 0; border-color: #ddd;">
+        <h4 style="margin-bottom: 10px; color: #1a365d;">TWG MEMBERS (Signatories)</h4>
+        <div style="background: #e8eaf6; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">TWG Head</label>
+              <input type="text" placeholder="Name" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <input type="text" placeholder="Name">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            <input type="text" placeholder="Name">
           </div>
         </div>
         <div class="form-group">
-          <label>TWG Findings</label>
-          <textarea rows="2" placeholder="Post-qualification findings..."></textarea>
-        </div>
-        <div class="form-group">
-          <label><strong>Required Attachments</strong> <span class="text-danger">*</span></label>
+          <label><strong>Required Attachments</strong></label>
           <div class="attachment-box" style="background: #e8eaf6; padding: 12px; border-radius: 6px; border: 2px dashed #3f51b5;">
             <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-user-check"></i> Post-Qualification Report (TWG Signed)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-user-check"></i> TWG Report (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="postQualReport" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'postQualReportLabel')">
                 <button type="button" class="btn btn-sm" style="background: #3f51b5; color: white;" onclick="document.getElementById('postQualReport').click()"><i class="fas fa-upload"></i> Upload</button>
@@ -1768,7 +5197,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div>
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-folder-open"></i> Bidder Documents (Scanned)</label>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-folder-open"></i> Bidder Documents (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="file" id="postQualBidderDocs" accept=".pdf,.jpg,.jpeg,.png" required multiple style="display: none;" onchange="updateFileLabel(this, 'postQualBidderDocsLabel', true)">
                 <button type="button" class="btn btn-sm" style="background: #3f51b5; color: white;" onclick="document.getElementById('postQualBidderDocs').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
@@ -1779,11 +5208,24 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="return validateMultipleAttachments(['postQualReport', 'postQualBidderDocs'], ['Post-Qualification Report', 'Bidder Documents'])"><i class="fas fa-user-check"></i> Complete Post-Qual</button>
+          <button type="submit" class="btn btn-primary" onclick="return validateMultipleAttachments(['postQualReport', 'postQualBidderDocs'], ['TWG Report', 'Bidder Documents'])"><i class="fas fa-user-check"></i> Submit TWG Report</button>
         </div>
       </form>
     `;
-    openModal('Post-Qualification Validation', html);
+    openModal('TWG Evaluation Report / Post-Qualification', html);
+  };
+
+  window.addTWGPriceRow = function() {
+    const tbody = document.getElementById('twgPriceBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" placeholder="Item/Service" style="width: 100%; font-size: 11px;"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+      <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+      <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+    `;
+    tbody.appendChild(row);
   };
 
   // COA Submission Modal
@@ -1863,13 +5305,2818 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('COA Submission Packet', html);
   };
 
+  // PO Accept Modal (NEW - per spec v1.2)
+  window.showAcceptPOModal = function() {
+    const html = `
+      <form id="acceptPoForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-info-circle"></i>
+          Mark PO as accepted by supplier. This will update workflow status to <strong>Awaiting Delivery</strong>.
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Accepted Date/Time <span class="text-danger">*</span></label>
+            <input type="datetime-local" id="acceptedAt" required>
+          </div>
+          <div class="form-group">
+            <label>Accepted By</label>
+            <input type="text" placeholder="Supplier representative name">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Supplier Conforme Attachment</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="conformeAttachment" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'conformeLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('conformeAttachment').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="conformeLabel" style="font-size: 12px; color: #666;">Optional - signed conforme</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Mark Accepted</button>
+        </div>
+      </form>
+    `;
+    openModal('Accept Purchase Order', html);
+  };
+
+  // Mark Delivered Modal (NEW - per spec v1.2)
+  window.showMarkDeliveredModal = function() {
+    const html = `
+      <form id="deliveredForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-truck"></i>
+          Mark delivery received. This will update workflow status to <strong>For Payment</strong>.
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Delivered Date <span class="text-danger">*</span></label>
+            <input type="date" id="deliveryDate" required>
+          </div>
+          <div class="form-group">
+            <label>Delivered At (Time)</label>
+            <input type="time" id="deliveredTime">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Delivery Receipt Number</label>
+          <input type="text" placeholder="DR Number">
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea rows="2" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-truck"></i> Mark Delivered</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark Delivery Received', html);
+  };
+
+  // Mark Paid (ADA) Modal (NEW - per spec v1.2)
+  window.showMarkPaidModal = function() {
+    const html = `
+      <form id="paidForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-money-check-alt"></i>
+          Record payment completion via ADA (Advice to Debit Account).
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Payment Date <span class="text-danger">*</span></label>
+            <input type="date" id="paymentDate" required>
+          </div>
+          <div class="form-group">
+            <label>ADA Reference Number <span class="text-danger">*</span></label>
+            <input type="text" id="adaReference" placeholder="ADA-XXXX-XXXX" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Amount Paid</label>
+          <input type="text" placeholder="₱0.00" readonly>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check-circle"></i> Mark Paid (ADA)</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark Payment Complete', html);
+  };
+
+  // Compile Packet Modal (NEW - per spec v1.2)
+  window.showCompilePacketModal = function() {
+    const html = `
+      <form id="compilePacketForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-folder-open"></i>
+          Compile supporting documents for Chief + Director signing before COA submission.
+        </div>
+        <div class="form-group">
+          <label>Select Purchase Order <span class="text-danger">*</span></label>
+          <select class="form-select" required>
+            <option value="">-- Select PO --</option>
+            <option value="po-001">PO-JAN-2026-001 - Security Services (Paid)</option>
+            <option value="po-002">PO-JAN-2026-002 - Office Supplies (For Payment)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><strong>Supporting Documents Checklist</strong></label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; background: var(--bg-color); border-radius: 8px; font-size: 12px;">
+            <label><input type="checkbox" checked disabled> Purchase Request (PR)</label>
+            <label><input type="checkbox" checked disabled> RFQ</label>
+            <label><input type="checkbox" checked disabled> Abstract of Quotation</label>
+            <label><input type="checkbox" checked disabled> Post-Qualification Report</label>
+            <label><input type="checkbox" checked disabled> BAC Resolution</label>
+            <label><input type="checkbox" checked disabled> Notice of Award</label>
+            <label><input type="checkbox" checked disabled> Purchase Order</label>
+            <label><input type="checkbox" checked disabled> Supplier Conforme</label>
+            <label><input type="checkbox" checked disabled> IAR (Appendix 62)</label>
+            <label><input type="checkbox" checked disabled> Delivery Receipt</label>
+            <label><input type="checkbox" checked disabled> Supplier Invoice</label>
+            <label><input type="checkbox"> Other Supporting Docs</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Upload Merged Packet (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="mergedPacket" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'mergedPacketLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('mergedPacket').click()"><i class="fas fa-upload"></i> Upload PDF</button>
+            <span id="mergedPacketLabel" style="font-size: 12px; color: #666;">Optional - single merged PDF</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea rows="2" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> Compile Packet</button>
+        </div>
+      </form>
+    `;
+    openModal('Compile PO Packet', html);
+  };
+
+  // Chief Sign Modal (NEW - per spec v1.2)
+  window.showChiefSignModal = function() {
+    const html = `
+      <form id="chiefSignForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-signature"></i>
+          Record Chief's signature on the PO packet.
+        </div>
+        <div class="form-group">
+          <label>Signed Date/Time <span class="text-danger">*</span></label>
+          <input type="datetime-local" id="chiefSignedAt" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Page (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="chiefSignedPage" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'chiefSignedLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('chiefSignedPage').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="chiefSignedLabel" style="font-size: 12px; color: #666;">Scanned signed page</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Record Chief Signature</button>
+        </div>
+      </form>
+    `;
+    openModal('Chief Signature', html);
+  };
+
+  // Director Sign Modal (NEW - per spec v1.2)
+  window.showDirectorSignModal = function() {
+    const html = `
+      <form id="directorSignForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-signature"></i>
+          Record Director's (HoPE) signature on the PO packet. Both Chief + Director signatures are required before COA submission.
+        </div>
+        <div class="form-group">
+          <label>Signed Date/Time <span class="text-danger">*</span></label>
+          <input type="datetime-local" id="directorSignedAt" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Page (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="directorSignedPage" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'directorSignedLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('directorSignedPage').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="directorSignedLabel" style="font-size: 12px; color: #666;">Scanned signed page</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Record Director Signature</button>
+        </div>
+      </form>
+    `;
+    openModal('Director Signature', html);
+  };
+
   // APP Consolidation function
-  window.consolidateAPP = function() {
-    alert('Consolidating PPMP entries from all 5 divisions into APP...\n\nThis will pull all approved PPMP items from:\n• FAD\n• WRSD\n• MWPSD\n• MWPTD\n• ORD');
+  window.consolidateAPP = async function() {
+    try {
+      alert('Consolidating PPMP entries from all divisions into APP...');
+      await loadAPP();
+      const items = window._appItems || [];
+      if (items.length === 0) {
+        alert('No plan items found to consolidate. Please ensure PPMP plans have items.');
+        return;
+      }
+      // Group by department
+      function getDeptCode(name) {
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const byDept = {};
+      items.forEach(i => {
+        const dc = getDeptCode(i.department_name);
+        if (!byDept[dc]) byDept[dc] = { count: 0, total: 0 };
+        byDept[dc].count++;
+        byDept[dc].total += parseFloat(i.unit_price || 0);
+      });
+      let summary = 'APP Consolidation Complete!\n\n';
+      for (const [dept, data] of Object.entries(byDept)) {
+        summary += dept + ': ' + data.count + ' items — ₱' + data.total.toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n';
+      }
+      summary += '\nTotal: ' + items.length + ' items consolidated.';
+      alert('Successfully consolidated ' + items.length + ' items from all divisions');
+      // Navigate to APP page to show results
+      if (typeof navigateTo === 'function') navigateTo('app');
+    } catch (err) {
+      alert('Consolidation failed: ' + err.message);
+    }
+  };
+
+  // Set APP Status Modal
+  window.showSetAPPStatusModal = function() {
+    const st = window._appStatus || { app_type: 'indicative', update_count: 0 };
+    const html = `
+      <form id="setAPPStatusForm" onsubmit="submitAPPStatus(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-cog"></i>
+          Set the current status of the Annual Procurement Plan for FY 2026.
+        </div>
+        <div class="view-details" style="margin-bottom: 15px;">
+          <div class="detail-row"><label>Current Status:</label><span style="font-weight:700;">${st.app_type === 'updated' ? 'Updated (v' + (st.update_count||1) + ')' : st.app_type.charAt(0).toUpperCase() + st.app_type.slice(1)}</span></div>
+          ${st.set_by_name ? '<div class="detail-row"><label>Last Set By:</label><span>' + st.set_by_name + '</span></div>' : ''}
+          ${st.set_at ? '<div class="detail-row"><label>Last Set On:</label><span>' + new Date(st.set_at).toLocaleDateString('en-PH', {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) + '</span></div>' : ''}
+        </div>
+        <div class="form-group">
+          <label>Set APP Status To <span class="text-danger">*</span></label>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #ddd;border-radius:4px;cursor:pointer;" class="status-radio-option">
+              <input type="radio" name="app_type" value="indicative" ${st.app_type === 'indicative' ? 'checked' : ''}>
+              <span class="version-tag indicative" style="font-size:11px;">Indicative</span>
+              <small style="color:#666;">Initial APP before budget approval</small>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #ddd;border-radius:4px;cursor:pointer;" class="status-radio-option">
+              <input type="radio" name="app_type" value="final" ${st.app_type === 'final' ? 'checked' : ''}>
+              <span class="version-tag final" style="font-size:11px;">Final</span>
+              <small style="color:#666;">APP after GAA/budget approval</small>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #ddd;border-radius:4px;cursor:pointer;" class="status-radio-option">
+              <input type="radio" name="app_type" value="updated" ${st.app_type === 'updated' ? 'checked' : ''}>
+              <span class="version-tag updated" style="font-size:11px;">Updated</span>
+              <small style="color:#666;">Revised APP (version count increments automatically: currently v${st.update_count || 0})</small>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks (Optional)</label>
+          <textarea name="remarks" rows="2" placeholder="e.g., Updated per BAC Resolution No. 2026-005">${st.remarks || ''}</textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Set Status</button>
+        </div>
+      </form>
+    `;
+    openModal('Set APP Status — FY 2026', html);
+  };
+
+  // Submit APP Status
+  window.submitAPPStatus = async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const appType = form.querySelector('input[name="app_type"]:checked').value;
+    const remarks = form.remarks.value;
+    try {
+      const result = await apiRequest('/app-settings/2026', 'PUT', { app_type: appType, remarks: remarks });
+      alert('APP status set to ' + appType.charAt(0).toUpperCase() + appType.slice(1) + (appType === 'updated' ? ' (v' + result.update_count + ')' : ''));
+      closeModal();
+      loadAPP();
+    } catch (err) {
+      alert('Failed to update APP status: ' + err.message);
+    }
+  };
+
+  // APP Version Filter Change (dropdown sync)
+  window.onAPPVersionFilterChange = function(value) {
+    // When user selects a version filter, open the set status modal so they can officially change it
+    showSetAPPStatusModal();
+  };
+
+  // =====================================================
+  // VIEW MODALS - Display record details
+  // =====================================================
+
+  // View PPMP Details
+  window.showViewPPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(name) {
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan.department_name);
+      const ppmpNo = 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
+      const totalAmt = parseFloat(plan.total_amount || 0);
+      const statusClass = plan.status === 'approved' ? 'approved' : plan.status === 'submitted' ? 'submitted' : 'draft';
+      const items = plan.items || [];
+      const itemsHtml = items.length > 0 ? '<div style="margin-top:15px;"><h4 style="margin-bottom:8px;">Plan Items (' + items.length + ')</h4><table class="data-table full-width" style="font-size:12px;"><thead><tr><th>Code</th><th>Item Name</th><th>Unit</th><th>Unit Price</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Total Qty</th><th>Category</th></tr></thead><tbody>' + items.map(it => '<tr><td>' + (it.item_code||'-') + '</td><td>' + (it.item_name||'-') + '</td><td>' + (it.unit||'-') + '</td><td>₱' + parseFloat(it.unit_price||0).toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td><td>' + (it.q1_qty||0) + '</td><td>' + (it.q2_qty||0) + '</td><td>' + (it.q3_qty||0) + '</td><td>' + (it.q4_qty||0) + '</td><td>' + (it.total_qty||0) + '</td><td>' + (it.category||'-') + '</td></tr>').join('') + '</tbody></table></div>' : '';
+
+      const html = `
+        <div class="view-details">
+          <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo}</span></div>
+          <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
+          <div class="detail-row"><label>Fiscal Year:</label><span>${plan.fiscal_year}</span></div>
+          <div class="detail-row"><label>Total Items:</label><span>${items.length}</span></div>
+          <div class="detail-row"><label>Schedule:</label><span>Jan - Dec ${plan.fiscal_year}</span></div>
+          <div class="detail-row"><label>Total ABC:</label><span>₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          <div class="detail-row"><label>Funding Source:</label><span>GAA ${plan.fiscal_year}</span></div>
+          <div class="detail-row"><label>Status:</label><span><span class="status-badge ${statusClass}">${plan.status}</span></span></div>
+          <div class="detail-row"><label>Remarks:</label><span>${plan.remarks || '-'}</span></div>
+          <div class="detail-row"><label>Date Created:</label><span>${plan.created_at ? new Date(plan.created_at).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}) : '-'}</span></div>
+        </div>
+        ${itemsHtml}
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button type="button" class="btn btn-primary" onclick="closeModal(); showEditPPMPModal(${planId});"><i class="fas fa-edit"></i> Edit</button>
+        </div>
+      `;
+      openModal('View PPMP Details', html);
+    } catch (err) {
+      alert('Failed to load PPMP details: ' + err.message);
+    }
+  };
+
+  // View APP Project Details
+  window.showViewAPPModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    function getDeptCode(name) {
+      if (!name) return 'DMW';
+      const lower = name.toLowerCase();
+      if (lower.includes('finance')) return 'FAD';
+      if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+      if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+      if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+      if (lower.includes('director')) return 'ORD';
+      return name.substring(0,3).toUpperCase();
+    }
+    function getProcMode(remarks) {
+      if (!remarks) return { label: 'Small Value Procurement', css: 'svp' };
+      const r = remarks.toLowerCase();
+      if (r.includes('direct contracting')) return { label: 'Direct Contracting', css: 'dc' };
+      if (r.includes('agency-to-agency') || r.includes('agency to agency')) return { label: 'Agency-To-Agency', css: 'others' };
+      if (r.includes('shopping')) return { label: 'Shopping', css: 'shopping' };
+      return { label: 'Small Value Procurement', css: 'svp' };
+    }
+
+    const deptCode = getDeptCode(item.department_name);
+    const mode = getProcMode(item.remarks);
+    const unitPrice = parseFloat(item.unit_price || 0);
+    const totalQty = parseInt(item.total_qty || 0);
+    const totalPrice = parseFloat(item.total_price || (unitPrice * totalQty));
+
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
+        <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
+        <div class="detail-row"><label>Description:</label><span>${item.item_description || '-'}</span></div>
+        <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
+        <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
+        <div class="detail-row"><label>Unit:</label><span>${item.unit || '-'}</span></div>
+        <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        <div class="detail-row"><label>Quarterly Qty:</label><span>Q1: ${item.q1_qty||0} | Q2: ${item.q2_qty||0} | Q3: ${item.q3_qty||0} | Q4: ${item.q4_qty||0}</span></div>
+        <div class="detail-row"><label>Total Quantity:</label><span>${totalQty} ${item.unit || ''}</span></div>
+        <div class="detail-row"><label>Total Price:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        <div class="detail-row"><label>Procurement Mode:</label><span><span class="mode-badge ${mode.css}">${mode.label}</span></span></div>
+        <div class="detail-row"><label>Funding Source:</label><span>GAA ${item.fiscal_year || '2026'}</span></div>
+        <div class="detail-row"><label>Remarks:</label><span>${item.remarks || '-'}</span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showCreatePRFromAPPModal(${item.id});"><i class="fas fa-file-signature"></i> Create PR</button>
+      </div>
+    `;
+    openModal('View APP Project', html);
+  };
+
+  // View PR Details
+  window.showViewPRModal = function(prNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-001'}</span></div>
+        <div class="detail-row"><label>Date:</label><span>Jan 10, 2026</span></div>
+        <div class="detail-row"><label>Project/Purpose:</label><span>Security Services - Q1</span></div>
+        <div class="detail-row"><label>Division:</label><span>FAD</span></div>
+        <div class="detail-row"><label>APP Reference:</label><span>APP-2026-001</span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱120,000.00</span></div>
+        <div class="detail-row"><label>Requested By:</label><span>End-User (FAD)</span></div>
+        <div class="detail-row"><label>Approved By:</label><span>HoPE</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge pr-approved">PR Approved</span></span></div>
+        <div class="detail-row"><label>Annex 1 (Route Slip):</label><span><i class="fas fa-check-circle text-success"></i> Attached</span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Attachments</h4>
+      <ul style="font-size: 13px; color: #555;">
+        <li><i class="fas fa-file-pdf"></i> Route_Slip_Annex1.pdf</li>
+        <li><i class="fas fa-file-pdf"></i> Technical_Specifications.pdf</li>
+      </ul>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('PR', '${prNo}');"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View Purchase Request', html);
+  };
+
+  // View RFQ Details
+  window.showViewRFQModal = function(rfqNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || 'RFQ-2026-001'}</span></div>
+        <div class="detail-row"><label>PR Reference:</label><span>PR-JAN-2026-001</span></div>
+        <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+        <div class="detail-row"><label>ABC:</label><span>₱120,000.00</span></div>
+        <div class="detail-row"><label>PhilGEPS Posting:</label><span><span class="status-badge not-required">Not Required</span></span></div>
+        <div class="detail-row"><label>Posted Date:</label><span>Jan 12, 2026</span></div>
+        <div class="detail-row"><label>Deadline:</label><span>Jan 17, 2026</span></div>
+        <div class="detail-row"><label>Quotations:</label><span>3</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge quotations-received">Quotations Received</span></span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Quotations Received</h4>
+      <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+        <thead><tr><th>Supplier</th><th>Amount</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr><td>ABC Security Agency</td><td>₱115,000.00</td><td>Jan 15, 2026</td></tr>
+          <tr><td>XYZ Security Co.</td><td>₱118,500.00</td><td>Jan 16, 2026</td></tr>
+          <tr><td>SafeGuard Inc.</td><td>₱122,000.00</td><td>Jan 17, 2026</td></tr>
+        </tbody>
+      </table>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showNewAbstractModal();"><i class="fas fa-table"></i> Create Abstract</button>
+      </div>
+    `;
+    openModal('View RFQ Details', html);
+  };
+
+  // View Abstract Details
+  window.showViewAbstractModal = function(absNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Abstract No.:</label><span>${absNo || 'ABS-2026-001'}</span></div>
+        <div class="detail-row"><label>RFQ Reference:</label><span>RFQ-2026-001</span></div>
+        <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+        <div class="detail-row"><label>Total Bidders:</label><span>3</span></div>
+        <div class="detail-row"><label>Lowest Compliant:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Bid Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Date Prepared:</label><span>Jan 18, 2026</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge abstract-prepared">Abstract Prepared</span></span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Bid Comparison</h4>
+      <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+        <thead><tr><th>Rank</th><th>Supplier</th><th>Bid Amount</th><th>Compliant</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>ABC Security Agency</td><td>₱115,000.00</td><td><i class="fas fa-check text-success"></i></td></tr>
+          <tr><td>2</td><td>XYZ Security Co.</td><td>₱118,500.00</td><td><i class="fas fa-check text-success"></i></td></tr>
+          <tr><td>3</td><td>SafeGuard Inc.</td><td>₱122,000.00</td><td><i class="fas fa-check text-success"></i></td></tr>
+        </tbody>
+      </table>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('Abstract', '${absNo}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showNewPostQualModal();"><i class="fas fa-user-check"></i> Post-Qual</button>
+      </div>
+    `;
+    openModal('View Abstract of Quotations', html);
+  };
+
+  // View Post-Qual Details
+  window.showViewPostQualModal = function(pqNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Post-Qual No.:</label><span>${pqNo || 'PQ-2026-001'}</span></div>
+        <div class="detail-row"><label>Abstract Reference:</label><span>ABS-2026-001</span></div>
+        <div class="detail-row"><label>Bidder:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge post-qual-passed">Passed</span></span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Document Verification</h4>
+      <div class="checklist-grid" style="margin-top: 8px;">
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> ITR (Income Tax Return)</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Omnibus Sworn Statement</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> PhilGEPS Registration</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> BIR Certificate of Registration</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Business Permits</div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showNewBACResolutionModal();"><i class="fas fa-gavel"></i> Create BAC Resolution</button>
+      </div>
+    `;
+    openModal('View Post-Qualification', html);
+  };
+
+  // View BAC Resolution Details
+  window.showViewBACResolutionModal = function(resNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Resolution No.:</label><span>${resNo || 'BAC-RES-2026-001'}</span></div>
+        <div class="detail-row"><label>Date:</label><span>Jan 19, 2026</span></div>
+        <div class="detail-row"><label>Abstract Reference:</label><span>ABS-2026-001</span></div>
+        <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+        <div class="detail-row"><label>Recommended Awardee:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge bac-resolution-approved">BAC Resolution Approved</span></span></div>
+        <div class="detail-row"><label>Approved By:</label><span>BAC Chairperson</span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('BACRes', '${resNo}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showNewNOAModal();"><i class="fas fa-award"></i> Issue NOA</button>
+      </div>
+    `;
+    openModal('View BAC Resolution', html);
+  };
+
+  // View NOA Details
+  window.showViewNOAModal = function(noaNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>NOA No.:</label><span>${noaNo || 'NOA-2026-001'}</span></div>
+        <div class="detail-row"><label>Date Issued:</label><span>Jan 20, 2026</span></div>
+        <div class="detail-row"><label>BAC Res Reference:</label><span>BAC-RES-2026-001</span></div>
+        <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+        <div class="detail-row"><label>Winning Bidder:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Contract Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Received by Bidder:</label><span>Jan 21, 2026</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge noa-issued">NOA Issued</span></span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('NOA', '${noaNo}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showNewPOModal();"><i class="fas fa-file-invoice-dollar"></i> Create PO</button>
+      </div>
+    `;
+    openModal('View Notice of Award', html);
+  };
+
+  // View PO Details
+  window.showViewPOModal = function(poNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>PO No.:</label><span>${poNo || 'PO-JAN-2026-001'}</span></div>
+        <div class="detail-row"><label>Date:</label><span>Jan 22, 2026</span></div>
+        <div class="detail-row"><label>Supplier:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Doc Status:</label><span><span class="status-badge approved">Approved</span></span></div>
+        <div class="detail-row"><label>Workflow:</label><span><span class="status-badge paid-ada">Paid (ADA)</span></span></div>
+        <div class="detail-row"><label>NOA Reference:</label><span>NOA-2026-001</span></div>
+        <div class="detail-row"><label>Supplier Conforme:</label><span>Jan 25, 2026</span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('PO', '${poNo}');"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View Purchase Order', html);
+  };
+
+  // View IAR Details
+  window.showViewIARModal = function(iarNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>IAR No.:</label><span>${iarNo || 'IAR-2026-001'}</span></div>
+        <div class="detail-row"><label>Date:</label><span>Feb 1, 2026</span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>PO-JAN-2026-001</span></div>
+        <div class="detail-row"><label>Supplier:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Invoice No.:</label><span>INV-12345</span></div>
+        <div class="detail-row"><label>Requisitioning Office:</label><span>FAD</span></div>
+        <div class="detail-row"><label>Inspection:</label><span><span class="status-badge approved">Inspected</span></span></div>
+        <div class="detail-row"><label>Acceptance:</label><span><span class="status-badge approved">Complete</span></span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge iar-completed">IAR Completed</span></span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('IAR', '${iarNo}');"><i class="fas fa-print"></i> Print Appendix 62</button>
+      </div>
+    `;
+    openModal('View IAR (Appendix 62)', html);
+  };
+
+  // View PO Packet Details
+  window.showViewPacketModal = function(packetId) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Packet ID:</label><span>${packetId || 'PKT-2026-001'}</span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>PO-JAN-2026-001</span></div>
+        <div class="detail-row"><label>Project:</label><span>Security Services Q1</span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Compiled:</label><span>Feb 2, 2026</span></div>
+        <div class="detail-row"><label>Chief Signed:</label><span><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></span></div>
+        <div class="detail-row"><label>Director Signed:</label><span><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge signed">Signed</span></span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Supporting Documents Checklist</h4>
+      <div class="checklist-grid" style="margin-top: 8px;">
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Purchase Request (PR)</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> RFQ</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Abstract of Quotation</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> BAC Resolution</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> NOA</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> PO</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Conforme</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> IAR</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Delivery Receipt</div>
+        <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Invoice</div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('Packet', '${packetId}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-success" onclick="closeModal(); showSubmitToCOAModal('${packetId}');"><i class="fas fa-file-export"></i> Submit to COA</button>
+      </div>
+    `;
+    openModal('View PO Packet', html);
+  };
+
+  // View COA Submission Details
+  window.showViewCOAModal = function(coaNo) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Submission No.:</label><span>${coaNo || 'COA-2026-001'}</span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>PO-JAN-2026-001</span></div>
+        <div class="detail-row"><label>Packet Status:</label><span><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
+        <div class="detail-row"><label>Submitted:</label><span>Feb 3, 2026</span></div>
+        <div class="detail-row"><label>Received by COA:</label><span>Feb 3, 2026</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge submitted-to-coa">COA Submitted</span></span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('COA', '${coaNo}');"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View COA Submission', html);
+  };
+
+  // View Supplier Details
+  window.showViewSupplierModal = function(supplierId) {
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Supplier ID:</label><span>${supplierId || 'SUP-001'}</span></div>
+        <div class="detail-row"><label>Company Name:</label><span>ABC Security Agency</span></div>
+        <div class="detail-row"><label>Address:</label><span>Butuan City, Agusan del Norte</span></div>
+        <div class="detail-row"><label>Contact:</label><span>+63 85 123 4567</span></div>
+        <div class="detail-row"><label>PhilGEPS Status:</label><span><span class="status-badge philgeps-platinum">Platinum</span></span></div>
+        <div class="detail-row"><label>TIN:</label><span>123-456-789-000</span></div>
+        <div class="detail-row"><label>Email:</label><span>info@abcsecurity.ph</span></div>
+        <div class="detail-row"><label>Contact Person:</label><span>Juan Dela Cruz</span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Transaction History</h4>
+      <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+        <thead><tr><th>PO No.</th><th>Project</th><th>Amount</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr><td>PO-JAN-2026-001</td><td>Security Services Q1</td><td>₱115,000.00</td><td>Jan 22, 2026</td></tr>
+        </tbody>
+      </table>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showEditSupplierModal('${supplierId}');"><i class="fas fa-edit"></i> Edit</button>
+      </div>
+    `;
+    openModal('View Supplier Profile', html);
+  };
+
+  // =====================================================
+  // EDIT MODALS - Modify existing records
+  // =====================================================
+
+  // Edit PPMP Modal
+  window.showEditPPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(name) {
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan.department_name);
+      const ppmpNo = 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
+      const totalAmt = parseFloat(plan.total_amount || 0);
+      const statusVal = plan.status || 'draft';
+
+      const html = `
+        <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
+          <div class="form-row">
+            <div class="form-group">
+              <label>PPMP No.</label>
+              <input type="text" value="${ppmpNo}" readonly style="background: #f5f5f5;">
+            </div>
+            <div class="form-group">
+              <label>Division</label>
+              <input type="text" value="${deptCode} - ${plan.department_name || ''}" readonly style="background: #f5f5f5;">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fiscal Year <span class="text-danger">*</span></label>
+              <input type="number" name="fiscal_year" value="${plan.fiscal_year}" required>
+            </div>
+            <div class="form-group">
+              <label>Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="status" required>
+                <option value="draft" ${statusVal==='draft'?'selected':''}>Draft</option>
+                <option value="submitted" ${statusVal==='submitted'?'selected':''}>Submitted</option>
+                <option value="approved" ${statusVal==='approved'?'selected':''}>Approved</option>
+                <option value="rejected" ${statusVal==='rejected'?'selected':''}>Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Total Amount (ABC) <span class="text-danger">*</span></label>
+              <input type="number" name="total_amount" step="0.01" value="${totalAmt.toFixed(2)}" required>
+            </div>
+            <div class="form-group">
+              <label>Funding Source</label>
+              <select class="form-select" name="fund_source">
+                <option value="GAA-MOOE" selected>GAA-MOOE</option>
+                <option value="GAA-CO">GAA-CO</option>
+                <option value="Trust Fund">Trust Fund</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Remarks</label>
+            <textarea name="remarks" rows="2">${plan.remarks || ''}</textarea>
+          </div>
+          <div class="form-group" style="text-align: right; margin-top: 20px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+          </div>
+        </form>
+      `;
+      openModal('Edit PPMP', html);
+    } catch (err) {
+      alert('Failed to load PPMP for editing: ' + err.message);
+    }
+  };
+
+  // Submit Edit PPMP
+  window.submitEditPPMP = async function(e, planId) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      fiscal_year: parseInt(form.fiscal_year.value),
+      status: form.status.value,
+      total_amount: parseFloat(form.total_amount.value),
+      remarks: form.remarks.value
+    };
+    try {
+      await apiRequest('/plans/' + planId, 'PUT', data);
+      alert('PPMP updated successfully');
+      closeModal();
+      loadPPMP();
+    } catch (err) {
+      alert('Failed to update PPMP: ' + err.message);
+    }
+  };
+
+  // Edit Supplier Modal
+  window.showEditSupplierModal = function(supplierId) {
+    const html = `
+      <form id="editSupplierForm">
+        <div class="form-group">
+          <label>Supplier ID</label>
+          <input type="text" value="${supplierId || 'SUP-001'}" readonly style="background: #f5f5f5;">
+        </div>
+        <div class="form-group">
+          <label>Company Name <span class="text-danger">*</span></label>
+          <input type="text" value="ABC Security Agency" required>
+        </div>
+        <div class="form-group">
+          <label>Address <span class="text-danger">*</span></label>
+          <input type="text" value="Butuan City, Agusan del Norte" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contact Number <span class="text-danger">*</span></label>
+            <input type="text" value="+63 85 123 4567" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" value="info@abcsecurity.ph">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TIN <span class="text-danger">*</span></label>
+            <input type="text" value="123-456-789-000" required>
+          </div>
+          <div class="form-group">
+            <label>PhilGEPS Status</label>
+            <select class="form-select">
+              <option value="platinum" selected>Platinum</option>
+              <option value="registered">Registered</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Contact Person</label>
+          <input type="text" value="Juan Dela Cruz">
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit Supplier', html);
+  };
+
+  // Edit Item Modal
+  window.showEditItemModal = function(itemCode) {
+    const html = `
+      <form id="editItemForm">
+        <div class="form-group">
+          <label>Item Code</label>
+          <input type="text" value="${itemCode || 'SVC-001'}" readonly style="background: #f5f5f5;">
+        </div>
+        <div class="form-group">
+          <label>Description <span class="text-danger">*</span></label>
+          <input type="text" value="Security Guard Services" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category <span class="text-danger">*</span></label>
+            <select class="form-select" required>
+              <option value="services" selected>Services</option>
+              <option value="supplies">Supplies</option>
+              <option value="equipment">Equipment</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Unit <span class="text-danger">*</span></label>
+            <input type="text" value="Month" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Estimated Unit Price <span class="text-danger">*</span></label>
+          <input type="text" value="₱40,000.00" required>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit Item', html);
+  };
+
+  // Edit User Modal
+  window.showEditUserModal = async function(userId) {
+    // Fetch user data from API
+    let user = {};
+    try {
+      user = await apiRequest(`/users/${userId}`);
+    } catch (err) {
+      // Fallback: try to read from the table row
+      console.warn('Could not fetch user, using defaults:', err);
+      user = { id: userId, username: '', full_name: '', email: '', role: 'end_user', dept_id: 1, is_active: true, employee_id: null };
+    }
+
+    const roles = [
+      { value: 'end_user', label: 'End User' },
+      { value: 'division_head', label: 'Division Head' },
+      { value: 'bac_secretariat', label: 'BAC Secretariat' },
+      { value: 'bac_chair', label: 'BAC Chairperson' },
+      { value: 'twg_member', label: 'TWG Member' },
+      { value: 'supply_officer', label: 'Supply/Procurement Officer' },
+      { value: 'inspector', label: 'Inspection/Property Custodian' },
+      { value: 'hope', label: 'HoPE (Regional Director)' },
+      { value: 'admin', label: 'System Administrator' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'officer', label: 'Officer' },
+      { value: 'viewer', label: 'Viewer' },
+      { value: 'auditor', label: 'Auditor' }
+    ];
+    const roleOptions = roles.map(r => `<option value="${r.value}" ${user.role === r.value ? 'selected' : ''}>${r.label}</option>`).join('');
+
+    const html = `
+      <form id="editUserForm" onsubmit="saveEditUser(event, ${userId})">
+        <div class="form-row">
+          <div class="form-group">
+            <label>User ID</label>
+            <input type="text" value="${userId}" readonly style="background: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="editUsername" value="${user.username || ''}" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Full Name <span class="text-danger">*</span></label>
+          <input type="text" id="editFullName" value="${user.full_name || ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="editEmail" value="${user.email || ''}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Role <span class="text-danger">*</span></label>
+            <select class="form-select" id="editRole" required>
+              ${roleOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="editDivision" required>
+              <option value="1" ${user.dept_id == 1 ? 'selected' : ''}>FAD - Finance & Administrative</option>
+              <option value="2" ${user.dept_id == 2 ? 'selected' : ''}>WRSD - Welfare Reintegration Services</option>
+              <option value="3" ${user.dept_id == 3 ? 'selected' : ''}>MWPSD - Migrant Workers Protection Services</option>
+              <option value="4" ${user.dept_id == 4 ? 'selected' : ''}>MWPTD - Migrant Workers Protection Training</option>
+              <option value="5" ${user.dept_id == 5 ? 'selected' : ''}>ORD - Office of Regional Director</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="editIsActive">
+            <option value="true" ${user.is_active !== false ? 'selected' : ''}>Active</option>
+            <option value="false" ${user.is_active === false ? 'selected' : ''}>Inactive</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reset Password</label>
+          <input type="password" id="editNewPassword" placeholder="Leave blank to keep current password">
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit User', html);
+  };
+
+  // Save edited user via API
+  window.saveEditUser = async function(e, userId) {
+    e.preventDefault();
+    const data = {
+      username: document.getElementById('editUsername').value,
+      full_name: document.getElementById('editFullName').value,
+      email: document.getElementById('editEmail')?.value || '',
+      role: document.getElementById('editRole').value,
+      dept_id: parseInt(document.getElementById('editDivision').value),
+      is_active: document.getElementById('editIsActive').value === 'true',
+      employee_id: null
+    };
+
+    // Include password only if provided
+    const newPassword = document.getElementById('editNewPassword')?.value;
+    if (newPassword) {
+      data.password = newPassword;
+    }
+
+    try {
+      await apiRequest(`/users/${userId}`, 'PUT', data);
+      alert('User updated successfully!');
+      closeModal();
+      loadUsers();
+    } catch (err) {
+      alert('Error updating user: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // ACTION MODALS - Workflow actions
+  // =====================================================
+
+  // Submit PPMP to APP Modal
+  window.showSubmitToAPPModal = function(ppmpNo) {
+    const html = `
+      <form id="submitToAPPForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Submit this PPMP item to be included in the APP.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo || 'PPMP-WRSD-2026-001'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Reintegration</span></div>
+          <div class="detail-row"><label>ABC:</label><span>₱45,000.00</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Remarks (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for BAC Secretariat"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Submit to APP</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit to APP', html);
+  };
+
+  // Create PR from APP Modal
+  window.showCreatePRFromAPPModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    const unitPrice = parseFloat(item.unit_price || 0);
+    const totalQty = parseInt(item.total_qty || 0);
+    const totalPrice = parseFloat(item.total_price || (unitPrice * totalQty));
+
+    const html = `
+      <form id="createPRFromAPPForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-signature"></i>
+          Create a new Purchase Request based on this APP item.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
+          <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
+          <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          <div class="detail-row"><label>Total Qty:</label><span>${totalQty} ${item.unit || ''}</span></div>
+          <div class="detail-row"><label>Total ABC:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>PR Amount <span class="text-danger">*</span></label>
+          <input type="number" step="0.01" value="${unitPrice.toFixed(2)}" required placeholder="Amount for this PR">
+        </div>
+        <div class="form-group">
+          <label>Specific Purpose <span class="text-danger">*</span></label>
+          <input type="text" value="${item.item_name || ''}" required placeholder="e.g., Security Services - Q1">
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create PR</button>
+        </div>
+      </form>
+    `;
+    openModal('Create PR from APP', html);
+  };
+
+  // Approve PR Modal
+  window.showApprovePRModal = function(prNo) {
+    const html = `
+      <form id="approvePRForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-check-circle"></i>
+          Approve this Purchase Request as HoPE (Head of Procuring Entity).
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-002'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Office Supplies - Q1</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱85,000.00</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>End-User (FAD)</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Approval Remarks (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for record"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Approve PR</button>
+        </div>
+      </form>
+    `;
+    openModal('Approve Purchase Request', html);
+  };
+
+  // Return PR Modal
+  window.showReturnPRModal = function(prNo) {
+    const html = `
+      <form id="returnPRForm">
+        <div class="info-banner warning-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-undo"></i>
+          Return this PR to the requesting division for revision.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-002'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Office Supplies - Q1</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>End-User (FAD)</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Reason for Return <span class="text-danger">*</span></label>
+          <textarea rows="3" required placeholder="Specify the reason for returning this PR (e.g., incomplete attachments, wrong amount, etc.)"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-warning"><i class="fas fa-undo"></i> Return PR</button>
+        </div>
+      </form>
+    `;
+    openModal('Return Purchase Request', html);
+  };
+
+  // Attach Annex 1 Modal
+  window.showAttachAnnex1Modal = function(prNo) {
+    const html = `
+      <form id="attachAnnex1Form">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paperclip"></i>
+          Attach Route Slip (Annex 1) and other required documents.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-003'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Orientation</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Route Slip (Annex 1) <span class="text-danger">*</span></label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="annex1File" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'annex1Label')" required>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('annex1File').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="annex1Label" style="font-size: 12px; color: #666;">No file selected</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Technical Specs/SOW/TOR</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="techSpecsFile" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'techSpecsLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('techSpecsFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="techSpecsLabel" style="font-size: 12px; color: #666;">Optional</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paperclip"></i> Attach Documents</button>
+        </div>
+      </form>
+    `;
+    openModal('Attach Annex 1 & Documents', html);
+  };
+
+  // Submit PR for Approval Modal
+  window.showSubmitPRForApprovalModal = function(prNo) {
+    const html = `
+      <form id="submitPRForApprovalForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Submit this PR for HoPE approval.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-003'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Orientation</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱45,000.00</span></div>
+          <div class="detail-row"><label>Annex 1:</label><span><i class="fas fa-check-circle text-success"></i> Attached</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Submission Notes (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for approver"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Submit for Approval</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit PR for Approval', html);
+  };
+
+  // Create RFQ from PR Modal
+  window.showCreateRFQFromPRModal = function(prNo) {
+    const html = `
+      <form id="createRFQFromPRForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Issue Request for Quotation based on this PR.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-JAN-2026-001'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱120,000.00</span></div>
+        </div>
+        <div class="form-row" style="margin-top: 15px;">
+          <div class="form-group">
+            <label>RFQ Deadline <span class="text-danger">*</span></label>
+            <input type="date" required>
+          </div>
+          <div class="form-group">
+            <label>No. of Suppliers to Invite</label>
+            <input type="number" value="3" min="3">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>PhilGEPS Posting</label>
+          <div style="font-size: 13px; color: #666;">
+            <i class="fas fa-info-circle"></i> ABC < ₱200,000 - PhilGEPS posting not required
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Issue RFQ</button>
+        </div>
+      </form>
+    `;
+    openModal('Create RFQ from PR', html);
+  };
+
+  // Add Quotation Modal
+  window.showAddQuotationModal = function(rfqNo) {
+    const html = `
+      <form id="addQuotationForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-plus"></i>
+          Add a quotation received for this RFQ.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || 'RFQ-2026-002'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>IT Equipment Upgrade</span></div>
+          <div class="detail-row"><label>ABC:</label><span>₱320,000.00</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Supplier <span class="text-danger">*</span></label>
+          <select class="form-select" required>
+            <option value="">Select Supplier</option>
+            <option value="abc">ABC Security Agency</option>
+            <option value="pldt">PLDT Enterprise</option>
+            <option value="xyz">XYZ Office Supplies</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quoted Amount <span class="text-danger">*</span></label>
+            <input type="text" placeholder="₱0.00" required>
+          </div>
+          <div class="form-group">
+            <label>Date Received <span class="text-danger">*</span></label>
+            <input type="date" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Upload Quotation</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="quotationFile" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'quotationLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('quotationFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="quotationLabel" style="font-size: 12px; color: #666;">PDF file</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Quotation</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Quotation', html);
+  };
+
+  // Create Abstract from RFQ Modal
+  window.showCreateAbstractFromRFQModal = function(rfqNo) {
+    const html = `
+      <form id="createAbstractFromRFQForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-table"></i>
+          Create Abstract of Quotations from this RFQ.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || 'RFQ-2026-001'}</span></div>
+          <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
+          <div class="detail-row"><label>Quotations:</label><span>3</span></div>
+        </div>
+        <h4 style="margin-top: 15px;">Quotations Summary</h4>
+        <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+          <thead><tr><th>Supplier</th><th>Amount</th><th>Compliant</th></tr></thead>
+          <tbody>
+            <tr><td>ABC Security Agency</td><td>₱115,000.00</td><td><input type="checkbox" checked></td></tr>
+            <tr><td>XYZ Security Co.</td><td>₱118,500.00</td><td><input type="checkbox" checked></td></tr>
+            <tr><td>SafeGuard Inc.</td><td>₱122,000.00</td><td><input type="checkbox" checked></td></tr>
+          </tbody>
+        </table>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-table"></i> Create Abstract</button>
+        </div>
+      </form>
+    `;
+    openModal('Create Abstract from RFQ', html);
+  };
+
+  // Mark NOA Received Modal
+  window.showMarkNOAReceivedModal = function(noaNo) {
+    const html = `
+      <form id="markNOAReceivedForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-check"></i>
+          Record receipt of NOA by the winning bidder.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>NOA No.:</label><span>${noaNo || 'NOA-2026-002'}</span></div>
+          <div class="detail-row"><label>Winning Bidder:</label><span>PLDT Enterprise</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Date Received by Bidder <span class="text-danger">*</span></label>
+          <input type="date" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Receipt (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="noaReceiptFile" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'noaReceiptLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('noaReceiptFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="noaReceiptLabel" style="font-size: 12px; color: #666;">Scanned signed receipt</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Mark Received</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark NOA Received', html);
+  };
+
+  // Submit to COA Modal
+  window.showSubmitToCOAModal = function(packetId) {
+    const html = `
+      <form id="submitToCOAForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-export"></i>
+          Submit this PO Packet to COA.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>Packet ID:</label><span>${packetId || 'PKT-2026-001'}</span></div>
+          <div class="detail-row"><label>PO Reference:</label><span>PO-JAN-2026-001</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
+          <div class="detail-row"><label>Chief Signed:</label><span><i class="fas fa-check text-success"></i> Yes</span></div>
+          <div class="detail-row"><label>Director Signed:</label><span><i class="fas fa-check text-success"></i> Yes</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Submission Date <span class="text-danger">*</span></label>
+          <input type="date" required>
+        </div>
+        <div class="form-group">
+          <label>Received By (COA Personnel)</label>
+          <input type="text" placeholder="Name of COA receiving officer">
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-file-export"></i> Submit to COA</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit to COA', html);
+  };
+
+  // Delete Confirmation Modal
+  window.showDeleteConfirmModal = function(recordType, recordId) {
+    const html = `
+      <div class="info-banner warning-banner" style="margin-bottom: 15px;">
+        <i class="fas fa-exclamation-triangle"></i>
+        Are you sure you want to delete this ${recordType}?
+      </div>
+      <div class="view-details">
+        <div class="detail-row"><label>${recordType} ID:</label><span>${recordId}</span></div>
+      </div>
+      <p style="margin-top: 15px; font-size: 13px; color: #666;">This action cannot be undone.</p>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="deleteRecord('${recordType}', '${recordId}'); closeModal();"><i class="fas fa-trash"></i> Delete</button>
+      </div>
+    `;
+    openModal('Confirm Delete', html);
+  };
+
+  // Export to Excel Modal
+  window.showExportToExcelModal = function(docType) {
+    const html = `
+      <div class="info-banner" style="margin-bottom: 15px;">
+        <i class="fas fa-file-excel"></i>
+        Export ${docType} to Excel file.
+      </div>
+      <div class="form-group">
+        <label>Select Format</label>
+        <select class="form-select">
+          <option value="xlsx">Excel (.xlsx)</option>
+          <option value="csv">CSV (.csv)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Include</label>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: normal;"><input type="checkbox" checked> All visible columns</label>
+          <label style="font-weight: normal;"><input type="checkbox" checked> All records</label>
+        </div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="exportToExcel('${docType}'); closeModal();"><i class="fas fa-download"></i> Export</button>
+      </div>
+    `;
+    openModal('Export to Excel', html);
+  };
+
+  // =====================================================
+  // PRINT & UTILITY FUNCTIONS
+  // =====================================================
+
+  // Get document-specific print content
+  function getPrintContent(recordType, recordId) {
+    const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    
+    const templates = {
+      'PR': `
+        <div class="doc-title">PURCHASE REQUEST</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>PR Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+          <tr><td><strong>Division:</strong></td><td>FAD</td><td><strong>Fund Cluster:</strong></td><td>GAA-MOOE</td></tr>
+          <tr><td><strong>Purpose:</strong></td><td colspan="3">Procurement of supplies/services for agency operations</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Item No.</th><th>Unit</th><th>Item Description</th><th>Quantity</th><th>Unit Cost</th><th>Total Cost</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>lot</td><td>As per attached specifications</td><td>1</td><td>See attached</td><td>See attached</td></tr>
+          </tbody>
+        </table>
+        <div class="signature-box">
+          <div class="sig-line"><span>Requested by:</span><div class="sig-space"></div><p>Division Head</p></div>
+          <div class="sig-line"><span>Approved by:</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+        </div>`,
+      'PO': `
+        <div class="doc-title">PURCHASE ORDER</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>PO Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+          <tr><td><strong>Supplier:</strong></td><td colspan="3">ABC Security Agency</td></tr>
+          <tr><td><strong>Address:</strong></td><td colspan="3">Butuan City, Agusan del Norte</td></tr>
+          <tr><td><strong>TIN:</strong></td><td>123-456-789-000</td><td><strong>Mode:</strong></td><td>SVP</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Stock No.</th><th>Unit</th><th>Description</th><th>Quantity</th><th>Unit Cost</th><th>Amount</th></tr></thead>
+          <tbody><tr><td colspan="6" style="text-align:center;">See attached specifications</td></tr></tbody>
+        </table>
+        <p style="margin-top:20px;"><strong>Total Amount:</strong> (In words and figures)</p>
+        <p><strong>Delivery Period:</strong> Within 15 calendar days upon receipt of PO</p>
+        <div class="signature-box">
+          <div class="sig-line"><span>Conforme:</span><div class="sig-space"></div><p>Supplier Representative</p></div>
+          <div class="sig-line"><span>Approved:</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+        </div>`,
+      'Abstract': `
+        <div class="doc-title">ABSTRACT OF QUOTATIONS</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>Abstract No:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+          <tr><td><strong>PR Reference:</strong></td><td colspan="3">See attached</td></tr>
+          <tr><td><strong>Mode of Procurement:</strong></td><td colspan="3">Small Value Procurement (SVP)</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Supplier</th><th>Unit Price</th><th>Total Price</th><th>Remarks</th></tr></thead>
+          <tbody>
+            <tr><td>Supplier A</td><td>See quotation</td><td>See quotation</td><td></td></tr>
+            <tr><td>Supplier B</td><td>See quotation</td><td>See quotation</td><td></td></tr>
+            <tr><td>Supplier C</td><td>See quotation</td><td>See quotation</td><td></td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:20px;"><strong>Award Recommendation:</strong> Award to lowest calculated responsive quotation</p>
+        <div class="signature-box">
+          <div class="sig-line"><span>Prepared by:</span><div class="sig-space"></div><p>BAC Secretariat</p></div>
+          <div class="sig-line"><span>Certified Correct:</span><div class="sig-space"></div><p>BAC Chairman</p></div>
+        </div>`,
+      'NOA': `
+        <div class="doc-title">NOTICE OF AWARD</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>NOA Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+        </table>
+        <p style="margin:20px 0;">This is to inform you that your quotation dated _________ for the procurement of _________ in the amount of ₱_________ has been accepted.</p>
+        <p>You are hereby required to submit the following within five (5) calendar days:</p>
+        <ul style="margin-left:20px;">
+          <li>Valid Mayor's/Business Permit</li>
+          <li>PhilGEPS Registration Number</li>
+          <li>Income/Business Tax Return</li>
+          <li>Omnibus Sworn Statement</li>
+        </ul>
+        <div class="signature-box">
+          <div class="sig-line"><span>Very truly yours,</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+          <div class="sig-line"><span>Conforme:</span><div class="sig-space"></div><p>Supplier Representative</p></div>
+        </div>`,
+      'IAR': `
+        <div class="doc-title">INSPECTION AND ACCEPTANCE REPORT</div>
+        <div class="doc-subtitle">(Appendix 62 - GAM for NGAs)</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>IAR Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+          <tr><td><strong>Supplier:</strong></td><td colspan="3">See attached PO</td></tr>
+          <tr><td><strong>PO Number:</strong></td><td colspan="3">See attached</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Stock No.</th><th>Description</th><th>Unit</th><th>Quantity</th><th>Date Inspected</th></tr></thead>
+          <tbody><tr><td colspan="5" style="text-align:center;">See attached delivery receipt</td></tr></tbody>
+        </table>
+        <div class="signature-box" style="margin-top:30px;">
+          <div style="width:45%;">
+            <p><strong>INSPECTION</strong></p>
+            <p>Date Inspected: _______________</p>
+            <div class="sig-space"></div>
+            <p>Inspection Officer/Committee</p>
+          </div>
+          <div style="width:45%;">
+            <p><strong>ACCEPTANCE</strong></p>
+            <p>Date Received: _______________</p>
+            <div class="sig-space"></div>
+            <p>Property Custodian</p>
+          </div>
+        </div>`,
+      'BAC Resolution': `
+        <div class="doc-title">BAC RESOLUTION</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>Resolution No:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+        </table>
+        <p style="margin:20px 0;"><strong>RESOLUTION</strong> recommending the award of contract to the Lowest Calculated Responsive Quotation for the procurement of _________ in the total amount of ₱_________.</p>
+        <p><strong>WHEREAS,</strong> the Bids and Awards Committee conducted the procurement process in accordance with RA 9184;</p>
+        <p><strong>WHEREAS,</strong> after evaluation, the BAC found the quotation to be compliant;</p>
+        <p><strong>NOW THEREFORE,</strong> the BAC recommends the award to the winning supplier.</p>
+        <div class="signature-box">
+          <div class="sig-line"><span></span><div class="sig-space"></div><p>BAC Chairman</p></div>
+          <div class="sig-line"><span></span><div class="sig-space"></div><p>BAC Vice-Chairman</p></div>
+        </div>`
+    };
+    
+    return templates[recordType] || `
+      <div class="doc-title">${recordType.toUpperCase()}</div>
+      <table class="info-table">
+        <tr><td width="30%"><strong>Document No:</strong></td><td>${recordId}</td></tr>
+        <tr><td><strong>Date:</strong></td><td>${today}</td></tr>
+        <tr><td><strong>Status:</strong></td><td>For Print</td></tr>
+      </table>`;
+  }
+
+  // Print Record Function
+  window.printRecord = function(recordType, recordId) {
+    const printContent = getPrintContent(recordType, recordId);
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print ${recordType} - ${recordId}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 40px; font-size: 12px; line-height: 1.5; }
+            .header { text-align: center; margin-bottom: 25px; }
+            .header img { width: 60px; margin-bottom: 5px; }
+            .header h1 { font-size: 14px; margin: 0; font-weight: bold; }
+            .header h2 { font-size: 12px; margin: 3px 0; font-weight: normal; }
+            .header p { font-size: 10px; color: #666; }
+            .doc-title { font-size: 16px; font-weight: bold; margin: 20px 0; text-align: center; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .doc-subtitle { text-align: center; font-style: italic; margin-bottom: 15px; font-size: 11px; }
+            .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            .info-table td { padding: 5px 10px; border: 1px solid #ddd; }
+            .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .items-table th, .items-table td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 11px; }
+            .items-table th { background: #f5f5f5; font-weight: bold; }
+            .signature-box { margin-top: 40px; display: flex; justify-content: space-between; flex-wrap: wrap; }
+            .sig-line { width: 45%; margin-bottom: 30px; }
+            .sig-space { border-bottom: 1px solid #333; height: 40px; margin: 20px 0 5px; }
+            .sig-line p { text-align: center; font-size: 11px; }
+            .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }
+            ul { margin: 10px 0 10px 30px; }
+            @media print { 
+              body { padding: 20px; } 
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>REPUBLIC OF THE PHILIPPINES</h1>
+            <h1>DEPARTMENT OF MIGRANT WORKERS</h1>
+            <h2>Regional Office XIII (Caraga Region)</h2>
+            <p>J.C. Aquino Avenue, Butuan City 8600</p>
+          </div>
+          ${printContent}
+          <div class="footer">
+            <p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>
+          </div>
+          <script>
+            window.onload = function() { 
+              setTimeout(function() { window.print(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+  };
+
+  // Print current page/table
+  window.printCurrentPage = function() {
+    const currentPage = document.querySelector('.page.active');
+    if (!currentPage) {
+      alert('No active page to print');
+      return;
+    }
+    
+    const table = currentPage.querySelector('table');
+    if (!table) {
+      alert('No table data to print');
+      return;
+    }
+    
+    const pageTitle = currentPage.querySelector('h2, .page-title')?.textContent || 'Report';
+    const tableClone = table.cloneNode(true);
+    
+    // Remove action column
+    const actionHeaders = tableClone.querySelectorAll('th:last-child');
+    const actionCells = tableClone.querySelectorAll('td:last-child');
+    actionHeaders.forEach(el => el.remove());
+    actionCells.forEach(el => el.remove());
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print ${pageTitle}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; font-size: 11px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { font-size: 14px; margin: 0; }
+            .header h2 { font-size: 12px; margin: 3px 0; font-weight: normal; }
+            h3 { margin: 20px 0 10px; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #333; padding: 6px; text-align: left; }
+            th { background: #f5f5f5; font-weight: bold; }
+            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>DEPARTMENT OF MIGRANT WORKERS</h1>
+            <h2>Regional Office XIII (Caraga)</h2>
+          </div>
+          <h3>${pageTitle}</h3>
+          ${tableClone.outerHTML}
+          <div class="footer">
+            <p>Printed: ${new Date().toLocaleString('en-PH')}</p>
+          </div>
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>
+        </body>
+      </html>
+    `);
+  };
+
+  // Delete Record Function with API
+  window.deleteRecord = async function(recordType, recordId) {
+    const endpointMap = {
+      'Item': '/items',
+      'Supplier': '/suppliers',
+      'User': '/users',
+      'PPMP': '/ppmp',
+      'PR': '/pr',
+      'RFQ': '/rfq',
+      'Abstract': '/abstract',
+      'PostQual': '/postqual',
+      'BAC Resolution': '/bac-resolution',
+      'NOA': '/noa',
+      'PO': '/po',
+      'IAR': '/iar',
+      'POPacket': '/po-packet',
+      'COA': '/coa',
+      'PAR': '/pars',
+      'PTR': '/ptrs',
+      'RIS': '/ris',
+      'TripTicket': '/trip-tickets',
+      'Office': '/offices',
+      'Designation': '/designations',
+      'Division': '/divisions',
+      'FundCluster': '/fund-clusters',
+      'ProcurementMode': '/procurement-modes',
+      'UACSCode': '/uacs-codes',
+      'UOM': '/uoms'
+    };
+    
+    const endpoint = endpointMap[recordType];
+    if (!endpoint) {
+      alert(`${recordType} ${recordId} has been deleted (demo).`);
+      return;
+    }
+    
+    try {
+      await apiRequest(`${endpoint}/${recordId}`, 'DELETE');
+      alert(`${recordType} deleted successfully.`);
+      
+      // Reload the current page data
+      const refreshMap = {
+        'Item': loadItems,
+        'Supplier': loadSuppliers,
+        'User': loadUsers,
+        'PPMP': loadPPMP,
+        'PR': loadPR,
+        'RFQ': loadRFQ,
+        'Abstract': loadAbstract,
+        'PostQual': loadPostQual,
+        'BAC Resolution': loadBACResolution,
+        'NOA': loadNOA,
+        'PO': loadPO,
+        'IAR': loadIAR,
+        'POPacket': loadPOPacket,
+        'COA': loadCOA,
+        'PAR': loadPAR,
+        'PTR': loadPTR,
+        'RIS': loadRIS,
+        'TripTicket': loadTripTickets,
+        'Office': loadOffices,
+        'Designation': loadDesignations,
+        'Division': loadDivisions,
+        'FundCluster': loadFundClusters,
+        'ProcurementMode': loadProcurementModes,
+        'UACSCode': loadUACSCodes,
+        'UOM': loadUOMs
+      };
+      if (refreshMap[recordType]) refreshMap[recordType]();
+    } catch (err) {
+      alert(`Error deleting ${recordType}: ${err.message}`);
+    }
+  };
+
+  // =====================================================
+  // EXPORT TO EXCEL/CSV FUNCTIONS
+  // =====================================================
+
+  // Convert data to CSV format
+  function convertToCSV(data, headers) {
+    const headerRow = headers.join(',');
+    const rows = data.map(row => 
+      headers.map(header => {
+        let value = row[header] || '';
+        // Escape quotes and wrap in quotes if contains comma
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          value = '"' + value.replace(/"/g, '""') + '"';
+        }
+        return value;
+      }).join(',')
+    );
+    return [headerRow, ...rows].join('\n');
+  }
+
+  // Download CSV file
+  function downloadCSV(csvContent, filename) {
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    alert(`✓ Successfully exported to ${filename}`);
+  }
+
+  // Get table data from DOM
+  function getTableData(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return { headers: [], data: [] };
+    
+    const headers = [];
+    const headerCells = table.querySelectorAll('thead th');
+    headerCells.forEach(th => {
+      const text = th.textContent.trim();
+      if (text && text !== 'Actions') headers.push(text);
+    });
+    
+    const data = [];
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const rowData = {};
+      const cells = row.querySelectorAll('td');
+      cells.forEach((cell, index) => {
+        if (index < headers.length) {
+          rowData[headers[index]] = cell.textContent.trim();
+        }
+      });
+      if (Object.keys(rowData).length > 0) data.push(rowData);
+    });
+    
+    return { headers, data };
+  }
+
+  // Export to Excel/CSV Function
+  window.exportToExcel = function(docType) {
+    const timestamp = new Date().toISOString().slice(0, 10);
+    let filename = `${docType}_Export_${timestamp}.csv`;
+    let csvContent = '';
+    
+    const tableMap = {
+      'PPMP': 'ppmpTableBody',
+      'APP': 'appTableBody',
+      'PR': 'prTableBody',
+      'RFQ': 'rfqTableBody',
+      'Abstract': 'abstractTableBody',
+      'PostQual': 'postQualTableBody',
+      'BACRes': 'bacResTableBody',
+      'NOA': 'noaTableBody',
+      'PO': 'poTableBody',
+      'IAR': 'iarTableBody',
+      'POPacket': 'poPacketTableBody',
+      'COA': 'coaTableBody',
+      'Items': 'itemsTableBody',
+      'Suppliers': 'suppliersTableBody',
+      'Users': 'usersTableBody',
+      'ICS': 'icsTableBody',
+      'StockCards': 'stockCardsTableBody',
+      'PropertyCards': 'propertyCardsTableBody',
+      'Employees': 'employeesTableBody',
+      'PAR': 'parTableBody',
+      'PTR': 'ptrTableBody',
+      'RIS': 'risTableBody',
+      'SuppliesLedger': 'suppliesLedgerTableBody',
+      'SemiExpendable': 'semiExpendableTableBody',
+      'CapitalOutlay': 'capitalOutlayTableBody',
+      'TripTickets': 'tripTicketsTableBody',
+      'Divisions': 'divisionsTableBody',
+      'Offices': 'officesTableBody',
+      'Designations': 'designationsTableBody',
+      'FundClusters': 'fundClustersTableBody',
+      'ProcurementModes': 'procurementModesTableBody',
+      'UACSCodes': 'uacsCodesTableBody',
+      'UOMs': 'uomsTableBody'
+    };
+    
+    // Try to get data from the table
+    const tableBodyId = tableMap[docType];
+    if (tableBodyId) {
+      const tbody = document.getElementById(tableBodyId);
+      if (tbody) {
+        const table = tbody.closest('table');
+        if (table) {
+          const { headers, data } = getTableData(table.id || tableBodyId.replace('Body', ''));
+          if (data.length > 0) {
+            csvContent = convertToCSV(data, headers);
+          }
+        }
+      }
+    }
+    
+    // If no table data, create sample data based on docType
+    if (!csvContent) {
+      const sampleData = getSampleExportData(docType);
+      csvContent = convertToCSV(sampleData.data, sampleData.headers);
+    }
+    
+    downloadCSV(csvContent, filename);
+  };
+
+  // Get sample export data for various document types
+  function getSampleExportData(docType) {
+    const samples = {
+      'PPMP': {
+        headers: ['PPMP No', 'Description', 'Division', 'Category', 'Qty', 'Mode', 'Schedule', 'Est. Budget', 'Fund Source', 'Status'],
+        data: [
+          { 'PPMP No': 'PPMP-FAD-2026-001', 'Description': 'Office Supplies', 'Division': 'FAD', 'Category': 'Supplies', 'Qty': '100', 'Mode': 'SVP', 'Schedule': 'Q1 2026', 'Est. Budget': '₱50,000.00', 'Fund Source': 'GAA-MOOE', 'Status': 'In APP' }
+        ]
+      },
+      'PR': {
+        headers: ['PR No', 'Date', 'Description', 'Division', 'APP Reference', 'Amount', 'Status'],
+        data: [
+          { 'PR No': 'PR-JAN-2026-001', 'Date': '2026-01-10', 'Description': 'Security Services - Q1', 'Division': 'FAD', 'APP Reference': 'APP-2026-001', 'Amount': '₱120,000.00', 'Status': 'PR Approved' }
+        ]
+      },
+      'Items': {
+        headers: ['Item Code', 'Description', 'Category', 'Unit', 'Est. Price', 'Status'],
+        data: [
+          { 'Item Code': 'ITM-001', 'Description': 'Bond Paper A4', 'Category': 'Office Supplies', 'Unit': 'ream', 'Est. Price': '₱250.00', 'Status': 'Active' }
+        ]
+      },
+      'Suppliers': {
+        headers: ['Supplier ID', 'Name', 'Address', 'Contact', 'PhilGEPS Status', 'TIN'],
+        data: [
+          { 'Supplier ID': 'SUP-001', 'Name': 'ABC Security Agency', 'Address': 'Butuan City', 'Contact': '+63 85 123 4567', 'PhilGEPS Status': 'Platinum', 'TIN': '123-456-789-000' }
+        ]
+      }
+    };
+    
+    return samples[docType] || { headers: ['Data'], data: [{ 'Data': 'No data available' }] };
+  }
+
+  // Export current page data 
+  window.exportCurrentPage = function() {
+    const currentPage = document.querySelector('.page.active');
+    if (!currentPage) {
+      alert('No active page to export');
+      return;
+    }
+    
+    const pageId = currentPage.id;
+    const docTypeMap = {
+      'ppmp': 'PPMP',
+      'app': 'APP',
+      'purchase-requests': 'PR',
+      'rfq': 'RFQ',
+      'abstract': 'Abstract',
+      'post-qual': 'PostQual',
+      'bac-resolution': 'BACRes',
+      'noa': 'NOA',
+      'purchase-orders': 'PO',
+      'iar': 'IAR',
+      'po-packet': 'POPacket',
+      'coa': 'COA',
+      'items': 'Items',
+      'suppliers': 'Suppliers',
+      'users': 'Users',
+      'ics': 'ICS',
+      'stock-cards': 'StockCards',
+      'property-cards': 'PropertyCards',
+      'employees': 'Employees',
+      'par': 'PAR',
+      'ptr': 'PTR',
+      'ris': 'RIS',
+      'supplies-ledger': 'SuppliesLedger',
+      'semi-expendable': 'SemiExpendable',
+      'capital-outlay': 'CapitalOutlay',
+      'trip-tickets': 'TripTickets',
+      'divisions': 'Divisions',
+      'offices': 'Offices',
+      'designations': 'Designations',
+      'fund-clusters': 'FundClusters',
+      'procurement-modes': 'ProcurementModes',
+      'uacs-codes': 'UACSCodes',
+      'uoms': 'UOMs'
+    };
+    
+    const docType = docTypeMap[pageId] || pageId;
+    exportToExcel(docType);
   };
 
   // Expose closeModal to window for inline onclick handlers
   window.closeModal = closeModal;
+  window.navigateTo = navigateTo;
+  
+  // Direct login function with API authentication
+  window.doLogin = async function() {
+    const username = document.getElementById('username')?.value?.trim();
+    const password = document.getElementById('password')?.value;
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    
+    // Validate inputs
+    if (!username || !password) {
+      if (loginError) {
+        loginError.textContent = 'Please enter username and password';
+        loginError.style.display = 'block';
+      }
+      return;
+    }
+    
+    // Disable button and show loading
+    if (loginBtn) {
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+    }
+    if (loginError) loginError.style.display = 'none';
+
+    try {
+      // Attempt API login
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+      
+      authToken = data.token;
+      currentUser = {
+        id: data.user.id,
+        name: data.user.full_name || username,
+        role: data.user.role,
+        division: data.user.department_code || data.user.department || 'FAD',
+        department: data.user.department || '',
+        department_code: data.user.department_code || ''
+      };
+      console.log('Login successful:', currentUser);
+      
+      // Use showApp() which handles overlay, user info, RBAC, and navigation
+      showApp();
+      
+    } catch (err) {
+      console.error('Login error:', err);
+      if (loginError) {
+        loginError.textContent = err.message || 'Unable to connect to server';
+        loginError.style.display = 'block';
+      }
+    } finally {
+      // Re-enable button
+      if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+      }
+    }
+  };
+
+  // Toggle between login and signup forms
+  window.toggleAuthForm = function(form) {
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginError = document.getElementById('loginError');
+    const signupError = document.getElementById('signupError');
+    const signupSuccess = document.getElementById('signupSuccess');
+    
+    // Clear any errors/messages
+    if (loginError) loginError.style.display = 'none';
+    if (signupError) signupError.style.display = 'none';
+    if (signupSuccess) signupSuccess.style.display = 'none';
+    
+    if (form === 'signup') {
+      if (loginForm) loginForm.style.display = 'none';
+      if (signupForm) signupForm.style.display = 'block';
+    } else {
+      if (loginForm) loginForm.style.display = 'block';
+      if (signupForm) signupForm.style.display = 'none';
+    }
+  };
+
+  // Signup function
+  window.doSignup = async function() {
+    const fullName = document.getElementById('signupFullName')?.value?.trim();
+    const username = document.getElementById('signupUsername')?.value?.trim();
+    const email = document.getElementById('signupEmail')?.value?.trim();
+    const password = document.getElementById('signupPassword')?.value;
+    const division = document.getElementById('signupDivision')?.value || 'FAD';
+    const signupBtn = document.getElementById('signupBtn');
+    const signupError = document.getElementById('signupError');
+    const signupSuccess = document.getElementById('signupSuccess');
+    
+    // Validate inputs
+    if (!fullName || !username || !password) {
+      if (signupError) {
+        signupError.textContent = 'Please fill in all required fields';
+        signupError.style.display = 'block';
+      }
+      return;
+    }
+    
+    if (password.length < 4) {
+      if (signupError) {
+        signupError.textContent = 'Password must be at least 4 characters';
+        signupError.style.display = 'block';
+      }
+      return;
+    }
+    
+    // Disable button and show loading
+    if (signupBtn) {
+      signupBtn.disabled = true;
+      signupBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+    }
+    if (signupError) signupError.style.display = 'none';
+    if (signupSuccess) signupSuccess.style.display = 'none';
+
+    try {
+      const response = await fetch(`${API_URL}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, full_name: fullName, email, division })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Signup failed');
+      }
+      
+      // Show success message
+      if (signupSuccess) {
+        signupSuccess.textContent = 'Account created successfully! Redirecting...';
+        signupSuccess.style.display = 'block';
+      }
+      
+      // Auto-login with the new account
+      authToken = data.token;
+      currentUser = {
+        id: data.user.id,
+        name: data.user.full_name || username,
+        role: data.user.role,
+        division: data.user.department_code || data.user.department || 'FAD',
+        department: data.user.department || '',
+        department_code: data.user.department_code || ''
+      };
+      
+      // Wait a moment then proceed to app
+      setTimeout(() => {
+        showApp();
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Signup error:', err);
+      if (signupError) {
+        signupError.textContent = err.message || 'Unable to create account';
+        signupError.style.display = 'block';
+      }
+    } finally {
+      // Re-enable button
+      if (signupBtn) {
+        signupBtn.disabled = false;
+        signupBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+      }
+    }
+  };
+
+  // ========================================
+  // REPORT GENERATION FUNCTIONS
+  // ========================================
+
+  // Notification Panel
+  window.showNotificationPanel = function() {
+    showModal('Notifications', `
+      <div class="view-details">
+        <div class="notification-list">
+          <div class="notification-item unread">
+            <div class="notification-icon"><i class="fas fa-file-signature text-warning"></i></div>
+            <div class="notification-content">
+              <strong>PR-2026-003 Pending Approval</strong>
+              <p>Internet Connectivity upgrade requires your approval</p>
+              <small class="text-muted">5 minutes ago</small>
+            </div>
+          </div>
+          <div class="notification-item unread">
+            <div class="notification-icon"><i class="fas fa-truck text-info"></i></div>
+            <div class="notification-content">
+              <strong>PO-2025-004 Delivered</strong>
+              <p>Office Supplies Q4 has been delivered and awaiting inspection</p>
+              <small class="text-muted">1 hour ago</small>
+            </div>
+          </div>
+          <div class="notification-item unread">
+            <div class="notification-icon"><i class="fas fa-clock text-danger"></i></div>
+            <div class="notification-content">
+              <strong>NOA-2025-002 Expiring Soon</strong>
+              <p>Supplier acceptance deadline in 2 days</p>
+              <small class="text-muted">3 hours ago</small>
+            </div>
+          </div>
+          <div class="notification-item">
+            <div class="notification-icon"><i class="fas fa-check-circle text-success"></i></div>
+            <div class="notification-content">
+              <strong>IAR-2025-001 Submitted to COA</strong>
+              <p>Packet successfully submitted for audit</p>
+              <small class="text-muted">Yesterday</small>
+            </div>
+          </div>
+          <div class="notification-item">
+            <div class="notification-icon"><i class="fas fa-calendar-check text-primary"></i></div>
+            <div class="notification-content">
+              <strong>PPMP FY 2026 Due</strong>
+              <p>Reminder: PPMP submission deadline approaching</p>
+              <small class="text-muted">2 days ago</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions" style="margin-top:15px;">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="alert('Marking all as read...'); closeModal();">
+            <i class="fas fa-check-double"></i> Mark All Read
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  // =====================================================
+  // REPORT GENERATION FUNCTIONS
+  // =====================================================
+  
+  // Generate and download report 
+  window.downloadReport = function(reportType, format) {
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `${reportType}_Report_${timestamp}`;
+    
+    // Get report data based on type
+    const reportData = getReportData(reportType);
+    
+    if (format === 'excel' || format === 'csv') {
+      const csvContent = convertToCSV(reportData.data, reportData.headers);
+      downloadCSV(csvContent, filename + '.csv');
+    } else if (format === 'pdf') {
+      // For PDF, open print dialog
+      printReport(reportType, reportData);
+    }
+    
+    closeModal();
+  };
+  
+  // Get report data based on report type
+  function getReportData(reportType) {
+    const today = new Date().toLocaleDateString('en-PH');
+    
+    const reports = {
+      'PPMP': {
+        title: 'PPMP Summary Report',
+        headers: ['PPMP No', 'Description', 'Division', 'Category', 'Qty', 'Mode', 'Schedule', 'Est. Budget', 'Status'],
+        data: [
+          { 'PPMP No': 'PPMP-FAD-2026-001', 'Description': 'Security Services', 'Division': 'FAD', 'Category': 'Services', 'Qty': '12 mos', 'Mode': 'SVP', 'Schedule': 'Jan-Dec 2026', 'Est. Budget': '₱480,000.00', 'Status': 'In APP' },
+          { 'PPMP No': 'PPMP-FAD-2026-002', 'Description': 'Janitorial Services', 'Division': 'FAD', 'Category': 'Services', 'Qty': '12 mos', 'Mode': 'SVP', 'Schedule': 'Jan-Dec 2026', 'Est. Budget': '₱360,000.00', 'Status': 'In APP' },
+          { 'PPMP No': 'PPMP-WRSD-2026-001', 'Description': 'Training Meals', 'Division': 'WRSD', 'Category': 'Catering', 'Qty': '200 pax', 'Mode': 'SVP', 'Schedule': 'Feb 2026', 'Est. Budget': '₱45,000.00', 'Status': 'Draft' }
+        ]
+      },
+      'APP': {
+        title: 'Annual Procurement Plan Report',
+        headers: ['APP Code', 'Project', 'Mode', 'ABC', 'Schedule', 'Status'],
+        data: [
+          { 'APP Code': 'APP-2026-001', 'Project': 'Security Services', 'Mode': 'SVP', 'ABC': '₱480,000.00', 'Schedule': 'Q1 2026', 'Status': 'Active' },
+          { 'APP Code': 'APP-2026-002', 'Project': 'Office Supplies', 'Mode': 'Shopping', 'ABC': '₱85,000.00', 'Schedule': 'Q1 2026', 'Status': 'Active' }
+        ]
+      },
+      'PR': {
+        title: 'PR Status Report',
+        headers: ['PR No', 'Date', 'Description', 'Division', 'Amount', 'Status', 'Timeline Compliant'],
+        data: [
+          { 'PR No': 'PR-JAN-2026-001', 'Date': '2026-01-10', 'Description': 'Security Services Q1', 'Division': 'FAD', 'Amount': '₱120,000.00', 'Status': 'Approved', 'Timeline Compliant': 'Yes' },
+          { 'PR No': 'PR-JAN-2026-002', 'Date': '2026-01-15', 'Description': 'Office Supplies Q1', 'Division': 'FAD', 'Amount': '₱85,000.00', 'Status': 'For Approval', 'Timeline Compliant': 'Yes' }
+        ]
+      },
+      'SVPLifecycle': {
+        title: 'SVP Lifecycle Report',
+        headers: ['Transaction', 'PR Stage', 'RFQ Stage', 'Abstract', 'NOA', 'PO', 'IAR', 'COA', 'Total Days'],
+        data: [
+          { 'Transaction': 'PR-JAN-2026-001', 'PR Stage': '2 days', 'RFQ Stage': '3 days', 'Abstract': '1 day', 'NOA': '1 day', 'PO': '2 days', 'IAR': '5 days', 'COA': 'Pending', 'Total Days': '14' }
+        ]
+      },
+      'TimelineKPI': {
+        title: 'Timeline KPI Report',
+        headers: ['KPI Metric', 'Target', 'Actual', 'Status'],
+        data: [
+          { 'KPI Metric': '% PRs ≥15 days prior', 'Target': '100%', 'Actual': '85%', 'Status': 'Needs Improvement' },
+          { 'KPI Metric': 'Avg days PR-to-NOA', 'Target': '≤10 days', 'Actual': '8 days', 'Status': 'On Track' },
+          { 'KPI Metric': '% Complete IARs', 'Target': '100%', 'Actual': '92%', 'Status': 'On Track' },
+          { 'KPI Metric': '% COA ≤5 days post-PO', 'Target': '100%', 'Actual': '78%', 'Status': 'Needs Improvement' }
+        ]
+      },
+      'PhilGEPS': {
+        title: 'PhilGEPS Compliance Report',
+        headers: ['RFQ No', 'ABC', 'Posted Date', 'Days Posted', 'Status'],
+        data: [
+          { 'RFQ No': 'RFQ-2026-001', 'ABC': '₱250,000.00', 'Posted Date': '2026-01-15', 'Days Posted': '5', 'Status': 'Compliant' },
+          { 'RFQ No': 'RFQ-2026-002', 'ABC': '₱180,000.00', 'Posted Date': 'N/A', 'Days Posted': 'N/A', 'Status': 'Below Threshold' }
+        ]
+      },
+      'COA': {
+        title: 'COA Submission Report',
+        headers: ['Packet No', 'PO Reference', 'Submitted Date', 'Days After PO', 'Status', 'Compliant'],
+        data: [
+          { 'Packet No': 'PKT-2026-001', 'PO Reference': 'PO-JAN-2026-001', 'Submitted Date': '2026-01-20', 'Days After PO': '3', 'Status': 'Submitted', 'Compliant': 'Yes' }
+        ]
+      },
+      'AuditTrail': {
+        title: 'Audit Trail Report',
+        headers: ['Date/Time', 'User', 'Action', 'Module', 'Details'],
+        data: [
+          { 'Date/Time': '2026-01-20 09:30', 'User': 'admin', 'Action': 'CREATE', 'Module': 'PR', 'Details': 'Created PR-JAN-2026-001' },
+          { 'Date/Time': '2026-01-20 10:15', 'User': 'rd.caraga', 'Action': 'APPROVE', 'Module': 'PR', 'Details': 'Approved PR-JAN-2026-001' }
+        ]
+      }
+    };
+    
+    return reports[reportType] || { title: reportType, headers: ['Data'], data: [] };
+  }
+  
+  // Print formatted report
+  function printReport(reportType, reportData) {
+    const printWindow = window.open('', '_blank');
+    const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    
+    let tableRows = '';
+    reportData.data.forEach(row => {
+      tableRows += '<tr>';
+      reportData.headers.forEach(header => {
+        tableRows += `<td>${row[header] || ''}</td>`;
+      });
+      tableRows += '</tr>';
+    });
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${reportData.title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; font-size: 11px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { font-size: 14px; margin: 0; }
+            .header h2 { font-size: 12px; margin: 3px 0; font-weight: normal; }
+            .report-title { font-size: 14px; font-weight: bold; margin: 20px 0 10px; text-align: center; }
+            .report-date { text-align: center; margin-bottom: 15px; color: #666; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #333; padding: 6px; text-align: left; }
+            th { background: #f5f5f5; font-weight: bold; }
+            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>DEPARTMENT OF MIGRANT WORKERS</h1>
+            <h2>Regional Office XIII (Caraga)</h2>
+          </div>
+          <div class="report-title">${reportData.title}</div>
+          <div class="report-date">As of ${today}</div>
+          <table>
+            <thead><tr>${reportData.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          <div class="footer">
+            <p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>
+          </div>
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>
+        </body>
+      </html>
+    `);
+  }
+  
+  window.generatePPMPReport = function() {
+    showModal('PPMP Summary Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fiscal Year</label>
+            <select class="form-select" id="ppmpReportYear">
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select">
+              <option value="all">All Divisions</option>
+              <option value="FAD">FAD</option>
+              <option value="WRSD">WRSD</option>
+              <option value="MWPSD">MWPSD</option>
+              <option value="MWPTD">MWPTD</option>
+              <option value="ORD">ORD</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Format</label>
+            <select class="form-select" id="ppmpReportFormat">
+              <option value="pdf">PDF</option>
+              <option value="excel">Excel (NGPA Form)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Include</label>
+            <div>
+              <label class="checkbox-label"><input type="checkbox" checked> Approved Items</label>
+              <label class="checkbox-label"><input type="checkbox"> Draft Items</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('PPMP', document.getElementById('ppmpReportFormat').value);">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generateAPPReport = function() {
+    showModal('APP Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fiscal Year</label>
+            <select class="form-select">
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>APP Type</label>
+            <select class="form-select">
+              <option value="indicative">Indicative APP</option>
+              <option value="final">Final APP</option>
+              <option value="updated">Updated APP</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Procurement Mode</label>
+            <select class="form-select">
+              <option value="all">All Modes</option>
+              <option value="svp">Shopping/SVP Only</option>
+              <option value="bidding">Competitive Bidding</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Format</label>
+            <select class="form-select" id="appReportFormat">
+              <option value="pdf">PDF</option>
+              <option value="excel">Excel</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('APP', document.getElementById('appReportFormat').value);">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generatePRStatusReport = function() {
+    showModal('PR Status Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date Range</label>
+            <div style="display:flex;gap:10px;">
+              <input type="date" class="form-input" value="2025-01-01">
+              <span>to</span>
+              <input type="date" class="form-input" value="2025-12-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Status Filter</label>
+            <select class="form-select">
+              <option value="all">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="pending">Pending Approval</option>
+              <option value="approved">Approved</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select">
+              <option value="all">All Divisions</option>
+              <option value="FAD">FAD</option>
+              <option value="WRSD">WRSD</option>
+              <option value="MWPSD">MWPSD</option>
+              <option value="MWPTD">MWPTD</option>
+              <option value="ORD">ORD</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Include Timeline Compliance</label>
+            <select class="form-select">
+              <option value="yes">Yes - Show 15-day compliance</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('PR', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generateSVPLifecycleReport = function() {
+    showModal('SVP Lifecycle Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date Range</label>
+            <div style="display:flex;gap:10px;">
+              <input type="date" class="form-input" value="2025-01-01">
+              <span>to</span>
+              <input type="date" class="form-input" value="2025-12-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Current Stage</label>
+            <select class="form-select">
+              <option value="all">All Stages</option>
+              <option value="pr">At PR Stage</option>
+              <option value="rfq">At RFQ Stage</option>
+              <option value="abstract">At Abstract Stage</option>
+              <option value="postqual">At Post-Qual</option>
+              <option value="noa">At NOA Stage</option>
+              <option value="po">At PO Stage</option>
+              <option value="iar">At IAR Stage</option>
+              <option value="coa">Submitted to COA</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Show Aging</label>
+            <select class="form-select">
+              <option value="yes">Yes - Days at each stage</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('SVPLifecycle', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generateTimelineKPIReport = function() {
+    showModal('Timeline KPI Report', `
+      <div class="view-details">
+        <div class="info-banner" style="margin-bottom:15px;">
+          <i class="fas fa-info-circle"></i>
+          KPIs based on Memo dated 14 November 2025 timelines
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Reporting Period</label>
+            <select class="form-select">
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annual">Annual</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Year</label>
+            <select class="form-select">
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>KPI Metrics</label>
+            <div>
+              <label class="checkbox-label"><input type="checkbox" checked> % PRs ≥15 days prior</label>
+              <label class="checkbox-label"><input type="checkbox" checked> Avg days PR-to-NOA</label>
+              <label class="checkbox-label"><input type="checkbox" checked> % Complete IARs</label>
+              <label class="checkbox-label"><input type="checkbox" checked> % COA ≤5 days post-PO</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('TimelineKPI', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generatePhilGEPSReport = function() {
+    showModal('PhilGEPS Compliance Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date Range</label>
+            <div style="display:flex;gap:10px;">
+              <input type="date" class="form-input" value="2025-01-01">
+              <span>to</span>
+              <input type="date" class="form-input" value="2025-12-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>ABC Threshold</label>
+            <select class="form-select">
+              <option value="200000">≥ ₱200,000 (Required)</option>
+              <option value="all">All Amounts</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Posting Status</label>
+            <select class="form-select">
+              <option value="all">All</option>
+              <option value="posted">Posted Only</option>
+              <option value="pending">Pending Posting</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('PhilGEPS', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generateCOASubmissionReport = function() {
+    showModal('COA Submission Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date Range</label>
+            <div style="display:flex;gap:10px;">
+              <input type="date" class="form-input" value="2025-01-01">
+              <span>to</span>
+              <input type="date" class="form-input" value="2025-12-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Submission Status</label>
+            <select class="form-select">
+              <option value="all">All</option>
+              <option value="submitted">Submitted to COA</option>
+              <option value="pending">Pending Submission</option>
+              <option value="compliant">≤5 Days (Compliant)</option>
+              <option value="noncompliant">>5 Days (Non-Compliant)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Packet Completeness</label>
+            <select class="form-select">
+              <option value="all">All</option>
+              <option value="complete">Complete Packets</option>
+              <option value="incomplete">Incomplete Packets</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('COA', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  window.generateAuditTrailReport = function() {
+    showModal('Audit Trail Report', `
+      <div class="view-details">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date Range</label>
+            <div style="display:flex;gap:10px;">
+              <input type="date" class="form-input" value="2025-01-01">
+              <span>to</span>
+              <input type="date" class="form-input" value="2025-12-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>User Filter</label>
+            <select class="form-select">
+              <option value="all">All Users</option>
+              <option value="admin">Admin Only</option>
+              <option value="bac">BAC Members</option>
+              <option value="supply">Supply Officers</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Action Type</label>
+            <select class="form-select">
+              <option value="all">All Actions</option>
+              <option value="create">Create</option>
+              <option value="update">Update</option>
+              <option value="delete">Delete</option>
+              <option value="approve">Approve/Sign</option>
+              <option value="print">Print</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Document Type</label>
+            <select class="form-select">
+              <option value="all">All Documents</option>
+              <option value="ppmp">PPMP</option>
+              <option value="pr">Purchase Requests</option>
+              <option value="po">Purchase Orders</option>
+              <option value="iar">IARs</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="downloadReport('AuditTrail', 'excel');">
+            <i class="fas fa-file-download"></i> Generate Report
+          </button>
+        </div>
+      </div>
+    `);
+  };
+
+  // ==================== INVENTORY REPORT FUNCTIONS ====================
+
+  window.generateStockLevelReport = async function() {
+    openModal('Current Stock Levels Report', `
+      <div class="view-details">
+        <div id="stockLevelReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading stock data...</p></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="downloadReport('StockLevels', 'excel')"><i class="fas fa-file-download"></i> Export</button>
+        </div>
+      </div>
+    `);
+    try {
+      const items = await apiRequest('/items');
+      const stockItems = items.filter(i => (i.category || '').toLowerCase() !== 'services');
+      const reportEl = document.getElementById('stockLevelReportContent');
+      reportEl.innerHTML = `
+        <table class="data-table"><thead><tr><th>Stock No</th><th>Item</th><th>Category</th><th>Qty</th><th>Reorder Pt</th><th>Status</th></tr></thead>
+        <tbody>${stockItems.map(i => {
+          const qty = parseInt(i.quantity) || 0;
+          const rp = parseInt(i.reorder_point) || 0;
+          let status = 'In Stock', cls = 'in-stock';
+          if (qty === 0) { status = 'Out'; cls = 'out-of-stock'; }
+          else if (qty <= rp) { status = 'Low'; cls = 'low-stock'; }
+          return `<tr><td>${i.stock_no || '-'}</td><td>${i.name}</td><td>${i.category}</td><td>${qty}</td><td>${rp}</td><td><span class="stock-badge ${cls}">${status}</span></td></tr>`;
+        }).join('')}</tbody></table>
+      `;
+    } catch(err) { document.getElementById('stockLevelReportContent').innerHTML = '<p>Error loading data.</p>'; }
+  };
+
+  window.generatePropertyAccountabilityReport = async function() {
+    openModal('Property Accountability Report', `
+      <div class="view-details">
+        <div id="propAcctReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading property data...</p></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="downloadReport('PropertyAccountability', 'excel')"><i class="fas fa-file-download"></i> Export</button>
+        </div>
+      </div>
+    `);
+    try {
+      const cards = await apiRequest('/property-cards');
+      const reportEl = document.getElementById('propAcctReportContent');
+      reportEl.innerHTML = `
+        <table class="data-table"><thead><tr><th>Property No</th><th>Description</th><th>Cost</th><th>Custodian</th><th>Dept</th><th>Status</th></tr></thead>
+        <tbody>${cards.map(c => `<tr><td>${c.property_number}</td><td>${c.description}</td><td>₱${parseFloat(c.acquisition_cost||0).toLocaleString()}</td><td>${c.custodian_name||'-'}</td><td>${c.department_name||'-'}</td><td>${c.status}</td></tr>`).join('')}</tbody></table>
+      `;
+    } catch(err) { document.getElementById('propAcctReportContent').innerHTML = '<p>Error loading data.</p>'; }
+  };
+
+  window.generateICSSummaryReport = async function() {
+    openModal('ICS Summary Report', `
+      <div class="view-details">
+        <div id="icsReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading ICS data...</p></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="downloadReport('ICSSummary', 'excel')"><i class="fas fa-file-download"></i> Export</button>
+        </div>
+      </div>
+    `);
+    try {
+      const ics = await apiRequest('/ics');
+      const reportEl = document.getElementById('icsReportContent');
+      reportEl.innerHTML = `
+        <table class="data-table"><thead><tr><th>ICS No</th><th>Date</th><th>Property No</th><th>Description</th><th>Issued To</th></tr></thead>
+        <tbody>${ics.map(i => `<tr><td>${i.ics_no}</td><td>${i.date_of_issue ? new Date(i.date_of_issue).toLocaleDateString() : ''}</td><td>${i.property_number||'-'}</td><td>${i.description||i.property_description||''}</td><td>${i.issued_to_name||'-'}</td></tr>`).join('')}</tbody></table>
+      `;
+    } catch(err) { document.getElementById('icsReportContent').innerHTML = '<p>Error loading data.</p>'; }
+  };
+
+  window.generateLowStockReport = async function() {
+    openModal('Low Stock / Reorder Alert Report', `
+      <div class="view-details">
+        <div id="lowStockReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading low stock data...</p></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="downloadReport('LowStock', 'excel')"><i class="fas fa-file-download"></i> Export</button>
+        </div>
+      </div>
+    `);
+    try {
+      const items = await apiRequest('/items');
+      const lowStock = items.filter(i => {
+        const qty = parseInt(i.quantity) || 0;
+        const rp = parseInt(i.reorder_point) || 0;
+        return qty > 0 && qty <= rp;
+      });
+      const outOfStock = items.filter(i => parseInt(i.quantity) === 0 && (i.category || '').toLowerCase() !== 'services');
+      const reportEl = document.getElementById('lowStockReportContent');
+      reportEl.innerHTML = `
+        <h4 style="margin-bottom:10px;"><i class="fas fa-exclamation-triangle" style="color:#d69e2e;"></i> Low Stock (${lowStock.length} items)</h4>
+        <table class="data-table"><thead><tr><th>Code</th><th>Item</th><th>Qty</th><th>Reorder Point</th></tr></thead>
+        <tbody>${lowStock.map(i => `<tr><td>${i.code}</td><td>${i.name}</td><td style="color:#d69e2e;font-weight:600;">${i.quantity}</td><td>${i.reorder_point}</td></tr>`).join('')}</tbody></table>
+        <h4 style="margin:15px 0 10px;"><i class="fas fa-times-circle" style="color:#e53e3e;"></i> Out of Stock (${outOfStock.length} items)</h4>
+        <table class="data-table"><thead><tr><th>Code</th><th>Item</th><th>Category</th></tr></thead>
+        <tbody>${outOfStock.map(i => `<tr><td>${i.code}</td><td>${i.name}</td><td>${i.category}</td></tr>`).join('')}</tbody></table>
+      `;
+    } catch(err) { document.getElementById('lowStockReportContent').innerHTML = '<p>Error loading data.</p>'; }
+  };
 
   // Initialize the application
   init();
