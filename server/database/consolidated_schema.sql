@@ -300,7 +300,7 @@ CREATE TABLE IF NOT EXISTS purchaserequests (
     dept_id      INT REFERENCES departments(id) ON DELETE SET NULL,
     purpose      TEXT,
     total_amount DECIMAL(12,2) DEFAULT 0,
-    status       VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','processed','cancelled')),
+    status       VARCHAR(30) DEFAULT 'pending_approval' CHECK (status IN ('pending_approval','approved','rejected','cancelled')),
     requested_by INT REFERENCES users(id) ON DELETE SET NULL,
     approved_by  INT REFERENCES users(id) ON DELETE SET NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS rfqs (
     philgeps_required    BOOLEAN DEFAULT FALSE,
     philgeps_posted_from DATE,
     philgeps_posted_until DATE,
-    status               VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','posted','closed','cancelled')),
+    status               VARCHAR(20) DEFAULT 'on_going' CHECK (status IN ('on_going','completed','cancelled')),
     created_by           INT REFERENCES users(id) ON DELETE SET NULL,
     created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS abstracts (
     rfq_id                   INT REFERENCES rfqs(id) ON DELETE SET NULL,
     date_prepared            DATE,
     purpose                  TEXT,
-    status                   VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','submitted','approved','cancelled')),
+    status                   VARCHAR(20) DEFAULT 'on_going' CHECK (status IN ('on_going','completed','cancelled')),
     recommended_supplier_id  INT REFERENCES suppliers(id) ON DELETE SET NULL,
     recommended_amount       DECIMAL(12,2) DEFAULT 0,
     created_by               INT REFERENCES users(id) ON DELETE SET NULL,
@@ -456,7 +456,7 @@ CREATE TABLE IF NOT EXISTS post_qualifications (
     financial_validation TEXT,
     twg_result           TEXT,
     findings             TEXT,
-    status               VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','completed','cancelled')),
+    status               VARCHAR(20) DEFAULT 'on_going' CHECK (status IN ('on_going','completed','cancelled')),
     created_by           INT REFERENCES users(id) ON DELETE SET NULL,
     created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -480,7 +480,7 @@ CREATE TABLE IF NOT EXISTS bac_resolutions (
     philgeps_required         BOOLEAN DEFAULT FALSE,
     philgeps_posted_from      DATE,
     philgeps_posted_until     DATE,
-    status                    VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','approved','rejected','cancelled')),
+    status                    VARCHAR(20) DEFAULT 'on_going' CHECK (status IN ('on_going','completed','cancelled')),
     created_by                INT REFERENCES users(id) ON DELETE SET NULL,
     approved_by               INT REFERENCES users(id) ON DELETE SET NULL,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -502,7 +502,7 @@ CREATE TABLE IF NOT EXISTS notices_of_award (
     contract_amount     DECIMAL(12,2) DEFAULT 0,
     date_issued         DATE,
     bidder_receipt_date DATE,
-    status              VARCHAR(20) DEFAULT 'issued' CHECK (status IN ('draft','issued','received','cancelled')),
+    status              VARCHAR(20) DEFAULT 'awaiting_noa' CHECK (status IN ('awaiting_noa','with_noa','cancelled')),
     created_by          INT REFERENCES users(id) ON DELETE SET NULL,
     approved_by         INT REFERENCES users(id) ON DELETE SET NULL,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -524,7 +524,7 @@ CREATE TABLE IF NOT EXISTS purchaseorders (
     total_amount            DECIMAL(12,2) DEFAULT 0,
 
     -- Document status
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','delivered','completed','cancelled')),
+    status VARCHAR(20) DEFAULT 'for_signing' CHECK (status IN ('for_signing','signed','cancelled')),
 
     -- Workflow status
     workflow_status VARCHAR(30) DEFAULT 'pending' CHECK (
@@ -607,21 +607,21 @@ CREATE TABLE IF NOT EXISTS iars (
     invoice_number          VARCHAR(80),
     invoice_date            DATE,
     delivery_receipt_number VARCHAR(80),
-    inspection_result       VARCHAR(20) DEFAULT 'pending' CHECK (inspection_result IN ('pending','accepted','rejected','partial')),
+    inspection_result       VARCHAR(50) DEFAULT 'on_going' CHECK (inspection_result IN ('to_be_checked','on_going','verified')),
     findings                TEXT,
     purpose                 TEXT,
     inspected_by            INT REFERENCES users(id) ON DELETE SET NULL,
     date_inspected          DATE,
     received_by             INT REFERENCES users(id) ON DELETE SET NULL,
     date_received           DATE,
-    status                  VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','completed','cancelled')),
+    acceptance              VARCHAR(30) DEFAULT 'to_be_checked' CHECK (acceptance IN ('to_be_checked','complete','partial')),
     created_by              INT REFERENCES users(id) ON DELETE SET NULL,
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_iars_po     ON iars(po_id);
-CREATE INDEX IF NOT EXISTS idx_iars_status ON iars(status);
+CREATE INDEX IF NOT EXISTS idx_iars_po         ON iars(po_id);
+CREATE INDEX IF NOT EXISTS idx_iars_acceptance  ON iars(acceptance);
 
 -- ============================================================
 -- 31. IAR ITEMS

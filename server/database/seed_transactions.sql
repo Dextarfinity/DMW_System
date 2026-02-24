@@ -3,16 +3,16 @@ BEGIN;
 
 -- PURCHASE REQUESTS
 INSERT INTO purchaserequests (id, pr_number, dept_id, purpose, total_amount, status, requested_by, created_at) VALUES
-    (1,  'PR-2025-001', 1, 'Procurement of office supplies for FAD',                      59127.80,  'approved',  1, '2025-01-15 08:00:00'),
-    (2,  'PR-2025-002', 5, 'Procurement of cork board and whiteboard for the use of DMW',  8900.00,   'approved',  1, '2025-05-10 09:00:00'),
-    (3,  'PR-2025-003', 1, 'Supply and deliver of printer inks for DMW Caraga',             43450.00,  'approved',  1, '2025-06-20 10:00:00'),
-    (4,  'PR-2025-004', 4, 'For Welfare and Reintegration Services Division Use',           5000.00,   'approved',  1, '2025-04-15 08:30:00'),
-    (5,  'PR-2025-005', 1, 'Procurement of water dispenser for the use of DMW Caraga',      47370.00,  'approved',  1, '2025-07-10 09:00:00'),
-    (6,  'PR-2025-006', 1, 'Procurement of air conditioning units for DMW Caraga',          322594.00, 'approved',  1, '2025-04-15 10:00:00'),
-    (7,  'PR-2025-007', 1, 'Procurement of scanner for DMW Caraga',                         225540.00, 'pending',   1, '2025-09-25 08:00:00'),
-    (8,  'PR-2025-008', 1, 'Procurement of additional printers for DMW Caraga CY 2025',     139986.00, 'pending',   1, '2025-09-25 09:00:00'),
-    (9,  'PR-2025-009', 1, 'Furniture and fixture for DMW CARAGA',                           394000.00, 'processed', 1, '2025-10-15 10:00:00'),
-    (10, 'PR-2025-010', 1, 'Supply and delivery of external hard drives',                    37440.00,  'processed', 1, '2025-07-15 08:00:00')
+    (1,  'PR-2025-001', 1, 'Procurement of office supplies for FAD',                      59127.80,  'approved',          1, '2025-01-15 08:00:00'),
+    (2,  'PR-2025-002', 5, 'Procurement of cork board and whiteboard for the use of DMW',  8900.00,   'approved',          1, '2025-05-10 09:00:00'),
+    (3,  'PR-2025-003', 1, 'Supply and deliver of printer inks for DMW Caraga',             43450.00,  'approved',          1, '2025-06-20 10:00:00'),
+    (4,  'PR-2025-004', 4, 'For Welfare and Reintegration Services Division Use',           5000.00,   'approved',          1, '2025-04-15 08:30:00'),
+    (5,  'PR-2025-005', 1, 'Procurement of water dispenser for the use of DMW Caraga',      47370.00,  'approved',          1, '2025-07-10 09:00:00'),
+    (6,  'PR-2025-006', 1, 'Procurement of air conditioning units for DMW Caraga',          322594.00, 'approved',          1, '2025-04-15 10:00:00'),
+    (7,  'PR-2025-007', 1, 'Procurement of scanner for DMW Caraga',                         225540.00, 'pending_approval',  1, '2025-09-25 08:00:00'),
+    (8,  'PR-2025-008', 1, 'Procurement of additional printers for DMW Caraga CY 2025',     139986.00, 'pending_approval',  1, '2025-09-25 09:00:00'),
+    (9,  'PR-2025-009', 1, 'Furniture and fixture for DMW CARAGA',                           394000.00, 'approved',          1, '2025-10-15 10:00:00'),
+    (10, 'PR-2025-010', 1, 'Supply and delivery of external hard drives',                    37440.00,  'approved',          1, '2025-07-15 08:00:00')
 ON CONFLICT (pr_number) DO NOTHING;
 SELECT setval('purchaserequests_id_seq', 10);
 
@@ -39,14 +39,14 @@ INSERT INTO pr_items (pr_id, item_code, item_name, unit, quantity, unit_price) V
 
 -- RFQs
 INSERT INTO rfqs (id, rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, status, created_by, created_at) VALUES
-    (1, 'RFQ-2025-001', 1,  '2025-01-20', '2025-01-30', 59127.80,  'closed',  1, '2025-01-20 08:00:00'),
-    (2, 'RFQ-2025-002', 2,  '2025-05-12', '2025-05-18', 8900.00,   'closed',  1, '2025-05-12 09:00:00'),
-    (3, 'RFQ-2025-003', 3,  '2025-06-22', '2025-06-28', 43450.00,  'closed',  1, '2025-06-22 10:00:00'),
-    (4, 'RFQ-2025-004', 5,  '2025-07-12', '2025-07-20', 47370.00,  'closed',  1, '2025-07-12 08:00:00'),
-    (5, 'RFQ-2025-005', 6,  '2025-04-18', '2025-04-25', 322594.00, 'closed',  1, '2025-04-18 09:00:00'),
-    (6, 'RFQ-2025-006', 7,  '2025-09-28', '2025-10-01', 225540.00, 'posted',  1, '2025-09-28 10:00:00'),
-    (7, 'RFQ-2025-007', 9,  '2025-10-20', '2025-10-30', 394000.00, 'closed',  1, '2025-10-20 08:00:00'),
-    (8, 'RFQ-2025-008', 10, '2025-07-18', '2025-07-25', 37440.00,  'closed',  1, '2025-07-18 09:00:00')
+    (1, 'RFQ-2025-001', 1,  '2025-01-20', '2025-01-30', 59127.80,  'completed', 1, '2025-01-20 08:00:00'),
+    (2, 'RFQ-2025-002', 2,  '2025-05-12', '2025-05-18', 8900.00,   'completed', 1, '2025-05-12 09:00:00'),
+    (3, 'RFQ-2025-003', 3,  '2025-06-22', '2025-06-28', 43450.00,  'completed', 1, '2025-06-22 10:00:00'),
+    (4, 'RFQ-2025-004', 5,  '2025-07-12', '2025-07-20', 47370.00,  'completed', 1, '2025-07-12 08:00:00'),
+    (5, 'RFQ-2025-005', 6,  '2025-04-18', '2025-04-25', 322594.00, 'completed', 1, '2025-04-18 09:00:00'),
+    (6, 'RFQ-2025-006', 7,  '2025-09-28', '2025-10-01', 225540.00, 'on_going',  1, '2025-09-28 10:00:00'),
+    (7, 'RFQ-2025-007', 9,  '2025-10-20', '2025-10-30', 394000.00, 'completed', 1, '2025-10-20 08:00:00'),
+    (8, 'RFQ-2025-008', 10, '2025-07-18', '2025-07-25', 37440.00,  'completed', 1, '2025-07-18 09:00:00')
 ON CONFLICT (rfq_number) DO NOTHING;
 SELECT setval('rfqs_id_seq', 8);
 
@@ -83,13 +83,13 @@ INSERT INTO rfq_suppliers (rfq_id, supplier_id, invited_at, responded) VALUES
 
 -- ABSTRACTS
 INSERT INTO abstracts (id, abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, created_by, created_at) VALUES
-    (1, 'ABS-2025-001', 1, '2025-01-31', 'Office supplies for FAD',                      'approved',  3, 59127.80,  1, '2025-01-31 08:00:00'),
-    (2, 'ABS-2025-002', 2, '2025-05-19', 'Cork board and whiteboard for DMW',             'approved',  9, 8900.00,   1, '2025-05-19 09:00:00'),
-    (3, 'ABS-2025-003', 3, '2025-06-29', 'Printer inks for DMW Caraga',                   'approved',  1, 43450.00,  1, '2025-06-29 10:00:00'),
-    (4, 'ABS-2025-004', 4, '2025-07-21', 'Water dispenser for DMW Caraga',                'approved',  2, 47370.00,  1, '2025-07-21 08:00:00'),
-    (5, 'ABS-2025-005', 5, '2025-04-26', 'Air conditioning units for DMW Caraga',         'approved',  5, 322594.00, 1, '2025-04-26 09:00:00'),
-    (6, 'ABS-2025-006', 7, '2025-10-31', 'Furniture and fixture for DMW CARAGA',          'submitted', 8, 394000.00, 1, '2025-10-31 10:00:00'),
-    (7, 'ABS-2025-007', 8, '2025-07-26', 'External hard drives for DMW Caraga',           'approved',  1, 37440.00,  1, '2025-07-26 08:00:00')
+    (1, 'ABS-2025-001', 1, '2025-01-31', 'Office supplies for FAD',                      'completed', 3, 59127.80,  1, '2025-01-31 08:00:00'),
+    (2, 'ABS-2025-002', 2, '2025-05-19', 'Cork board and whiteboard for DMW',             'completed', 9, 8900.00,   1, '2025-05-19 09:00:00'),
+    (3, 'ABS-2025-003', 3, '2025-06-29', 'Printer inks for DMW Caraga',                   'completed', 1, 43450.00,  1, '2025-06-29 10:00:00'),
+    (4, 'ABS-2025-004', 4, '2025-07-21', 'Water dispenser for DMW Caraga',                'completed', 2, 47370.00,  1, '2025-07-21 08:00:00'),
+    (5, 'ABS-2025-005', 5, '2025-04-26', 'Air conditioning units for DMW Caraga',         'completed', 5, 322594.00, 1, '2025-04-26 09:00:00'),
+    (6, 'ABS-2025-006', 7, '2025-10-31', 'Furniture and fixture for DMW CARAGA',          'on_going',  8, 394000.00, 1, '2025-10-31 10:00:00'),
+    (7, 'ABS-2025-007', 8, '2025-07-26', 'External hard drives for DMW Caraga',           'completed', 1, 37440.00,  1, '2025-07-26 08:00:00')
 ON CONFLICT (abstract_number) DO NOTHING;
 SELECT setval('abstracts_id_seq', 7);
 
@@ -136,23 +136,23 @@ SELECT setval('post_qualifications_id_seq', 6);
 
 -- BAC RESOLUTIONS
 INSERT INTO bac_resolutions (id, resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by, created_at) VALUES
-    (1, 'BACR-2025-001', 1, '2025-02-01', 'OTHERS',  59127.80,  3, 'PROCUREMENT SERVICE',                59127.80,  'approved', 1, '2025-02-01 10:00:00'),
-    (2, 'BACR-2025-002', 2, '2025-05-20', 'SVP',     8900.00,   9, 'COMPAÑERO COMMERCIAL',               8900.00,   'approved', 1, '2025-05-20 10:00:00'),
-    (3, 'BACR-2025-003', 3, '2025-06-30', 'SVP',     43450.00,  1, 'MID-TOWN COMPUTERS AND SERVICES',    43450.00,  'approved', 1, '2025-06-30 10:00:00'),
-    (4, 'BACR-2025-004', 4, '2025-07-22', 'SVP',     47370.00,  2, 'RFY MARKETING',                      47370.00,  'approved', 1, '2025-07-22 10:00:00'),
-    (5, 'BACR-2025-005', 5, '2025-04-28', 'SVP',     322594.00, 5, 'AIRMASTERS AIRCONDITIONING SERVICES', 322594.00, 'approved', 1, '2025-04-28 10:00:00'),
-    (6, 'BACR-2025-006', 7, '2025-07-28', 'SVP',     37440.00,  1, 'MID-TOWN COMPUTERS AND SERVICES',    37440.00,  'approved', 1, '2025-07-28 10:00:00')
+    (1, 'BACR-2025-001', 1, '2025-02-01', 'OTHERS',  59127.80,  3, 'PROCUREMENT SERVICE',                59127.80,  'completed', 1, '2025-02-01 10:00:00'),
+    (2, 'BACR-2025-002', 2, '2025-05-20', 'SVP',     8900.00,   9, 'COMPAÑERO COMMERCIAL',               8900.00,   'completed', 1, '2025-05-20 10:00:00'),
+    (3, 'BACR-2025-003', 3, '2025-06-30', 'SVP',     43450.00,  1, 'MID-TOWN COMPUTERS AND SERVICES',    43450.00,  'completed', 1, '2025-06-30 10:00:00'),
+    (4, 'BACR-2025-004', 4, '2025-07-22', 'SVP',     47370.00,  2, 'RFY MARKETING',                      47370.00,  'completed', 1, '2025-07-22 10:00:00'),
+    (5, 'BACR-2025-005', 5, '2025-04-28', 'SVP',     322594.00, 5, 'AIRMASTERS AIRCONDITIONING SERVICES', 322594.00, 'completed', 1, '2025-04-28 10:00:00'),
+    (6, 'BACR-2025-006', 7, '2025-07-28', 'SVP',     37440.00,  1, 'MID-TOWN COMPUTERS AND SERVICES',    37440.00,  'completed', 1, '2025-07-28 10:00:00')
 ON CONFLICT (resolution_number) DO NOTHING;
 SELECT setval('bac_resolutions_id_seq', 6);
 
 -- NOTICES OF AWARD
 INSERT INTO notices_of_award (id, noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, bidder_receipt_date, status, created_by, created_at) VALUES
-    (1, 'NOA-2025-001', 1, 3, 59127.80,  '2025-02-02', '2025-02-03', 'received', 1, '2025-02-02 08:00:00'),
-    (2, 'NOA-2025-002', 2, 9, 8900.00,   '2025-05-20', '2025-05-21', 'received', 1, '2025-05-20 08:00:00'),
-    (3, 'NOA-2025-003', 3, 1, 43450.00,  '2025-07-01', '2025-07-02', 'received', 1, '2025-07-01 08:00:00'),
-    (4, 'NOA-2025-004', 4, 2, 47370.00,  '2025-07-23', '2025-07-24', 'received', 1, '2025-07-23 08:00:00'),
-    (5, 'NOA-2025-005', 5, 5, 322594.00, '2025-04-30', '2025-05-02', 'received', 1, '2025-04-30 08:00:00'),
-    (6, 'NOA-2025-006', 6, 1, 37440.00,  '2025-07-28', '2025-07-29', 'issued',   1, '2025-07-28 08:00:00')
+    (1, 'NOA-2025-001', 1, 3, 59127.80,  '2025-02-02', '2025-02-03', 'with_noa',     1, '2025-02-02 08:00:00'),
+    (2, 'NOA-2025-002', 2, 9, 8900.00,   '2025-05-20', '2025-05-21', 'with_noa',     1, '2025-05-20 08:00:00'),
+    (3, 'NOA-2025-003', 3, 1, 43450.00,  '2025-07-01', '2025-07-02', 'with_noa',     1, '2025-07-01 08:00:00'),
+    (4, 'NOA-2025-004', 4, 2, 47370.00,  '2025-07-23', '2025-07-24', 'with_noa',     1, '2025-07-23 08:00:00'),
+    (5, 'NOA-2025-005', 5, 5, 322594.00, '2025-04-30', '2025-05-02', 'with_noa',     1, '2025-04-30 08:00:00'),
+    (6, 'NOA-2025-006', 6, 1, 37440.00,  '2025-07-28', '2025-07-29', 'awaiting_noa', 1, '2025-07-28 08:00:00')
 ON CONFLICT (noa_number) DO NOTHING;
 SELECT setval('notices_of_award_id_seq', 6);
 

@@ -323,26 +323,26 @@ SELECT setval('suppliers_id_seq', 9);
 
 INSERT INTO purchaseorders (id, po_number, supplier_id, total_amount, status, mode_of_procurement,
     delivery_address, payment_terms, po_date, purpose, place_of_delivery) VALUES
-    (1, 'BUT25-02224',   3, 59127.80,  'pending',   'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW1',                                                         'DMW-CARAGA, Butuan City'),
-    (2, '2025-05-036B',  9, 8900.00,   'completed', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-05-20', 'Procurement of cork board and whiteboard for the use of DMW',  'DMW-CARAGA, Butuan City'),
-    (3, '2025-07-064',   1, 43450.00,  'completed', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-01', 'Supply and deliver of printer inks for DMW Caraga',            'DMW-CARAGA, Butuan City'),
-    (4, '2025-04-022',   1, 5000.00,   'pending',   'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-04-28', 'For Welfare and Reintegration Services Division Use',          'RO XIII-BUTUAN CITY'),
-    (5, '2025-07-074',   2, 47370.00,  'pending',   'Small Value Procurement - SVP', 'P-8 AMBAGO, BUTUAN CITY',                                      '30 days', '2025-07-23', 'Procurement of water dispenser for the use of DMW Caraga',     'RO XIII-BUTUAN CITY'),
-    (6, '2025-04-026',   5, 322594.00, 'pending',   'Small Value Procurement - SVP', 'PHASE 3, BLK 13 LOT 16-18, EMENVILLE SUBD., BRGY. AMBAGO, BUTUAN CITY', '30 days', '2025-04-30', 'Procurement of air conditioning units for the use of DMW Caraga', 'RO XIII-BUTUAN CITY'),
-    (7, 'BUT25-02224-B', 3, 34026.90,  'pending',   'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
-    (8, 'BUT25-02541',   1, 246809.00, 'pending',   'Agency -To - Agency', 'LOPEZ JAENA ST., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
-    (9, 'BUT25-02541-B', 3, 43450.00,  'pending',   'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
-    (10, '2025-11-126',   8, 394000.00, 'pending',   'Small Value Procurement - SVP', '4TH ST. VILLAGE 2 LIBERTAD, BUTUAN CITY',                      '30 days', '2025-11-10', 'Furniture and fixture for DMW CARAGA',                         'RO XIII-BUTUAN CITY'),
-    (11, '2025-10-109',   1, 225540.00, 'pending',   'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-10-03', 'Procurement of scanner for DMW Caraga',                        'RO XIII-BUTUAN CITY'),
-    (12, '2025-05-047A',  6, 6820.00,   'pending',   'Small Value Procurement - SVP', 'R.CALO St., HUMABON POB.(BGY11) BUTUAN CITY',                  '30 days', '2025-04-28', 'Customized stamps for document and files of DMW RO XIII office', 'RO XIII-BUTUAN CITY'),
-    (13, '2025-10-107',   1, 139986.00, 'pending',   'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-10-03', 'Procurement of additional printers for DMW Caraga CY 2025',    'RO XIII-BUTUAN CITY'),
-    (14, '2025-05-047',   2, 39150.00,  'pending',   'Small Value Procurement - SVP', 'P-8 AMBAGO, BUTUAN CITY',                                      '30 days', '2025-05-26', 'Supply and delivery of trash bins and trash bags',             'RO XIII-BUTUAN CITY'),
-    (15, '2025-06-063',   7, 9000.00,   'pending',   'Agency -To - Agency', 'R. CALCO ST., BUTUAN CITY',                                             '30 days', '2025-06-27', 'Procurement of dry seal for the use of DMW Caraga Regional Office', 'DMW-CARAGA, Butuan City'),
-    (16, '2025-07-075',   1, 37440.00,  'pending',   'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-28', 'Supply and delivery of external hard drives',                  'RO XIII-BUTUAN CITY'),
-    (17, 'BUT25-02541-C', 3, 49362.92,  'pending',   'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
-    (18, '2025-05-047B',  4, 241110.00, 'pending',   'Small Value Procurement - SVP', '3RD FLOOR MATHEUS BLDG., GEN.LUNA POBLACION, MAKATI CITY',      '30 days', '2025-05-28', 'Supply and delivery of printer units for DMW Caraga',          'DMW-CARAGA, Butuan City'),
-    (19, '2025-04-022-B', 1, 5000.00,   'completed', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-04-08', 'Cellphone for WRSD',                                           'DMW-CARAGA, Butuan City'),
-    (20, '2025-07-071',   1, 20000.00,  'pending',   'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-10', 'Procurement of cellphone for the DMW Division''s Hotline',     'RO XIII-BUTUAN CITY')
+    (1, 'BUT25-02224',   3, 59127.80,  'for_signing', 'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW1',                                                         'DMW-CARAGA, Butuan City'),
+    (2, '2025-05-036B',  9, 8900.00,   'signed',      'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-05-20', 'Procurement of cork board and whiteboard for the use of DMW',  'DMW-CARAGA, Butuan City'),
+    (3, '2025-07-064',   1, 43450.00,  'signed',      'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-01', 'Supply and deliver of printer inks for DMW Caraga',            'DMW-CARAGA, Butuan City'),
+    (4, '2025-04-022',   1, 5000.00,   'for_signing', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-04-28', 'For Welfare and Reintegration Services Division Use',          'RO XIII-BUTUAN CITY'),
+    (5, '2025-07-074',   2, 47370.00,  'for_signing', 'Small Value Procurement - SVP', 'P-8 AMBAGO, BUTUAN CITY',                                      '30 days', '2025-07-23', 'Procurement of water dispenser for the use of DMW Caraga',     'RO XIII-BUTUAN CITY'),
+    (6, '2025-04-026',   5, 322594.00, 'for_signing', 'Small Value Procurement - SVP', 'PHASE 3, BLK 13 LOT 16-18, EMENVILLE SUBD., BRGY. AMBAGO, BUTUAN CITY', '30 days', '2025-04-30', 'Procurement of air conditioning units for the use of DMW Caraga', 'RO XIII-BUTUAN CITY'),
+    (7, 'BUT25-02224-B', 3, 34026.90,  'for_signing', 'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
+    (8, 'BUT25-02541',   1, 246809.00, 'for_signing', 'Agency -To - Agency', 'LOPEZ JAENA ST., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
+    (9, 'BUT25-02541-B', 3, 43450.00,  'for_signing', 'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
+    (10, '2025-11-126',   8, 394000.00, 'for_signing', 'Small Value Procurement - SVP', '4TH ST. VILLAGE 2 LIBERTAD, BUTUAN CITY',                      '30 days', '2025-11-10', 'Furniture and fixture for DMW CARAGA',                         'RO XIII-BUTUAN CITY'),
+    (11, '2025-10-109',   1, 225540.00, 'for_signing', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-10-03', 'Procurement of scanner for DMW Caraga',                        'RO XIII-BUTUAN CITY'),
+    (12, '2025-05-047A',  6, 6820.00,   'for_signing', 'Small Value Procurement - SVP', 'R.CALO St., HUMABON POB.(BGY11) BUTUAN CITY',                  '30 days', '2025-04-28', 'Customized stamps for document and files of DMW RO XIII office', 'RO XIII-BUTUAN CITY'),
+    (13, '2025-10-107',   1, 139986.00, 'for_signing', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-10-03', 'Procurement of additional printers for DMW Caraga CY 2025',    'RO XIII-BUTUAN CITY'),
+    (14, '2025-05-047',   2, 39150.00,  'for_signing', 'Small Value Procurement - SVP', 'P-8 AMBAGO, BUTUAN CITY',                                      '30 days', '2025-05-26', 'Supply and delivery of trash bins and trash bags',             'RO XIII-BUTUAN CITY'),
+    (15, '2025-06-063',   7, 9000.00,   'for_signing', 'Agency -To - Agency', 'R. CALCO ST., BUTUAN CITY',                                             '30 days', '2025-06-27', 'Procurement of dry seal for the use of DMW Caraga Regional Office', 'DMW-CARAGA, Butuan City'),
+    (16, '2025-07-075',   1, 37440.00,  'for_signing', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-28', 'Supply and delivery of external hard drives',                  'RO XIII-BUTUAN CITY'),
+    (17, 'BUT25-02541-C', 3, 49362.92,  'for_signing', 'Agency -To - Agency', 'J.P. RIZAL AVE., BUTUAN CITY',                                          '30 days', '2026-02-02', 'DMW',                                                          'DMW-CARAGA, Butuan City'),
+    (18, '2025-05-047B',  4, 241110.00, 'for_signing', 'Small Value Procurement - SVP', '3RD FLOOR MATHEUS BLDG., GEN.LUNA POBLACION, MAKATI CITY',      '30 days', '2025-05-28', 'Supply and delivery of printer units for DMW Caraga',          'DMW-CARAGA, Butuan City'),
+    (19, '2025-04-022-B', 1, 5000.00,   'signed',      'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-04-08', 'Cellphone for WRSD',                                           'DMW-CARAGA, Butuan City'),
+    (20, '2025-07-071',   1, 20000.00,  'for_signing', 'Small Value Procurement - SVP', 'LOPEZ JAENA ST., BUTUAN CITY',                                 '30 days', '2025-07-10', 'Procurement of cellphone for the DMW Division''s Hotline',     'RO XIII-BUTUAN CITY')
 ON CONFLICT (po_number) DO NOTHING;
 
 SELECT setval('purchaseorders_id_seq', 20);
@@ -481,14 +481,14 @@ INSERT INTO po_items (po_id, item_id, item_code, item_name, unit, quantity, unit
 -- ============================================================
 -- 14. IARS (from Excel - 4 unique IARs with 7 item rows)
 -- ============================================================
-INSERT INTO iars (id, iar_number, po_id, inspection_date, invoice_number, invoice_date, purpose, status) VALUES
-    (1, '2025-07-027', 3, '2025-07-04', '608',  '2025-07-04', 'Supply and deliver of printer inks for DMW Caraga', 'completed'),
-    (2, '2025-07-028', 3, '2025-07-05', '608',  '2025-07-05', 'Supply and deliver of printer inks for DMW Caraga', 'completed'),
-    (3, '2025-07-029', 3, '2025-07-06', '608',  '2025-07-06', 'Supply and deliver of printer inks for DMW Caraga', 'completed'),
-    (4, '2025-07-030', 3, '2025-07-07', '608',  '2025-07-07', 'Supply and deliver of printer inks for DMW Caraga', 'completed'),
-    (5, '2025-05-008', 19, '2025-05-02', '3727', '2025-05-02', 'Cellphone for WRSD', 'completed'),
-    (6, '2025-05-18C', 2, '2025-05-27', '0',    '2025-05-27', 'Procurement of cork board and whiteboard for the use of DMW', 'completed'),
-    (7, '2025-05-18C-B', 2, '2025-05-28', '1', '2025-05-28', 'Procurement of cork board and whiteboard for the use of DMW', 'completed')
+INSERT INTO iars (id, iar_number, po_id, inspection_date, invoice_number, invoice_date, purpose, inspection_result, acceptance) VALUES
+    (1, '2025-07-027', 3, '2025-07-04', '608',  '2025-07-04', 'Supply and deliver of printer inks for DMW Caraga', 'verified', 'complete'),
+    (2, '2025-07-028', 3, '2025-07-05', '608',  '2025-07-05', 'Supply and deliver of printer inks for DMW Caraga', 'verified', 'complete'),
+    (3, '2025-07-029', 3, '2025-07-06', '608',  '2025-07-06', 'Supply and deliver of printer inks for DMW Caraga', 'verified', 'complete'),
+    (4, '2025-07-030', 3, '2025-07-07', '608',  '2025-07-07', 'Supply and deliver of printer inks for DMW Caraga', 'verified', 'complete'),
+    (5, '2025-05-008', 19, '2025-05-02', '3727', '2025-05-02', 'Cellphone for WRSD', 'verified', 'complete'),
+    (6, '2025-05-18C', 2, '2025-05-27', '0',    '2025-05-27', 'Procurement of cork board and whiteboard for the use of DMW', 'verified', 'complete'),
+    (7, '2025-05-18C-B', 2, '2025-05-28', '1', '2025-05-28', 'Procurement of cork board and whiteboard for the use of DMW', 'verified', 'complete')
 ON CONFLICT (iar_number) DO NOTHING;
 
 SELECT setval('iars_id_seq', 7);

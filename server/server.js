@@ -5,22 +5,64 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const os = require('os');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const { PDFDocument } = require('pdf-lib');
 require('dotenv').config();
 
 const app = express();
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// Multer storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+    const ext = path.extname(file.originalname);
+    cb(null, unique + ext);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per file
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg', 'image/png', 'image/jpg'
+    ];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not allowed. Accepted: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG'));
+    }
+  }
+});
 
 // Middleware
 app.use(cors({ origin: '*' }));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 
+// Serve uploaded files statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 // PostgreSQL Connection Pool
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'dmw_db',
-  password: process.env.DB_PASSWORD || 'kurt09908',
-  port: parseInt(process.env.DB_PORT) || 5433,
+  password: process.env.DB_PASSWORD || 'dmw123',
+  port: parseInt(process.env.DB_PORT) || 5432,
 });
 
 pool.connect((err, client, release) => {
@@ -62,7 +104,8 @@ const authenticateToken = (req, res, next) => {
 
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Insufficient permissions' });
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    if (!userRoles.some(r => roles.includes(r))) return res.status(403).json({ error: 'Insufficient permissions' });
     next();
   };
 };
@@ -104,8 +147,12 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const result = await pool.query(
-      `SELECT u.*, d.name as department_name, d.code as department_code 
-       FROM users u LEFT JOIN departments d ON u.dept_id = d.id 
+      `SELECT u.*, d.name as department_name, d.code as department_code,
+              des.name as designation_name
+       FROM users u 
+       LEFT JOIN departments d ON u.dept_id = d.id 
+       LEFT JOIN employees e ON u.employee_id = e.id
+       LEFT JOIN designations des ON e.designation_id = des.id
        WHERE u.username = $1`, [username]
     );
     if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
@@ -123,12 +170,13 @@ app.post('/api/auth/login', async (req, res) => {
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, dept_id: user.dept_id },
+      { id: user.id, username: user.username, role: user.role, secondary_role: user.secondary_role || null, dept_id: user.dept_id },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
+    const roles = [user.role, user.secondary_role].filter(Boolean);
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, department: user.department_name, department_code: user.department_code }
+      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -165,12 +213,88 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.full_name, u.role, u.email, d.name as department_name, d.code as department_code 
-       FROM users u LEFT JOIN departments d ON u.dept_id = d.id WHERE u.id = $1`, [req.user.id]
+      `SELECT u.id, u.username, u.full_name, u.role, u.secondary_role, u.email, u.dept_id, d.name as department_name, d.code as department_code,
+              des.name as designation_name
+       FROM users u 
+       LEFT JOIN departments d ON u.dept_id = d.id 
+       LEFT JOIN employees e ON u.employee_id = e.id
+       LEFT JOIN designations des ON e.designation_id = des.id
+       WHERE u.id = $1`, [req.user.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json(result.rows[0]);
+    const u = result.rows[0];
+    u.roles = [u.role, u.secondary_role].filter(Boolean);
+    res.json(u);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Change Password
+app.put('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Get user's current password hash
+    const userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    const user = userResult.rows[0];
+
+    // Verify current password (support both bcrypt hashed and plain text)
+    let validPassword = false;
+    if (user.password_hash.startsWith('$2')) {
+      validPassword = await bcrypt.compare(current_password, user.password_hash);
+    } else {
+      validPassword = (current_password === user.password_hash);
+    }
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash and save new password
+    const newHash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user.id]);
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// Update Own Profile (self-service)
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const { username, full_name, email, dept_id } = req.body;
+    if (!username || !full_name) {
+      return res.status(400).json({ error: 'Username and full name are required' });
+    }
+
+    // Check if username is taken by another user
+    const existing = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, req.user.id]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Username is already taken by another user' });
+    }
+
+    await pool.query(
+      `UPDATE users SET username=$1, full_name=$2, email=$3, dept_id=$4, updated_at=CURRENT_TIMESTAMP WHERE id=$5`,
+      [username, full_name, email || null, dept_id || null, req.user.id]
+    );
+
+    // Return updated user with department info
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.full_name, u.role, u.email, u.dept_id, d.name as department_name, d.code as department_code
+       FROM users u LEFT JOIN departments d ON u.dept_id = d.id WHERE u.id = $1`, [req.user.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
 });
 
 // ==============================================================================
@@ -179,13 +303,36 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
-    const [items, plans, prs, pos, suppliers, users, departments, 
-           stockCards, propertyCards, ics, employees,
-           lowStock, outOfStock,
-           semiExpItems, capitalOutlayItems,
-           pendingIARs, pendingRIS, tripTickets] = await Promise.all([
+    const [
+      // Counts
+      items, plans, ppmpItems, prs, pos, suppliers, users, departments,
+      stockCards, propertyCards, ics, employees,
+      lowStock, outOfStock,
+      semiExpItems, capitalOutlayItems,
+      pendingIARs, iarsTotal, pendingRIS, tripTickets,
+      rfqs, abstracts, postQuals, bacRes, noas, poPackets, coaSubs,
+      // Status breakdowns
+      prByStatus, poByStatus, iarByStatus,
+      // PPMP per division
+      ppmpByDiv,
+      // Budget utilization
+      totalPPMPBudget,
+      // Recent PRs
+      recentPRs,
+      // Recent activity
+      recentActivity,
+      // Procurement tracker
+      procurementTracker,
+      // Alerts
+      overduePRs,
+      overdueRFQs,
+      rejectedPRs,
+      pendingPOs
+    ] = await Promise.all([
+      // Basic counts
       pool.query('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
       pool.query('SELECT COUNT(*) FROM procurementplans'),
+      pool.query("SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL"),
       pool.query('SELECT COUNT(*) FROM purchaserequests'),
       pool.query('SELECT COUNT(*) FROM purchaseorders'),
       pool.query('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
@@ -194,19 +341,91 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       pool.query('SELECT COUNT(*) FROM stock_cards'),
       pool.query('SELECT COUNT(*) FROM property_cards'),
       pool.query('SELECT COUNT(*) FROM inventory_custodian_slips'),
-      pool.query('SELECT COUNT(*) FROM employees WHERE status = \'active\''),
-      pool.query('SELECT 0 as count'),
-      pool.query('SELECT 0 as count'),
+      pool.query("SELECT COUNT(*) FROM employees WHERE status = 'active'"),
+      pool.query("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity > 0 AND quantity <= reorder_point"),
+      pool.query("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity = 0"),
       pool.query('SELECT COUNT(*) FROM received_semi_expendable_items'),
       pool.query('SELECT COUNT(*) FROM received_capital_outlay_items'),
-      pool.query("SELECT COUNT(*) FROM iars WHERE status = 'draft'"),
+      pool.query("SELECT COUNT(*) FROM iars WHERE acceptance != 'complete'"),
+      pool.query('SELECT COUNT(*) FROM iars'),
       pool.query("SELECT COUNT(*) FROM requisition_issue_slips WHERE status = 'PENDING'"),
       pool.query('SELECT COUNT(*) FROM trip_tickets'),
+      pool.query('SELECT COUNT(*) FROM rfqs'),
+      pool.query('SELECT COUNT(*) FROM abstracts'),
+      pool.query('SELECT COUNT(*) FROM post_qualifications'),
+      pool.query('SELECT COUNT(*) FROM bac_resolutions'),
+      pool.query('SELECT COUNT(*) FROM notices_of_award'),
+      pool.query('SELECT COUNT(*) FROM po_packets'),
+      pool.query('SELECT COUNT(*) FROM coa_submissions'),
+      // Status breakdowns
+      pool.query("SELECT status, COUNT(*)::int as count FROM purchaserequests GROUP BY status"),
+      pool.query("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
+      pool.query("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
+      // PPMP by division
+      pool.query("SELECT d.code, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL GROUP BY d.code ORDER BY d.code"),
+      // Total PPMP budget
+      pool.query("SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL"),
+      // Recent PRs with department + item descriptions
+      pool.query(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
+        COALESCE(
+          (SELECT string_agg(pi.item_name, ', ' ORDER BY pi.id) FROM pr_items pi WHERE pi.pr_id = pr.id),
+          'N/A'
+        ) as item_descriptions
+        FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id ORDER BY pr.created_at DESC LIMIT 50`),
+      // Recent activity log (last 15 actions from various tables)
+      pool.query(`
+        (SELECT 'PR' as type, pr_number as ref_no, purpose as description, status, created_at FROM purchaserequests ORDER BY created_at DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'PO' as type, po_number as ref_no, '' as description, status, created_at FROM purchaseorders ORDER BY created_at DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'IAR' as type, iar_number as ref_no, '' as description, acceptance as status, created_at FROM iars ORDER BY created_at DESC LIMIT 5)
+        ORDER BY created_at DESC LIMIT 15
+      `),
+      // Procurement Tracker: each PR's current step in the process
+      pool.query(`SELECT
+        pr.id, pr.pr_number, pr.purpose, pr.status as pr_status, pr.total_amount, d.code as dept_code, pr.created_at,
+        COALESCE((SELECT string_agg(pi.item_name, ', ' ORDER BY pi.id) FROM pr_items pi WHERE pi.pr_id = pr.id), 'N/A') as item_descriptions,
+        rfq.rfq_number, rfq.status as rfq_status,
+        ab.abstract_number, ab.status as abstract_status,
+        pq.postqual_number, pq.status as postqual_status,
+        br.resolution_number, br.status as bac_status,
+        noa.noa_number, noa.status as noa_status,
+        po.po_number, po.status as po_status,
+        iar.iar_number, iar.acceptance as iar_acceptance, iar.inspection_result as iar_inspection
+      FROM purchaserequests pr
+      LEFT JOIN departments d ON pr.dept_id = d.id
+      LEFT JOIN rfqs rfq ON rfq.pr_id = pr.id
+      LEFT JOIN abstracts ab ON ab.rfq_id = rfq.id
+      LEFT JOIN post_qualifications pq ON pq.abstract_id = ab.id
+      LEFT JOIN bac_resolutions br ON br.abstract_id = ab.id
+      LEFT JOIN notices_of_award noa ON noa.bac_resolution_id = br.id
+      LEFT JOIN purchaseorders po ON po.noa_id = noa.id
+      LEFT JOIN iars iar ON iar.po_id = po.id
+      ORDER BY pr.created_at DESC LIMIT 50`),
+      // Overdue / Alerts data
+      pool.query(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'pending_approval' AND created_at < NOW() - INTERVAL '5 days'`),
+      pool.query(`SELECT COUNT(*) FROM rfqs WHERE status = 'on_going' AND created_at < NOW() - INTERVAL '3 days'`),
+      pool.query(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'rejected'`),
+      pool.query(`SELECT COUNT(*) FROM purchaseorders WHERE status = 'for_signing'`)
     ]);
 
+    // Build status maps
+    const prStatusMap = {};
+    prByStatus.rows.forEach(r => { prStatusMap[r.status] = r.count; });
+    const poStatusMap = {};
+    poByStatus.rows.forEach(r => { poStatusMap[r.status] = r.count; });
+    const iarStatusMap = {};
+    iarByStatus.rows.forEach(r => { iarStatusMap[r.acceptance] = r.count; });
+
+    // Build division PPMP map
+    const divisionPPMP = {};
+    ppmpByDiv.rows.forEach(r => { divisionPPMP[r.code] = { count: r.count, budget: parseFloat(r.budget) }; });
+
     res.json({
+      // Summary counts
       totalItems: parseInt(items.rows[0].count),
       totalPlans: parseInt(plans.rows[0].count),
+      totalPPMPItems: parseInt(ppmpItems.rows[0].count),
       totalPRs: parseInt(prs.rows[0].count),
       totalPOs: parseInt(pos.rows[0].count),
       totalSuppliers: parseInt(suppliers.rows[0].count),
@@ -221,8 +440,36 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       totalSemiExpendable: parseInt(semiExpItems.rows[0].count),
       totalCapitalOutlay: parseInt(capitalOutlayItems.rows[0].count),
       pendingIARs: parseInt(pendingIARs.rows[0].count),
+      totalIARs: parseInt(iarsTotal.rows[0].count),
       pendingRIS: parseInt(pendingRIS.rows[0].count),
       totalTripTickets: parseInt(tripTickets.rows[0].count),
+      totalRFQs: parseInt(rfqs.rows[0].count),
+      totalAbstracts: parseInt(abstracts.rows[0].count),
+      totalPostQuals: parseInt(postQuals.rows[0].count),
+      totalBACResolutions: parseInt(bacRes.rows[0].count),
+      totalNOAs: parseInt(noas.rows[0].count),
+      totalPOPackets: parseInt(poPackets.rows[0].count),
+      totalCOA: parseInt(coaSubs.rows[0].count),
+      // Status breakdowns
+      prByStatus: prStatusMap,
+      poByStatus: poStatusMap,
+      iarByStatus: iarStatusMap,
+      // Division PPMP
+      divisionPPMP: divisionPPMP,
+      totalPPMPBudget: parseFloat(totalPPMPBudget.rows[0].total),
+      // Recent PRs
+      recentPRs: recentPRs.rows,
+      // Recent activity
+      recentActivity: recentActivity.rows,
+      // Procurement tracker
+      procurementTracker: procurementTracker.rows,
+      // Alerts
+      alerts: {
+        overduePRs: parseInt(overduePRs.rows[0].count),
+        overdueRFQs: parseInt(overdueRFQs.rows[0].count),
+        rejectedPRs: parseInt(rejectedPRs.rows[0].count),
+        pendingPOs: parseInt(pendingPOs.rows[0].count)
+      }
     });
   } catch (err) {
     console.error('Dashboard stats error:', err);
@@ -279,6 +526,14 @@ app.get('/api/divisions', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/divisions/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM divisions WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Division not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/divisions', authenticateToken, async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -307,6 +562,14 @@ app.get('/api/offices', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM offices ORDER BY name');
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/offices/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM offices WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Office not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -340,7 +603,7 @@ app.delete('/api/offices/:id', authenticateToken, async (req, res) => {
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.full_name, u.email, u.role, u.is_active, u.last_login, u.created_at,
+      `SELECT u.id, u.username, u.full_name, u.email, u.role, u.secondary_role, u.is_active, u.last_login, u.created_at,
               d.name as department_name, d.code as department_code
        FROM users u LEFT JOIN departments d ON u.dept_id = d.id ORDER BY u.id`
     );
@@ -351,7 +614,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 app.get('/api/users/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.full_name, u.email, u.role, u.dept_id, u.is_active, u.employee_id, u.last_login, u.created_at,
+      `SELECT u.id, u.username, u.full_name, u.email, u.role, u.secondary_role, u.dept_id, u.is_active, u.employee_id, u.last_login, u.created_at,
               d.name as department_name, d.code as department_code
        FROM users u LEFT JOIN departments d ON u.dept_id = d.id WHERE u.id = $1`, [req.params.id]
     );
@@ -395,8 +658,41 @@ app.put('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (req
 
 app.delete('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    await pool.query('UPDATE users SET is_active = FALSE WHERE id = $1', [req.params.id]);
-    res.json({ message: 'User deactivated' });
+    // Check if permanent delete requested
+    if (req.query.permanent === 'true') {
+      const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, username', [req.params.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+      res.json({ message: 'User permanently deleted', user: result.rows[0] });
+    } else {
+      await pool.query('UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
+      res.json({ message: 'User deactivated' });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Reactivate user
+app.patch('/api/users/:id/activate', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE users SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, username, full_name, role',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'User activated', user: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Promote/change user role
+app.patch('/api/users/:id/role', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ error: 'Role is required' });
+    const result = await pool.query(
+      'UPDATE users SET role = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, username, full_name, role',
+      [role, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'Role updated', user: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -408,6 +704,14 @@ app.get('/api/designations', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM designations ORDER BY name');
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/designations/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM designations WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Designation not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -473,11 +777,12 @@ app.get('/api/employees/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/employees', authenticateToken, async (req, res) => {
   try {
-    const { employee_code, full_name, designation_id, dept_id, email, phone, status } = req.body;
+    const { employee_code, full_name, designation_id, dept_id, department_id, email, phone, status } = req.body;
+    const deptValue = dept_id || department_id || null;
     const result = await pool.query(
       `INSERT INTO employees (employee_code, full_name, designation_id, dept_id, email, phone, status) 
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [employee_code, full_name, designation_id, dept_id, email, phone, status || 'active']
+      [employee_code, full_name, designation_id, deptValue, email, phone, status || 'active']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -510,6 +815,14 @@ app.get('/api/fund-clusters', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM fund_clusters ORDER BY code');
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/fund-clusters/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM fund_clusters WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Fund cluster not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -553,6 +866,14 @@ app.get('/api/procurement-modes', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/procurement-modes/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM procurement_modes WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Procurement mode not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/procurement-modes', authenticateToken, async (req, res) => {
   try {
     const { code, name, description } = req.body;
@@ -593,6 +914,14 @@ app.get('/api/uacs-codes', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/uacs-codes/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM uacs_codes WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'UACS code not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/uacs-codes', authenticateToken, async (req, res) => {
   try {
     const { code, category, name, description } = req.body;
@@ -630,6 +959,14 @@ app.get('/api/uoms', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM uoms ORDER BY name');
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/uoms/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM uoms WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'UOM not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -798,28 +1135,60 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
   try {
     // Chief roles can only see their own division's PPMP
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
-    const isChief = chiefRoles.includes(req.user.role);
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const isChief = userRoles.some(r => chiefRoles.includes(r));
     
     let query = `SELECT pp.*, d.name as department_name, d.code as department_code,
               u.username as created_by_name,
-              au.username as approved_by_name
+              au.username as approved_by_name,
+              cu.username as chief_approver_name,
+              hu.username as hope_approver_name
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
        LEFT JOIN users u ON pp.created_by = u.id
-       LEFT JOIN users au ON pp.approved_by = au.id`;
+       LEFT JOIN users au ON pp.approved_by = au.id
+       LEFT JOIN users cu ON pp.approved_by_chief = cu.id
+       LEFT JOIN users hu ON pp.approved_by_hope = hu.id`;
     const params = [];
+    const conditions = [];
     
     // If dept_id filter is passed via query param, use it
     if (req.query.dept_id) {
       params.push(req.query.dept_id);
-      query += ` WHERE pp.dept_id = $${params.length}`;
+      conditions.push(`pp.dept_id = $${params.length}`);
     } else if (isChief && req.user.dept_id) {
       // Chiefs only see their own division
       params.push(req.user.dept_id);
-      query += ` WHERE pp.dept_id = $${params.length}`;
+      conditions.push(`pp.dept_id = $${params.length}`);
+    }
+
+    // Fiscal year filter
+    if (req.query.fiscal_year) {
+      params.push(req.query.fiscal_year);
+      conditions.push(`pp.fiscal_year = $${params.length}`);
+    }
+
+    // Procurement mode filter
+    if (req.query.procurement_mode) {
+      params.push(req.query.procurement_mode);
+      conditions.push(`pp.procurement_mode = $${params.length}`);
+    }
+
+    // Only return PPMP line items (with ppmp_no) unless explicitly requesting all
+    if (req.query.ppmp_only !== 'false') {
+      conditions.push(`pp.ppmp_no IS NOT NULL`);
+    }
+
+    // Exclude soft-deleted unless explicitly requesting them
+    if (req.query.include_deleted !== 'true') {
+      conditions.push(`(pp.is_deleted = false OR pp.is_deleted IS NULL)`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
     }
     
-    query += ` ORDER BY pp.created_at DESC`;
+    query += ` ORDER BY pp.ppmp_no ASC, pp.created_at DESC`;
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -828,7 +1197,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
 app.get('/api/plans/:id', authenticateToken, async (req, res) => {
   try {
     const plan = await pool.query(
-      `SELECT pp.*, d.name as department_name FROM procurementplans pp LEFT JOIN departments d ON pp.dept_id = d.id WHERE pp.id = $1`,
+      `SELECT pp.*, d.name as department_name, d.code as department_code FROM procurementplans pp LEFT JOIN departments d ON pp.dept_id = d.id WHERE pp.id = $1`,
       [req.params.id]
     );
     if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
@@ -841,11 +1210,35 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { dept_id, fiscal_year, status, remarks, total_amount, items } = req.body;
+    const { dept_id, fiscal_year, status, remarks, total_amount, items,
+            ppmp_no, description, project_type, quantity_size, procurement_mode,
+            pre_procurement, start_date, end_date, delivery_period, fund_source } = req.body;
+
+    const deptId = dept_id || req.user.dept_id;
+    const fy = fiscal_year || new Date().getFullYear();
+
+    // Auto-generate PPMP number dynamically if not provided: PPMP-{DEPT}-{YEAR}-{SEQ}
+    let finalPpmpNo = ppmp_no;
+    if (!finalPpmpNo && deptId) {
+      const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
+      const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
+      const prefix = `PPMP-${deptCode}-${fy}-`;
+      const seqResult = await client.query(
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+         FROM procurementplans WHERE ppmp_no LIKE $2`,
+        [prefix, prefix + '%']
+      );
+      const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
+      finalPpmpNo = prefix + nextSeq;
+    }
+
     const planResult = await client.query(
-      `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dept_id || req.user.dept_id, fiscal_year || new Date().getFullYear(), status || 'draft', remarks, total_amount || 0, req.user.id]
+      `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
+        ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+      [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
+       finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
+       pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA']
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -867,11 +1260,18 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { dept_id, fiscal_year, status, remarks, total_amount, items } = req.body;
+    const { dept_id, fiscal_year, status, remarks, total_amount, items,
+            ppmp_no, description, project_type, quantity_size, procurement_mode,
+            pre_procurement, start_date, end_date, delivery_period, fund_source } = req.body;
     const result = await client.query(
-      `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5, updated_at=CURRENT_TIMESTAMP
+      `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
+        ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
+        pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
+        updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
-      [dept_id, fiscal_year, status, remarks, total_amount, req.params.id]
+      [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
+       ppmp_no, description, project_type, quantity_size, procurement_mode,
+       pre_procurement, start_date, end_date, delivery_period, fund_source]
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -891,24 +1291,256 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
 
 app.delete('/api/plans/:id', authenticateToken, async (req, res) => {
   try {
-    await pool.query('DELETE FROM procurementplans WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Plan deleted' });
+    const reason = req.body?.reason || 'Removed by user';
+    // Soft-delete: mark as deleted but keep the record for budget tracking
+    const result = await pool.query(
+      `UPDATE procurementplans SET is_deleted = true, deleted_at = NOW(), deleted_reason = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id, reason]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    const plan = result.rows[0];
+    res.json({ 
+      message: 'Plan removed — budget of ₱' + parseFloat(plan.total_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' is now available for reallocation.',
+      freed_budget: parseFloat(plan.total_amount)
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Restore a soft-deleted plan
+app.put('/api/plans/:id/restore', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE procurementplans SET is_deleted = false, deleted_at = NULL, deleted_reason = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    res.json({ message: 'Plan restored successfully', plan: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Approve a PPMP (dual approval: HOPE + Chief FAD)
+app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const userId = req.user.id;
+    
+    // Only chief_fad and hope can approve
+    if (!userRoles.some(r => ['chief_fad', 'hope', 'admin'].includes(r))) {
+      return res.status(403).json({ error: 'Only HOPE and Chief FAD can approve PPMPs' });
+    }
+    // Determine effective role for approval (prefer chief_fad or hope over admin)
+    const userRole = userRoles.find(r => ['chief_fad', 'hope'].includes(r)) || userRoles.find(r => r === 'admin') || userRoles[0];
+
+    // Get current plan
+    const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
+    if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    
+    const p = plan.rows[0];
+    if (p.status === 'approved') return res.status(400).json({ error: 'PPMP is already fully approved' });
+
+    let updateFields = [];
+    let updateValues = [];
+    let paramIdx = 1;
+
+    if (userRole === 'chief_fad' || (userRole === 'admin')) {
+      if (p.approved_by_chief && userRole !== 'admin') {
+        return res.status(400).json({ error: 'Already approved by Chief FAD' });
+      }
+      updateFields.push(`approved_by_chief = $${paramIdx++}`);
+      updateValues.push(userId);
+      updateFields.push(`chief_approved_at = $${paramIdx++}`);
+      updateValues.push(new Date());
+    }
+
+    if (userRole === 'hope' || (userRole === 'admin')) {
+      if (p.approved_by_hope && userRole !== 'admin') {
+        return res.status(400).json({ error: 'Already approved by HOPE' });
+      }
+      updateFields.push(`approved_by_hope = $${paramIdx++}`);
+      updateValues.push(userId);
+      updateFields.push(`hope_approved_at = $${paramIdx++}`);
+      updateValues.push(new Date());
+    }
+
+    updateFields.push(`updated_at = NOW()`);
+    updateValues.push(req.params.id);
+
+    await pool.query(
+      `UPDATE procurementplans SET ${updateFields.join(', ')} WHERE id = $${paramIdx}`,
+      updateValues
+    );
+
+    // Check if both approvals are now present
+    const updated = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
+    const up = updated.rows[0];
+    
+    if (up.approved_by_chief && up.approved_by_hope) {
+      // Both approved — set status to approved
+      await pool.query(
+        `UPDATE procurementplans SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW() WHERE id = $2`,
+        [userId, req.params.id]
+      );
+      const final = await pool.query(
+        `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name
+         FROM procurementplans pp
+         LEFT JOIN users u1 ON pp.approved_by_chief = u1.id
+         LEFT JOIN users u2 ON pp.approved_by_hope = u2.id
+         WHERE pp.id = $1`, [req.params.id]
+      );
+      return res.json({ message: 'PPMP fully approved! Both HOPE and Chief FAD have approved.', status: 'approved', plan: final.rows[0] });
+    }
+
+    // Only one approval so far
+    const partial = await pool.query(
+      `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name
+       FROM procurementplans pp
+       LEFT JOIN users u1 ON pp.approved_by_chief = u1.id
+       LEFT JOIN users u2 ON pp.approved_by_hope = u2.id
+       WHERE pp.id = $1`, [req.params.id]
+    );
+    const whoApproved = userRole === 'chief_fad' ? 'Chief FAD' : userRole === 'hope' ? 'HOPE' : 'Admin';
+    const whoRemains = up.approved_by_chief ? 'HOPE' : 'Chief FAD';
+    res.json({ message: `Approved by ${whoApproved}. Awaiting approval from ${whoRemains}.`, status: 'pending', plan: partial.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET all plan items across all plans (for the APP page)
+// Returns PPMP entries from procurementplans directly, with codes transformed to APP codes
 app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT pi.*, pp.fiscal_year, pp.status as plan_status, pp.dept_id,
-              d.name as department_name, d.code as department_code
-       FROM plan_items pi
-       JOIN procurementplans pp ON pi.plan_id = pp.id
+      `SELECT pp.id, pp.ppmp_no,
+              REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
+              pp.description as item_name,
+              pp.description as item_description,
+              'lot' as unit,
+              pp.total_amount as unit_price,
+              pp.total_amount as total_price,
+              1 as total_qty,
+              pp.project_type as category,
+              pp.procurement_mode,
+              pp.fund_source,
+              pp.fiscal_year,
+              pp.status as plan_status,
+              pp.dept_id,
+              pp.remarks,
+              pp.start_date, pp.end_date,
+              d.name as department_name,
+              d.code as department_code
+       FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
-       ORDER BY pi.id`
+       WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'
+       ORDER BY pp.id`
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET removed/deleted plan items (for Available Budget tracking)
+app.get('/api/plan-items/removed', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT pp.id, pp.ppmp_no,
+              REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
+              pp.description as item_name,
+              pp.description as item_description,
+              pp.total_amount,
+              pp.project_type as category,
+              pp.procurement_mode,
+              pp.fiscal_year,
+              pp.deleted_at, pp.deleted_reason,
+              pp.dept_id,
+              d.name as department_name,
+              d.code as department_code
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
+       WHERE pp.ppmp_no IS NOT NULL AND pp.is_deleted = true
+       ORDER BY pp.deleted_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET APP budget summary (total allocated, active, available)
+app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
+  try {
+    const fy = req.query.fiscal_year || new Date().getFullYear();
+    const result = await pool.query(
+      `SELECT 
+        COALESCE(SUM(total_amount), 0) as total_budget,
+        COALESCE(SUM(CASE WHEN is_deleted = false OR is_deleted IS NULL THEN total_amount ELSE 0 END), 0) as active_budget,
+        COALESCE(SUM(CASE WHEN is_deleted = true THEN total_amount ELSE 0 END), 0) as available_budget,
+        COUNT(*) FILTER (WHERE is_deleted = false OR is_deleted IS NULL) as active_count,
+        COUNT(*) FILTER (WHERE is_deleted = true) as removed_count
+       FROM procurementplans
+       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+      [fy]
+    );
+    // Department breakdown
+    const deptResult = await pool.query(
+      `SELECT d.code as department_code, d.name as department_name,
+              COALESCE(SUM(pp.total_amount), 0) as total,
+              COALESCE(SUM(CASE WHEN pp.is_deleted = false OR pp.is_deleted IS NULL THEN pp.total_amount ELSE 0 END), 0) as active,
+              COALESCE(SUM(CASE WHEN pp.is_deleted = true THEN pp.total_amount ELSE 0 END), 0) as available,
+              COUNT(*) FILTER (WHERE pp.is_deleted = false OR pp.is_deleted IS NULL) as active_count,
+              COUNT(*) FILTER (WHERE pp.is_deleted = true) as removed_count
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+       GROUP BY d.code, d.name ORDER BY d.code`,
+      [fy]
+    );
+    res.json({ ...result.rows[0], by_department: deptResult.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST consolidate PPMP into APP
+// This just returns summary since APP now reads directly from procurementplans
+app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
+  try {
+    const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    
+    // Get all active (non-deleted) PPMP entries for this fiscal year
+    const result = await pool.query(
+      `SELECT COUNT(*) as item_count, 
+              COALESCE(SUM(pp.total_amount), 0) as total_abc
+       FROM procurementplans pp
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
+      [fiscalYear]
+    );
+
+    // Get total including deleted (original approved budget)
+    const totalResult = await pool.query(
+      `SELECT COALESCE(SUM(total_amount), 0) as total_approved,
+              COALESCE(SUM(CASE WHEN is_deleted = true THEN total_amount ELSE 0 END), 0) as available_budget
+       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+      [fiscalYear]
+    );
+
+    // Get breakdown by department
+    const deptBreakdown = await pool.query(
+      `SELECT d.name as department_name, COUNT(*) as count, 
+              COALESCE(SUM(pp.total_amount), 0) as total
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+       GROUP BY d.name ORDER BY d.name`,
+      [fiscalYear]
+    );
+
+    res.json({
+      message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}.`,
+      created: 0,
+      total_items: parseInt(result.rows[0].item_count),
+      total_abc: parseFloat(result.rows[0].total_abc),
+      total_approved: parseFloat(totalResult.rows[0].total_approved),
+      available_budget: parseFloat(totalResult.rows[0].available_budget),
+      by_department: deptBreakdown.rows
+    });
+  } catch (err) {
+    console.error('Consolidation error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==============================================================================
@@ -961,10 +1593,14 @@ app.put('/api/app-settings/:year', authenticateToken, async (req, res) => {
 app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT pr.*, d.name as department_name, u.username as requested_by_name
+      `SELECT pr.*, d.name as department_name, d.code as department_code, u.username as requested_by_name,
+              pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
+              pri.item_name as first_item_name, pri.item_description as first_item_description,
+              (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
+       LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
        ORDER BY pr.created_at DESC`
     );
     res.json(result.rows);
@@ -974,7 +1610,7 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
 app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     const pr = await pool.query(
-      `SELECT pr.*, d.name as department_name FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id WHERE pr.id = $1`,
+      `SELECT pr.*, d.name as department_name, d.code as department_code FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id WHERE pr.id = $1`,
       [req.params.id]
     );
     if (pr.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
@@ -988,10 +1624,28 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { pr_number, purpose, total_amount, dept_id, status, items } = req.body;
+    const deptId = dept_id || req.user.dept_id;
+    const fy = new Date().getFullYear();
+
+    // Auto-generate PR number dynamically: PR-{DEPT}-{YEAR}-{SEQ}
+    let finalPrNumber = pr_number;
+    if (!finalPrNumber || !finalPrNumber.includes('-')) {
+      const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
+      const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
+      const prefix = `PR-${deptCode}-${fy}-`;
+      const seqResult = await client.query(
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(pr_number FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+         FROM purchaserequests WHERE pr_number LIKE $2`,
+        [prefix, prefix + '%']
+      );
+      const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
+      finalPrNumber = prefix + nextSeq;
+    }
+
     const prResult = await client.query(
       `INSERT INTO purchaserequests (pr_number, purpose, total_amount, dept_id, status, requested_by) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [pr_number, purpose, total_amount || 0, dept_id || req.user.dept_id, status || 'pending', req.user.id]
+      [finalPrNumber, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id]
     );
     const pr = prResult.rows[0];
     if (items && items.length > 0) {
@@ -1004,6 +1658,19 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    
+    // Notify approvers about new PR
+    broadcastNotification({
+      type: 'approval',
+      icon: 'fas fa-file-signature',
+      title: `${pr_number} Pending Approval`,
+      message: `${purpose || 'New purchase request'} requires your approval`,
+      reference_type: 'purchase_request',
+      reference_id: pr.id,
+      reference_code: pr_number,
+      roles: ['admin', 'manager', 'division_head', 'hope']
+    });
+    
     res.status(201).json(pr);
   } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
   finally { client.release(); }
@@ -1014,11 +1681,21 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { pr_number, purpose, total_amount, dept_id, status, items } = req.body;
-    const result = await client.query(
-      `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$6 RETURNING *`,
-      [pr_number, purpose, total_amount, dept_id, status, req.params.id]
-    );
+    // Only update dept_id if explicitly provided, otherwise preserve existing value
+    let result;
+    if (dept_id !== undefined && dept_id !== null) {
+      result = await client.query(
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$6 RETURNING *`,
+        [pr_number, purpose, total_amount, dept_id, status, req.params.id]
+      );
+    } else {
+      result = await client.query(
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, status=$4, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$5 RETURNING *`,
+        [pr_number, purpose, total_amount, status, req.params.id]
+      );
+    }
     if (items) {
       await client.query('DELETE FROM pr_items WHERE pr_id = $1', [req.params.id]);
       for (const item of items) {
@@ -1042,7 +1719,22 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
        WHERE id=$2 RETURNING *`,
       [req.user.id, req.params.id]
     );
-    res.json(result.rows[0]);
+    const pr = result.rows[0];
+    
+    // Notify the requester that their PR was approved
+    if (pr && pr.requested_by) {
+      createNotification(pr.requested_by, {
+        type: 'approval',
+        icon: 'fas fa-check-circle',
+        title: `${pr.pr_number} Approved`,
+        message: 'Your purchase request has been approved',
+        reference_type: 'purchase_request',
+        reference_id: pr.id,
+        reference_code: pr.pr_number
+      });
+    }
+    
+    res.json(pr);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1050,6 +1742,15 @@ app.delete('/api/purchase-requests/:id', authenticateToken, async (req, res) => 
   try {
     await pool.query('DELETE FROM purchaserequests WHERE id = $1', [req.params.id]);
     res.json({ message: 'PR deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/purchase-requests/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE purchaserequests SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1091,7 +1792,7 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
     const rfqResult = await client.query(
       `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'draft', req.user.id]
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id]
     );
     const rfq = rfqResult.rows[0];
     if (items) for (const it of items) {
@@ -1129,6 +1830,15 @@ app.delete('/api/rfqs/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM rfqs WHERE id = $1', [req.params.id]);
     res.json({ message: 'RFQ deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/rfqs/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE rfqs SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'RFQ not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1172,7 +1882,7 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
     const absResult = await client.query(
       `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status||'draft', recommended_supplier_id, recommended_amount||0, req.user.id]
+      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id, recommended_amount||0, req.user.id]
     );
     const abs = absResult.rows[0];
     if (quotations) for (const q of quotations) {
@@ -1212,6 +1922,15 @@ app.delete('/api/abstracts/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE abstracts SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Abstract not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==============================================================================
 // POST-QUALIFICATION (TWG)
 // ==============================================================================
@@ -1239,7 +1958,7 @@ app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO post_qualifications (postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'draft', req.user.id]
+      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1254,6 +1973,23 @@ app.put('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
       [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, req.params.id]
     );
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/post-qualifications/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE post_qualifications SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Post-Qualification not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM post_qualifications WHERE id=$1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Post-Qualification not found' });
+    res.json({ message: 'Post-Qualification deleted successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1278,7 +2014,7 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'draft', req.user.id]
+      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'on_going', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1299,7 +2035,7 @@ app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 app.put('/api/bac-resolutions/:id/approve', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `UPDATE bac_resolutions SET status='approved', approved_by=$1, approved_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
+      `UPDATE bac_resolutions SET status='completed', approved_by=$1, approved_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
       [req.user.id, req.params.id]
     );
     res.json(result.rows[0]);
@@ -1310,6 +2046,15 @@ app.delete('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM bac_resolutions WHERE id = $1', [req.params.id]);
     res.json({ message: 'BAC Resolution deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/bac-resolutions/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE bac_resolutions SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1349,6 +2094,23 @@ app.put('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
       [noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, bidder_receipt_date, status, req.params.id]
     );
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/notices-of-award/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE notices_of_award SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM notices_of_award WHERE id=$1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
+    res.json({ message: 'NOA deleted successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1397,7 +2159,7 @@ app.post('/api/purchase-orders', authenticateToken, async (req, res) => {
        status, workflow_status, expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [po_number, pr_id, noa_id, supplier_id, total_amount||0, payment_terms, delivery_address,
-       status||'pending', workflow_status||'pending', expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, req.user.id]
+       status||'for_signing', workflow_status||'pending', expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, req.user.id]
     );
     const po = poResult.rows[0];
     if (items && items.length > 0) {
@@ -1410,6 +2172,19 @@ app.post('/api/purchase-orders', authenticateToken, async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    
+    // Notify about new PO
+    broadcastNotification({
+      type: 'delivery',
+      icon: 'fas fa-receipt',
+      title: `${po_number} Created`,
+      message: `New Purchase Order issued – ${purpose || 'awaiting processing'}`,
+      reference_type: 'purchase_order',
+      reference_id: po.id,
+      reference_code: po_number,
+      roles: ['admin', 'supply_officer', 'inspector']
+    });
+    
     res.status(201).json(po);
   } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
   finally { client.release(); }
@@ -1468,6 +2243,15 @@ app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/purchase-orders/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await pool.query('UPDATE purchaseorders SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PO not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==============================================================================
 // IAR (Inspection and Acceptance Report) - FULL INVENTORY INTEGRATION
 // ==============================================================================
@@ -1491,9 +2275,13 @@ app.get('/api/iars', authenticateToken, async (req, res) => {
 app.get('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     const iar = await pool.query(
-      `SELECT iar.*, po.po_number, s.name as supplier_name
+      `SELECT iar.*, po.po_number, po.po_date, s.name as supplier_name,
+              u1.username as inspected_by_name, u2.username as received_by_name
        FROM iars iar LEFT JOIN purchaseorders po ON iar.po_id = po.id
-       LEFT JOIN suppliers s ON po.supplier_id = s.id WHERE iar.id = $1`, [req.params.id]
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN users u1 ON iar.inspected_by = u1.id
+       LEFT JOIN users u2 ON iar.received_by = u2.id
+       WHERE iar.id = $1`, [req.params.id]
     );
     if (iar.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
     const items = await pool.query(
@@ -1510,13 +2298,13 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, status, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, items } = req.body;
     const iarResult = await client.query(
       `INSERT INTO iars (iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result, findings, purpose, status, created_by)
+       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result||'pending', findings, purpose, status||'draft', req.user.id]
+       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id]
     );
     const iar = iarResult.rows[0];
     if (items && items.length > 0) {
@@ -1530,6 +2318,19 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    
+    // Notify about new IAR
+    broadcastNotification({
+      type: 'submission',
+      icon: 'fas fa-clipboard-check',
+      title: `${iar_number} Created`,
+      message: `Inspection & Acceptance Report filed – ${inspection_result || 'pending inspection'}`,
+      reference_type: 'iar',
+      reference_id: iar.id,
+      reference_code: iar_number,
+      roles: ['admin', 'supply_officer', 'inspector', 'manager']
+    });
+    
     res.status(201).json(iar);
   } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
   finally { client.release(); }
@@ -1540,11 +2341,11 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, status, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, items } = req.body;
     const result = await client.query(
       `UPDATE iars SET iar_number=$1, po_id=$2, inspection_date=$3, delivery_date=$4, invoice_number=$5, invoice_date=$6,
-       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, status=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$12 RETURNING *`,
-      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, status, req.params.id]
+       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$12 RETURNING *`,
+      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, req.params.id]
     );
     if (items) {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);
@@ -1709,7 +2510,7 @@ app.put('/api/iars/:id/accept', authenticateToken, async (req, res) => {
     }
 
     // Update IAR status
-    await client.query("UPDATE iars SET status='completed', inspection_result='accepted', inspected_by=$1, date_inspected=CURRENT_DATE, received_by=$1, date_received=CURRENT_DATE, updated_at=CURRENT_TIMESTAMP WHERE id=$2",
+    await client.query("UPDATE iars SET acceptance='complete', inspection_result='verified', inspected_by=$1, date_inspected=CURRENT_DATE, received_by=$1, date_received=CURRENT_DATE, updated_at=CURRENT_TIMESTAMP WHERE id=$2",
       [req.user.id, iarId]
     );
 
@@ -1730,6 +2531,21 @@ app.put('/api/iars/:id/accept', authenticateToken, async (req, res) => {
     console.error('IAR accept error:', err);
     res.status(500).json({ error: err.message });
   } finally { client.release(); }
+});
+
+// Set IAR inspection_result and acceptance status
+app.put('/api/iars/:id/set-status', authenticateToken, async (req, res) => {
+  try {
+    const { inspection_result, acceptance } = req.body;
+    // Enforce: if inspection is on_going, acceptance must be to_be_checked
+    const finalAcceptance = inspection_result === 'on_going' ? 'to_be_checked' : (acceptance || 'to_be_checked');
+    const result = await pool.query(
+      `UPDATE iars SET inspection_result=$1, acceptance=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3 RETURNING *`,
+      [inspection_result, finalAcceptance, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Unpost IAR - Reverse inventory changes
@@ -1764,9 +2580,9 @@ app.put('/api/iars/:id/unpost', authenticateToken, async (req, res) => {
       }
     }
 
-    await client.query("UPDATE iars SET status='draft', inspection_result='pending', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [iarId]);
+    await client.query("UPDATE iars SET acceptance='to_be_checked', inspection_result='to_be_checked', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [iarId]);
     if (iar.po_id) {
-      await client.query("UPDATE purchaseorders SET status='delivered', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [iar.po_id]);
+      await client.query("UPDATE purchaseorders SET status='for_signing', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [iar.po_id]);
     }
 
     await client.query('COMMIT');
@@ -2585,6 +3401,79 @@ app.delete('/api/trip-tickets/:id', authenticateToken, async (req, res) => {
 // PO PACKETS
 // ==============================================================================
 
+// Document Monitoring - comprehensive view of all POs with their document chain
+app.get('/api/po-packets/monitoring', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        pr.id as pr_id, 
+        pr.pr_number, pr.status as pr_status,
+        pr.purpose, pr.total_amount as pr_amount, pr.created_at as pr_created_at,
+        pr_req.full_name as pr_requested_by_name, pr_app.full_name as pr_approved_by_name,
+        d.name as division_name, d.code as division_code,
+        -- RFQ info
+        rfq.id as rfq_id, rfq.rfq_number, rfq.status as rfq_status,
+        rfq_u.full_name as rfq_created_by_name,
+        -- Abstract info
+        ab.id as abstract_id, ab.abstract_number, ab.status as abstract_status,
+        ab_u.full_name as abstract_created_by_name,
+        -- BAC Resolution info
+        br.id as bac_res_id, br.resolution_number, br.status as bac_res_status,
+        br_app.full_name as bac_res_approved_by_name,
+        -- Post-Qualification info
+        pq.id as postqual_id, pq.postqual_number, pq.status as postqual_status,
+        pq_u.full_name as postqual_created_by_name,
+        -- NOA info
+        noa.id as noa_id, noa.noa_number, noa.status as noa_status,
+        noa_u.full_name as noa_created_by_name,
+        -- PO info
+        po.id as po_id, po.po_number, po.total_amount, po.status as po_status,
+        po.po_date, po.created_at as po_created_at,
+        s.name as supplier_name,
+        po_creator.full_name as po_created_by_name,
+        po_approver.full_name as po_approved_by_name,
+        -- IAR info
+        iar.id as iar_id, iar.iar_number, iar.acceptance as iar_status,
+        iar_insp.full_name as iar_inspected_by_name,
+        iar_recv.full_name as iar_received_by_name,
+        -- PO Packet info
+        pp.id as packet_id, pp.status as packet_status,
+        pp.compiled_at, pp.chief_signed_at, pp.director_signed_at,
+        pp_chief.full_name as chief_signed_by_name,
+        pp_dir.full_name as director_signed_by_name
+      FROM purchaserequests pr
+      LEFT JOIN departments d ON pr.dept_id = d.id
+      LEFT JOIN users pr_req ON pr.requested_by = pr_req.id
+      LEFT JOIN users pr_app ON pr.approved_by = pr_app.id
+      LEFT JOIN rfqs rfq ON rfq.pr_id = pr.id
+      LEFT JOIN users rfq_u ON rfq.created_by = rfq_u.id
+      LEFT JOIN abstracts ab ON ab.rfq_id = rfq.id
+      LEFT JOIN users ab_u ON ab.created_by = ab_u.id
+      LEFT JOIN bac_resolutions br ON br.abstract_id = ab.id
+      LEFT JOIN users br_app ON br.approved_by = br_app.id
+      LEFT JOIN post_qualifications pq ON pq.abstract_id = ab.id
+      LEFT JOIN users pq_u ON pq.created_by = pq_u.id
+      LEFT JOIN notices_of_award noa ON noa.bac_resolution_id = br.id
+      LEFT JOIN users noa_u ON noa.created_by = noa_u.id
+      LEFT JOIN purchaseorders po ON po.pr_id = pr.id
+      LEFT JOIN suppliers s ON po.supplier_id = s.id
+      LEFT JOIN users po_creator ON po.created_by = po_creator.id
+      LEFT JOIN users po_approver ON po.approved_by = po_approver.id
+      LEFT JOIN iars iar ON iar.po_id = po.id
+      LEFT JOIN users iar_insp ON iar.inspected_by = iar_insp.id
+      LEFT JOIN users iar_recv ON iar.received_by = iar_recv.id
+      LEFT JOIN po_packets pp ON pp.po_id = po.id
+      LEFT JOIN users pp_chief ON pp.chief_signed_by = pp_chief.id
+      LEFT JOIN users pp_dir ON pp.director_signed_by = pp_dir.id
+      ORDER BY pr.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { 
+    console.error('PO Packet monitoring error:', err);
+    res.status(500).json({ error: err.message }); 
+  }
+});
+
 app.get('/api/po-packets', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -2617,6 +3506,42 @@ app.put('/api/po-packets/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Chief Sign endpoint
+app.put('/api/po-packets/:id/chief-sign', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE po_packets SET chief_signed_at=CURRENT_TIMESTAMP, chief_signed_by=$1,
+       status = CASE WHEN director_signed_at IS NOT NULL THEN 'signed' ELSE 'for_signing' END,
+       updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
+      [req.user.id, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PO Packet not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Director Sign endpoint
+app.put('/api/po-packets/:id/director-sign', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE po_packets SET director_signed_at=CURRENT_TIMESTAMP, director_signed_by=$1,
+       status = CASE WHEN chief_signed_at IS NOT NULL THEN 'signed' ELSE 'for_signing' END,
+       updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
+      [req.user.id, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PO Packet not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/po-packets/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM po_packets WHERE id=$1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PO Packet not found' });
+    res.json({ message: 'PO Packet deleted successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==============================================================================
 // COA SUBMISSIONS
 // ==============================================================================
@@ -2645,6 +3570,14 @@ app.post('/api/coa-submissions', authenticateToken, async (req, res) => {
       await pool.query("UPDATE purchaseorders SET workflow_status='submitted_to_coa', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [po_id]);
     }
     res.status(201).json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/coa-submissions/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM coa_submissions WHERE id=$1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'COA Submission not found' });
+    res.json({ message: 'COA Submission deleted successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2826,6 +3759,304 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==============================================================================
+// ==============================================================================
+// FILE ATTACHMENT ENDPOINTS
+// ==============================================================================
+
+// Upload files and link to an entity (POST /api/attachments/upload)
+// multipart form fields: entity_type, entity_id, description (optional), files[]
+app.post('/api/attachments/upload', upload.array('files', 10), async (req, res) => {
+  try {
+    const { entity_type, entity_id, description } = req.body;
+    if (!entity_type || !entity_id) {
+      return res.status(400).json({ error: 'entity_type and entity_id are required' });
+    }
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const results = [];
+    for (const file of req.files) {
+      // Compute SHA256 checksum
+      const fileBuffer = fs.readFileSync(file.path);
+      const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+      // Insert into attachments table
+      const attResult = await pool.query(
+        `INSERT INTO attachments (original_name, stored_name, mime_type, file_size_bytes, storage_path, checksum_sha256)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [file.originalname, file.filename, file.mimetype, file.size, file.path, checksum]
+      );
+      const attachment = attResult.rows[0];
+
+      // Link to entity
+      await pool.query(
+        `INSERT INTO entity_attachments (entity_type, entity_id, attachment_id, description)
+         VALUES ($1, $2, $3, $4)`,
+        [entity_type, parseInt(entity_id), attachment.id, description || file.originalname]
+      );
+
+      results.push(attachment);
+    }
+
+    res.json({ message: `${results.length} file(s) uploaded successfully`, attachments: results });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Download a specific attachment (GET /api/attachments/download/:id)
+// MUST be defined BEFORE the :entity_type/:entity_id wildcard route
+app.get('/api/attachments/download/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
+    const att = result.rows[0];
+    if (!fs.existsSync(att.storage_path)) return res.status(404).json({ error: 'File not found on disk' });
+    res.setHeader('Content-Disposition', `attachment; filename="${att.original_name}"`);
+    res.setHeader('Content-Type', att.mime_type);
+    res.sendFile(path.resolve(att.storage_path));
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// View/preview a specific attachment inline (GET /api/attachments/view/:id or /api/attachments/view/:id/filename.ext)
+// MUST be defined BEFORE the :entity_type/:entity_id wildcard route
+app.get(/^\/api\/attachments\/view\/(\d+)(?:\/.*)?$/, async (req, res) => {
+  req.params = { id: req.params[0] };
+  try {
+    const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
+    const att = result.rows[0];
+    if (!fs.existsSync(att.storage_path)) return res.status(404).json({ error: 'File not found on disk' });
+    res.setHeader('Content-Disposition', `inline; filename="${att.original_name}"`);
+    res.setHeader('Content-Type', att.mime_type);
+    res.sendFile(path.resolve(att.storage_path));
+  } catch (err) {
+    console.error('View error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Merge multiple attachments into a single PDF (POST /api/attachments/merge-download)
+app.post('/api/attachments/merge-download', async (req, res) => {
+  try {
+    const { attachmentIds } = req.body;
+    if (!attachmentIds || !attachmentIds.length) return res.status(400).json({ error: 'No attachment IDs provided' });
+
+    const result = await pool.query('SELECT * FROM attachments WHERE id = ANY($1) ORDER BY id', [attachmentIds]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No attachments found' });
+
+    const mergedPdf = await PDFDocument.create();
+
+    for (const att of result.rows) {
+      if (!fs.existsSync(att.storage_path)) continue;
+      const fileBytes = fs.readFileSync(att.storage_path);
+
+      if (att.mime_type === 'application/pdf') {
+        // Merge PDF pages
+        try {
+          const srcPdf = await PDFDocument.load(fileBytes, { ignoreEncryption: true });
+          const pages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+          pages.forEach(p => mergedPdf.addPage(p));
+        } catch (pdfErr) {
+          console.error(`Skipping corrupted PDF ${att.original_name}:`, pdfErr.message);
+        }
+      } else if (att.mime_type && att.mime_type.startsWith('image/')) {
+        // Embed image as a full page
+        try {
+          let img;
+          if (att.mime_type === 'image/png') {
+            img = await mergedPdf.embedPng(fileBytes);
+          } else {
+            img = await mergedPdf.embedJpg(fileBytes);
+          }
+          const page = mergedPdf.addPage([img.width, img.height]);
+          page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+        } catch (imgErr) {
+          console.error(`Skipping image ${att.original_name}:`, imgErr.message);
+        }
+      }
+      // Non-PDF/image files are skipped (Word, Excel cannot be merged into PDF server-side)
+    }
+
+    if (mergedPdf.getPageCount() === 0) {
+      return res.status(400).json({ error: 'No PDF or image files could be merged' });
+    }
+
+    const mergedBytes = await mergedPdf.save();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="PO_Packet_Merged.pdf"');
+    res.send(Buffer.from(mergedBytes));
+  } catch (err) {
+    console.error('Merge download error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all attachments for an entity (GET /api/attachments/:entity_type/:entity_id)
+app.get('/api/attachments/:entity_type/:entity_id', async (req, res) => {
+  try {
+    const { entity_type, entity_id } = req.params;
+    const result = await pool.query(
+      `SELECT a.*, ea.description, ea.is_required, ea.id as link_id
+       FROM entity_attachments ea
+       JOIN attachments a ON a.id = ea.attachment_id
+       WHERE ea.entity_type = $1 AND ea.entity_id = $2
+       ORDER BY a.created_at DESC`,
+      [entity_type, parseInt(entity_id)]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get attachments error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete attachment (DELETE /api/attachments/:id)
+app.delete('/api/attachments/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
+    const att = result.rows[0];
+
+    // Delete from DB (cascades to entity_attachments)
+    await pool.query('DELETE FROM attachments WHERE id = $1', [att.id]);
+
+    // Delete file from disk
+    if (fs.existsSync(att.storage_path)) fs.unlinkSync(att.storage_path);
+
+    res.json({ message: 'Attachment deleted successfully' });
+  } catch (err) {
+    console.error('Delete attachment error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
+// NOTIFICATIONS API
+// ==============================================================================
+
+// Helper: create a notification (used internally by other endpoints too)
+async function createNotification(userId, { type = 'info', icon = 'fas fa-bell', title, message, reference_type, reference_id, reference_code }) {
+  try {
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, icon, title, message, reference_type, reference_id, reference_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [userId, type, icon, title, message || '', reference_type || null, reference_id || null, reference_code || null]
+    );
+  } catch (err) {
+    console.error('Create notification error:', err);
+  }
+}
+
+// Broadcast notification to all users (or users with specific roles)
+async function broadcastNotification({ type, icon, title, message, reference_type, reference_id, reference_code, roles }) {
+  try {
+    let users;
+    if (roles && roles.length > 0) {
+      users = await pool.query('SELECT id FROM users WHERE role = ANY($1) AND is_active != false', [roles]);
+    } else {
+      users = await pool.query('SELECT id FROM users WHERE is_active != false');
+    }
+    for (const u of users.rows) {
+      await createNotification(u.id, { type, icon, title, message, reference_type, reference_id, reference_code });
+    }
+  } catch (err) {
+    console.error('Broadcast notification error:', err);
+  }
+}
+
+// GET /api/notifications — get notifications for current user
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const unreadOnly = req.query.unread === 'true';
+    let query = 'SELECT * FROM notifications WHERE user_id = $1';
+    const params = [req.user.id];
+    if (unreadOnly) {
+      query += ' AND is_read = false';
+    }
+    query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
+    params.push(limit);
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get notifications error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/count — get unread count
+app.get('/api/notifications/count', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false',
+      [req.user.id]
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (err) {
+    console.error('Notification count error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/notifications/:id/read — mark single notification as read
+app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    res.json({ message: 'Notification marked as read' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/notifications/read-all — mark all as read for current user
+app.put('/api/notifications/read-all', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
+      [req.user.id]
+    );
+    res.json({ message: 'All notifications marked as read', count: result.rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/notifications/:id — delete a notification
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    res.json({ message: 'Notification deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/notifications — clear all notifications for current user
+app.delete('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM notifications WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ message: 'All notifications cleared', count: result.rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
 // SERVER START
 // ==============================================================================
 
@@ -2882,6 +4113,7 @@ app.listen(PORT, HOST, () => {
   console.log('  Settings:      CRUD /api/settings');
   console.log('  Reports:       GET /api/reports/*');
   console.log('  Audit Log:     GET /api/audit-log');
+  console.log('  Notifications: CRUD /api/notifications');
   console.log('  Health:        GET /api/health');
   console.log('========================================');
 });

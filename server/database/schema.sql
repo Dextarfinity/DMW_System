@@ -270,6 +270,28 @@ CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 
 -- ============================================================
+-- NOTIFICATIONS TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(30) NOT NULL DEFAULT 'info',
+    -- Types: approval, delivery, deadline, submission, reminder, system
+    icon VARCHAR(50) DEFAULT 'fas fa-bell',
+    title VARCHAR(200) NOT NULL,
+    message TEXT,
+    reference_type VARCHAR(50),
+    reference_id INT,
+    reference_code VARCHAR(50),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
+
+-- ============================================================
 -- GRANT PERMISSIONS TO APP USER
 -- ============================================================
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO dmw_app;

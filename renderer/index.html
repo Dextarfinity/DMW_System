@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:3000 http://192.168.100.235:3000;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DMW Caraga - Procurement System</title>
   <link rel="stylesheet" href="styles/main.css">
@@ -12,12 +13,15 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="logo">
-          <i class="fas fa-landmark"></i>
-          <span>DMW Caraga</span>
+        <div class="sidebar-gov-accent"></div>
+        <div class="sidebar-brand">
+          <img src="assets/dmw-logo.png" alt="DMW" class="sidebar-logo-img">
+          <div class="sidebar-brand-text">
+            <span class="sidebar-brand-name">DMW CARAGA</span>
+            <span class="sidebar-brand-sub">Procurement &amp; Inventory</span>
+            <span class="sidebar-brand-region">Regional Office XIII</span>
+          </div>
         </div>
-        <h2>Procurement System</h2>
-        <p class="region-label">Region XIII</p>
       </div>
       
       <nav class="sidebar-nav">
@@ -50,13 +54,13 @@
             <i class="fas fa-table"></i>
             <span>Abstract</span>
           </li>
-          <li class="nav-item" data-page="post-qual" data-section-item="transactions">
-            <i class="fas fa-check-circle"></i>
-            <span>Post-Qualification</span>
-          </li>
           <li class="nav-item" data-page="bac-resolution" data-section-item="transactions">
             <i class="fas fa-gavel"></i>
             <span>BAC Resolution</span>
+          </li>
+          <li class="nav-item" data-page="post-qual" data-section-item="transactions">
+            <i class="fas fa-check-circle"></i>
+            <span>Post-Qualification</span>
           </li>
           <li class="nav-item" data-page="noa" data-section-item="transactions">
             <i class="fas fa-award"></i>
@@ -76,7 +80,7 @@
           <li class="nav-section" data-section="signing">Signing & Submission</li>
           <li class="nav-item" data-page="po-packet" data-section-item="signing">
             <i class="fas fa-folder-open"></i>
-            <span>PO Packet</span>
+            <span>Document Monitoring</span>
           </li>
           <li class="nav-item" data-page="coa" data-section-item="signing">
             <i class="fas fa-file-export"></i>
@@ -188,18 +192,27 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-info">
-          <div class="user-avatar">
-            <i class="fas fa-user-circle"></i>
-          </div>
+        <div class="user-account-toggle" id="userAccountToggle" onclick="document.getElementById('userAccountDropdown').classList.toggle('open'); this.classList.toggle('open')">
+          <div class="user-avatar-initials" id="userAvatarInitials">AU</div>
           <div class="user-details">
             <span class="user-name" id="userName">Admin User</span>
             <span class="user-role" id="userRole">Administrator</span>
           </div>
+          <i class="fas fa-chevron-up user-toggle-icon"></i>
+        </div>
+        <div class="user-account-dropdown" id="userAccountDropdown">
+          <button class="account-action-btn" onclick="window.showChangePasswordModal()">
+            <i class="fas fa-key"></i>
+            <span>Change Password</span>
+          </button>
+          <button class="account-action-btn" onclick="window.showAccountInfoModal()">
+            <i class="fas fa-id-card"></i>
+            <span>Account Info</span>
+          </button>
         </div>
         <button class="logout-btn" id="logoutBtn">
           <i class="fas fa-sign-out-alt"></i>
-          <span>Logout</span>
+          <span>LOGOUT</span>
         </button>
       </div>
     </aside>
@@ -215,9 +228,32 @@
           <h1 id="pageTitle">Dashboard</h1>
         </div>
         <div class="header-actions">
-          <div class="notification-bell" onclick="showNotificationPanel()">
+          <div class="notification-bell" id="notificationBell" onclick="window.toggleNotificationPanel()">
             <i class="fas fa-bell"></i>
-            <span class="notification-count">5</span>
+            <span class="notification-count" id="notificationCount" style="display:none;">0</span>
+          </div>
+          <!-- Notification Dropdown Panel -->
+          <div class="notification-panel" id="notificationPanel">
+            <div class="notification-panel-header">
+              <span class="notification-panel-title">Notifications</span>
+              <div class="notification-panel-actions">
+                <button class="notif-action-btn" onclick="window.markAllNotificationsRead()" title="Mark all as read">
+                  <i class="fas fa-check-double"></i>
+                </button>
+                <button class="notif-action-btn" onclick="window.clearAllNotifications()" title="Clear all">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+            <div class="notification-panel-body" id="notificationList">
+              <div class="notification-empty">
+                <i class="fas fa-bell-slash"></i>
+                <p>No notifications</p>
+              </div>
+            </div>
+            <div class="notification-panel-footer">
+              <span class="notif-footer-text" id="notifFooterText">No new notifications</span>
+            </div>
           </div>
           <div class="current-date">
             <i class="fas fa-calendar-alt"></i>
@@ -233,252 +269,251 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Procurement Management Dashboard</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
-          <!-- Procurement Stats -->
+          <!-- Admin/ORD Only: Stats, Pipeline, SLA -->
+          <div id="dashAdminOnlyStats">
+
+          <!-- Procurement Stats Row 1 -->
           <div class="dashboard-stats">
-            <div class="stat-card">
+            <div class="stat-card" onclick="navigateTo('ppmp')" style="cursor:pointer">
               <div class="stat-icon bg-primary">
                 <i class="fas fa-clipboard-list"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statTotalPlans">0</h3>
-                <p>PPMP Plans</p>
+                <h3 id="statTotalPPMP">--</h3>
+                <p>PPMP Items</p>
               </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="navigateTo('purchase-requests')" style="cursor:pointer">
               <div class="stat-icon bg-info">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <div class="stat-info">
+                <h3 id="statTotalPRs">--</h3>
+                <p>Purchase Requests</p>
+              </div>
+            </div>
+            <div class="stat-card" onclick="navigateTo('purchase-orders')" style="cursor:pointer">
+              <div class="stat-icon bg-success">
                 <i class="fas fa-shopping-cart"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statTotalPOs">0</h3>
+                <h3 id="statTotalPOs">--</h3>
                 <p>Purchase Orders</p>
               </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="navigateTo('suppliers')" style="cursor:pointer">
               <div class="stat-icon bg-warning">
-                <i class="fas fa-truck"></i>
+                <i class="fas fa-building"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statPendingIARs">0</h3>
-                <p>Pending IARs</p>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon bg-success">
-                <i class="fas fa-users"></i>
-              </div>
-              <div class="stat-info">
-                <h3 id="statTotalSuppliers">0</h3>
-                <p>Suppliers</p>
+                <h3 id="statTotalSuppliers">--</h3>
+                <p>Active Suppliers</p>
               </div>
             </div>
           </div>
 
-          <!-- Inventory Stats -->
+          <!-- Inventory Stats Row 2 -->
           <div class="dashboard-stats">
-            <div class="stat-card">
-              <div class="stat-icon bg-info">
-                <i class="fas fa-boxes"></i>
+            <div class="stat-card" onclick="navigateTo('items')" style="cursor:pointer">
+              <div class="stat-icon bg-primary">
+                <i class="fas fa-box"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statTotalItems">0</h3>
-                <p>Total Items</p>
+                <h3 id="statTotalItems">--</h3>
+                <p>Inventory Items</p>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-icon bg-danger">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i class="fas fa-exclamation-circle"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statLowStock">0</h3>
-                <p>Low Stock</p>
+                <h3 id="statLowStock">--</h3>
+                <p>Low Stock / Out of Stock</p>
               </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon bg-success">
-                <i class="fas fa-id-card"></i>
+            <div class="stat-card" onclick="navigateTo('iar')" style="cursor:pointer">
+              <div class="stat-icon bg-warning">
+                <i class="fas fa-clipboard-check"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statPropertyCards">0</h3>
-                <p>Property Cards</p>
+                <h3 id="statPendingIARs">--</h3>
+                <p>Pending IARs</p>
               </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon bg-primary">
-                <i class="fas fa-exchange-alt"></i>
+            <div class="stat-card" onclick="navigateTo('employees')" style="cursor:pointer">
+              <div class="stat-icon bg-info">
+                <i class="fas fa-user-tie"></i>
               </div>
               <div class="stat-info">
-                <h3 id="statICS">0</h3>
-                <p>ICS Issued</p>
+                <h3 id="statTotalEmployees">--</h3>
+                <p>Active Employees</p>
               </div>
             </div>
           </div>
 
-          <!-- Transaction Pipeline -->
+          <!-- Transaction Pipeline (dynamic) -->
           <div class="workflow-overview">
             <h3><i class="fas fa-stream"></i> Transaction Pipeline</h3>
-            <div class="workflow-pipeline">
-              <div class="pipeline-stage">
-                <div class="stage-count">3</div>
-                <div class="stage-label">PR</div>
-              </div>
+            <div class="workflow-pipeline" id="dashboardPipeline">
+              <div class="pipeline-stage"><div class="stage-count" id="pipelinePR">--</div><div class="stage-label">PR</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">2</div>
-                <div class="stage-label">RFQ</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineRFQ">--</div><div class="stage-label">RFQ</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">AOQ</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineAOQ">--</div><div class="stage-label">Abstract</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">TWG</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineBAC">--</div><div class="stage-label">BAC Res</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">2</div>
-                <div class="stage-label">BAC</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineTWG">--</div><div class="stage-label">Post-Qual</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">2</div>
-                <div class="stage-label">NOA</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineNOA">--</div><div class="stage-label">NOA</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">PO</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelinePO">--</div><div class="stage-label">PO</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage warning">
-                <div class="stage-count">2</div>
-                <div class="stage-label">Awaiting</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelineIAR">--</div><div class="stage-label">IAR</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage warning">
-                <div class="stage-count">1</div>
-                <div class="stage-label">For Payment</div>
-              </div>
+              <div class="pipeline-stage"><div class="stage-count" id="pipelinePOPacket">--</div><div class="stage-label">Packet</div></div>
               <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage">
-                <div class="stage-count">1</div>
-                <div class="stage-label">For Signing</div>
-              </div>
-              <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
-              <div class="pipeline-stage completed">
-                <div class="stage-count">5</div>
-                <div class="stage-label">COA</div>
-              </div>
+              <div class="pipeline-stage completed"><div class="stage-count" id="pipelineCOA">--</div><div class="stage-label">COA</div></div>
             </div>
           </div>
 
           <!-- SLA Targets -->
           <div class="info-banner kpi-banner" style="margin-bottom: 16px;">
             <i class="fas fa-clock"></i>
-            <strong>SLA Targets:</strong> PR Approval 5d &nbsp;|&nbsp; RFQ 3d &nbsp;|&nbsp; Abstract 1d &nbsp;|&nbsp; NOA 1d &nbsp;|&nbsp; PO Approval 1d &nbsp;|&nbsp; Supplier Sign 7d &nbsp;|&nbsp; COA 5d
+            <strong>SLA Targets:</strong> PR Approval 5d &nbsp;|&nbsp; RFQ 3d &nbsp;|&nbsp; Abstract 1d &nbsp;|&nbsp; BAC Res 2d &nbsp;|&nbsp; Post-Qual 3d &nbsp;|&nbsp; NOA 1d &nbsp;|&nbsp; PO Approval 1d &nbsp;|&nbsp; Supplier Sign 7d &nbsp;|&nbsp; COA 5d
           </div>
 
-          <div class="dashboard-grid">
-            <!-- Recent Procurement Cases -->
-            <div class="dashboard-card">
-              <div class="card-header">
-                <h3>Active Cases</h3>
-                <button class="btn btn-sm btn-secondary" onclick="navigateTo('pr')">View All</button>
-              </div>
-              <div class="card-body">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Case No.</th>
-                      <th>Project</th>
-                      <th>Division</th>
-                      <th>Workflow</th>
-                      <th>Timeline</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>PR-2026-001</td>
-                      <td>Security Services Q1</td>
-                      <td>FAD</td>
-                      <td><span class="status-badge paid-ada">Paid (ADA)</span></td>
-                      <td><span class="timeline-badge on-track">On Track</span></td>
-                    </tr>
-                    <tr>
-                      <td>PR-2026-002</td>
-                      <td>Office Supplies Q1</td>
-                      <td>FAD</td>
-                      <td><span class="status-badge awaiting-delivery">Awaiting Delivery</span></td>
-                      <td><span class="timeline-badge on-track">On Track</span></td>
-                    </tr>
-                    <tr>
-                      <td>PR-2026-003</td>
-                      <td>Training Meals - OWWA</td>
-                      <td>WRSD</td>
-                      <td><span class="status-badge on-process">On Process</span></td>
-                      <td><span class="timeline-badge at-risk">At Risk</span></td>
-                    </tr>
-                    <tr>
-                      <td>PR-2026-004</td>
-                      <td>Internet Subscription</td>
-                      <td>ORD</td>
-                      <td><span class="status-badge for-signing">For Signing</span></td>
-                      <td><span class="timeline-badge on-track">On Track</span></td>
-                    </tr>
-                  </tbody>
-                </table>
+          </div><!-- /dashAdminOnlyStats -->
+
+          <!-- Total PPMP Budget Banner -->
+          <div class="info-banner" style="margin-bottom: 16px; background: linear-gradient(135deg, #1a365d 0%, #2d4a7a 100%); color: #fff; padding: 14px 20px; border-radius: 8px;">
+            <i class="fas fa-peso-sign" style="margin-right:8px;"></i>
+            <strong>Total PPMP Budget (FY <span class="fiscal-year-display">):</strong> <span id="dashTotalBudget" style="font-size:18px;font-weight:700;margin-left:6px;">--</span>
+            <span style="margin-left:20px;opacity:0.8;">|</span>
+            <span style="margin-left:20px;"><strong>Items:</strong> <span id="statTotalPlans">--</span></span>
+            <span style="margin-left:20px;"><strong>Stock Cards:</strong> <span id="dashStockCards">--</span></span>
+            <span style="margin-left:20px;"><strong>Property Cards:</strong> <span id="statPropertyCards">--</span></span>
+            <span style="margin-left:20px;"><strong>ICS Issued:</strong> <span id="statICS">--</span></span>
+          </div>
+
+          <!-- Recent Purchase Requests (Full Width) -->
+          <div class="dashboard-card" style="margin-top:16px;">
+            <div class="card-header">
+              <h3><i class="fas fa-file-alt" style="margin-right:6px;"></i> Procurment Monitoring</h3>
+              <button class="btn btn-sm btn-secondary" onclick="navigateTo('purchase-requests')">View All</button>
+            </div>
+            <div class="card-body" style="overflow-x:auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>PR No.</th>
+                    <th>Item Description</th>
+                    <th>Purpose</th>
+                    <th>Division</th>
+                    <th>Amount</th>
+                    <th>Current Step</th>
+                  </tr>
+                </thead>
+                <tbody id="dashRecentPRsBody">
+                  <tr><td colspan="6" class="text-center" style="padding:20px;color:#636e78;">Loading...</td></tr>
+                </tbody>
+              </table>
+              <div id="dashPRsShowMore" style="display:none;text-align:center;padding:10px 0;">
+                <button class="btn btn-sm btn-outline" onclick="showMoreDashPRs()" style="min-width:200px;">
+                  <i class="fas fa-chevron-down" style="margin-right:4px;"></i> Show More Purchase Requests
+                </button>
               </div>
             </div>
+          </div>
 
+          <!-- Procurement Process Tracker (Full Width) -->
+          <div class="dashboard-card" style="margin-top:16px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #1a365d, #2d4a7a); color: #fff; border-radius: 8px 8px 0 0; padding: 10px 16px;">
+              <h3 style="color:#fff;"><i class="fas fa-route" style="margin-right:6px;"></i> Procurement Process Tracker</h3>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="navigateTo('purchase-requests')">View PRs</button>
+            </div>
+            <div class="card-body" style="overflow-x:auto;">
+              <table class="data-table" style="font-size:12px;">
+                <thead>
+                  <tr>
+                    <th>PR No.</th>
+                    <th>Items</th>
+                    <th>Division</th>
+                    <th style="text-align:center;">PR</th>
+                    <th style="text-align:center;">RFQ</th>
+                    <th style="text-align:center;">Abstract</th>
+                    <th style="text-align:center;">TWG</th>
+                    <th style="text-align:center;">BAC</th>
+                    <th style="text-align:center;">NOA</th>
+                    <th style="text-align:center;">PO</th>
+                    <th style="text-align:center;">IAR</th>
+                    <th>Current Step</th>
+                  </tr>
+                </thead>
+                <tbody id="dashTrackerBody">
+                  <tr><td colspan="12" class="text-center" style="padding:20px;color:#636e78;">Loading...</td></tr>
+                </tbody>
+              </table>
+              <div id="dashTrackerShowMore" style="display:none;text-align:center;padding:10px 0;">
+                <button class="btn btn-sm btn-outline" onclick="showMoreDashTracker()" style="min-width:200px;">
+                  <i class="fas fa-chevron-down" style="margin-right:4px;"></i> Show More Tracker Records
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid" style="margin-top:16px;">
             <!-- Division PPMP Submission Status -->
             <div class="dashboard-card">
               <div class="card-header">
-                <h3>PPMP Status by Division</h3>
+                <h3><i class="fas fa-building" style="margin-right:6px;"></i> PPMP by Division</h3>
+                <button class="btn btn-sm btn-secondary" onclick="navigateTo('ppmp')">View PPMP</button>
               </div>
               <div class="card-body">
                 <div class="division-stats" id="ppmpDivisionStats">
-                  <div class="division-item">
-                    <span class="division-name">FAD</span>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="progress-value">-</span>
-                  </div>
-                  <div class="division-item">
-                    <span class="division-name">WRSD</span>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="progress-value">-</span>
-                  </div>
-                  <div class="division-item">
-                    <span class="division-name">MWPSD</span>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="progress-value">-</span>
-                  </div>
-                  <div class="division-item">
-                    <span class="division-name">MWPTD</span>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="progress-value">-</span>
-                  </div>
-                  <div class="division-item">
-                    <span class="division-name">ORD</span>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="progress-value">-</span>
-                  </div>
+                  <!-- Populated dynamically -->
+                  <div style="text-align:center;padding:20px;color:#636e78;">Loading...</div>
                 </div>
               </div>
+            </div>
+
+            <!-- PR Status Summary -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3><i class="fas fa-chart-pie" style="margin-right:6px;"></i> PR Status Summary</h3>
+              </div>
+              <div class="card-body">
+                <div id="dashPRStatusSummary" style="padding:8px 0;">
+                  <div style="text-align:center;padding:20px;color:#636e78;">Loading...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity Log -->
+          <div class="dashboard-card" style="margin-top:16px;">
+            <div class="card-header">
+              <h3><i class="fas fa-history" style="margin-right:6px;"></i> Recent Activity</h3>
+            </div>
+            <div class="card-body">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="dashRecentActivityBody">
+                  <tr><td colspan="5" class="text-center" style="padding:20px;color:#636e78;">Loading...</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -488,7 +523,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Project Procurement Management Plan (PPMP)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           
           <div class="page-actions">
@@ -503,27 +538,39 @@
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search PPMP...">
+              <input type="text" id="ppmpSearchInput" placeholder="Search PPMP...">
             </div>
             <div class="filter-group">
               <select class="form-select" id="ppmpDivisionFilter">
-                <option value="">All Divisions</option>
-                <option value="FAD">FAD</option>
-                <option value="WRSD">WRSD</option>
-                <option value="MWPSD">MWPSD</option>
-                <option value="MWPTD">MWPTD</option>
-                <option value="ORD">ORD</option>
+                <option value="all" selected>All Divisions</option>
+                <option value="1">FAD</option>
+                <option value="4">WRSD</option>
+                <option value="3">MWPSD</option>
+                <option value="2">MWPTD</option>
               </select>
-              <select class="form-select">
+              <select class="form-select" id="ppmpModeFilter">
                 <option value="">All Modes</option>
-                <option value="SVP">SVP</option>
-                <option value="DC">Direct Contracting</option>
-                <option value="Shopping">Shopping</option>
+                <option value="Competitive Bidding">Competitive Bidding</option>
+                <option value="Limited Source Bidding">Limited Source Bidding</option>
+                <option value="Competitive Dialogue">Competitive Dialogue</option>
+                <option value="Unsolicited Offer with Bid Matching">Unsolicited Offer with Bid Matching</option>
+                <option value="Direct Contracting">Direct Contracting</option>
+                <option value="Direct Acquisition">Direct Acquisition</option>
+                <option value="Repeat Order">Repeat Order</option>
+                <option value="Small Value Procurement">Small Value Procurement</option>
+                <option value="Negotiated Procurement">Negotiated Procurement</option>
+                <option value="Direct Sales">Direct Sales</option>
+                <option value="Direct Procurement for Science, Technology and Innovation">Direct Procurement for STI</option>
               </select>
-              <select class="form-select">
-                <option value="2026">FY 2026</option>
-                <option value="2025">FY 2025</option>
+              <select class="form-select dynamic-fy-select" id="ppmpYearFilter" data-prefix="FY">
               </select>
+              <div id="ppmpGrandTotal" style="display:inline-flex;align-items:center;background:linear-gradient(135deg,#1a365d,#2d4a7a);color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;margin-left:8px;white-space:nowrap;">
+                <i class="fas fa-peso-sign" style="margin-right:6px;opacity:0.8;"></i>
+                <span>Grand Total: </span>
+                <span id="ppmpGrandTotalValue" style="margin-left:4px;font-size:15px;">--</span>
+                <span style="margin-left:10px;opacity:0.7;">|</span>
+                <span id="ppmpGrandTotalCount" style="margin-left:10px;font-size:12px;opacity:0.9;">-- items</span>
+              </div>
             </div>
           </div>
 
@@ -542,14 +589,13 @@
                   <th>Expected Delivery / Implementation Period</th>
                   <th>Source of Funds</th>
                   <th>Estimated Budget / ABC (₱)</th>
-                  <th>Attached Supporting Documents</th>
                   <th>Remarks</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="ppmpTableBody">
-                <tr><td colspan="15" class="text-center">Loading PPMP data...</td></tr>
+                <tr><td colspan="14" class="text-center">Loading PPMP data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -560,7 +606,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Annual Procurement Plan (APP)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -568,9 +614,7 @@
               <i class="fas fa-layer-group"></i> Consolidate from PPMP
             </button>
             <div class="filter-group">
-              <select class="form-select">
-                <option value="2026">FY 2026</option>
-                <option value="2025">FY 2025</option>
+              <select class="form-select dynamic-fy-select" data-prefix="FY">
               </select>
             </div>
             <button class="btn btn-secondary" data-action="export-reports" onclick="exportToExcel('APP')">
@@ -601,37 +645,45 @@
             </div>
             <div class="version-actions">
               <span class="current-version-label" id="currentVersionLabel">Indicative APP</span>
-              <button class="btn btn-sm btn-outline" onclick="showSetAPPStatusModal()" title="Set APP Status">
+              <button class="btn btn-sm btn-primary" onclick="showSetAPPStatusModal()" title="Set APP Status">
                 <i class="fas fa-cog"></i> Set Status
               </button>
             </div>
           </div>
 
-          <div class="app-summary">
+          <div class="app-mode-stats-row">
             <div class="summary-card">
-              <h4>Total ABC</h4>
-              <p class="summary-value">₱0.00</p>
+              <h4>Total Approved Budget</h4>
+              <p class="summary-value" id="appTotalApproved">₱0.00</p>
             </div>
             <div class="summary-card">
-              <h4>Total Projects</h4>
-              <p class="summary-value">0</p>
+              <h4>Active Budget</h4>
+              <p class="summary-value" id="appActiveBudget">₱0.00</p>
+            </div>
+            <div class="summary-card" style="border-left: 3px solid #28a745; cursor:pointer;" onclick="showRemovedItemsModal()" title="Click to view removed items">
+              <h4>Available Budget <i class="fas fa-external-link-alt" style="font-size:10px; color:#999;"></i></h4>
+              <p class="summary-value" id="appAvailableBudget" style="color: #28a745;">₱0.00</p>
             </div>
             <div class="summary-card">
-              <h4>SVP Projects</h4>
-              <p class="summary-value">0</p>
+              <h4>Active Projects</h4>
+              <p class="summary-value" id="appActiveProjects">0</p>
             </div>
             <div class="summary-card">
-              <h4>DC/Shopping</h4>
-              <p class="summary-value">0</p>
+              <h4>Removed</h4>
+              <p class="summary-value" id="appRemovedCount" style="color: #dc3545;">0</p>
             </div>
+            <!-- Dynamic mode stats appended here by JS -->
+            <span id="appModeStats" style="display:contents;"></span>
           </div>
+
+          <!-- Division Budget Breakdown -->
+          <div id="appDivisionBudgets" class="division-budget-row"></div>
 
           <div class="data-card">
             <table class="data-table full-width">
               <thead>
                 <tr>
                   <th>PAP Code</th>
-                  <th>Object Code<br><small>(Funding code per Technical GAA)</small></th>
                   <th>Project Title</th>
                   <th>End-User or Implementing Unit</th>
                   <th>General Description of the Project</th>
@@ -650,7 +702,7 @@
                 </tr>
               </thead>
               <tbody id="appTableBody">
-                <tr><td colspan="16" class="text-center">Loading APP data...</td></tr>
+                <tr><td colspan="15" class="text-center">Loading APP data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -661,7 +713,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Purchase Request (PR)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -679,13 +731,14 @@
               <input type="text" placeholder="Search PR...">
             </div>
             <div class="filter-group">
-              <select class="form-select">
+              <select class="form-select" id="prStatusFilter" onchange="filterPRTable()">
                 <option value="">All Status</option>
-                <option value="draft-pr">Draft PR</option>
-                <option value="pr-for-approval">PR for Approval</option>
-                <option value="pr-approved">PR Approved</option>
+                <option value="pending_approval">PR Pending Approval</option>
+                <option value="approved">PR Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
               </select>
-              <select class="form-select">
+              <select class="form-select" id="prDivisionFilter" onchange="filterPRTable()">
                 <option value="">All Divisions</option>
                 <option value="FAD">FAD</option>
                 <option value="WRSD">WRSD</option>
@@ -703,7 +756,6 @@
                   <th>PR No.</th>
                   <th>Date</th>
                   <th>Office/Section</th>
-                  <th>Responsibility Center Code</th>
                   <th>Item Description</th>
                   <th>Quantity</th>
                   <th>Unit</th>
@@ -714,65 +766,7 @@
                 </tr>
               </thead>
               <tbody id="prTableBody">
-                <tr>
-                  <td>PR-JAN-2026-001</td>
-                  <td>Jan 10, 2026</td>
-                  <td>DMW Caraga</td>
-                  <td>-</td>
-                  <td>Security Guard (4 pax)<br><small>Duration: 11.5 months</small></td>
-                  <td>1</td>
-                  <td>Lot</td>
-                  <td>₱1,066,000.00</td>
-                  <td>₱1,066,000.00</td>
-                  <td><span class="status-badge pr-approved">PR Approved</span></td>
-                  <td><i class="fas fa-check-circle text-success"></i></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal('PR-JAN-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" data-action="view-pr" title="Print" onclick="printRecord('PR', 'PR-JAN-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" data-action="create-rfq" title="Create RFQ" onclick="showCreateRFQFromPRModal('PR-JAN-2026-001')"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PR-JAN-2026-002</td>
-                  <td>Jan 15, 2026</td>
-                  <td>DMW Caraga</td>
-                  <td>-</td>
-                  <td>Tarpaulin Printing<br><small>Duration: 1 year, Billing: Bi-weekly</small></td>
-                  <td>1500</td>
-                  <td>Sq.ft</td>
-                  <td>₱20.00</td>
-                  <td>₱30,000.00</td>
-                  <td><span class="status-badge pr-for-approval">PR for Approval</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal('PR-JAN-2026-002')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" data-action="approve-pr" title="Approve (HoPE)" onclick="showApprovePRModal('PR-JAN-2026-002')"><i class="fas fa-check"></i></button>
-                      <button class="btn-icon danger" data-action="approve-pr" title="Return" onclick="showReturnPRModal('PR-JAN-2026-002')"><i class="fas fa-undo"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PR-JAN-2026-003</td>
-                  <td>Jan 20, 2026</td>
-                  <td>DMW Caraga</td>
-                  <td>-</td>
-                  <td>Purified Drinking Water<br><small>Duration: 1 year, Billing: Monthly</small></td>
-                  <td>850</td>
-                  <td>Gal</td>
-                  <td>₱50.00</td>
-                  <td>₱42,500.00</td>
-                  <td><span class="status-badge draft-pr">Draft PR</span></td>
-                  <td><i class="fas fa-times-circle text-danger"></i></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-pr" title="Edit" onclick="showEditPRModal('PR-JAN-2026-003')"><i class="fas fa-edit"></i></button>
-                      <button class="btn-icon" data-action="edit-pr" title="Attach Annex 1" onclick="showAttachAnnex1Modal('PR-JAN-2026-003')"><i class="fas fa-paperclip"></i></button>
-                      <button class="btn-icon success" data-action="create-pr" title="Submit for Approval" onclick="showSubmitPRForApprovalModal('PR-JAN-2026-003')"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -783,7 +777,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Request for Quotation (RFQ)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -801,11 +795,11 @@
               <input type="text" placeholder="Search RFQ...">
             </div>
             <div class="filter-group">
-              <select class="form-select">
+              <select class="form-select" id="rfqStatusFilter" onchange="filterRFQTable()">
                 <option value="">All Status</option>
-                <option value="rfq-prepared">RFQ Prepared</option>
-                <option value="rfq-posted">RFQ Posted (PhilGEPS)</option>
-                <option value="quotations-received">Quotations Received</option>
+                <option value="on_going">RFQ On-Going</option>
+                <option value="completed">RFQ Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -827,40 +821,7 @@
                 </tr>
               </thead>
               <tbody id="rfqTableBody">
-                <tr>
-                  <td>RFQ-2026-01-0001</td>
-                  <td>Jan 5, 2026</td>
-                  <td>PR-JAN-2026-001</td>
-                  <td>1800</td>
-                  <td>Ltrs</td>
-                  <td>Gas<br><small>Open Holidays/Weekends, 5AM-9PM, Flood Free, Monthly Billing, PhilGEPS Registered</small></td>
-                  <td>₱129,600.00</td>
-                  <td>Jan 9, 2026</td>
-                  <td><span class="status-badge quotations-received">Quotations Received</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewRFQModal('RFQ-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Create Abstract" onclick="showCreateAbstractFromRFQModal('RFQ-2026-001')"><i class="fas fa-table"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>RFQ-2026-02-0013</td>
-                  <td>Feb 2, 2026</td>
-                  <td>PR-FEB-2026-001</td>
-                  <td>38</td>
-                  <td>Pcs</td>
-                  <td>PVC ID</td>
-                  <td>₱6,480.00</td>
-                  <td>Feb 5, 2026</td>
-                  <td><span class="status-badge rfq-posted">RFQ Posted</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewRFQModal('RFQ-2026-002')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Add Quotation" onclick="showAddQuotationModal('RFQ-2026-002')"><i class="fas fa-plus"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -871,7 +832,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Abstract of Quotations (AOQ)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -887,6 +848,14 @@
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" placeholder="Search...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select" id="abstractStatusFilter" onchange="filterAbstractTable()">
+                <option value="">All Status</option>
+                <option value="on_going">Abstract On-Going</option>
+                <option value="completed">Abstract Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
           </div>
 
@@ -907,85 +876,7 @@
                 </tr>
               </thead>
               <tbody id="abstractTableBody">
-                <tr>
-                  <td>AOQ-2026-001</td>
-                  <td>Jan 18, 2026</td>
-                  <td>RFQ-2026-001</td>
-                  <td>Security Guard Services - Q1 2026</td>
-                  <td>₱129,600.00</td>
-                  <td>3</td>
-                  <td>ABC Security Agency</td>
-                  <td>₱115,000.00</td>
-                  <td><span class="status-badge abstract-prepared">Abstract Prepared</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewAbstractModal('ABS-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('Abstract', 'ABS-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Proceed to Post-Qual" onclick="showNewPostQualModal()"><i class="fas fa-user-check"></i></button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- Post-Qualification Page (Optional) -->
-        <section class="page" id="post-qual">
-          <div class="gov-form-header">
-            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
-            <div class="form-title">Post-Qualification Report</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
-          </div>
-
-          <div class="page-actions">
-            <button class="btn btn-primary" data-action="create-postqual" onclick="showNewPostQualModal()">
-              <i class="fas fa-plus"></i> Start Post-Qualification
-            </button>
-            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PostQual')">
-              <i class="fas fa-file-excel"></i> Export
-            </button>
-            <button class="btn btn-outline" onclick="printCurrentPage()">
-              <i class="fas fa-print"></i> Print
-            </button>
-            <div class="search-box">
-              <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search...">
-            </div>
-          </div>
-
-          <div class="data-card">
-            <table class="data-table full-width">
-              <thead>
-                <tr>
-                  <th>TWG Report No.</th>
-                  <th>Date</th>
-                  <th>Abstract Ref</th>
-                  <th>Subject</th>
-                  <th>Bidders Evaluated</th>
-                  <th>Documents</th>
-                  <th>Price Evaluation</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="postQualTableBody">
-                <tr>
-                  <td>TWG-2026-001</td>
-                  <td>Jan 19, 2026</td>
-                  <td>AOQ-2026-001</td>
-                  <td>Security Guard Services</td>
-                  <td>3</td>
-                  <td><span class="status-badge approved">All Passed</span></td>
-                  <td><span class="status-badge approved">Completed</span></td>
-                  <td><span class="status-badge post-qual-passed">Passed</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View Documents" onclick="showViewPostQualModal('PQ-2026-001')"><i class="fas fa-folder-open"></i></button>
-                      <button class="btn-icon" title="Create BAC Resolution" onclick="showNewBACResolutionModal()"><i class="fas fa-gavel"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -996,7 +887,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">BAC Resolution</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1012,6 +903,14 @@
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" placeholder="Search...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select" id="bacResStatusFilter" onchange="filterBACResTable()">
+                <option value="">All Status</option>
+                <option value="on_going">BAC Resolution On-Going</option>
+                <option value="completed">BAC Resolution Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
           </div>
 
@@ -1031,23 +930,61 @@
                 </tr>
               </thead>
               <tbody id="bacResolutionTableBody">
+                <!-- Dynamic content loaded from DB -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Post-Qualification Page -->
+        <section class="page" id="post-qual">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Post-Qualification Report</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-primary" data-action="create-postqual" onclick="showNewPostQualModal()">
+              <i class="fas fa-plus"></i> Start Post-Qualification
+            </button>
+            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PostQual')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <button class="btn btn-outline" onclick="printCurrentPage()">
+              <i class="fas fa-print"></i> Print
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select" id="postQualStatusFilter" onchange="filterPostQualTable()">
+                <option value="">All Status</option>
+                <option value="on_going">Post-Qualification On-Going</option>
+                <option value="completed">Post-Qualification Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
                 <tr>
-                  <td>BAC-RES-2026-001</td>
-                  <td>2026</td>
-                  <td>Jan 19, 2026</td>
-                  <td>Security Guard Services - Q1 2026</td>
-                  <td>ABC Security Agency</td>
-                  <td>₱115,000.00</td>
-                  <td>₱129,600.00</td>
-                  <td><span class="status-badge bac-resolution-approved">BAC Resolution Approved</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewBACResolutionModal('BAC-RES-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('BAC Resolution', 'BAC-RES-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Issue NOA" onclick="showNewNOAModal()"><i class="fas fa-award"></i></button>
-                    </div>
-                  </td>
+                  <th>TWG Report No.</th>
+                  <th>Date</th>
+                  <th>BAC Res. Ref</th>
+                  <th>Subject</th>
+                  <th>Bidders Evaluated</th>
+                  <th>Documents</th>
+                  <th>Price Evaluation</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
+              </thead>
+              <tbody id="postQualTableBody">
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -1058,7 +995,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Notice of Award (NOA)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1074,6 +1011,14 @@
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" placeholder="Search NOA...">
+            </div>
+            <div class="filter-group">
+              <select class="form-select" id="noaStatusFilter" onchange="filterNOATable()">
+                <option value="">All Status</option>
+                <option value="awaiting_noa">Awaiting NOA</option>
+                <option value="with_noa">With NOA</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
           </div>
 
@@ -1093,39 +1038,7 @@
                 </tr>
               </thead>
               <tbody id="noaTableBody">
-                <tr>
-                  <td>NOA-2026-001</td>
-                  <td>Jan 20, 2026</td>
-                  <td>ABC Security Agency</td>
-                  <td>Butuan City, Agusan del Norte</td>
-                  <td>RFQ-2026-001</td>
-                  <td>₱115,000.00</td>
-                  <td>Jan 21, 2026</td>
-                  <td><span class="status-badge noa-issued">NOA Issued</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewNOAModal('NOA-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('NOA', 'NOA-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Create PO" onclick="showNewPOModal()"><i class="fas fa-file-invoice-dollar"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>NOA-2026-002</td>
-                  <td>Jan 25, 2026</td>
-                  <td>PLDT Enterprise</td>
-                  <td>Butuan City</td>
-                  <td>RFQ-2026-002</td>
-                  <td>₱10,000.00/mo</td>
-                  <td>-</td>
-                  <td><span class="status-badge pending">Pending Receipt</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewNOAModal('NOA-2026-002')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Mark Received by Bidder" onclick="showMarkNOAReceivedModal('NOA-2026-002')"><i class="fas fa-check"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -1136,7 +1049,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Purchase Order (PO)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1154,13 +1067,11 @@
               <input type="text" placeholder="Search PO...">
             </div>
             <div class="filter-group">
-              <select class="form-select">
+              <select class="form-select" id="poStatusFilter" onchange="filterPOTable()">
                 <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="awaiting-delivery">Awaiting Delivery</option>
-                <option value="for-payment">For Payment</option>
-                <option value="paid-ada">Paid (ADA)</option>
+                <option value="for_signing">For Signing</option>
+                <option value="signed">Signed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -1181,71 +1092,7 @@
                 </tr>
               </thead>
               <tbody id="poTableBody">
-                <tr>
-                  <td>PO-JAN-2026-001</td>
-                  <td>Jan 22, 2026</td>
-                  <td>SVP - Shopping</td>
-                  <td>ABC Security Agency</td>
-                  <td>DMW RO XIII</td>
-                  <td>Feb 1, 2026</td>
-                  <td>₱115,000.00</td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-JAN-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('PO', 'PO-JAN-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon success" title="Create Packet" onclick="showCompilePacketModal()"><i class="fas fa-folder-plus"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PO-JAN-2026-002</td>
-                  <td>Jan 28, 2026</td>
-                  <td>Direct Contracting</td>
-                  <td>PLDT Enterprise</td>
-                  <td>DMW RO XIII</td>
-                  <td>Feb 15, 2026</td>
-                  <td>₱10,000.00</td>
-                  <td><span class="status-badge awaiting-delivery">Awaiting Delivery</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-JAN-2026-002')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Mark Delivered" onclick="showMarkDeliveredModal()"><i class="fas fa-truck"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PO-FEB-2026-001</td>
-                  <td>Feb 5, 2026</td>
-                  <td>SVP - Shopping</td>
-                  <td>Office Pro Supplies</td>
-                  <td>DMW RO XIII</td>
-                  <td>Feb 20, 2026</td>
-                  <td>₱45,000.00</td>
-                  <td><span class="status-badge for-payment">For Payment</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-FEB-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon success" title="Mark Paid" onclick="showMarkPaidModal()"><i class="fas fa-money-check"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PO-FEB-2026-002</td>
-                  <td>Feb 8, 2026</td>
-                  <td>SVP - Shopping</td>
-                  <td>Quick Print Services</td>
-                  <td>DMW RO XIII</td>
-                  <td>Feb 25, 2026</td>
-                  <td>₱25,000.00</td>
-                  <td><span class="status-badge pending">Pending</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewPOModal('PO-FEB-2026-002')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Approve" onclick="showApprovePOModal('PO-FEB-2026-002')"><i class="fas fa-check"></i></button>
-                      <button class="btn-icon success" title="Accept PO" onclick="showAcceptPOModal()"><i class="fas fa-handshake"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
@@ -1256,7 +1103,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Inspection and Acceptance Report (IAR)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1274,10 +1121,13 @@
               <input type="text" placeholder="Search IAR...">
             </div>
             <div class="filter-group">
-              <select class="form-select">
-                <option value="">All Status</option>
-                <option value="delivered">Delivered/Inspected</option>
-                <option value="iar-complete">IAR Completed</option>
+              <select class="form-select" id="iarStatusFilter" onchange="filterIARTable()">
+                <option value="">All</option>
+                <option value="to_be_checked">To Be Checked</option>
+                <option value="on_going">Inspection: On Going</option>
+                <option value="verified">Inspection: Verified</option>
+                <option value="complete">Acceptance: Complete</option>
+                <option value="partial">Acceptance: Partial</option>
               </select>
             </div>
           </div>
@@ -1292,50 +1142,27 @@
                   <th>PO No./Date</th>
                   <th>Invoice No.</th>
                   <th>Requisitioning Office</th>
-                  <th>Fund Cluster</th>
                   <th>Inspection</th>
                   <th>Acceptance</th>
-                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="iarTableBody">
-                <tr>
-                  <td>IAR-2026-001</td>
-                  <td>Feb 1, 2026</td>
-                  <td>ABC Security Agency</td>
-                  <td>PO-JAN-2026-001 / Jan 22, 2026</td>
-                  <td>INV-12345</td>
-                  <td>FAD</td>
-                  <td>01 101 101</td>
-                  <td><span class="status-badge approved">Inspected</span></td>
-                  <td><span class="status-badge approved">Complete</span></td>
-                  <td><span class="status-badge iar-completed">IAR Completed</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View" onclick="showViewIARModal('IAR-2026-001')"><i class="fas fa-eye"></i></button>
-                      <button class="btn-icon" title="Print Appendix 62" onclick="printRecord('IAR', 'IAR-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon" title="Submit to COA" onclick="showNewCOASubmissionModal()"><i class="fas fa-file-export"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Dynamic content loaded from DB -->
               </tbody>
             </table>
           </div>
         </section>
 
-        <!-- PO Packet / Signing Page -->
+        <!-- PO Packet / Document Monitoring Page -->
         <section class="page" id="po-packet">
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
-            <div class="form-title">Purchase Order Packet</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-title">Document Monitoring</div>
+            <div class="form-subtitle">Compiled Documents Tracking &bull; Fiscal Year <span class="fiscal-year-display"></span></div>
           </div>
 
           <div class="page-actions">
-            <button class="btn btn-primary" data-action="compile-packet" onclick="showCompilePacketModal()">
-              <i class="fas fa-plus"></i> Compile Packet
-            </button>
             <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('POPacket')">
               <i class="fas fa-file-excel"></i> Export
             </button>
@@ -1344,92 +1171,67 @@
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search packets...">
+              <input type="text" id="poPacketSearch" placeholder="Search PR / PO number..." oninput="filterPOPacketTable(this.value)">
             </div>
             <div class="filter-group">
-              <select class="form-select">
-                <option value="">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="for-signing">For Signing</option>
-                <option value="signed">Signed</option>
-                <option value="submitted">Submitted to COA</option>
+              <select class="form-select" id="poPacketStatusFilter" onchange="filterPOPacketByStatus(this.value)">
+                <option value="">All</option>
+                <option value="complete">Complete</option>
+                <option value="in_progress">In Progress</option>
+                <option value="not_started">Not Started</option>
               </select>
             </div>
           </div>
 
-          <div class="data-card">
-            <table class="data-table full-width">
+          <!-- Summary Cards -->
+          <div class="stats-grid" style="margin-bottom: 16px;">
+            <div class="stat-card">
+              <div class="stat-icon-mini"><i class="fas fa-layer-group"></i></div>
+              <div class="stat-value" id="pktTotalPO">--</div>
+              <div class="stat-label">Total Transactions</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-mini" style="color: var(--success-color);"><i class="fas fa-check-double"></i></div>
+              <div class="stat-value" style="color: var(--success-color);" id="pktComplete">--</div>
+              <div class="stat-label">Complete Documents</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-mini" style="color: #3182ce;"><i class="fas fa-spinner"></i></div>
+              <div class="stat-value" style="color: #3182ce;" id="pktInProgress">--</div>
+              <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-mini" style="color: var(--danger-color);"><i class="fas fa-circle-xmark"></i></div>
+              <div class="stat-value" style="color: var(--danger-color);" id="pktNotStarted">--</div>
+              <div class="stat-label">Not Started</div>
+            </div>
+          </div>
+
+          <!-- Main Monitoring Table -->
+          <div class="data-card" style="overflow-x:auto;">
+            <table class="data-table full-width pkt-doc-table">
               <thead>
                 <tr>
-                  <th>Packet ID</th>
-                  <th>PO Reference</th>
-                  <th>Project</th>
-                  <th>Amount</th>
-                  <th>Compiled</th>
-                  <th>Chief Signed</th>
-                  <th>Director Signed</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th rowspan="2" class="pkt-th-fixed">PR Number</th>
+                  <th rowspan="2" class="pkt-th-fixed">Office/Section</th>
+                  <th colspan="8" class="text-center pkt-th-docs-header">Supporting Documents</th>
+                  <th rowspan="2" class="pkt-th-fixed">Status</th>
+                </tr>
+                <tr>
+                  <th class="pkt-doc-col-header">PR</th>
+                  <th class="pkt-doc-col-header">RFQ</th>
+                  <th class="pkt-doc-col-header">ABSTRACT</th>
+                  <th class="pkt-doc-col-header">BAC RESOLUTION</th>
+                  <th class="pkt-doc-col-header">POST-QUALIFICATION</th>
+                  <th class="pkt-doc-col-header">NOTICE OF AWARD</th>
+                  <th class="pkt-doc-col-header">PURCHASE ORDER</th>
+                  <th class="pkt-doc-col-header">IAR</th>
                 </tr>
               </thead>
               <tbody id="poPacketTableBody">
-                <tr>
-                  <td>PKT-2026-001</td>
-                  <td>PO-JAN-2026-001</td>
-                  <td>Security Services Q1</td>
-                  <td>₱115,000.00</td>
-                  <td>Feb 2, 2026</td>
-                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></td>
-                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Feb 2</span></td>
-                  <td><span class="status-badge signed">Signed</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View Checklist" onclick="showViewPacketModal('PKT-2026-001')"><i class="fas fa-list-check"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('Packet', 'PKT-2026-001')"><i class="fas fa-print"></i></button>
-                      <button class="btn-icon success" title="Submit to COA" onclick="showSubmitToCOAModal('PKT-2026-001')"><i class="fas fa-file-export"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>PKT-2026-002</td>
-                  <td>PO-JAN-2026-002</td>
-                  <td>Office Supplies Q1</td>
-                  <td>₱45,000.00</td>
-                  <td>Feb 5, 2026</td>
-                  <td><span class="status-badge pending">Pending</span></td>
-                  <td><span class="status-badge pending">Pending</span></td>
-                  <td><span class="status-badge for-signing">For Signing</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View Checklist" onclick="showViewPacketModal('PKT-2026-002')"><i class="fas fa-list-check"></i></button>
-                      <button class="btn-icon" title="Chief Sign" onclick="showChiefSignModal()"><i class="fas fa-signature"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colspan="10" class="text-center">Loading document monitoring data...</td></tr>
               </tbody>
             </table>
-          </div>
-
-          <!-- Supporting Documents Checklist Section -->
-          <div class="dashboard-card" style="margin-top: 20px;">
-            <div class="card-header">
-              <h3>Supporting Documents Checklist</h3>
-            </div>
-            <div class="card-body">
-              <div class="checklist-grid">
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Purchase Request (PR)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Request for Quotation (RFQ)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Abstract of Quotation (AOQ)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Post-Qualification Report</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> BAC Resolution</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Notice of Award (NOA)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Purchase Order (PO)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Conforme</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> IAR (Appendix 62)</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Delivery Receipt</div>
-                <div class="checklist-item"><i class="fas fa-check-circle text-success"></i> Supplier Invoice</div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -1438,7 +1240,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">COA Submission</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1480,37 +1282,7 @@
                 </tr>
               </thead>
               <tbody id="coaTableBody">
-                <tr>
-                  <td>COA-2026-001</td>
-                  <td>PO-JAN-2026-001</td>
-                  <td><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></td>
-                  <td>₱115,000.00</td>
-                  <td>Feb 3, 2026</td>
-                  <td>Feb 3, 2026</td>
-                  <td><span class="status-badge submitted-to-coa">COA Submitted</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View Packet" onclick="showViewCOAModal('COA-2026-001')"><i class="fas fa-folder-open"></i></button>
-                      <button class="btn-icon" title="Print" onclick="printRecord('COA', 'COA-2026-001')"><i class="fas fa-print"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>-</td>
-                  <td>PO-JAN-2026-002</td>
-                  <td>-</td>
-                  <td>Internet Subscription</td>
-                  <td>₱10,000.00</td>
-                  <td><i class="fas fa-times-circle text-danger"></i> Pending IAR</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td><span class="status-badge pending">Pending</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" title="View Checklist"><i class="fas fa-list-check"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colspan="8" class="text-center">Loading COA submissions...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1521,7 +1293,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Items Catalog</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1661,7 +1433,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Divisions</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="divisions-grid">
@@ -1762,12 +1534,12 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">User Management</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-user" onclick="showNewUserModal()">
-              <i class="fas fa-plus"></i> Add User
+              <i class="fas fa-user-plus"></i> Add User
             </button>
             <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Users')">
               <i class="fas fa-file-excel"></i> Export
@@ -1777,11 +1549,12 @@
             </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search users...">
+              <input type="text" id="userSearchInput" placeholder="Search users..." oninput="filterUsersTable()">
             </div>
-            <select class="form-select">
+            <select class="form-select" id="userRoleFilter" onchange="filterUsersTable()">
               <option value="">All Roles</option>
-              <option value="admin">System Admin</option>
+              <option value="admin">System Administrator</option>
+              <option value="ord_manager">ORD Manager</option>
               <option value="hope">HoPE (Regional Director)</option>
               <option value="bac_chair">BAC Chairperson</option>
               <option value="bac_secretariat">BAC Secretariat</option>
@@ -1790,10 +1563,19 @@
               <option value="end_user">End User</option>
               <option value="supply_officer">Supply/Procurement Officer</option>
               <option value="inspector">Inspection/Property Custodian</option>
+              <option value="chief_fad">Chief FAD</option>
+              <option value="chief_wrsd">Chief WRSD</option>
+              <option value="chief_mwpsd">Chief MWPSD</option>
+              <option value="chief_mwptd">Chief MWPTD</option>
               <option value="manager">Manager</option>
               <option value="officer">Officer</option>
               <option value="viewer">Viewer</option>
               <option value="auditor">Auditor</option>
+            </select>
+            <select class="form-select" id="userStatusFilter" onchange="filterUsersTable()">
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
 
@@ -1804,117 +1586,16 @@
                   <th>User ID</th>
                   <th>Username</th>
                   <th>Full Name</th>
+                  <th>Email</th>
                   <th>Role</th>
                   <th>Division</th>
                   <th>Status</th>
+                  <th>Last Login</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr>
-                  <td>USR-001</td>
-                  <td>admin</td>
-                  <td>System Administrator</td>
-                  <td><span class="role-badge admin">Admin</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-001')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-002</td>
-                  <td>rd.caraga</td>
-                  <td>Regional Director</td>
-                  <td><span class="role-badge hope">HoPE</span></td>
-                  <td>ORD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-002')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-003</td>
-                  <td>bac.chair</td>
-                  <td>BAC Chairperson</td>
-                  <td><span class="role-badge bac">BAC Chair</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-003')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-004</td>
-                  <td>bac.sec</td>
-                  <td>BAC Secretariat</td>
-                  <td><span class="role-badge bac-sec">BAC Sec</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-004')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-005</td>
-                  <td>twg.member</td>
-                  <td>TWG Member</td>
-                  <td><span class="role-badge twg">TWG</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-005')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-006</td>
-                  <td>supply.officer</td>
-                  <td>Supply/Procurement Officer</td>
-                  <td><span class="role-badge supply">Supply</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-006')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-007</td>
-                  <td>inspector</td>
-                  <td>Property Custodian</td>
-                  <td><span class="role-badge inspector">Inspector</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-007')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>USR-008</td>
-                  <td>fad.head</td>
-                  <td>Regienald S. Espaldon</td>
-                  <td><span class="role-badge div-head">Div Head</span></td>
-                  <td>FAD</td>
-                  <td><span class="status-badge approved">Active</span></td>
-                  <td>
-                    <div class="action-buttons">
-                      <button class="btn-icon" data-action="edit-user" title="Edit" onclick="showEditUserModal('USR-008')"><i class="fas fa-edit"></i></button>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colspan="9" class="text-center">Loading users...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1925,7 +1606,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Stock Cards</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -1976,7 +1657,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Property Cards</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -2029,7 +1710,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Inventory Custodian Slips (ICS)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -2074,7 +1755,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Employee Records</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="page-actions">
@@ -2125,7 +1806,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Reports</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
           <div class="reports-grid">
@@ -2233,7 +1914,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Property Acknowledgement Receipt (PAR)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewPARModal()"><i class="fas fa-plus"></i> New PAR</button>
@@ -2267,7 +1948,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Property Transfer Report (PTR)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewPTRModal()"><i class="fas fa-plus"></i> New PTR</button>
@@ -2300,7 +1981,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Requisition and Issue Slip (RIS)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewRISModal()"><i class="fas fa-plus"></i> New RIS</button>
@@ -2340,7 +2021,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Supplies Ledger Cards</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-outline" onclick="exportToExcel('SuppliesLedger')"><i class="fas fa-file-excel"></i> Export</button>
@@ -2373,7 +2054,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Semi-Expendable Items Received</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-outline" onclick="exportToExcel('SemiExpendable')"><i class="fas fa-file-excel"></i> Export</button>
@@ -2406,7 +2087,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Capital Outlay Items Received</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-outline" onclick="exportToExcel('CapitalOutlay')"><i class="fas fa-file-excel"></i> Export</button>
@@ -2439,7 +2120,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Trip Tickets</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewTripTicketModal()"><i class="fas fa-plus"></i> New Trip Ticket</button>
@@ -2460,7 +2141,7 @@
                 <tr>
                   <th>Ticket No.</th>
                   <th>Date</th>
-                  <th>Driver</th>
+                  <th>Passenger</th>
                   <th>Vehicle</th>
                   <th>Destination</th>
                   <th>Purpose</th>
@@ -2480,7 +2161,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Offices</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewOfficeModal()"><i class="fas fa-plus"></i> Add Office</button>
@@ -2509,7 +2190,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Designations</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewDesignationModal()"><i class="fas fa-plus"></i> Add Designation</button>
@@ -2538,7 +2219,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Fund Clusters</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewFundClusterModal()"><i class="fas fa-plus"></i> Add Fund Cluster</button>
@@ -2567,7 +2248,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Procurement Modes</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewProcurementModeModal()"><i class="fas fa-plus"></i> Add Mode</button>
@@ -2597,7 +2278,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">UACS Codes</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewUACSCodeModal()"><i class="fas fa-plus"></i> Add UACS Code</button>
@@ -2626,7 +2307,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">Units of Measure (UOM)</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewUOMModal()"><i class="fas fa-plus"></i> Add UOM</button>
@@ -2654,7 +2335,7 @@
           <div class="gov-form-header">
             <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
             <div class="form-title">System Settings</div>
-            <div class="form-subtitle">Fiscal Year 2026</div>
+            <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="saveAllSettings()"><i class="fas fa-save"></i> Save All Settings</button>
@@ -2693,96 +2374,176 @@
 
   <!-- Login Modal -->
   <div class="login-overlay" id="loginOverlay">
-    <div class="login-modal">
-      <div class="login-header">
-        <div class="login-logo">
-          <i class="fas fa-landmark"></i>
-        </div>
-        <h2>DMW Caraga</h2>
-        <p>Procurement Plan System (As-Is)</p>
-      </div>
-      
-      <!-- Login Form -->
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="username">Username</label>
-          <div class="input-icon">
-            <i class="fas fa-user"></i>
-            <input type="text" id="username" placeholder="Enter username" required>
+    <div class="login-card">
+      <!-- Government header band across top -->
+      <div class="login-gov-band"></div>
+
+      <div class="login-card-body">
+        <!-- LEFT PANEL: Branding -->
+        <div class="login-panel-left">
+          <div class="login-panel-left-inner">
+            <img src="assets/dmw-logo.png" alt="DMW Logo" class="login-logo-img">
+            <div class="login-agency-text">
+              <span class="login-republic">Republic of the Philippines</span>
+              <span class="login-dept">Department of Migrant Workers</span>
+              <span class="login-regional">Regional Office XIII (Caraga)</span>
+            </div>
+            <div class="login-panel-divider"></div>
+            <div class="login-system-label">
+              Procurement &amp; Inventory Management System
+            </div>
+            <div class="login-panel-tagline">
+              Efficient &bull; Transparent &bull; Accountable
+            </div>
+          </div>
+          <div class="login-footer-left">
+            <p>&copy; <span class="fiscal-year-display"></span> DMW CARAGA. All rights reserved.</p>
           </div>
         </div>
-        <div class="form-group">
-          <label for="password">Password</label>
-          <div class="input-icon">
-            <i class="fas fa-lock"></i>
-            <input type="password" id="password" placeholder="Enter password" required>
+
+        <!-- RIGHT PANEL: Auth Forms -->
+        <div class="login-panel-right">
+          <!-- Tab Slider -->
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="tabSignIn" onclick="toggleAuthForm('login')">
+              Sign In
+            </button>
+            <button class="auth-tab" id="tabSignUp" onclick="toggleAuthForm('signup')">
+              Sign Up
+            </button>
+            <div class="auth-tab-slider" id="authTabSlider"></div>
+          </div>
+
+          <div class="login-panel-right-welcome">
+            <span class="welcome-title" id="authWelcomeTitle">Welcome Back</span>
+            <span class="welcome-sub" id="authWelcomeSub">Sign in to access the procurement system</span>
+          </div>
+
+          <!-- Forms Container with slide animation -->
+          <div class="auth-forms-wrapper">
+            <div class="auth-forms-slider" id="authFormsSlider">
+              <!-- Login Form -->
+              <form id="loginForm" class="auth-form" onsubmit="event.preventDefault(); doLogin();">
+                <div class="form-group">
+                  <label for="username">Username</label>
+                  <div class="input-icon">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="username" placeholder="Enter your username" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <div class="input-icon">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                  </div>
+                </div>
+                <div id="loginError" class="auth-alert auth-alert-error" style="display:none;"></div>
+                <button type="submit" class="btn-login-submit" id="loginBtn">
+                  <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+                <div class="auth-form-footer">
+                  <span>Don't have an account?</span>
+                  <a href="#" onclick="event.preventDefault(); toggleAuthForm('signup')">Create one</a>
+                </div>
+              </form>
+
+              <!-- Signup Form -->
+              <form id="signupForm" class="auth-form" onsubmit="event.preventDefault(); doSignup();">
+                <div class="auth-form-grid">
+                  <div class="form-group">
+                    <label for="signupFullName">Full Name</label>
+                    <div class="input-icon">
+                      <i class="fas fa-user"></i>
+                      <input type="text" id="signupFullName" placeholder="Enter your full name" required>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="signupUsername">Username</label>
+                    <div class="input-icon">
+                      <i class="fas fa-at"></i>
+                      <input type="text" id="signupUsername" placeholder="Choose a username" required>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="signupEmail">Email (Optional)</label>
+                    <div class="input-icon">
+                      <i class="fas fa-envelope"></i>
+                      <input type="email" id="signupEmail" placeholder="Enter your email">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <div class="input-icon">
+                      <i class="fas fa-lock"></i>
+                      <input type="password" id="signupPassword" placeholder="Create a password" required>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="signupDivision">Division</label>
+                  <select id="signupDivision" class="form-select">
+                    <option value="FAD">Finance & Administrative Division (FAD)</option>
+                    <option value="WRSD">Welfare Reintegration Services Division (WRSD)</option>
+                    <option value="MWPD">Migrant Workers Protection Division (MWPD)</option>
+                    <option value="MWProD">Migrant Workers Processing Division (MWProD)</option>
+                    <option value="ORD">Office of the Regional Director (ORD)</option>
+                  </select>
+                </div>
+                <div id="signupError" class="auth-alert auth-alert-error" style="display:none;"></div>
+                <div id="signupSuccess" class="auth-alert auth-alert-success" style="display:none;"></div>
+                <button type="submit" class="btn-login-submit" id="signupBtn">
+                  <i class="fas fa-user-plus"></i> Create Account
+                </button>
+                <div class="auth-form-footer">
+                  <span>Already have an account?</span>
+                  <a href="#" onclick="event.preventDefault(); toggleAuthForm('login')">Sign in</a>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
-        <div id="loginError" class="login-error" style="display: none; color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
-        <button type="button" class="btn btn-primary btn-block" onclick="doLogin()" id="loginBtn">
-          <i class="fas fa-sign-in-alt"></i> Sign In
-        </button>
-        <p style="text-align: center; margin-top: 15px; color: #666;">
-          Don't have an account? <a href="#" onclick="toggleAuthForm('signup')" style="color: #1e88e5; text-decoration: none;">Sign Up</a>
-        </p>
-      </form>
-      
-      <!-- Signup Form -->
-      <form id="signupForm" style="display: none;">
-        <div class="form-group">
-          <label for="signupFullName">Full Name</label>
-          <div class="input-icon">
-            <i class="fas fa-user"></i>
-            <input type="text" id="signupFullName" placeholder="Enter your full name" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupUsername">Username</label>
-          <div class="input-icon">
-            <i class="fas fa-at"></i>
-            <input type="text" id="signupUsername" placeholder="Choose a username" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupEmail">Email (Optional)</label>
-          <div class="input-icon">
-            <i class="fas fa-envelope"></i>
-            <input type="email" id="signupEmail" placeholder="Enter your email">
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupPassword">Password</label>
-          <div class="input-icon">
-            <i class="fas fa-lock"></i>
-            <input type="password" id="signupPassword" placeholder="Create a password" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupDivision">Division</label>
-          <select id="signupDivision" class="form-select">
-            <option value="FAD">Finance & Administrative Division (FAD)</option>
-            <option value="WRSD">Welfare Reintegration Services Division (WRSD)</option>
-            <option value="MWPD">Migrant Workers Protection Division (MWPD)</option>
-            <option value="MWProD">Migrant Workers Processing Division (MWProD)</option>
-            <option value="ORD">Office of the Regional Director (ORD)</option>
-          </select>
-        </div>
-        <div id="signupError" class="login-error" style="display: none; color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
-        <div id="signupSuccess" style="display: none; color: #28a745; background: #d4edda; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;"></div>
-        <button type="button" class="btn btn-primary btn-block" onclick="doSignup()" id="signupBtn">
-          <i class="fas fa-user-plus"></i> Create Account
-        </button>
-        <p style="text-align: center; margin-top: 15px; color: #666;">
-          Already have an account? <a href="#" onclick="toggleAuthForm('login')" style="color: #1e88e5; text-decoration: none;">Sign In</a>
-        </p>
-      </form>
-      
-      <div class="login-footer">
-        <p>ISO 9001:2015 Compliant €¢ Per Memo 14 Nov 2025</p>
       </div>
     </div>
   </div>
 
   <script src="scripts/app.js"></script>
+  <script>
+    // Inject DMW letterhead into every gov-form-header (matching official DMW Regional Office letterhead)
+    document.querySelectorAll('.gov-form-header').forEach(function(header) {
+      if (header.querySelector('.dmw-letterhead')) return; // already injected
+
+      // Build the letterhead HTML
+      var letterhead = document.createElement('div');
+      letterhead.className = 'dmw-letterhead';
+      letterhead.innerHTML = 
+        '<img src="assets/dmw-logo.png" alt="DMW Logo" class="letterhead-logo">' +
+        '<div class="letterhead-center">' +
+          '<div class="letterhead-republic">Republic of the Philippines</div>' +
+          '<div class="letterhead-dept">Department of Migrant Workers</div>' +
+          '<div class="letterhead-office">Regional Office &ndash; XIII (Caraga)</div>' +
+          '<div class="letterhead-address">3<sup>rd</sup> Floor Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City,<br>Agusan del Norte, 8600</div>' +
+        '</div>' +
+        '<img src="assets/bagong-pilipinas.png" alt="Bagong Pilipinas" class="letterhead-logo letterhead-logo-right">';
+
+      // Build the divider
+      var divider = document.createElement('div');
+      divider.className = 'letterhead-divider';
+
+      // Wrap existing form-title and form-subtitle in a form-title-area div
+      var titleArea = document.createElement('div');
+      titleArea.className = 'form-title-area';
+      
+      var formTitle = header.querySelector('.form-title');
+      var formSubtitle = header.querySelector('.form-subtitle');
+      if (formTitle) titleArea.appendChild(formTitle);
+      if (formSubtitle) titleArea.appendChild(formSubtitle);
+
+      // Insert letterhead at the top, then divider, then title area
+      header.insertBefore(letterhead, header.firstChild);
+      letterhead.after(divider);
+      divider.after(titleArea);
+    });
+  </script>
 </body>
 </html>
