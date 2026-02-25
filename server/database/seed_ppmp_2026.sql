@@ -1,15 +1,16 @@
 -- ============================================================================
 -- DMW CARAGA Regional Office XIII - PPMP SEED DATA FY 2026
 -- Source: Actual PPMP Excel files per Division
+-- Updated: February 25, 2026
 -- 
--- Division Breakdown (99 PPMP Line Items, Grand Total: ₱19,091,072.00):
---   FAD:   53 items, ₱10,788,550.00 (includes 5 ORD items merged under FAD)
+-- Division Breakdown (104 PPMP Line Items, Grand Total: ₱19,588,072.00):
+--   FAD:   58 items, ₱11,285,550.00 (includes 5 ORD items merged under FAD)
 --   MWPTD: 16 items, ₱968,950.00
 --   MWPSD: 12 items, ₱1,364,500.00
 --   WRSD:  18 items, ₱5,969,072.00
 --
 -- Source Files:
---   FAD:   NGPA PPMP 2026 FAD.xlsx (48 FAD + 5 ORD merged)
+--   FAD:   NGPA PPMP 2026 FAD.xlsx (48 FAD + 5 ORD merged + 5 additional)
 --   MWPTD: MWPTD PPMP 2026.xlsx
 --   MWPSD: MWPSD-PPMP 2026.xlsx
 --   WRSD:  NGPA_PPMP-of-DMW-WRSD Caraga.xlsx
@@ -171,7 +172,17 @@ INSERT INTO procurementplans (dept_id, fiscal_year, status, ppmp_no, description
 (1, 2026, 'approved', 'PPMP-FAD-2026-050', 'ORD Coordination & Monitoring Activities', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 200000.00, 1),
 (1, 2026, 'approved', 'PPMP-FAD-2026-051', 'Regional Management Committee Meetings', 'Goods', '4 Sessions', 'Small Value Procurement', 'NO', 'March 2026', 'December 2026', 'March 2026', 'GAA', 100000.00, 1),
 (1, 2026, 'approved', 'PPMP-FAD-2026-052', 'Stakeholder Engagement & Partnership Development', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'February 2026', 'November 2026', 'February 2026', 'GAA', 150000.00, 1),
-(1, 2026, 'approved', 'PPMP-FAD-2026-053', 'ORD ICT and Office Supplies', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 50000.00, 1);
+(1, 2026, 'approved', 'PPMP-FAD-2026-053', 'ORD ICT and Office Supplies', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 50000.00, 1),
+
+-- ============================================================================
+-- ADDITIONAL FAD PPMP ITEMS (Added February 2026)
+-- ============================================================================
+
+(1, 2026, 'approved', 'PPMP-FAD-2026-054', 'Procurement of Office Supplies', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 500000.00, 1),
+(1, 2026, 'approved', 'PPMP-FAD-2026-055', 'Procurement of Other Supplies and Materials (Janitorial supplies, Fuel, etc)', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 200000.00, 1),
+(1, 2026, 'approved', 'PPMP-FAD-2026-056', 'Procurement of Semi - Office Equipment', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 200000.00, 1),
+(1, 2026, 'approved', 'PPMP-FAD-2026-057', 'Procurement of Semi - ICT', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 190000.00, 1),
+(1, 2026, 'approved', 'PPMP-FAD-2026-058', 'Procurement of Semi - Furniture and Fixture', 'Goods', '1 Lot', 'Small Value Procurement', 'NO', 'January 2026', 'December 2026', 'January 2026', 'GAA', 200000.00, 1);
 
 COMMIT;
 

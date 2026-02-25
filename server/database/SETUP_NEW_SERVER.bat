@@ -29,7 +29,7 @@ echo   - 22 abstracts + 32 quotations + quote items
 echo   - 20 post-qualifications
 echo   - 20 BAC resolutions
 echo   - 20 notices of award
-echo   - 99 PPMP line items (4 divisions, FY 2026)
+echo   - 104 PPMP line items (4 divisions, FY 2026)
 echo   - 10 user accounts (admin + division heads + officers)
 echo   - Dual role: BAC Chair assignment
 echo   - Status migration (all tables updated to latest format)
@@ -131,9 +131,9 @@ echo Done.
 echo.
 echo =====================================================
 echo   STEP 7 of 10: Running PPMP seed data
-echo   (99 line items across 4 divisions, FY 2026)
-echo   Grand Total: P19,091,072.00
-echo   FAD: 53 items ^| MWPTD: 16 items
+echo   (104 line items across 4 divisions, FY 2026)
+echo   Grand Total: P19,588,072.00
+echo   FAD: 58 items ^| MWPTD: 16 items
 echo   MWPSD: 12 items ^| WRSD: 18 items
 echo =====================================================
 %PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_ppmp_2026.sql"
