@@ -2,13 +2,14 @@
 echo =====================================================
 echo   DMW Caraga Procurement System
 echo   Full Database Setup Script (ALL DATA)
+echo   Updated: February 25, 2026
 echo =====================================================
 echo.
 echo This will set up the ENTIRE database on this server
 echo with ALL the latest inserted data.
 echo.
-echo PostgreSQL must be installed and running on port 5432.
-echo PostgreSQL password: dmw123
+echo PostgreSQL 18 must be installed and running on port 5433.
+echo PostgreSQL password: kurt09908
 echo.
 echo Data included:
 echo   - 44 database tables (consolidated schema)
@@ -33,11 +34,20 @@ echo   - 10 user accounts (admin + division heads + officers)
 echo   - Dual role: BAC Chair assignment
 echo   - Status migration (all tables updated to latest format)
 echo.
+echo LATEST CHANGES (Feb 2026):
+echo   - PAR, PTR, Semi-Expendable, Capital Outlay,
+echo     and Offices pages removed from frontend
+echo   - Items, Suppliers, Fund Clusters, UACS Codes,
+echo     UOMs moved to Inventory Management section
+echo   - View buttons (eye icon) added to all tables
+echo   - Trip Tickets, ICS, RIS, Property Cards modals fixed
+echo.
 pause
 
 set PSQL="C:\Program Files\PostgreSQL\18\bin\psql.exe"
+set PGPASSWORD=kurt09908
 set DB=dmw_db
-set PORT=5432
+set PORT=5433
 set USER=postgres
 
 echo.
@@ -52,7 +62,7 @@ echo =====================================================
 echo   STEP 2 of 10: Running consolidated schema
 echo   (all 44 tables)
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\consolidated_schema.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0consolidated_schema.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Schema creation failed!
     pause
@@ -80,7 +90,7 @@ echo    3 semi-expendable items, 2 RIS + items,
 echo    16 stock cards, 16 supplies ledger cards,
 echo    3 trip tickets, settings, 5 divisions)
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\consolidated_seed.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0consolidated_seed.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Seed data failed!
     pause
@@ -94,7 +104,7 @@ echo   STEP 5 of 10: Running employee seed data
 echo   (30 employees with full details:
 echo    employee_code, designation, division, phone, email)
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\seed_employees.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_employees.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Employee seed failed!
     pause
@@ -110,7 +120,7 @@ echo    22 RFQs, 22 Abstracts, 20 PostQuals,
 echo    20 BAC Resolutions, 20 NOAs)
 echo   NOTE: This must run BEFORE PPMP seed data!
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\seed_app_2026.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_app_2026.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: APP seed failed!
     pause
@@ -126,7 +136,7 @@ echo   Grand Total: P19,091,072.00
 echo   FAD: 53 items | MWPTD: 16 items
 echo   MWPSD: 12 items | WRSD: 18 items
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\seed_ppmp_2026.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_ppmp_2026.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: PPMP seed failed!
     pause
@@ -147,7 +157,7 @@ echo   NOA: awaiting_noa/with_noa/cancelled
 echo   PO: for_signing/signed/cancelled
 echo   IAR: inspection_ongoing/inspected_verified/etc
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\migration_status_update.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0migration_status_update.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Status migration failed!
     pause
@@ -162,7 +172,7 @@ echo   (10 users: admin + 4 division heads +
 echo    1 HOPE + 2 supply officers + 2 officers)
 echo   Default password for new accounts: dmw2026
 echo =====================================================
-%PSQL% -U %USER% -p %PORT% -d %DB% -f database\seed_users.sql
+%PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_users.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: User seed failed!
     pause
@@ -194,6 +204,13 @@ echo =====================================================
 echo.
 echo All data has been loaded successfully.
 echo.
+echo DATABASE CONNECTION:
+echo   Host: localhost
+echo   Port: 5433
+echo   Database: dmw_db
+echo   User: postgres
+echo   Password: kurt09908
+echo.
 echo USER ACCOUNTS:
 echo   admin          (password: admin123, role: admin)
 echo   regienald      (password: dmw2026, role: division_head, FAD)
@@ -206,8 +223,11 @@ echo   gary           (password: dmw2026, role: supply_officer, FAD)
 echo   giovanni       (password: dmw2026, role: bac_secretariat, FAD)
 echo   jomar          (password: dmw2026, role: officer, FAD)
 echo.
-echo Now start the server with:
-echo   cd server
-echo   node server.js
+echo NEXT STEPS:
+echo   1. Navigate to DMW_System\server folder
+echo   2. Run: npm install
+echo   3. Run: node server.js
+echo   4. Server will start on http://localhost:3000
+echo   5. Open Electron app: npm start (from DMW_System folder)
 echo.
 pause
