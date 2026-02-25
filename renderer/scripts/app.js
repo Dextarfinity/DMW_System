@@ -184,15 +184,12 @@ function getPrintHeaderCSS() {
   `;
 }
 
-<<<<<<< HEAD
-// API Configuration
-const API_URL = 'http://localhost:3000';
-=======
+
 // API Configuration - Use the server's network IP so other machines on the LAN can connect
 const API_URL = (window.location.hostname === 'localhost' || window.location.protocol === 'file:')
   ? 'http://192.168.100.235:3000/api'
   : `http://${window.location.hostname}:3000/api`;
->>>>>>> ecf8a97fbf5c567047958b46ca60c71a38ff3a34
+
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
 
