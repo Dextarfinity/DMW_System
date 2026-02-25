@@ -9,7 +9,8 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    icon: path.join(__dirname, 'assets/icon.ico'),
+    title: 'Procurement Plan System',
+    icon: path.join(__dirname, 'renderer/assets/dmw-logo.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -64,7 +65,7 @@ ipcMain.handle('show-attachment-preview', async (event, url, fileName) => {
     height: 800,
     title: fileName || 'Attachment Preview',
     parent: mainWindow,
-    icon: path.join(__dirname, 'assets/icon.ico'),
+    icon: path.join(__dirname, 'renderer/assets/dmw-logo.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -81,13 +82,14 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
   const pageSize = options.pageSize || 'A4';
   const landscape = options.landscape || false;
   const reportTitle = options.title || 'Report';
+  const editable = options.editable || false;
 
   const previewWin = new BrowserWindow({
     width: landscape ? 1100 : 900,
     height: 780,
-    title: 'Print Preview',
+    title: editable ? 'Document Preview (Editable)' : 'Print Preview',
     parent: mainWindow,
-    icon: path.join(__dirname, 'assets/icon.ico'),
+    icon: path.join(__dirname, 'renderer/assets/dmw-logo.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -95,13 +97,16 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
   });
   previewWin.setMenuBarVisibility(false);
 
+  // Save as Doc button (only shown when editable)
+  const saveDocBtn = editable ? `<button class="pp-btn" onclick="doSaveDoc()" title="Save as Word Doc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a365d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>` : '';
+
   // Build a toolbar matching the app's .top-header government minimalist style
   const toolbarHTML = `
     <div id="pp-toolbar">
       <div class="pp-left">
-        <span class="pp-title">PRINT PREVIEW</span>
+        <span class="pp-title">${editable ? 'DOCUMENT PREVIEW' : 'PRINT PREVIEW'}</span>
         <span class="pp-sep"></span>
-        <span class="pp-subtitle">${reportTitle}</span>
+        <span class="pp-subtitle">${reportTitle}${editable ? ' (Editable - click to edit)' : ''}</span>
       </div>
       <div class="pp-controls">
         <div class="pp-field">
@@ -121,6 +126,7 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
           </select>
         </div>
         <div class="pp-actions">
+          ${saveDocBtn}
           <button class="pp-btn" onclick="doPrint()" title="Print"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a365d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
           <button class="pp-btn" onclick="doSavePDF()" title="Save PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a365d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
         </div>
@@ -180,13 +186,39 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
         const land = document.getElementById('pp-orientation').value === 'landscape';
         ppIpc.send('preview-do-pdf', { pageSize: ps, landscape: land, title: '${reportTitle.replace(/'/g, "\\'") }' });
       }
+      function doSaveDoc() {
+        // Get the edited body content (excluding toolbar)
+        const toolbar = document.getElementById('pp-toolbar');
+        const clone = document.body.cloneNode(true);
+        const tb = clone.querySelector('#pp-toolbar');
+        if (tb) tb.remove();
+        // Remove scripts and toolbar styles
+        clone.querySelectorAll('script').forEach(s => s.remove());
+        const editableContent = clone.innerHTML;
+        ppIpc.send('preview-do-save-doc', { title: '${reportTitle.replace(/'/g, "\\'") }', html: editableContent });
+      }
       ppIpc.on('pdf-saved', (e, fp) => { alert('PDF saved to:\\n' + fp); });
       ppIpc.on('pdf-error', (e, msg) => { alert('PDF error: ' + msg); });
+      ppIpc.on('doc-saved', (e, fp) => { alert('Word document saved to:\\n' + fp); });
+      ppIpc.on('doc-error', (e, msg) => { alert('Save Doc error: ' + msg); });
     </script>
   `;
 
+  // If editable, make the body content area editable
+  let finalHTML = htmlContent;
+  if (editable) {
+    // Add contenteditable to the page-body-group td or body content
+    finalHTML = finalHTML.replace(/<tbody class="page-body-group">/, '<tbody class="page-body-group" contenteditable="true">');
+    // Also add editable styling
+    finalHTML = finalHTML.replace('</style>', `
+      [contenteditable="true"] { outline: none; }
+      [contenteditable="true"]:focus { background: transparent; }
+      [contenteditable="true"] td:hover { cursor: text; }
+      </style>`);
+  }
+
   // Inject toolbar right after <body>
-  const modifiedHTML = htmlContent.replace(/<body[^>]*>/, '$&' + toolbarHTML);
+  const modifiedHTML = finalHTML.replace(/<body[^>]*>/, '$&' + toolbarHTML);
   previewWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(modifiedHTML));
 
   return { success: true };
@@ -227,5 +259,112 @@ ipcMain.on('preview-do-pdf', async (event, opts) => {
   } catch (err) {
     console.error('PDF save error:', err);
     event.sender.send('pdf-error', err.message);
+  }
+});
+
+// Save as Doc button from preview window
+ipcMain.on('preview-do-save-doc', async (event, opts) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save as Word Document',
+      defaultPath: (opts.title || 'Document') + '.doc',
+      filters: [
+        { name: 'Word Document', extensions: ['doc'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    if (canceled || !filePath) return;
+
+    // Wrap in Word-compatible HTML format
+    const wordHTML = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!--[if gte mso 9]>
+<xml>
+  <w:WordDocument>
+    <w:View>Print</w:View>
+    <w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  @page { size: A4 portrait; margin: 1cm 1.5cm 1cm 1.5cm; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+${opts.html}
+</body>
+</html>`;
+
+    require('fs').writeFileSync(filePath, wordHTML, 'utf-8');
+    event.sender.send('doc-saved', filePath);
+  } catch (err) {
+    console.error('Save DOC error:', err);
+    event.sender.send('doc-error', err.message);
+  }
+});
+
+// ==================== SAVE AS EDITABLE WORD DOC (direct) ====================
+// Saves HTML content as a .doc file that Microsoft Word can open and edit
+ipcMain.handle('save-as-doc', async (event, htmlContent, defaultFilename) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save as Word Document',
+      defaultPath: (defaultFilename || 'Document') + '.doc',
+      filters: [
+        { name: 'Word Document', extensions: ['doc'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    if (canceled || !filePath) return { success: false, canceled: true };
+
+    // Wrap HTML in Word-compatible MHTML format
+    const wordHTML = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!--[if gte mso 9]>
+<xml>
+  <w:WordDocument>
+    <w:View>Print</w:View>
+    <w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 1cm 1.5cm 1cm 1.5cm;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+  }
+  table {
+    border-collapse: collapse;
+  }
+</style>
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`;
+
+    require('fs').writeFileSync(filePath, wordHTML, 'utf-8');
+    return { success: true, filePath: filePath };
+  } catch (err) {
+    console.error('Save DOC error:', err);
+    return { success: false, error: err.message };
   }
 });

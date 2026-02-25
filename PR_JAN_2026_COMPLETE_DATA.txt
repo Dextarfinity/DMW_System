@@ -1,0 +1,374 @@
+==============================================================================
+COMPLETE EXCEL DATA DUMP: PR JAN 2026 (1).xlsx
+==============================================================================
+
+=== 13 SHEET NAMES ===
+1. "Security Guard"
+2. "Tarp printing"
+3. "purified drinking water"
+4. "janitorial service"
+5. "POL"
+6. "Sheet1"
+7. "courier"
+8. "monoblock chair"
+9. "Sheet2"
+10. "Sheet3"
+11. "mic and ref"
+12. "drum toner"
+13. "supplies"
+
+==============================================================================
+COMMON LAYOUT (shared by ALL sheets)
+==============================================================================
+
+All sheets follow the same Purchase Request template layout:
+
+COLUMN WIDTHS (consistent across most sheets):
+  Col A: wch=0.43, wpx=8    (hidden/spacer column)
+  Col B: wch=12.57, wpx=93  (Item No. / labels)
+  Col C: wch=11.14, wpx=83  (Unit)
+  Col D: wch=68.86, wpx=487 (Item Description - widest column)
+  Col E: wch=11.14, wpx=83  (Quantity)
+  Col F: wch=13.57, wpx=100 (Unit Cost)
+  Col G: wch=16.86, wpx=123 (Total Cost)
+  * Sheet1 has D: wch=72.86, wpx=515 and F: wch=11.86, wpx=88
+
+COMMON MERGED CELLS PATTERN:
+  B1:D1  - Header area (Republic of Philippines)
+  B2:D2  - Header area (Department name)
+  B8:G9  - "PURCHASE REQUEST" title (spans 6 cols, 2 rows)
+  E{n}:F{n}  - "TOTAL AMOUNT" label row
+  B{n}:G{n+1} - Purpose section (spans 6 cols, 2 rows)
+  E{n}:F{n}  - "Requested by:" / "Approved by:" row
+  E{n}:G{n}  - Printed Name row
+  E{n}:G{n}  - Designation row
+
+COMMON ROW STRUCTURE:
+  Rows 1-7: Header area (empty except for merged cells for govt headers)
+  Row 8-9:  "PURCHASE REQUEST" title (merged B8:G9)
+  Row 10:   Empty
+  Row 11:   Office/Section | DMW Caraga | PR No. | | Date: | [date value]
+  Row 12:   | | Responsibility Center Code:____ | | | |
+  Row 13:   Empty
+  Row 14:   Item No. | Unit | Item Description | Quantity | Unit Cost | Total Cost
+  Row 15+:  Line items with specs below each
+  ...
+  TOTAL AMOUNT row: | | | TOTAL AMOUNT (E:F merged) | | [sum formula]
+  Purpose row: Purpose text (B:G merged, 2 rows)
+  Empty row
+  Requested/Approved row: | | Requested by: | Approved by: | | |
+  2 empty rows (signature space)
+  Printed Name row: Printed Name | | [Requestor name] | [Approver name] (E:G merged)
+  Designation row: Designation | | [Requestor title] | [Approver title] (E:G merged)
+
+==============================================================================
+SHEET 1: "Security Guard"
+==============================================================================
+Range: B1:J37
+Merges: B1:D1, B2:D2, B8:G9, E30:F30, B31:G32, E33:F33, E36:G36, E37:G37
+
+CELL DATA:
+  B8 = "PURCHASE REQUEST"
+  B11 = "Office/Section:"
+  C11 = "DMW Caraga"
+  D11 = "      PR No.:  "
+  F11 = "Date :"
+  D12 = "      Responsibility Center Code:____________________"
+  B14 = "Item No."    C14 = "Unit"    D14 = "Item Description"    E14 = "Quantity"    F14 = "Unit Cost"    G14 = "Total Cost"
+  
+  B15 = 1    C15 = "Lot"    D15 = "Security Guard (4 pax)"    E15 = 1    F15 = 1,066,000.00    G15 = 1,066,000.00 [f: +F15*E15]
+  D16 = "Duration: 11.5 months"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 1,066,000.00 [f: SUM(G15:G29)]
+  B31 = "Purpose:  Hiring of security guards to maintain a secure environment for DMW RO XIII personnel and clients."
+  D33 = "Requested by:"    E33 = "Approved by:"
+  B36 = "Printed Name"    D36 = "REGIENALD S. ESPALDON"    E36 = "RITCHEL M. BUTAO"
+  B37 = "Designation"     D37 = "OIC - ARD / CAO"          E37 = "Regional Director"
+
+==============================================================================
+SHEET 2: "Tarp printing"
+==============================================================================
+Range: B1:J37
+Merges: B1:D1, B2:D2, B8:G9, E30:F30, B31:G32, E33:F33, E36:G36, E37:G37
+
+CELL DATA:
+  B8 = "PURCHASE REQUEST"
+  B11 = "Office/Section:"    C11 = "DMW Caraga"    D11 = "      PR No.:  "    F11 = "Date :"
+  D12 = "      Responsibility Center Code:____________________"
+  B14-G14 = headers
+  
+  B15 = 1    C15 = "Sq.ft"    D15 = "Tarpaulin Printing"    E15 = 1500    F15 = 20.00    G15 = 30,000.00 [f: +F15*E15]
+  D16 = "Duration: 1 year"
+  D17 = "Billing: Bi-weekly, actual billing"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 30,000.00 [f: SUM(G15:G29)]
+  B31 = "Purpose:  Tarpaulin printing for all the activities of DMW Caraga for CY 2026"
+  D33 = "Requested by:"    E33 = "Approved by:"
+  B36 = "Printed Name"    D36 = "REGIENALD S. ESPALDON"    E36 = "RITCHEL M. BUTAO"
+  B37 = "Designation"     D37 = "OIC - ARD / CAO"          E37 = "Regional Director"
+
+==============================================================================
+SHEET 3: "purified drinking water"
+==============================================================================
+Range: B1:J37
+Merges: same pattern
+
+CELL DATA:
+  B15 = 1    C15 = "Gal"    D15 = "Purified Drinking Water"    E15 = 850    F15 = 50.00    G15 = 42,500.00 [f: +F15*E15]
+  D16 = "Duration: 1 year"
+  D17 = "Billing: Monthly, actual billing"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 42,500.00
+  B31 = "Purpose:  Supply and delivery of purified drinking water for CY 2026"
+  Same signatories
+
+==============================================================================
+SHEET 4: "janitorial service"
+==============================================================================
+Range: B1:J37
+Merges: same pattern
+
+CELL DATA:
+  B15 = 1    C15 = "Pax"    D15 = "Janitorial Services"    E15 = 3    F15 = 215,666.67 [f: +G15/E15]    G15 = 647,000.00
+  D16 = "Duration: 11.5 months"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 647,000.00
+  B31 = "Purpose:  Hiring of janitorial services to maintain cleanliness of DMW Caraga CY 2026"
+  Same signatories
+
+==============================================================================
+SHEET 5: "POL"
+==============================================================================
+Range: B1:J37
+Merges: same pattern
+
+CELL DATA:
+  B15 = 1    C15 = "Ltrs"    D15 = "Gas"    E15 = 1,800.00    F15 = 72.00    G15 = 129,600.00 [f: +F15*E15]
+  D16 = "Note:"
+  D17 = "1. Open on Holidays, Saturdays, and Sundays"
+  D18 = "2. Office hours open at least 5:00 AM to 9:00 PM"
+  D19 = "3. Flood Free Areas"
+  D20 = "4. Contract location within the area"
+  D21 = "5. Monthly Billing"
+  D22 = "6. Must be PhilGeps Registered"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 129,600.00
+  B31 = "Purpose:  Supply and delivery of Petroleum Oil (Gas) for CY 2026 (PUMP PRICE) "
+  Same signatories
+
+==============================================================================
+SHEET 6: "Sheet1" (Refrigerators, Microphones, Paper Shredder)
+==============================================================================
+Range: B1:J63
+Merges: B1:D1, B2:D2, B8:G9, E56:F56, B57:G58, E59:F59, E62:G62, E63:G63
+Column D wider: wch=72.86, Col F: wch=11.86
+
+CELL DATA:
+  Item 1: B15=1  C15="Unit"  D15="Refrigerator"  E15=1  F15=37,000  G15=37,000
+    D16="Specs:"  D17="9.5 cu. Ft."  D18="2 door, top freezer"  D19="Frost Free Cooling System"
+    D20="Fresh Safe for Vegetable CaseHighest"  D21="Full Flat Door Panel Image"
+    D22="Fully Automatic Defrost System"  D23="Tempered Shelves"  D24="Inverter Motor"  D25="Warranties"
+  
+  Item 2: B26=2  C26="Unit"  D26="Refrigerator"  E26=1  F26=17,000  G26=17,000
+    D27="Specs:"  D28="3.5 cu. Ft."  D29="Type: Two Door Direct Cool Ref"
+    D30="Capacity, Freezer: 25L"  D31="Capacity, Fresh Food: 71L"
+    D32="Temperature Control: Mechanical Control Knob"  D33="Defrost System: Manual"  D34="Warranties"
+  
+  Item 3: B35=3  C35="Unit"  D35="Dual Wireless Microphone"  E35=2  F35=25,000  G35=50,000
+    D36="Specs:"  D37="must come with receiver"  D38="Balanced outputs:+10dB(XLR)"
+    D39="Unbalanced outputs:+4dB(1/4\" 6.3mm jack socket)"
+    D40="Adjacent channel interference ratio: 80dB"  D41="Image interference Ratio:80dB"
+    D42="RF Outputs:8mW ~ 30mW"  D43="Harmonic suppression:>50dB"
+    D44="With Free Two (4) XLR Wire, male to female (2m each)"  D45="Warranties"
+  
+  Item 4: B46=4  C46="Unit"  D46="Paper Shredder"  E46=2  F46=25,000  G46=50,000
+    D47="Specs:"  D48="Shreds 16 sheets per pass into 4 x 38mm cross-cut particles (Security Level P-4)"
+    D49="100% Jam Proof System eliminate paper jams and powers through tough jobs"
+    D50="Auto Start/Stop: Yes - Electronic"  D51="Bin Capacity (gallons): 6"
+    D52="Run Time (minutes): Up to 20"  D53="Sheet Capacity: 16"  D54="Shreds Per Sheet: 397"
+  
+  E56 = "TOTAL AMOUNT"    G56 = 154,000.00 [f: SUM(G15:G55)]
+  B57 = "Purpose:  To support office operations by providing proper storage for supplies and refreshments (refrigerators), improving audio setup for meetings and activities (dual wireless microphone), and ensuring secure disposal of documents (paper shredder)."
+  D59 = "Requested by:"    E59 = "Approved by:"
+  B62 = "Printed Name"    D62 = "REGIENALD S. ESPALDON"    E62 = "RITCHEL M. BUTAO"
+  B63 = "Designation"     D63 = "Chief Administrative Officer"  E63 = "OIC, Regional Director"
+
+==============================================================================
+SHEET 7: "courier"
+==============================================================================
+Range: B1:J42
+Merges: B1:D1, B2:D2, B8:G9, E35:F35, B36:G37, E38:F38, E41:G41, E42:G42
+
+CELL DATA:
+  D11 = "      PR No.:  2026-01-0009"    G11 = "Jan. 6, 2026"
+  
+  B15 = 1    C15 = "Lot"    D15 = "Letters / Pouches"
+  D16 = "From: Metro Manila/Luzon/Visayas/Mindanao"
+  D17 = "To: Metro Manila/Luzon/Visayas/Mindanao"
+  
+  Sub-items (no item number, just description rows):
+  D19 = "Letter Gram (Max weight: 250g)"     E19=24   F19=75    G19=1,800
+  D20 = "Small (Max weight: 500g)"           E20=10   F20=120   G20=1,200
+  D21 = "Medium (Max weight: 1kg)"           E21=10   F21=145   G21=1,450
+  D22 = "Large (Max weight: 1.5kg)"          E22=10   F22=180   G22=1,800
+  D23 = "Pouch (Max weight: 2kg)"            E23=10   F23=240   G23=2,400
+  
+  D25 = "Letters / Pouches (Containing with commercial value)"
+  D26 = "From: Metro Manila/Luzon/Visayas/Mindanao"
+  D27 = "To: Metro Manila/Luzon/Visayas/Mindanao"
+  
+  D29 = "Small (Max weight: 500g)"           E29=23   F29=140   G29=3,220
+  D30 = "Medium (Max weight: 1kg)"           E30=10   F30=170   G30=1,700
+  D31 = "Large (Max weight: 1.5kg)"          E31=10   F31=190   G31=1,900
+  D32 = "Pouch (Max weight: 2kg)"            E32=10   F32=250   G32=2,500
+  
+  D34 = "Billing: Actual, monthly"
+  E35 = "TOTAL AMOUNT"    G35 = 17,970.00
+  B36 = "Purpose:  Courier services for DMW Caraga 2026"
+  Same signatories (OIC - ARD / CAO, Regional Director)
+
+==============================================================================
+SHEET 8: "monoblock chair"
+==============================================================================
+Range: B1:J37
+Merges: same pattern
+
+CELL DATA:
+  D11 = "      PR No.:  2026-01-0011"    G11 = "Jan. 15, 2026"
+  
+  B15 = 1    C15 = "Pcs"    D15 = "Monoblock Chairs"    E15 = 60    F15 = 360    G15 = 21,600
+  D16 = "Specs:"    D17 = "•Color: Beige"    D18 = "•No arm rest"    D19 = "•Plastic"
+  
+  E30 = "TOTAL AMOUNT"    G30 = 21,600.00
+  B31 = "Purpose:  Procurement of monoblock chairs for DMW Caraga"
+  Same signatories
+
+==============================================================================
+SHEET 9: "Sheet2" (Furniture: Chairs, Cabinets, Racks, Tables)
+==============================================================================
+Range: B1:Q51
+Merges: B1:D1, B2:D2, B8:G9, E44:F44, B45:G46, E47:F47, E50:G50, E51:G51
+Note: Has extra data in cols K-Q (allocation lists, not part of PR form)
+
+  D11 = "      PR No.:  2026-01-0011"    G11 = "Jan. 15, 2026"
+
+  Item 1: B15=1  C15="Pcs"  D15="Stackable Chair"  E15=20  F15=1,100  G15=22,000
+    D16="Specs:"  D17="•Modern Design"  D18="•Meeting Chair"  D19="•Leather ergonomic"
+    D20="•Color: Black"  D21="•Metal base"
+  
+  Item 2: B22=2  C22="Pcs"  D22="Pedestal Cabinet with keys"  E22=14  F22=5,000  G22=70,000
+    D23="Specs:"  D24="•3 sliding cabinets"  D25="•Metal Type"  D26="•Color: White or beige"
+  
+  Item 3: B27=3  C27="Unit"  D27="Steel Cabinet"  E27=1  F27=8,000  G27=8,000
+    D28="Specs:"  D29="•Metal"  D30="•With lock"  D31="•3 or more drawers (sliding)"
+  
+  Item 4: B32=4  C32="Unit"  D32="Metal Rack"  E32=2  F32=2,000  G32=4,000
+    D33="Specs:"  D34="•4 ~ 5 racks"  D35="•L:100cm, H: 180cm, W: 30cm (size should be exact or higher)"
+    D36="•With installation"
+  
+  Item 5: B37=5  C37="Unit"  D37="Office Table"  E37=3  F37=9,500  G37=28,500
+    D38="Gray"  D39="Steel type"  D40="3 or more drawer"
+  
+  Item 6: B41=6  C41="Unit"  D41="Office Chairs"  E41=3  F41=7,000  G41=21,000
+    D42="Mesh"  D43="Black"
+  
+  E44 = "TOTAL AMOUNT"    G44 = 153,500.00
+  B45 = "Purpose:  "
+  Same signatories
+
+==============================================================================
+SHEET 10: "Sheet3" (Wall Mount Bracket, TV Stand)
+==============================================================================
+Range: B1:J38
+Merges: B1:D1, B2:D2, B8:G9, E31:F31, B32:G33, E34:F34, E37:G37, E38:G38
+
+CELL DATA:
+  Item 1: B15=1  C15="Set"  D15="Wall Mount Bracket"  E15=1  G15=0 (no price filled)
+    D16="Specs:"  D17="•Suitable for 55\" tv"  D18="•free screws, tux, etc."
+    D19="•rust proof"  D20="•VESA compliant"
+  
+  Item 2: B21=2  C21="Unit"  D21="TV Stand"  E21=2
+    D22="•Movable"  D23="•Suitable for 55\" tv"  D24="•free screws, tux, etc."
+    D25="•rust proof"  D26="•VESA compliant"
+  
+  E31 = "TOTAL AMOUNT"    G31 = 0 (prices not yet filled)
+  B32 = "Purpose:  Procurement of monoblock chairs for DMW Caraga" (copy-paste error in original)
+  Same signatories
+
+==============================================================================
+SHEET 11: "mic and ref"
+==============================================================================
+Range: B1:J51
+Merges: B1:D1, B2:D2, B8:G9, E44:F44, B45:G46, E47:F47, E50:G50, E51:G51
+  D11 = "      PR No.:  2026-01-0015"    G11 = "Jan. 26, 2026"
+
+  Item 1: B15=1  C15="Unit"  D15="Refrigerator"  E15=1  F15=37,000  G15=37,000
+    D16="Specs:"  D17="9.5 cu. Ft."  D18="2 door, top freezer"
+    D19="Frost Free Cooling System"  D20="Fresh Safe for Vegetable CaseHighest"
+    D21="Full Flat Door Panel Image"  D22="Fully Automatic Defrost System"
+    D23="Tempered Shelves"  D24="Inverter Motor"  D25="Warranties"
+  
+  Item 2: B26=2  C26="Unit"  D26="Refrigerator"  E26=1  F26=17,000  G26=17,000
+    D27="Specs:"  D28="3.5 cu. Ft."  D29="Type: Two Door Direct Cool Ref"
+    D30="Capacity, Freezer: 25L"  D31="Capacity, Fresh Food: 71L"
+    D32="Temperature Control: Mechanical Control Knob"  D33="Defrost System: Manual"  D34="Warranties"
+  
+  Item 3: B35=3  C35="Unit"  D35="Wireless Microphone"  E35=1  F35=28,000  G35=28,000
+    D36="Specs:"  D37="must come with receiver"  D38="4 microphones"
+    D39="Frequency Response: 80Hz~15KHz (+3dB)"  D40="Harmonic Interference Ratio: -50dB"
+    D41="Cartridge: Dynamic"  D42="With Free Two (4) XLR Wire, male to female (2m each)"
+    D43="Warranties"
+    I35 = [Shopee URL link for reference]
+  
+  E44 = "TOTAL AMOUNT"    G44 = 82,000.00 [f: SUM(G15:G43)]
+  B45 = "Purpose:  To support office operations by providing proper storage for supplies and refreshments (refrigerators), improving audio setup for meetings and activities (dual wireless microphone)."
+  D47 = "Requested by:"    E47 = "Approved by:"
+  B50 = "Printed Name"    D50 = "REGIENALD S. ESPALDON"    E50 = "RITCHEL M. BUTAO"
+  B51 = "Designation"     D51 = "Chief Administrative Officer"  E51 = "OIC, Regional Director"
+
+==============================================================================
+SHEET 12: "drum toner"
+==============================================================================
+Range: B1:J38
+Merges: B1:D1, B2:D2, B8:G9, E31:F31, B32:G33, E34:F34, E37:G37, E38:G38
+
+CELL DATA:
+  B15 = 1    C15 = "Set"    D15 = "Drum Toner"    E15 = 10    F15 = 4,500    G15 = 45,000 [f: +F15*E15]
+  D16 = "Specs:"    D17 = "•Compatible with Fuji Apeos 4620SX"
+  
+  E31 = "TOTAL AMOUNT"    G31 = 45,000.00
+  B32 = "Purpose:  Procurement of drum toner for DMW photocopiers"
+  D34 = "Requested by:"    E34 = "Approved by:"
+  B37 = "Printed Name"    D37 = "REGIENALD S. ESPALDON"    E37 = "RITCHEL M. BUTAO"
+  B38 = "Designation"     D38 = "OIC - ARD / CAO"          E38 = "Regional Director"
+
+==============================================================================
+SHEET 13: "supplies"
+==============================================================================
+Range: B1:N38
+Merges: B1:D1, B2:D2, B8:G9, E31:F31, B32:G33, E34:F34, E37:G37, E38:G38
+Note: Has extra tax calculation columns in L-N (not part of PR form)
+
+  Items (unit prices in col I, not filled in F - prices appear incomplete):
+  C15="Gal"  D15="Glass Cleaner - 4L/Gal"    E15=20   I15=350
+  D16="Glass Wiper"                            E16=20   I16=150
+  D17="Bleach - 4L/Gal"                       E17=20   I17=185
+  C18="Can"  D18="Air Freshener - "            E18=20   I18=265
+  C19="Pouch" D19="Cleanser Powder - 1 kl"    E19=17   I19=200
+  D20="Toilet Deodorizer - Large"              E20=20   I20=75
+  C21="Pcs"  D21="Toilet Gloves"               E21=6    I21=100
+  
+  E31 = "TOTAL AMOUNT"    G31 = 0 (prices not filled in col F/G)
+  B32 = "Purpose:  Procurement of drum toner for DMW photocopiers" (copy-paste from drum toner sheet)
+  
+  Tax calculations in cols L-N:
+  N6 = G31 total, M7=5%, M8=1%, L9="Total Vat", L10="Net", L11=25%, L12="Overall"
+  
+  Same signatories (OIC - ARD / CAO, Regional Director)
+
+==============================================================================
+ROW HEIGHTS (typical for all sheets)
+==============================================================================
+Most rows: height=15.75 hpt
+Special rows (12,13,14, total amount row): height=16.5 hpt
+Purpose rows: height=14.45-15 hpt

@@ -1611,7 +1611,14 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
 app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     const pr = await pool.query(
-      `SELECT pr.*, d.name as department_name, d.code as department_code FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id WHERE pr.id = $1`,
+      `SELECT pr.*, d.name as department_name, d.code as department_code,
+              u1.full_name as requested_by_name, u1.designation as requested_by_designation,
+              u2.full_name as approved_by_name, u2.designation as approved_by_designation
+       FROM purchaserequests pr
+       LEFT JOIN departments d ON pr.dept_id = d.id
+       LEFT JOIN users u1 ON pr.requested_by = u1.id
+       LEFT JOIN users u2 ON pr.approved_by = u2.id
+       WHERE pr.id = $1`,
       [req.params.id]
     );
     if (pr.rows.length === 0) return res.status(404).json({ error: 'PR not found' });

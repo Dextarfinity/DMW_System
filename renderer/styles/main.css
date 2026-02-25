@@ -104,8 +104,8 @@ body {
 }
 
 .sidebar-logo-img {
-  width: 46px;
-  height: 46px;
+  width: 70px;
+  height: 70px;
   object-fit: contain;
   flex-shrink: 0;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,0.2));
@@ -2753,14 +2753,22 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 3000;
+  overflow: hidden;
 }
 .login-overlay::before {
   content: '';
   position: absolute;
+  top: -20px; left: -20px; right: -20px; bottom: -20px;
+  background: url('../assets/dmw-background.jpeg') center/cover no-repeat;
+  filter: blur(12px);
+  z-index: 0;
+}
+.login-overlay::after {
+  content: '';
+  position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background:
-    radial-gradient(ellipse at 30% 50%, rgba(26,54,93,0.5) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(15,39,68,0.4) 0%, transparent 50%);
+  background: rgba(10, 30, 60, 0.65);
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -2873,22 +2881,23 @@ body {
 }
 
 .login-republic {
-  font-size: 9.5px;
-  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
   text-transform: uppercase;
   letter-spacing: 3px;
   font-weight: 500;
+  font-style: italic;
 }
 
 .login-dept {
-  font-family: 'Old English Text MT', 'UnifrakturMaguntia', serif;
-  font-size: 24px;
-  font-weight: 400;
+  font-family: 'Old English Text MT', 'UnifrakturMaguntia', 'Times New Roman', serif;
+  font-size: 28px;
+  font-weight: 700;
   color: #fff;
   letter-spacing: 0.3px;
   margin: 6px 0 2px;
   text-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .login-regional {

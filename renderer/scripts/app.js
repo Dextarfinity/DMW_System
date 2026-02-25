@@ -80,13 +80,13 @@ try {
     // fallback: try renderer/assets from workspace root
     const altDir = nodePath.join(__dirname, 'assets');
     if (fs.existsSync(altDir)) {
-      const dmwFile = nodePath.join(altDir, 'dmw-logo.png');
+      const dmwFile = nodePath.join(altDir, 'image.png');
       const bpFile = nodePath.join(altDir, 'bagong-pilipinas.png');
       if (fs.existsSync(dmwFile)) { dmwLogoBase64 = 'data:image/png;base64,' + fs.readFileSync(dmwFile).toString('base64'); dmwLogoFilePath = dmwFile; }
       if (fs.existsSync(bpFile)) { bagongPilipinasBase64 = 'data:image/png;base64,' + fs.readFileSync(bpFile).toString('base64'); bpLogoFilePath = bpFile; }
     }
   } else {
-    const dmwFile = nodePath.join(assetsDir, 'dmw-logo.png');
+    const dmwFile = nodePath.join(assetsDir, 'image.png');
     const bpFile = nodePath.join(assetsDir, 'bagong-pilipinas.png');
     if (fs.existsSync(dmwFile)) { dmwLogoBase64 = 'data:image/png;base64,' + fs.readFileSync(dmwFile).toString('base64'); dmwLogoFilePath = dmwFile; }
     if (fs.existsSync(bpFile)) { bagongPilipinasBase64 = 'data:image/png;base64,' + fs.readFileSync(bpFile).toString('base64'); bpLogoFilePath = bpFile; }
@@ -1977,7 +1977,7 @@ function renderPRTable(pr) {
           <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
           ${p.status === 'pending_approval' ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ''}
           <button class="btn-icon" title="Edit" onclick="showEditPRModal(${p.id})"><i class="fas fa-edit"></i></button>
-          <button class="btn-icon" title="Print" onclick="printRecord('PR', '${p.pr_number}')"><i class="fas fa-print"></i></button>
+          <button class="btn-icon" title="Print" onclick="printPR(${p.id})"><i class="fas fa-print"></i></button>
           <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PR', ${p.id})"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -2008,6 +2008,7 @@ function renderRFQTable(rfq) {
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewRFQModal(${r.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
           <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -10335,7 +10336,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       ${getViewAttachmentSectionHTML('purchase_request', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-        <button type="button" class="btn btn-outline" onclick="printRecord('PR', '${p.pr_number}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
     openModal('View Purchase Request', html);
@@ -10358,6 +10359,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       ${getViewAttachmentSectionHTML('rfq', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRFQ(${id});"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
     openModal('View RFQ Details', html);
@@ -12236,14 +12238,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <tbody class="page-body-group">
               <tr><td>${bodyContent}</td></tr>
             </tbody>
-          </table>async function(recordType, recordId) {
-    let record = null;
-    // Try to fetch actual record data from DB for accurate printing
-    try {
-      if (recordType === 'PO') record = cachedPO.find(p => p.id == recordId || p.po_number == recordId);
-      else if (recordType === 'PR') record = cachedPR.find(p => p.id == recordId || p.pr_number == recordId);
-    } catch(e) {}
-    const printContent = getPrintContent(recordType, recordId, recor
+          </table>
       </html>`;
   }
 
@@ -12253,7 +12248,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const printContent = getPrintContent(recordType, recordId);
     const title = recordType + ' - ' + recordId;
     const html = buildPrintHTML(title, printContent);
-    openPrintPreview(html, { title: toFilename(title) });
+    openPrintPreview(html, { title: toFilename(title), editable: true });
   };
 
   // Print IAR with full data fetched from API
@@ -12341,10 +12336,567 @@ Failure to submit the above requirements within the prescribed period shall cons
       `;
 
       const html = buildPrintHTML('IAR - ' + iar.iar_number, bodyContent);
-      openPrintPreview(html, { title: toFilename('IAR_' + iar.iar_number) });
+      openPrintPreview(html, { title: toFilename('IAR_' + iar.iar_number), editable: true });
     } catch (err) {
       console.error('Print IAR error:', err);
       showNotification('Failed to print IAR: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT PR (PURCHASE REQUEST) ====================
+  // Fetches full PR + items from API and renders official DMW Purchase Request form
+  window.printPR = async function(prId) {
+    try {
+      showNotification('Loading Purchase Request data for print...', 'info');
+      // Find PR from cache to get the id if prId is a pr_number
+      let id = prId;
+      if (typeof prId === 'string' && isNaN(prId)) {
+        const cached = cachedPR.find(p => p.pr_number === prId);
+        if (cached) id = cached.id;
+      }
+      const pr = await apiRequest('/purchase-requests/' + id);
+      if (!pr) { showNotification('Purchase Request not found', 'error'); return; }
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Build item rows
+      const items = pr.items || [];
+      let itemsHTML = '';
+      let grandTotal = 0;
+
+      if (items.length > 0) {
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity || 0);
+          const unitCost = parseFloat(item.unit_price || 0);
+          const totalCost = qty * unitCost;
+          grandTotal += totalCost;
+
+          // Main item row
+          itemsHTML += `
+            <tr>
+              <td class="pr-cell-center">${idx + 1}</td>
+              <td class="pr-cell-center">${item.unit || ''}</td>
+              <td class="pr-cell-desc"><strong>${item.item_name || ''}</strong></td>
+              <td class="pr-cell-center">${qty}</td>
+              <td class="pr-cell-right">${fmtCurrency(unitCost)}</td>
+              <td class="pr-cell-right">${fmtCurrency(totalCost)}</td>
+            </tr>`;
+
+          // Description/specs row (if any)
+          if (item.item_description) {
+            itemsHTML += `
+            <tr>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-desc pr-item-specs">${item.item_description}</td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-right"></td>
+              <td class="pr-cell-right"></td>
+            </tr>`;
+          }
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Use total_amount from PR if available, otherwise calculated
+      const totalAmount = parseFloat(pr.total_amount || 0) > 0 ? parseFloat(pr.total_amount) : grandTotal;
+
+      // Add empty rows to fill space (minimum ~15 visible rows for form look)
+      const minRows = 15;
+      const currentRows = items.length + items.filter(i => i.item_description).length;
+      for (let i = currentRows; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="pr-cell-center">&nbsp;</td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-desc"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-right"></td>
+              <td class="pr-cell-right"></td>
+            </tr>`;
+      }
+
+      const bodyContent = `
+        <style>
+          /* PR-specific print styles matching official DMW form */
+          .pr-form-title {
+            text-align: center;
+            font-size: 16pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 8px 0 2px 0;
+            letter-spacing: 1px;
+          }
+          .pr-appendix {
+            text-align: center;
+            font-size: 8pt;
+            font-style: italic;
+            font-family: Arial, sans-serif;
+            margin-bottom: 10px;
+            color: #444;
+          }
+          .pr-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-info-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .pr-info-label {
+            font-weight: normal;
+            color: #333;
+            white-space: nowrap;
+            width: 22%;
+          }
+          .pr-info-value {
+            font-weight: bold;
+          }
+          .pr-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-items-table thead th {
+            border: 1px solid #333;
+            padding: 6px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            background: #f5f5f5;
+            vertical-align: middle;
+          }
+          .pr-items-table tbody td {
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-size: 10pt;
+            vertical-align: top;
+          }
+          .pr-cell-center { text-align: center; }
+          .pr-cell-right { text-align: right; }
+          .pr-cell-desc { text-align: left; }
+          .pr-item-specs {
+            font-weight: normal;
+            font-size: 9pt;
+            color: #444;
+            padding-left: 20px !important;
+            white-space: pre-line;
+          }
+          .pr-total-row td {
+            border: 1px solid #333;
+            padding: 5px 6px;
+            font-size: 10pt;
+            font-weight: bold;
+          }
+          .pr-purpose-row td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            font-size: 10pt;
+            vertical-align: top;
+          }
+          .pr-sig-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-sig-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .pr-sig-name {
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            padding-top: 30px !important;
+          }
+          .pr-sig-designation {
+            text-align: center;
+            font-size: 8pt;
+            color: #444;
+            padding-bottom: 8px !important;
+          }
+        </style>
+
+        <div class="pr-form-title">PURCHASE REQUEST</div>
+
+        <table class="pr-info-table">
+          <tr>
+            <td class="pr-info-label">Office/Section:</td>
+            <td class="pr-info-value" style="width:28%;">${pr.department_name || pr.department_code || 'DMW Caraga'}</td>
+            <td class="pr-info-label" style="width:15%;">PR No.:</td>
+            <td class="pr-info-value" style="width:20%;">${pr.pr_number || ''}</td>
+          </tr>
+          <tr>
+            <td class="pr-info-label">Responsibility Center Code:</td>
+            <td class="pr-info-value" colspan="1">${pr.department_code || ''}</td>
+            <td class="pr-info-label">Date:</td>
+            <td class="pr-info-value">${fmtDate(pr.pr_date || pr.created_at)}</td>
+          </tr>
+        </table>
+
+        <table class="pr-items-table">
+          <thead>
+            <tr>
+              <th style="width:8%;">Item No.</th>
+              <th style="width:10%;">Unit</th>
+              <th>Item Description</th>
+              <th style="width:10%;">Quantity</th>
+              <th style="width:13%;">Unit Cost</th>
+              <th style="width:15%;">Total Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+            <tr class="pr-total-row">
+              <td colspan="3"></td>
+              <td colspan="2" style="text-align:right;">TOTAL AMOUNT</td>
+              <td style="text-align:right;">₱${fmtCurrency(totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="pr-info-table" style="margin:0;">
+          <tr class="pr-purpose-row">
+            <td style="width:12%; font-weight:bold;">Purpose:</td>
+            <td colspan="3">${pr.purpose || ''}</td>
+          </tr>
+        </table>
+
+        <table class="pr-sig-table">
+          <tr>
+            <td style="width:50%; text-align:center; padding-top:5px;">Requested by:</td>
+            <td style="width:50%; text-align:center; padding-top:5px;">Approved by:</td>
+          </tr>
+          <tr>
+            <td class="pr-sig-name">${pr.requested_by_name || ''}</td>
+            <td class="pr-sig-name">${pr.approved_by_name || ''}</td>
+          </tr>
+          <tr>
+            <td class="pr-sig-designation">Division Head</td>
+            <td class="pr-sig-designation">Head of Procuring Entity / Authorized Representative</td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('PR - ' + pr.pr_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('PR_' + pr.pr_number), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print PR error:', err);
+      showNotification('Failed to print Purchase Request: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT RFQ (REQUEST FOR QUOTATION) ====================
+  // Fetches full RFQ + items from API and renders official DMW RFQ form
+  window.printRFQ = async function(rfqId) {
+    try {
+      showNotification('Loading RFQ data for print...', 'info');
+      let id = rfqId;
+      if (typeof rfqId === 'string' && isNaN(rfqId)) {
+        const cached = cachedRFQ.find(r => r.rfq_number === rfqId);
+        if (cached) id = cached.id;
+      }
+      const rfq = await apiRequest('/rfqs/' + id);
+      if (!rfq) { showNotification('RFQ not found', 'error'); return; }
+
+      const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const months = ['Jan.','Feb.','Mar.','Apr.','May','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Build item rows
+      const items = rfq.items || [];
+      let itemsHTML = '';
+      let abcTotal = 0;
+
+      if (items.length > 0) {
+        items.forEach((item) => {
+          const qty = parseFloat(item.quantity || 0);
+          const abcUnitCost = parseFloat(item.abc_unit_cost || 0);
+          const abcItemTotal = qty * abcUnitCost;
+          abcTotal += abcItemTotal;
+
+          // Main item row
+          itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center">${qty}</td>
+              <td class="rfq-cell-center">${item.unit || ''}</td>
+              <td class="rfq-cell-desc"><strong>${item.item_name || ''}</strong></td>
+              <td class="rfq-cell-right">${fmtCurrency(abcItemTotal)}</td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+
+          // Description/specs rows
+          if (item.item_description) {
+            const specLines = item.item_description.split(/\\n|\n/).filter(l => l.trim());
+            specLines.forEach(line => {
+              itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-specs">${line.trim()}</td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+            });
+          }
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Fill empty rows for form look
+      const minRows = 12;
+      const currentRows = items.length + items.filter(i => i.item_description).reduce((c, i) => c + (i.item_description.split(/\\n|\n/).filter(l => l.trim()).length), 0);
+      for (let i = currentRows; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center">&nbsp;</td>
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-desc"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+      }
+
+      const totalABC = parseFloat(rfq.abc_amount || 0) > 0 ? parseFloat(rfq.abc_amount) : abcTotal;
+
+      const bodyContent = `
+        <style>
+          .rfq-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 8px 0 12px 0;
+            letter-spacing: 1px;
+          }
+          .rfq-info-row {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            margin: 3px 0;
+            line-height: 1.5;
+          }
+          .rfq-info-row .rfq-label {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 140px;
+          }
+          .rfq-info-right {
+            float: right;
+            text-align: right;
+          }
+          .rfq-body-text {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            margin: 6px 0;
+            text-align: justify;
+          }
+          .rfq-body-text.indent {
+            text-indent: 30px;
+          }
+          .rfq-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 0 0;
+            font-family: Arial, sans-serif;
+          }
+          .rfq-items-table thead th {
+            border: 1px solid #333;
+            padding: 5px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            background: #f5f5f5;
+          }
+          .rfq-items-table tbody td {
+            border: 1px solid #333;
+            padding: 2px 5px;
+            font-size: 9.5pt;
+            vertical-align: top;
+          }
+          .rfq-cell-center { text-align: center; }
+          .rfq-cell-right { text-align: right; }
+          .rfq-cell-desc { text-align: left; }
+          .rfq-cell-specs {
+            text-align: left;
+            font-size: 9pt;
+            padding-left: 15px !important;
+            color: #333;
+          }
+          .rfq-total-row td {
+            border: 1px solid #333;
+            padding: 4px 5px;
+            font-size: 9.5pt;
+            font-weight: bold;
+          }
+          .rfq-sig-section {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            margin-top: 12px;
+          }
+          .rfq-sig-line {
+            border-bottom: 1px solid #333;
+            height: 30px;
+            margin: 10px 0 3px 0;
+            width: 250px;
+          }
+          .rfq-sig-label {
+            font-size: 8.5pt;
+            color: #444;
+            text-align: center;
+            width: 250px;
+          }
+          .rfq-terms {
+            font-family: Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.5;
+          }
+          .rfq-terms-row {
+            display: flex;
+            margin: 1px 0;
+          }
+          .rfq-terms-num {
+            min-width: 20px;
+            text-align: right;
+            padding-right: 6px;
+          }
+          .rfq-conforme {
+            margin-top: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+          }
+          .rfq-two-col {
+            display: flex;
+            justify-content: space-between;
+          }
+          .rfq-col-left { width: 48%; }
+          .rfq-col-right { width: 48%; text-align: center; }
+        </style>
+
+        <div class="rfq-title">REQUEST FOR QUOTATION</div>
+
+        <div class="rfq-two-col">
+          <div class="rfq-col-left"></div>
+          <div class="rfq-col-right" style="text-align:right;">
+            <div class="rfq-info-row"><span class="rfq-label">RFQ No.:</span> ${rfq.rfq_number || ''}</div>
+            <div class="rfq-info-row"><span class="rfq-label">Date:</span> ${fmtDate(rfq.date_prepared)}</div>
+          </div>
+        </div>
+
+        <div class="rfq-info-row"><span class="rfq-label">Company Name:</span> ___________________________________</div>
+        <div class="rfq-info-row"><span class="rfq-label">Company Address:</span> ___________________________________</div>
+        <div class="rfq-info-row"><span class="rfq-label">TIN:</span> ___________________________________</div>
+
+        <div style="margin-top:10px;">
+          <div class="rfq-body-text">Sir/Madam:</div>
+          <div class="rfq-body-text indent">May we invite your company to quote for the lowest price/s, VAT included, on the item/s listed and described hereunder.</div>
+          <div class="rfq-body-text">Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary <strong>GIOVANNI S. PAREDES</strong>__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City, Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which shall be stamped thereon the date and time received by the BAC Secretariat.</div>
+          <div class="rfq-body-text indent">The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond 8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically disqualified.</div>
+          <div class="rfq-body-text indent">The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and those submitted after the deadline.</div>
+        </div>
+
+        <div class="rfq-sig-section">
+          <div style="text-align:right; margin-right:40px;">Very truly yours,</div>
+          <div class="rfq-two-col" style="margin-top:5px;">
+            <div class="rfq-col-left">
+              <div>Served by:</div>
+              <div class="rfq-sig-line"></div>
+              <div style="margin-top:15px;">Date:________________________</div>
+            </div>
+            <div class="rfq-col-right">
+              <div class="rfq-sig-line" style="margin:10px auto 3px auto;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:5px; border-top:1px dashed #999; padding-top:5px;"></div>
+
+        <table class="rfq-items-table">
+          <thead>
+            <tr>
+              <th style="width:8%;">Quantity</th>
+              <th style="width:10%;">Unit</th>
+              <th>Item (with specification)</th>
+              <th style="width:12%;">ABC</th>
+              <th style="width:13%;">Unit Cost</th>
+              <th style="width:13%;">Total Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+            <tr class="rfq-total-row">
+              <td colspan="3" style="text-align:right;">VAT INCLUSIVE</td>
+              <td style="text-align:right;">₱${fmtCurrency(totalABC)}</td>
+              <td style="text-align:right;"></td>
+              <td style="text-align:right;"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="rfq-two-col" style="margin-top:10px;">
+          <div class="rfq-col-left rfq-sig-section">
+            <div>Received by:</div>
+            <div class="rfq-sig-line"></div>
+            <div class="rfq-sig-label">(Name &amp; Signature of Proprietor/<br>Authorized Representative)</div>
+            <div style="margin-top:6px;">Telephone/Fax No. ___________________</div>
+            <div style="margin-top:3px;">Email ___________________________________</div>
+          </div>
+          <div class="rfq-col-right"></div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="rfq-info-row"><span class="rfq-label">PR No.:</span> ${rfq.pr_number || ''}</div>
+        </div>
+
+        <div class="rfq-terms" style="margin-top:8px;">
+          <div style="font-weight:bold; margin-bottom:4px;">Terms &amp; Conditions:</div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">1.</span><span>Award shall be made on &emsp; ___Per Item Basis &emsp; ___Lot/Package &emsp; ___Total Quoted</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">2.</span><span>Quotation validity shall not be less than 30 calendar days</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">3.</span><span>Must be registered with PhilGEPS.</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">4.</span><span>Goods shall be delivered within: one to three working days after the award has been made</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">5.</span><span>Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">6.</span><span>Term of Payment is Check / ADA</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">7.</span><span>Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">8.</span><span>In case of discrepancy between unit and total cost, unit cost shall prevail</span></div>
+        </div>
+
+        <div class="rfq-conforme" style="text-align:right; margin-right:40px;">
+          <div>Conforme:</div>
+          <div class="rfq-sig-line" style="margin:25px 0 3px auto;"></div>
+          <div class="rfq-sig-label" style="margin-left:auto;">Name &amp; Signature of Proprietor/<br>Authorized Representative</div>
+        </div>
+      `;
+
+      const html = buildPrintHTML('RFQ - ' + rfq.rfq_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('RFQ_' + rfq.rfq_number), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print RFQ error:', err);
+      showNotification('Failed to print RFQ: ' + err.message, 'error');
     }
   };
 

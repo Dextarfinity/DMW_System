@@ -1,0 +1,576 @@
+=== WORKBOOK INFO ===
+Sheet Names: ["ARTA ID","meals - likha","tokens - likha","sling bag"]
+
+================================================================================
+=== SHEET: "ARTA ID" ===
+================================================================================
+Range: B2:K83
+
+--- MERGED CELLS ---
+  E80:F80 (rows 80-80, cols 5-6)
+  B83:K83 (rows 83-83, cols 2-11)
+  B24:I24 (rows 24-24, cols 2-9)
+  C27:I27 (rows 27-27, cols 3-9)
+  B28:I28 (rows 28-28, cols 2-9)
+  E33:F33 (rows 33-33, cols 5-6)
+  B35:C35 (rows 35-35, cols 2-3)
+  E79:F79 (rows 79-79, cols 5-6)
+  C23:I23 (rows 23-23, cols 3-9)
+  H9:I9 (rows 9-9, cols 8-9)
+  J9:K9 (rows 9-9, cols 10-11)
+  D10:E10 (rows 10-10, cols 4-5)
+  H10:I10 (rows 10-10, cols 8-9)
+  D11:E11 (rows 11-11, cols 4-5)
+  D12:E12 (rows 12-12, cols 4-5)
+  D13:E13 (rows 13-13, cols 4-5)
+  C17:I17 (rows 17-17, cols 3-9)
+  B19:I19 (rows 19-19, cols 2-9)
+  B20:I20 (rows 20-20, cols 2-9)
+  B21:I21 (rows 21-21, cols 2-9)
+  B8:F8 (rows 8-8, cols 2-6)
+  J8:K8 (rows 8-8, cols 10-11)
+  B2:K2 (rows 2-2, cols 2-11)
+  B3:I3 (rows 3-3, cols 2-9)
+  B4:I4 (rows 4-4, cols 2-9)
+  B5:I5 (rows 5-5, cols 2-9)
+  B7:I7 (rows 7-7, cols 2-9)
+
+--- COLUMN WIDTHS ---
+  Col A (1): width=1.33, wpx=17, wch=1.33, hidden=false
+  Col B (2): width=13.33, wpx=125, wch=13.33, hidden=false
+  Col C (3): width=23.22, wpx=214, wch=23.22, hidden=false
+  Col D (4): width=81.33, wpx=737, wch=81.33, hidden=false
+  Col E (5): width=14.44, wpx=135, wch=14.44, hidden=false
+  Col F (6): width=17, wpx=158, wch=17, hidden=false
+  Col G (7): width=17, wpx=158, wch=17, hidden=false
+  Col I (9): width=3.89, wpx=40, wch=3.89, hidden=false
+  Col J (10): width=7.33, wpx=71, wch=7.33, hidden=false
+  Col K (11): width=10.56, wpx=100, wch=10.56, hidden=false
+
+--- ROW HEIGHTS ---
+  Row 4: hpt=27.6, hpx=27.600000000000005, hidden=false
+  Row 5: hpt=25.5, hpx=25.5, hidden=false
+  Row 7: hpt=18.6, hpx=18.6, hidden=false
+  Row 8: hpt=18.6, hpx=18.6, hidden=false
+  Row 38: hpt=15, hpx=15, hidden=false
+  Row 39: hpt=15, hpx=15, hidden=false
+  Row 40: hpt=15.6, hpx=15.6, hidden=false
+  Row 41: hpt=15.6, hpx=15.6, hidden=false
+  Row 42: hpt=15.6, hpx=15.6, hidden=false
+  Row 43: hpt=15.6, hpx=15.6, hidden=false
+  Row 44: hpt=15.6, hpx=15.6, hidden=false
+  Row 45: hpt=15.6, hpx=15.6, hidden=false
+  Row 46: hpt=15.6, hpx=15.6, hidden=false
+  Row 47: hpt=15.6, hpx=15.6, hidden=false
+  Row 48: hpt=15.6, hpx=15.6, hidden=false
+  Row 49: hpt=15.6, hpx=15.6, hidden=false
+  Row 50: hpt=15.6, hpx=15.6, hidden=false
+  Row 51: hpt=15.6, hpx=15.6, hidden=false
+  Row 52: hpt=15.6, hpx=15.6, hidden=false
+  Row 53: hpt=15.6, hpx=15.6, hidden=false
+  Row 54: hpt=15.6, hpx=15.6, hidden=false
+  Row 55: hpt=15.6, hpx=15.6, hidden=false
+  Row 56: hpt=16.2, hpx=16.2, hidden=false
+
+--- CELLS WITH CONTENT (non-empty only) ---
+  B7 [R7,C2]: type=s, value="REQUEST FOR QUOTATION", fmt="REQUEST FOR QUOTATION", numFmt="General"
+  G9 [R9,C7]: type=s, value="RFQ No.:", fmt="RFQ No.:", numFmt="General"
+  H9 [R9,C8]: type=s, value="2026-02-0013", fmt="2026-02-0013", numFmt="General"
+  G10 [R10,C7]: type=s, value="Date:", fmt="Date:", numFmt="General"
+  H10 [R10,C8]: type=s, value="Feb. 2, 2026", fmt="Feb. 2, 2026", numFmt="General"
+  B11 [R11,C2]: type=s, value="Company Name:", fmt="Company Name:", numFmt="General"
+  B12 [R12,C2]: type=s, value="Company Address:", fmt="Company Address:", numFmt="General"
+  B13 [R13,C2]: type=s, value="TIN:", fmt="TIN:", numFmt="General"
+  B15 [R15,C2]: type=s, value="Sir/Madam:", fmt="Sir/Madam:", numFmt="General"
+  C17 [R17,C3]: type=s, value="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", fmt="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", numFmt="General"
+  B19 [R19,C2]: type=s, value="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", fmt="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", numFmt="General"
+  B20 [R20,C2]: type=s, value="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", fmt="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", numFmt="General"
+  B21 [R21,C2]: type=s, value="shall be stamped thereon the date and time  received by the BAC Secretariat.", fmt="shall be stamped thereon the date and time  received by the BAC Secretariat.", numFmt="General"
+  C23 [R23,C3]: type=s, value="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", fmt="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", numFmt="General"
+  B24 [R24,C2]: type=s, value="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", fmt="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", numFmt="General"
+  B25 [R25,C2]: type=s, value="disqualified.", fmt="disqualified.", numFmt="General"
+  C27 [R27,C3]: type=s, value="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", fmt="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", numFmt="General"
+  B28 [R28,C2]: type=s, value="those  submitted after the deadline.", fmt="those  submitted after the deadline.", numFmt="General"
+  E30 [R30,C5]: type=s, value="Very truly yours,", fmt="Very truly yours,", numFmt="General"
+  K30 [R30,C11]: type=n, value=9171006158, fmt="9171006158", numFmt="General"
+  B32 [R32,C2]: type=s, value="Served by:", fmt="Served by:", numFmt="General"
+  E32 [R32,C5]: type=s, value="____________________________________", fmt="____________________________________", numFmt="General"
+  B36 [R36,C2]: type=s, value="Date:________________________", fmt="Date:________________________", numFmt="General"
+  B37 [R37,C2]: type=s, value="............................................................................................................................", fmt="............................................................................................................................", numFmt="General"
+  B39 [R39,C2]: type=s, value="Quantity", fmt="Quantity", numFmt="General"
+  C39 [R39,C3]: type=s, value="Unit", fmt="Unit", numFmt="General"
+  D39 [R39,C4]: type=s, value="Item (with specification)", fmt="Item (with specification)", numFmt="General"
+  E39 [R39,C5]: type=s, value="ABC", fmt="ABC", numFmt="General"
+  F39 [R39,C6]: type=s, value="Unit Cost", fmt="Unit Cost", numFmt="General"
+  G39 [R39,C7]: type=s, value="Total Cost", fmt="Total Cost", numFmt="General"
+  B40 [R40,C2]: type=n, value=38, fmt="38", numFmt="General"
+  C40 [R40,C3]: type=s, value="Pcs", fmt="Pcs", numFmt="General"
+  D40 [R40,C4]: type=s, value="PVC ID", fmt="PVC ID", numFmt="@"
+  E40 [R40,C5]: type=n, value=6480, fmt=" 6,480.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)"
+  D41 [R41,C4]: type=s, value="Specs:", fmt="Specs:", numFmt="@"
+  D42 [R42,C4]: type=s, value="•ARTA ID compliant", fmt="•ARTA ID compliant", numFmt="@"
+  D43 [R43,C4]: type=s, value="•Size: H: 5\" x W: 3.5\"", fmt="•Size: H: 5" x W: 3.5"", numFmt="@"
+  D44 [R44,C4]: type=s, value="•Please see the attached sample", fmt="•Please see the attached sample", numFmt="@"
+  D55 [R55,C4]: type=s, value="PURPOSE: Printing of ARTA ID for DMW Caraga", fmt="PURPOSE: Printing of ARTA ID for DMW Caraga", numFmt="General"
+  D56 [R56,C4]: type=s, value="VAT INCLUSIVE", fmt="VAT INCLUSIVE", numFmt="General"
+  E56 [R56,C5]: type=n, value=6480, fmt=" 6,480.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)", formula="SUM(E40:E55)"
+  D58 [R58,C4]: type=s, value=" Received by:", fmt=" Received by:", numFmt="General"
+  D59 [R59,C4]: type=s, value="                                                                                                                                                               ", fmt="                                                                                                                                                               ", numFmt="General"
+  D60 [R60,C4]: type=s, value="(Name & Signature of Proprietor/", fmt="(Name & Signature of Proprietor/", numFmt="General"
+  E60 [R60,C5]: type=s, value="Authorized Representative)", fmt="Authorized Representative)", numFmt="General"
+  D61 [R61,C4]: type=s, value="            Telephone/Fax No.", fmt="            Telephone/Fax No.", numFmt="General"
+  D62 [R62,C4]: type=s, value="                           Email ___________________________________________________", fmt="                           Email ___________________________________________________", numFmt="General"
+  B64 [R64,C2]: type=s, value="PR No.: ", fmt="PR No.: ", numFmt="General"
+  C64 [R64,C3]: type=s, value="2026-02-0018", fmt="2026-02-0018", numFmt="General"
+  B66 [R66,C2]: type=s, value="Terms & Conditions:", fmt="Terms & Conditions:", numFmt="General"
+  B68 [R68,C2]: type=s, value="1.", fmt="1.", numFmt="@"
+  C68 [R68,C3]: type=s, value="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", fmt="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", numFmt="General"
+  B69 [R69,C2]: type=s, value="2.", fmt="2.", numFmt="@"
+  C69 [R69,C3]: type=s, value="Quotation validity shall not be less than 30 calendar days", fmt="Quotation validity shall not be less than 30 calendar days", numFmt="General"
+  B70 [R70,C2]: type=s, value="3.", fmt="3.", numFmt="@"
+  C70 [R70,C3]: type=s, value="Must be registered with PhilGEPS.", fmt="Must be registered with PhilGEPS.", numFmt="General"
+  B71 [R71,C2]: type=s, value="4.", fmt="4.", numFmt="@"
+  C71 [R71,C3]: type=s, value="Goods shall be delivered within: one to three working days after the award has made ", fmt="Goods shall be delivered within: one to three working days after the award has made ", numFmt="General"
+  B72 [R72,C2]: type=s, value="5.", fmt="5.", numFmt="@"
+  C72 [R72,C3]: type=s, value="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", fmt="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", numFmt="General"
+  B73 [R73,C2]: type=s, value="6.", fmt="6.", numFmt="@"
+  C73 [R73,C3]: type=s, value="Term of Payment is Check / ADA", fmt="Term of Payment is Check / ADA", numFmt="General"
+  B74 [R74,C2]: type=s, value="7.", fmt="7.", numFmt="@"
+  C74 [R74,C3]: type=s, value="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", fmt="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", numFmt="General"
+  B75 [R75,C2]: type=s, value="8.", fmt="8.", numFmt="@"
+  C75 [R75,C3]: type=s, value="In case of discrepancy between unit and total cost, until cost shall prevail", fmt="In case of discrepancy between unit and total cost, until cost shall prevail", numFmt="General"
+  E76 [R76,C5]: type=s, value="Conforme:", fmt="Conforme:", numFmt="General"
+  E79 [R79,C5]: type=s, value="Name & Signature of Proprietor/", fmt="Name & Signature of Proprietor/", numFmt="General"
+  E80 [R80,C5]: type=s, value="Authorized Representative", fmt="Authorized Representative", numFmt="General"
+
+================================================================================
+=== SHEET: "meals - likha" ===
+================================================================================
+Range: B2:K83
+
+--- MERGED CELLS ---
+  B8:F8 (rows 8-8, cols 2-6)
+  J8:K8 (rows 8-8, cols 10-11)
+  B2:K2 (rows 2-2, cols 2-11)
+  B3:I3 (rows 3-3, cols 2-9)
+  B4:I4 (rows 4-4, cols 2-9)
+  B5:I5 (rows 5-5, cols 2-9)
+  B7:I7 (rows 7-7, cols 2-9)
+  C23:I23 (rows 23-23, cols 3-9)
+  H9:I9 (rows 9-9, cols 8-9)
+  J9:K9 (rows 9-9, cols 10-11)
+  D10:E10 (rows 10-10, cols 4-5)
+  H10:I10 (rows 10-10, cols 8-9)
+  D11:E11 (rows 11-11, cols 4-5)
+  D12:E12 (rows 12-12, cols 4-5)
+  D13:E13 (rows 13-13, cols 4-5)
+  C17:I17 (rows 17-17, cols 3-9)
+  B19:I19 (rows 19-19, cols 2-9)
+  B20:I20 (rows 20-20, cols 2-9)
+  B21:I21 (rows 21-21, cols 2-9)
+  E80:F80 (rows 80-80, cols 5-6)
+  B83:K83 (rows 83-83, cols 2-11)
+  B24:I24 (rows 24-24, cols 2-9)
+  C27:I27 (rows 27-27, cols 3-9)
+  B28:I28 (rows 28-28, cols 2-9)
+  E33:F33 (rows 33-33, cols 5-6)
+  B35:C35 (rows 35-35, cols 2-3)
+  E79:F79 (rows 79-79, cols 5-6)
+
+--- COLUMN WIDTHS ---
+  Col A (1): width=1.33, wpx=17, wch=1.33, hidden=false
+  Col B (2): width=13.33, wpx=125, wch=13.33, hidden=false
+  Col C (3): width=23.22, wpx=214, wch=23.22, hidden=false
+  Col D (4): width=81.33, wpx=737, wch=81.33, hidden=false
+  Col E (5): width=14.44, wpx=135, wch=14.44, hidden=false
+  Col F (6): width=17, wpx=158, wch=17, hidden=false
+  Col G (7): width=17, wpx=158, wch=17, hidden=false
+  Col I (9): width=3.89, wpx=40, wch=3.89, hidden=false
+  Col J (10): width=7.33, wpx=71, wch=7.33, hidden=false
+  Col K (11): width=10.56, wpx=100, wch=10.56, hidden=false
+
+--- ROW HEIGHTS ---
+  Row 4: hpt=27.6, hpx=27.600000000000005, hidden=false
+  Row 5: hpt=25.5, hpx=25.5, hidden=false
+  Row 7: hpt=18.6, hpx=18.6, hidden=false
+  Row 8: hpt=18.6, hpx=18.6, hidden=false
+  Row 38: hpt=15, hpx=15, hidden=false
+  Row 39: hpt=15, hpx=15, hidden=false
+  Row 40: hpt=15.6, hpx=15.6, hidden=false
+  Row 41: hpt=15.6, hpx=15.6, hidden=false
+  Row 42: hpt=15.6, hpx=15.6, hidden=false
+  Row 43: hpt=15.6, hpx=15.6, hidden=false
+  Row 44: hpt=15.6, hpx=15.6, hidden=false
+  Row 45: hpt=15.6, hpx=15.6, hidden=false
+  Row 46: hpt=15.6, hpx=15.6, hidden=false
+  Row 47: hpt=15.6, hpx=15.6, hidden=false
+  Row 48: hpt=15.6, hpx=15.6, hidden=false
+  Row 49: hpt=15.6, hpx=15.6, hidden=false
+  Row 50: hpt=15.6, hpx=15.6, hidden=false
+  Row 51: hpt=15.6, hpx=15.6, hidden=false
+  Row 52: hpt=15.6, hpx=15.6, hidden=false
+  Row 53: hpt=15.6, hpx=15.6, hidden=false
+  Row 54: hpt=15.6, hpx=15.6, hidden=false
+  Row 55: hpt=31.2, hpx=31.2, hidden=false
+  Row 56: hpt=16.2, hpx=16.2, hidden=false
+
+--- CELLS WITH CONTENT (non-empty only) ---
+  B7 [R7,C2]: type=s, value="REQUEST FOR QUOTATION", fmt="REQUEST FOR QUOTATION", numFmt="General"
+  G9 [R9,C7]: type=s, value="RFQ No.:", fmt="RFQ No.:", numFmt="General"
+  H9 [R9,C8]: type=s, value="2026-02-0016", fmt="2026-02-0016", numFmt="General"
+  G10 [R10,C7]: type=s, value="Date:", fmt="Date:", numFmt="General"
+  H10 [R10,C8]: type=s, value="Feb. 9, 2026", fmt="Feb. 9, 2026", numFmt="General"
+  B11 [R11,C2]: type=s, value="Company Name:", fmt="Company Name:", numFmt="General"
+  B12 [R12,C2]: type=s, value="Company Address:", fmt="Company Address:", numFmt="General"
+  B13 [R13,C2]: type=s, value="TIN:", fmt="TIN:", numFmt="General"
+  B15 [R15,C2]: type=s, value="Sir/Madam:", fmt="Sir/Madam:", numFmt="General"
+  C17 [R17,C3]: type=s, value="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", fmt="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", numFmt="General"
+  B19 [R19,C2]: type=s, value="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", fmt="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", numFmt="General"
+  B20 [R20,C2]: type=s, value="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", fmt="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", numFmt="General"
+  B21 [R21,C2]: type=s, value="shall be stamped thereon the date and time  received by the BAC Secretariat.", fmt="shall be stamped thereon the date and time  received by the BAC Secretariat.", numFmt="General"
+  C23 [R23,C3]: type=s, value="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", fmt="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", numFmt="General"
+  B24 [R24,C2]: type=s, value="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", fmt="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", numFmt="General"
+  B25 [R25,C2]: type=s, value="disqualified.", fmt="disqualified.", numFmt="General"
+  C27 [R27,C3]: type=s, value="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", fmt="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", numFmt="General"
+  B28 [R28,C2]: type=s, value="those  submitted after the deadline.", fmt="those  submitted after the deadline.", numFmt="General"
+  E30 [R30,C5]: type=s, value="Very truly yours,", fmt="Very truly yours,", numFmt="General"
+  K30 [R30,C11]: type=n, value=9171006158, fmt="9171006158", numFmt="General"
+  B32 [R32,C2]: type=s, value="Served by:", fmt="Served by:", numFmt="General"
+  E32 [R32,C5]: type=s, value="____________________________________", fmt="____________________________________", numFmt="General"
+  B36 [R36,C2]: type=s, value="Date:________________________", fmt="Date:________________________", numFmt="General"
+  B37 [R37,C2]: type=s, value="............................................................................................................................", fmt="............................................................................................................................", numFmt="General"
+  B39 [R39,C2]: type=s, value="Quantity", fmt="Quantity", numFmt="General"
+  C39 [R39,C3]: type=s, value="Unit", fmt="Unit", numFmt="General"
+  D39 [R39,C4]: type=s, value="Item (with specification)", fmt="Item (with specification)", numFmt="General"
+  E39 [R39,C5]: type=s, value="ABC", fmt="ABC", numFmt="General"
+  F39 [R39,C6]: type=s, value="Unit Cost", fmt="Unit Cost", numFmt="General"
+  G39 [R39,C7]: type=s, value="Total Cost", fmt="Total Cost", numFmt="General"
+  B40 [R40,C2]: type=n, value=25, fmt="25", numFmt="General"
+  C40 [R40,C3]: type=s, value="Pax", fmt="Pax", numFmt="General"
+  D40 [R40,C4]: type=s, value="MEALS", fmt="MEALS", numFmt="@"
+  E40 [R40,C5]: type=n, value=12500, fmt=" 12,500.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)"
+  D41 [R41,C4]: type=s, value="Details:", fmt="Details:", numFmt="@"
+  D42 [R42,C4]: type=s, value="  *AM Snacks - puto maya with sliced mango and skwate", fmt="  *AM Snacks - puto maya with sliced mango and skwate", numFmt="@"
+  D43 [R43,C4]: type=s, value="  *Lunch - Beef Menudo, Garlic Chicken, Stir Fried Veggie and Softdrinks with Dessert", fmt="  *Lunch - Beef Menudo, Garlic Chicken, Stir Fried Veggie and Softdrinks with Dessert", numFmt="@"
+  D44 [R44,C4]: type=s, value="  *PM Snacks - Sandwhich with chips and juice", fmt="  *PM Snacks - Sandwhich with chips and juice", numFmt="@"
+  D45 [R45,C4]: type=s, value="***Nothing Follows***", fmt="***Nothing Follows***", numFmt="@"
+  D55 [R55,C4]: type=s, value="PURPOSE: LIKHAng Kababaihan Regional Screening on February 24, 2026 at DMW Regional Office XIII Training Hall, Butuan City", fmt="PURPOSE: LIKHAng Kababaihan Regional Screening on February 24, 2026 at DMW Regional Office XIII Training Hall, Butuan City", numFmt="General"
+  D56 [R56,C4]: type=s, value="VAT INCLUSIVE", fmt="VAT INCLUSIVE", numFmt="General"
+  E56 [R56,C5]: type=n, value=12500, fmt=" 12,500.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)", formula="SUM(E40:E55)"
+  D58 [R58,C4]: type=s, value=" Received by:", fmt=" Received by:", numFmt="General"
+  D59 [R59,C4]: type=s, value="                                                                                                                                                               ", fmt="                                                                                                                                                               ", numFmt="General"
+  D60 [R60,C4]: type=s, value="(Name & Signature of Proprietor/", fmt="(Name & Signature of Proprietor/", numFmt="General"
+  E60 [R60,C5]: type=s, value="Authorized Representative)", fmt="Authorized Representative)", numFmt="General"
+  D61 [R61,C4]: type=s, value="            Telephone/Fax No.", fmt="            Telephone/Fax No.", numFmt="General"
+  D62 [R62,C4]: type=s, value="                           Email ___________________________________________________", fmt="                           Email ___________________________________________________", numFmt="General"
+  B64 [R64,C2]: type=s, value="PR No.: ", fmt="PR No.: ", numFmt="General"
+  C64 [R64,C3]: type=s, value="2026-02-0021", fmt="2026-02-0021", numFmt="General"
+  B66 [R66,C2]: type=s, value="Terms & Conditions:", fmt="Terms & Conditions:", numFmt="General"
+  B68 [R68,C2]: type=s, value="1.", fmt="1.", numFmt="@"
+  C68 [R68,C3]: type=s, value="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", fmt="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", numFmt="General"
+  B69 [R69,C2]: type=s, value="2.", fmt="2.", numFmt="@"
+  C69 [R69,C3]: type=s, value="Quotation validity shall not be less than 30 calendar days", fmt="Quotation validity shall not be less than 30 calendar days", numFmt="General"
+  B70 [R70,C2]: type=s, value="3.", fmt="3.", numFmt="@"
+  C70 [R70,C3]: type=s, value="Must be registered with PhilGEPS.", fmt="Must be registered with PhilGEPS.", numFmt="General"
+  B71 [R71,C2]: type=s, value="4.", fmt="4.", numFmt="@"
+  C71 [R71,C3]: type=s, value="Goods shall be delivered within: one to three working days after the award has made ", fmt="Goods shall be delivered within: one to three working days after the award has made ", numFmt="General"
+  B72 [R72,C2]: type=s, value="5.", fmt="5.", numFmt="@"
+  C72 [R72,C3]: type=s, value="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", fmt="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", numFmt="General"
+  B73 [R73,C2]: type=s, value="6.", fmt="6.", numFmt="@"
+  C73 [R73,C3]: type=s, value="Term of Payment is Check / ADA", fmt="Term of Payment is Check / ADA", numFmt="General"
+  B74 [R74,C2]: type=s, value="7.", fmt="7.", numFmt="@"
+  C74 [R74,C3]: type=s, value="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", fmt="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", numFmt="General"
+  B75 [R75,C2]: type=s, value="8.", fmt="8.", numFmt="@"
+  C75 [R75,C3]: type=s, value="In case of discrepancy between unit and total cost, until cost shall prevail", fmt="In case of discrepancy between unit and total cost, until cost shall prevail", numFmt="General"
+  E76 [R76,C5]: type=s, value="Conforme:", fmt="Conforme:", numFmt="General"
+  E79 [R79,C5]: type=s, value="Name & Signature of Proprietor/", fmt="Name & Signature of Proprietor/", numFmt="General"
+  E80 [R80,C5]: type=s, value="Authorized Representative", fmt="Authorized Representative", numFmt="General"
+
+================================================================================
+=== SHEET: "tokens - likha" ===
+================================================================================
+Range: B2:K83
+
+--- MERGED CELLS ---
+  B8:F8 (rows 8-8, cols 2-6)
+  J8:K8 (rows 8-8, cols 10-11)
+  B2:K2 (rows 2-2, cols 2-11)
+  B3:I3 (rows 3-3, cols 2-9)
+  B4:I4 (rows 4-4, cols 2-9)
+  B5:I5 (rows 5-5, cols 2-9)
+  B7:I7 (rows 7-7, cols 2-9)
+  C23:I23 (rows 23-23, cols 3-9)
+  H9:I9 (rows 9-9, cols 8-9)
+  J9:K9 (rows 9-9, cols 10-11)
+  D10:E10 (rows 10-10, cols 4-5)
+  H10:I10 (rows 10-10, cols 8-9)
+  D11:E11 (rows 11-11, cols 4-5)
+  D12:E12 (rows 12-12, cols 4-5)
+  D13:E13 (rows 13-13, cols 4-5)
+  C17:I17 (rows 17-17, cols 3-9)
+  B19:I19 (rows 19-19, cols 2-9)
+  B20:I20 (rows 20-20, cols 2-9)
+  B21:I21 (rows 21-21, cols 2-9)
+  E80:F80 (rows 80-80, cols 5-6)
+  B83:K83 (rows 83-83, cols 2-11)
+  B24:I24 (rows 24-24, cols 2-9)
+  C27:I27 (rows 27-27, cols 3-9)
+  B28:I28 (rows 28-28, cols 2-9)
+  E33:F33 (rows 33-33, cols 5-6)
+  B35:C35 (rows 35-35, cols 2-3)
+  E79:F79 (rows 79-79, cols 5-6)
+
+--- COLUMN WIDTHS ---
+  Col A (1): width=1.33, wpx=17, wch=1.33, hidden=false
+  Col B (2): width=13.33, wpx=125, wch=13.33, hidden=false
+  Col C (3): width=23.22, wpx=214, wch=23.22, hidden=false
+  Col D (4): width=81.33, wpx=737, wch=81.33, hidden=false
+  Col E (5): width=14.44, wpx=135, wch=14.44, hidden=false
+  Col F (6): width=17, wpx=158, wch=17, hidden=false
+  Col G (7): width=17, wpx=158, wch=17, hidden=false
+  Col I (9): width=3.89, wpx=40, wch=3.89, hidden=false
+  Col J (10): width=7.33, wpx=71, wch=7.33, hidden=false
+  Col K (11): width=10.56, wpx=100, wch=10.56, hidden=false
+
+--- ROW HEIGHTS ---
+  Row 4: hpt=27.6, hpx=27.600000000000005, hidden=false
+  Row 5: hpt=25.5, hpx=25.5, hidden=false
+  Row 7: hpt=18.6, hpx=18.6, hidden=false
+  Row 8: hpt=18.6, hpx=18.6, hidden=false
+  Row 38: hpt=15, hpx=15, hidden=false
+  Row 39: hpt=15, hpx=15, hidden=false
+  Row 40: hpt=15.6, hpx=15.6, hidden=false
+  Row 41: hpt=15.6, hpx=15.6, hidden=false
+  Row 42: hpt=15.6, hpx=15.6, hidden=false
+  Row 43: hpt=15.6, hpx=15.6, hidden=false
+  Row 44: hpt=15.6, hpx=15.6, hidden=false
+  Row 45: hpt=15.6, hpx=15.6, hidden=false
+  Row 46: hpt=15.6, hpx=15.6, hidden=false
+  Row 47: hpt=15.6, hpx=15.6, hidden=false
+  Row 48: hpt=15.6, hpx=15.6, hidden=false
+  Row 49: hpt=15.6, hpx=15.6, hidden=false
+  Row 50: hpt=15.6, hpx=15.6, hidden=false
+  Row 51: hpt=15.6, hpx=15.6, hidden=false
+  Row 52: hpt=15.6, hpx=15.6, hidden=false
+  Row 53: hpt=15.6, hpx=15.6, hidden=false
+  Row 54: hpt=15.6, hpx=15.6, hidden=false
+  Row 55: hpt=31.2, hpx=31.2, hidden=false
+  Row 56: hpt=16.2, hpx=16.2, hidden=false
+
+--- CELLS WITH CONTENT (non-empty only) ---
+  B7 [R7,C2]: type=s, value="REQUEST FOR QUOTATION", fmt="REQUEST FOR QUOTATION", numFmt="General"
+  G9 [R9,C7]: type=s, value="RFQ No.:", fmt="RFQ No.:", numFmt="General"
+  H9 [R9,C8]: type=s, value="2026-02-0017", fmt="2026-02-0017", numFmt="General"
+  G10 [R10,C7]: type=s, value="Date:", fmt="Date:", numFmt="General"
+  H10 [R10,C8]: type=s, value="Feb. 9, 2026", fmt="Feb. 9, 2026", numFmt="General"
+  B11 [R11,C2]: type=s, value="Company Name:", fmt="Company Name:", numFmt="General"
+  B12 [R12,C2]: type=s, value="Company Address:", fmt="Company Address:", numFmt="General"
+  B13 [R13,C2]: type=s, value="TIN:", fmt="TIN:", numFmt="General"
+  B15 [R15,C2]: type=s, value="Sir/Madam:", fmt="Sir/Madam:", numFmt="General"
+  C17 [R17,C3]: type=s, value="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", fmt="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", numFmt="General"
+  B19 [R19,C2]: type=s, value="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", fmt="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", numFmt="General"
+  B20 [R20,C2]: type=s, value="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", fmt="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", numFmt="General"
+  B21 [R21,C2]: type=s, value="shall be stamped thereon the date and time  received by the BAC Secretariat.", fmt="shall be stamped thereon the date and time  received by the BAC Secretariat.", numFmt="General"
+  C23 [R23,C3]: type=s, value="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", fmt="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", numFmt="General"
+  B24 [R24,C2]: type=s, value="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", fmt="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", numFmt="General"
+  B25 [R25,C2]: type=s, value="disqualified.", fmt="disqualified.", numFmt="General"
+  C27 [R27,C3]: type=s, value="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", fmt="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", numFmt="General"
+  B28 [R28,C2]: type=s, value="those  submitted after the deadline.", fmt="those  submitted after the deadline.", numFmt="General"
+  E30 [R30,C5]: type=s, value="Very truly yours,", fmt="Very truly yours,", numFmt="General"
+  K30 [R30,C11]: type=n, value=9171006158, fmt="9171006158", numFmt="General"
+  B32 [R32,C2]: type=s, value="Served by:", fmt="Served by:", numFmt="General"
+  E32 [R32,C5]: type=s, value="____________________________________", fmt="____________________________________", numFmt="General"
+  B36 [R36,C2]: type=s, value="Date:________________________", fmt="Date:________________________", numFmt="General"
+  B37 [R37,C2]: type=s, value="............................................................................................................................", fmt="............................................................................................................................", numFmt="General"
+  B39 [R39,C2]: type=s, value="Quantity", fmt="Quantity", numFmt="General"
+  C39 [R39,C3]: type=s, value="Unit", fmt="Unit", numFmt="General"
+  D39 [R39,C4]: type=s, value="Item (with specification)", fmt="Item (with specification)", numFmt="General"
+  E39 [R39,C5]: type=s, value="ABC", fmt="ABC", numFmt="General"
+  F39 [R39,C6]: type=s, value="Unit Cost", fmt="Unit Cost", numFmt="General"
+  G39 [R39,C7]: type=s, value="Total Cost", fmt="Total Cost", numFmt="General"
+  B40 [R40,C2]: type=n, value=2, fmt="2", numFmt="General"
+  C40 [R40,C3]: type=s, value="Set", fmt="Set", numFmt="General"
+  D40 [R40,C4]: type=s, value="Customized Token", fmt="Customized Token", numFmt="@"
+  E40 [R40,C5]: type=n, value=2000, fmt=" 2,000.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)"
+  D41 [R41,C4]: type=s, value="Details:", fmt="Details:", numFmt="@"
+  D42 [R42,C4]: type=s, value="  *Customized Burlap Bag, Notebook and Mug", fmt="  *Customized Burlap Bag, Notebook and Mug", numFmt="@"
+  D43 [R43,C4]: type=s, value="***Nothing Follows***", fmt="***Nothing Follows***", numFmt="@"
+  D55 [R55,C4]: type=s, value="PURPOSE: LIKHAng Kababaihan Regional Screening on February 24, 2026 at DMW Regional Office XIII Training Hall, Butuan City", fmt="PURPOSE: LIKHAng Kababaihan Regional Screening on February 24, 2026 at DMW Regional Office XIII Training Hall, Butuan City", numFmt="General"
+  D56 [R56,C4]: type=s, value="VAT INCLUSIVE", fmt="VAT INCLUSIVE", numFmt="General"
+  E56 [R56,C5]: type=n, value=2000, fmt=" 2,000.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)", formula="SUM(E40:E55)"
+  D58 [R58,C4]: type=s, value=" Received by:", fmt=" Received by:", numFmt="General"
+  D59 [R59,C4]: type=s, value="                                                                                                                                                               ", fmt="                                                                                                                                                               ", numFmt="General"
+  D60 [R60,C4]: type=s, value="(Name & Signature of Proprietor/", fmt="(Name & Signature of Proprietor/", numFmt="General"
+  E60 [R60,C5]: type=s, value="Authorized Representative)", fmt="Authorized Representative)", numFmt="General"
+  D61 [R61,C4]: type=s, value="            Telephone/Fax No.", fmt="            Telephone/Fax No.", numFmt="General"
+  D62 [R62,C4]: type=s, value="                           Email ___________________________________________________", fmt="                           Email ___________________________________________________", numFmt="General"
+  B64 [R64,C2]: type=s, value="PR No.: ", fmt="PR No.: ", numFmt="General"
+  C64 [R64,C3]: type=s, value="2026-02-0022", fmt="2026-02-0022", numFmt="General"
+  B66 [R66,C2]: type=s, value="Terms & Conditions:", fmt="Terms & Conditions:", numFmt="General"
+  B68 [R68,C2]: type=s, value="1.", fmt="1.", numFmt="@"
+  C68 [R68,C3]: type=s, value="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", fmt="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", numFmt="General"
+  B69 [R69,C2]: type=s, value="2.", fmt="2.", numFmt="@"
+  C69 [R69,C3]: type=s, value="Quotation validity shall not be less than 30 calendar days", fmt="Quotation validity shall not be less than 30 calendar days", numFmt="General"
+  B70 [R70,C2]: type=s, value="3.", fmt="3.", numFmt="@"
+  C70 [R70,C3]: type=s, value="Must be registered with PhilGEPS.", fmt="Must be registered with PhilGEPS.", numFmt="General"
+  B71 [R71,C2]: type=s, value="4.", fmt="4.", numFmt="@"
+  C71 [R71,C3]: type=s, value="Goods shall be delivered within: one to three working days after the award has made ", fmt="Goods shall be delivered within: one to three working days after the award has made ", numFmt="General"
+  B72 [R72,C2]: type=s, value="5.", fmt="5.", numFmt="@"
+  C72 [R72,C3]: type=s, value="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", fmt="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", numFmt="General"
+  B73 [R73,C2]: type=s, value="6.", fmt="6.", numFmt="@"
+  C73 [R73,C3]: type=s, value="Term of Payment is Check / ADA", fmt="Term of Payment is Check / ADA", numFmt="General"
+  B74 [R74,C2]: type=s, value="7.", fmt="7.", numFmt="@"
+  C74 [R74,C3]: type=s, value="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", fmt="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", numFmt="General"
+  B75 [R75,C2]: type=s, value="8.", fmt="8.", numFmt="@"
+  C75 [R75,C3]: type=s, value="In case of discrepancy between unit and total cost, until cost shall prevail", fmt="In case of discrepancy between unit and total cost, until cost shall prevail", numFmt="General"
+  E76 [R76,C5]: type=s, value="Conforme:", fmt="Conforme:", numFmt="General"
+  E79 [R79,C5]: type=s, value="Name & Signature of Proprietor/", fmt="Name & Signature of Proprietor/", numFmt="General"
+  E80 [R80,C5]: type=s, value="Authorized Representative", fmt="Authorized Representative", numFmt="General"
+
+================================================================================
+=== SHEET: "sling bag" ===
+================================================================================
+Range: B2:K83
+
+--- MERGED CELLS ---
+  E80:F80 (rows 80-80, cols 5-6)
+  B83:K83 (rows 83-83, cols 2-11)
+  B24:I24 (rows 24-24, cols 2-9)
+  C27:I27 (rows 27-27, cols 3-9)
+  B28:I28 (rows 28-28, cols 2-9)
+  E33:F33 (rows 33-33, cols 5-6)
+  B35:C35 (rows 35-35, cols 2-3)
+  E79:F79 (rows 79-79, cols 5-6)
+  D13:E13 (rows 13-13, cols 4-5)
+  C17:I17 (rows 17-17, cols 3-9)
+  B19:I19 (rows 19-19, cols 2-9)
+  B20:I20 (rows 20-20, cols 2-9)
+  B21:I21 (rows 21-21, cols 2-9)
+  C23:I23 (rows 23-23, cols 3-9)
+  H9:I9 (rows 9-9, cols 8-9)
+  J9:K9 (rows 9-9, cols 10-11)
+  D10:E10 (rows 10-10, cols 4-5)
+  H10:I10 (rows 10-10, cols 8-9)
+  D11:E11 (rows 11-11, cols 4-5)
+  D12:E12 (rows 12-12, cols 4-5)
+  B2:K2 (rows 2-2, cols 2-11)
+  B3:I3 (rows 3-3, cols 2-9)
+  B4:I4 (rows 4-4, cols 2-9)
+  B5:I5 (rows 5-5, cols 2-9)
+  B7:I7 (rows 7-7, cols 2-9)
+  B8:F8 (rows 8-8, cols 2-6)
+  J8:K8 (rows 8-8, cols 10-11)
+
+--- COLUMN WIDTHS ---
+  Col A (1): width=1.33, wpx=17, wch=1.33, hidden=false
+  Col B (2): width=13.33, wpx=125, wch=13.33, hidden=false
+  Col C (3): width=23.22, wpx=214, wch=23.22, hidden=false
+  Col D (4): width=81.33, wpx=737, wch=81.33, hidden=false
+  Col E (5): width=14.44, wpx=135, wch=14.44, hidden=false
+  Col F (6): width=17, wpx=158, wch=17, hidden=false
+  Col G (7): width=17, wpx=158, wch=17, hidden=false
+  Col I (9): width=3.89, wpx=40, wch=3.89, hidden=false
+  Col J (10): width=7.33, wpx=71, wch=7.33, hidden=false
+  Col K (11): width=10.56, wpx=100, wch=10.56, hidden=false
+
+--- ROW HEIGHTS ---
+  Row 4: hpt=27.6, hpx=27.600000000000005, hidden=false
+  Row 5: hpt=25.5, hpx=25.5, hidden=false
+  Row 7: hpt=18.6, hpx=18.6, hidden=false
+  Row 8: hpt=18.6, hpx=18.6, hidden=false
+  Row 38: hpt=15, hpx=15, hidden=false
+  Row 39: hpt=15, hpx=15, hidden=false
+  Row 40: hpt=15.6, hpx=15.6, hidden=false
+  Row 41: hpt=15.6, hpx=15.6, hidden=false
+  Row 42: hpt=15.6, hpx=15.6, hidden=false
+  Row 43: hpt=15.6, hpx=15.6, hidden=false
+  Row 44: hpt=15.6, hpx=15.6, hidden=false
+  Row 45: hpt=15.6, hpx=15.6, hidden=false
+  Row 46: hpt=15.6, hpx=15.6, hidden=false
+  Row 47: hpt=15.6, hpx=15.6, hidden=false
+  Row 48: hpt=15.6, hpx=15.6, hidden=false
+  Row 49: hpt=15.6, hpx=15.6, hidden=false
+  Row 50: hpt=15.6, hpx=15.6, hidden=false
+  Row 51: hpt=15.6, hpx=15.6, hidden=false
+  Row 52: hpt=15.6, hpx=15.6, hidden=false
+  Row 53: hpt=15.6, hpx=15.6, hidden=false
+  Row 54: hpt=15.6, hpx=15.6, hidden=false
+  Row 55: hpt=31.2, hpx=31.2, hidden=false
+  Row 56: hpt=16.2, hpx=16.2, hidden=false
+
+--- CELLS WITH CONTENT (non-empty only) ---
+  B7 [R7,C2]: type=s, value="REQUEST FOR QUOTATION", fmt="REQUEST FOR QUOTATION", numFmt="General"
+  G9 [R9,C7]: type=s, value="RFQ No.:", fmt="RFQ No.:", numFmt="General"
+  H9 [R9,C8]: type=s, value="2026-02-0018", fmt="2026-02-0018", numFmt="General"
+  G10 [R10,C7]: type=s, value="Date:", fmt="Date:", numFmt="General"
+  H10 [R10,C8]: type=s, value="Feb. 9, 2026", fmt="Feb. 9, 2026", numFmt="General"
+  B11 [R11,C2]: type=s, value="Company Name:", fmt="Company Name:", numFmt="General"
+  B12 [R12,C2]: type=s, value="Company Address:", fmt="Company Address:", numFmt="General"
+  B13 [R13,C2]: type=s, value="TIN:", fmt="TIN:", numFmt="General"
+  B15 [R15,C2]: type=s, value="Sir/Madam:", fmt="Sir/Madam:", numFmt="General"
+  C17 [R17,C3]: type=s, value="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", fmt="May we invite your company to quote for the lowest price/s, VAT included, on the items/s listed and described hereunder.", numFmt="General"
+  B19 [R19,C2]: type=s, value="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", fmt="Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary GIOVANNI S. PAREDES", numFmt="General"
+  B20 [R20,C2]: type=s, value="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", fmt="__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City,  Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which ", numFmt="General"
+  B21 [R21,C2]: type=s, value="shall be stamped thereon the date and time  received by the BAC Secretariat.", fmt="shall be stamped thereon the date and time  received by the BAC Secretariat.", numFmt="General"
+  C23 [R23,C3]: type=s, value="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", fmt="The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond ", numFmt="General"
+  B24 [R24,C2]: type=s, value="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", fmt="8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically ", numFmt="General"
+  B25 [R25,C2]: type=s, value="disqualified.", fmt="disqualified.", numFmt="General"
+  C27 [R27,C3]: type=s, value="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", fmt="The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and ", numFmt="General"
+  B28 [R28,C2]: type=s, value="those  submitted after the deadline.", fmt="those  submitted after the deadline.", numFmt="General"
+  E30 [R30,C5]: type=s, value="Very truly yours,", fmt="Very truly yours,", numFmt="General"
+  K30 [R30,C11]: type=n, value=9171006158, fmt="9171006158", numFmt="General"
+  B32 [R32,C2]: type=s, value="Served by:", fmt="Served by:", numFmt="General"
+  E32 [R32,C5]: type=s, value="____________________________________", fmt="____________________________________", numFmt="General"
+  B36 [R36,C2]: type=s, value="Date:________________________", fmt="Date:________________________", numFmt="General"
+  B37 [R37,C2]: type=s, value="............................................................................................................................", fmt="............................................................................................................................", numFmt="General"
+  B39 [R39,C2]: type=s, value="Quantity", fmt="Quantity", numFmt="General"
+  C39 [R39,C3]: type=s, value="Unit", fmt="Unit", numFmt="General"
+  D39 [R39,C4]: type=s, value="Item (with specification)", fmt="Item (with specification)", numFmt="General"
+  E39 [R39,C5]: type=s, value="ABC", fmt="ABC", numFmt="General"
+  F39 [R39,C6]: type=s, value="Unit Cost", fmt="Unit Cost", numFmt="General"
+  G39 [R39,C7]: type=s, value="Total Cost", fmt="Total Cost", numFmt="General"
+  B40 [R40,C2]: type=n, value=1, fmt="1", numFmt="General"
+  C40 [R40,C3]: type=s, value="Pcs", fmt="Pcs", numFmt="General"
+  D40 [R40,C4]: type=s, value="Camera Sling Bag", fmt="Camera Sling Bag", numFmt="@"
+  E40 [R40,C5]: type=n, value=2500, fmt=" 2,500.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)"
+  D41 [R41,C4]: type=s, value="Specs:", fmt="Specs:", numFmt="@"
+  D42 [R42,C4]: type=s, value="• Type: Crossbody/Sling bag with one adjustable strap", fmt="• Type: Crossbody/Sling bag with one adjustable strap", numFmt="@"
+  D43 [R43,C4]: type=s, value="• Exterior Material: Durable nylon or polyester, sometimes weather-resistant", fmt="• Exterior Material: Durable nylon or polyester, sometimes weather-resistant", numFmt="@"
+  D44 [R44,C4]: type=s, value="• Interior: Padded main compartment with removable dividers", fmt="• Interior: Padded main compartment with removable dividers", numFmt="@"
+  D45 [R45,C4]: type=s, value="•  Capacity: ~8 – 12 L (holds 1 camera body + 1–2 lenses + accessories) ", fmt="•  Capacity: ~8 – 12 L (holds 1 camera body + 1–2 lenses + accessories) ", numFmt="@"
+  D46 [R46,C4]: type=s, value="•  Closure: Zipper top or flap", fmt="•  Closure: Zipper top or flap", numFmt="@"
+  D47 [R47,C4]: type=s, value="•  Dimensions: ~30 × 20 × 15 cm ", fmt="•  Dimensions: ~30 × 20 × 15 cm ", numFmt="@"
+  D48 [R48,C4]: type=s, value="•  Color: Black ", fmt="•  Color: Black ", numFmt="@"
+  D49 [R49,C4]: type=s, value="•  Comfort: Padded shoulder strap with adjustable length", fmt="•  Comfort: Padded shoulder strap with adjustable length", numFmt="@"
+  D50 [R50,C4]: type=s, value="•  Extras: Small accessory pockets", fmt="•  Extras: Small accessory pockets", numFmt="@"
+  D55 [R55,C4]: type=s, value="PURPOSE: To procure a sling bag for the camera for safe transport, protection, and efficient use during official documentation of DMW RO XIII activities.", fmt="PURPOSE: To procure a sling bag for the camera for safe transport, protection, and efficient use during official documentation of DMW RO XIII activities.", numFmt="General"
+  D56 [R56,C4]: type=s, value="VAT INCLUSIVE", fmt="VAT INCLUSIVE", numFmt="General"
+  E56 [R56,C5]: type=n, value=2500, fmt=" 2,500.00 ", numFmt="_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)", formula="SUM(E40:E55)"
+  D58 [R58,C4]: type=s, value=" Received by:", fmt=" Received by:", numFmt="General"
+  D59 [R59,C4]: type=s, value="                                                                                                                                                               ", fmt="                                                                                                                                                               ", numFmt="General"
+  D60 [R60,C4]: type=s, value="(Name & Signature of Proprietor/", fmt="(Name & Signature of Proprietor/", numFmt="General"
+  E60 [R60,C5]: type=s, value="Authorized Representative)", fmt="Authorized Representative)", numFmt="General"
+  D61 [R61,C4]: type=s, value="            Telephone/Fax No.", fmt="            Telephone/Fax No.", numFmt="General"
+  D62 [R62,C4]: type=s, value="                           Email ___________________________________________________", fmt="                           Email ___________________________________________________", numFmt="General"
+  B64 [R64,C2]: type=s, value="PR No.: ", fmt="PR No.: ", numFmt="General"
+  C64 [R64,C3]: type=s, value="2026-02-0024", fmt="2026-02-0024", numFmt="General"
+  B66 [R66,C2]: type=s, value="Terms & Conditions:", fmt="Terms & Conditions:", numFmt="General"
+  B68 [R68,C2]: type=s, value="1.", fmt="1.", numFmt="@"
+  C68 [R68,C3]: type=s, value="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", fmt="Award shall be made on                            Per Item Basis                                             Lot/Package                                    Total Quoted", numFmt="General"
+  B69 [R69,C2]: type=s, value="2.", fmt="2.", numFmt="@"
+  C69 [R69,C3]: type=s, value="Quotation validity shall not be less than 30 calendar days", fmt="Quotation validity shall not be less than 30 calendar days", numFmt="General"
+  B70 [R70,C2]: type=s, value="3.", fmt="3.", numFmt="@"
+  C70 [R70,C3]: type=s, value="Must be registered with PhilGEPS.", fmt="Must be registered with PhilGEPS.", numFmt="General"
+  B71 [R71,C2]: type=s, value="4.", fmt="4.", numFmt="@"
+  C71 [R71,C3]: type=s, value="Goods shall be delivered within: one to three working days after the award has made ", fmt="Goods shall be delivered within: one to three working days after the award has made ", numFmt="General"
+  B72 [R72,C2]: type=s, value="5.", fmt="5.", numFmt="@"
+  C72 [R72,C3]: type=s, value="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", fmt="Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City", numFmt="General"
+  B73 [R73,C2]: type=s, value="6.", fmt="6.", numFmt="@"
+  C73 [R73,C3]: type=s, value="Term of Payment is Check / ADA", fmt="Term of Payment is Check / ADA", numFmt="General"
+  B74 [R74,C2]: type=s, value="7.", fmt="7.", numFmt="@"
+  C74 [R74,C3]: type=s, value="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", fmt="Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed", numFmt="General"
+  B75 [R75,C2]: type=s, value="8.", fmt="8.", numFmt="@"
+  C75 [R75,C3]: type=s, value="In case of discrepancy between unit and total cost, until cost shall prevail", fmt="In case of discrepancy between unit and total cost, until cost shall prevail", numFmt="General"
+  E76 [R76,C5]: type=s, value="Conforme:", fmt="Conforme:", numFmt="General"
+  E79 [R79,C5]: type=s, value="Name & Signature of Proprietor/", fmt="Name & Signature of Proprietor/", numFmt="General"
+  E80 [R80,C5]: type=s, value="Authorized Representative", fmt="Authorized Representative", numFmt="General"
