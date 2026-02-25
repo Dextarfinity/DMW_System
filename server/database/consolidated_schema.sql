@@ -66,29 +66,33 @@ CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
 -- 4. USERS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
-    id            SERIAL PRIMARY KEY,
-    username      VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    full_name     VARCHAR(100),
-    email         VARCHAR(100),
-    role          VARCHAR(30) NOT NULL CHECK (
-                      role IN (
-                          'admin','hope','bac_chair','bac_secretariat',
-                          'twg_member','division_head','end_user',
-                          'supply_officer','inspector','auditor',
-                          'manager','officer','viewer'
-                      )
-                  ),
-    dept_id       INT REFERENCES departments(id) ON DELETE SET NULL,
-    employee_id   INT REFERENCES employees(id) ON DELETE SET NULL,
-    is_active     BOOLEAN DEFAULT TRUE,
-    last_login    TIMESTAMP,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id              SERIAL PRIMARY KEY,
+    username        VARCHAR(50) UNIQUE NOT NULL,
+    password_hash   VARCHAR(255) NOT NULL,
+    full_name       VARCHAR(100),
+    email           VARCHAR(100),
+    role            VARCHAR(30) NOT NULL CHECK (
+                        role IN (
+                            'admin','hope','bac_chair','bac_secretariat',
+                            'twg_member','division_head','end_user',
+                            'supply_officer','inspector','auditor',
+                            'manager','officer','viewer'
+                        )
+                    ),
+    secondary_role  VARCHAR(30),
+    dept_id         INT REFERENCES departments(id) ON DELETE SET NULL,
+    division_id     INT REFERENCES divisions(id) ON DELETE SET NULL,
+    office_id       INT REFERENCES offices(id) ON DELETE SET NULL,
+    employee_id     INT REFERENCES employees(id) ON DELETE SET NULL,
+    is_active       BOOLEAN DEFAULT TRUE,
+    last_login      TIMESTAMP,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_dept ON users(dept_id);
+CREATE INDEX IF NOT EXISTS idx_users_username  ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_dept      ON users(dept_id);
+CREATE INDEX IF NOT EXISTS idx_users_division  ON users(division_id);
 
 -- ============================================================
 -- 5. FUND CLUSTERS
@@ -262,7 +266,12 @@ CREATE TABLE IF NOT EXISTS procurementplans (
     remarks          TEXT,
     total_amount     DECIMAL(12,2) DEFAULT 0,
     created_by       INT REFERENCES users(id) ON DELETE SET NULL,
-    approved_by      INT REFERENCES users(id) ON DELETE SET NULL,
+    approved_by       INT REFERENCES users(id) ON DELETE SET NULL,
+    approved_by_chief INT REFERENCES users(id) ON DELETE SET NULL,
+    approved_by_hope  INT REFERENCES users(id) ON DELETE SET NULL,
+    is_deleted       BOOLEAN DEFAULT FALSE,
+    deleted_at       TIMESTAMP,
+    deleted_reason   TEXT,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     approved_at      TIMESTAMP
@@ -625,6 +634,7 @@ CREATE TABLE IF NOT EXISTS iars (
     received_by             INT REFERENCES users(id) ON DELETE SET NULL,
     date_received           DATE,
     acceptance              VARCHAR(30) DEFAULT 'to_be_checked' CHECK (acceptance IN ('to_be_checked','complete','partial')),
+    status                  VARCHAR(30) DEFAULT 'draft' CHECK (status IN ('draft','completed','cancelled')),
     created_by              INT REFERENCES users(id) ON DELETE SET NULL,
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -632,6 +642,7 @@ CREATE TABLE IF NOT EXISTS iars (
 
 CREATE INDEX IF NOT EXISTS idx_iars_po         ON iars(po_id);
 CREATE INDEX IF NOT EXISTS idx_iars_acceptance  ON iars(acceptance);
+CREATE INDEX IF NOT EXISTS idx_iars_status     ON iars(status);
 
 -- ============================================================
 -- 31. IAR ITEMS
@@ -1022,6 +1033,26 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name);
 CREATE INDEX IF NOT EXISTS idx_audit_user  ON audit_log(user_id);
+
+-- ============================================================
+-- 48. NOTIFICATIONS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id              SERIAL PRIMARY KEY,
+    user_id         INT REFERENCES users(id) ON DELETE CASCADE,
+    type            VARCHAR(30) DEFAULT 'info',
+    icon            VARCHAR(50),
+    title           VARCHAR(200),
+    message         TEXT,
+    reference_type  VARCHAR(50),
+    reference_id    INT,
+    reference_code  VARCHAR(50),
+    is_read         BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
 
 -- ============================================================
 -- VIEWS
