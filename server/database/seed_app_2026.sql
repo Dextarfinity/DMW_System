@@ -172,17 +172,17 @@ INSERT INTO purchaserequests (id, pr_number, dept_id, purpose, total_amount, sta
     (22, 'PR-2026-022', 1, 'Meals and Snacks for SPMS Coaching and Integration',                                        23000.00,  'approved',  1, '2026-01-15 08:00:00'),
     (23, 'PR-2026-023', 1, 'Meals and Snacks for R.A. 6713: Code of Conduct and Ethical Standards',                      45000.00,  'approved',  1, '2026-02-02 08:00:00'),
     (24, 'PR-2026-024', 2, 'Meals and Snacks for Advanced Case Management Training for Protection Division Officers',    30000.00,  'approved',  1, '2026-02-02 09:00:00'),
-    (25, 'PR-2026-025', 1, 'Meals and Snacks for Bagong Pilipinas Serbisyo Fair',                                       100000.00, 'pending',   1, '2026-02-10 08:00:00'),
-    (26, 'PR-2026-026', 1, 'Meals and Snacks for Handog ng Pangulo',                                                     70000.00, 'pending',   1, '2026-02-10 09:00:00'),
-    (27, 'PR-2026-027', 1, 'Meals and Snacks for Labor Day Celebration',                                                  25000.00, 'pending',   1, '2026-02-10 10:00:00'),
-    (28, 'PR-2026-028', 1, 'Meals and Snacks for Organizational Development / Capability Enhancement Training',          250000.00, 'pending',   1, '2026-02-12 08:00:00'),
+    (25, 'PR-2026-025', 1, 'Meals and Snacks for Bagong Pilipinas Serbisyo Fair',                                       100000.00, 'pending_approval',   1, '2026-02-10 08:00:00'),
+    (26, 'PR-2026-026', 1, 'Meals and Snacks for Handog ng Pangulo',                                                     70000.00, 'pending_approval',   1, '2026-02-10 09:00:00'),
+    (27, 'PR-2026-027', 1, 'Meals and Snacks for Labor Day Celebration',                                                  25000.00, 'pending_approval',   1, '2026-02-10 10:00:00'),
+    (28, 'PR-2026-028', 1, 'Meals and Snacks for Organizational Development / Capability Enhancement Training',          250000.00, 'pending_approval',   1, '2026-02-12 08:00:00'),
     (29, 'PR-2026-029', 5, 'Supply and Delivery of Quarterly Common-Used Supplies and Equipment (Q1)',                   200000.00, 'approved',  1, '2026-01-06 08:00:00'),
     (30, 'PR-2026-030', 4, 'Capability Building Program for Children of OFWs at PNUM',                                   48125.00, 'approved',  1, '2026-01-15 08:00:00'),
     (31, 'PR-2026-031', 3, 'Conduct of Dialogue with Provincial PESO, City PESO, and DOLE Field Offices',                52748.80, 'approved',  1, '2026-01-15 09:00:00'),
     (32, 'PR-2026-032', 4, 'Mental Health Awareness and Stress Management Seminar',                                     271280.00, 'approved',  1, '2026-01-16 08:00:00'),
     (33, 'PR-2026-033', 4, 'Reintegration Education Seminar',                                                           191720.00, 'approved',  1, '2026-01-16 09:00:00'),
     (34, 'PR-2026-034', 3, 'Conduct of Job Fair during Migrants Day',                                                   133900.00, 'approved',  1, '2026-01-16 10:00:00'),
-    (35, 'PR-2026-035', 3, 'Procurement of Capital Outlay (ICT, Office Equipment, Furniture and Fixture) for MWPSD',    435000.00, 'pending',   1, '2026-02-03 08:00:00')
+    (35, 'PR-2026-035', 3, 'Procurement of Capital Outlay (ICT, Office Equipment, Furniture and Fixture) for MWPSD',    435000.00, 'pending_approval',   1, '2026-02-03 08:00:00')
 ON CONFLICT (pr_number) DO NOTHING;
 
 SELECT setval('purchaserequests_id_seq', 35);

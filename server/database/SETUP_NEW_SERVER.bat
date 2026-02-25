@@ -133,8 +133,8 @@ echo =====================================================
 echo   STEP 7 of 10: Running PPMP seed data
 echo   (99 line items across 4 divisions, FY 2026)
 echo   Grand Total: P19,091,072.00
-echo   FAD: 53 items | MWPTD: 16 items
-echo   MWPSD: 12 items | WRSD: 18 items
+echo   FAD: 53 items ^| MWPTD: 16 items
+echo   MWPSD: 12 items ^| WRSD: 18 items
 echo =====================================================
 %PSQL% -U %USER% -p %PORT% -d %DB% -f "%~dp0seed_ppmp_2026.sql"
 if %ERRORLEVEL% NEQ 0 (
