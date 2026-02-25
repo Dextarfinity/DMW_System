@@ -185,7 +185,7 @@ function getPrintHeaderCSS() {
 }
 
 // API Configuration
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'http://localhost:3000';
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
 
