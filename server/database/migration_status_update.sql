@@ -101,21 +101,22 @@ ALTER TABLE purchaseorders ALTER COLUMN status SET DEFAULT 'for_signing';
 -- Old inspection_result: pending, accepted, rejected, partial
 -- New inspection_result: on_going, inspected_verified, rejected, partial
 -- ============================================================
-ALTER TABLE iars DROP CONSTRAINT IF EXISTS iars_status_check;
-ALTER TABLE iars ALTER COLUMN status TYPE VARCHAR(30);
-UPDATE iars SET status = 'inspected_verified' WHERE status = 'completed';
-UPDATE iars SET status = 'inspection_ongoing' WHERE status = 'draft';
-ALTER TABLE iars ADD CONSTRAINT iars_status_check
-  CHECK (status IN ('inspection_ongoing','inspected_verified','complete','partial','cancelled'));
-ALTER TABLE iars ALTER COLUMN status SET DEFAULT 'inspection_ongoing';
-
+-- iars table has no 'status' column; it uses 'inspection_result' and 'acceptance'
+-- Update inspection_result values to match new labels
 ALTER TABLE iars DROP CONSTRAINT IF EXISTS iars_inspection_result_check;
 ALTER TABLE iars ALTER COLUMN inspection_result TYPE VARCHAR(30);
-UPDATE iars SET inspection_result = 'inspected_verified' WHERE inspection_result = 'accepted';
-UPDATE iars SET inspection_result = 'on_going' WHERE inspection_result = 'pending';
+UPDATE iars SET inspection_result = 'inspected_verified' WHERE inspection_result IN ('accepted','verified');
+UPDATE iars SET inspection_result = 'on_going' WHERE inspection_result IN ('pending','to_be_checked');
 ALTER TABLE iars ADD CONSTRAINT iars_inspection_result_check
   CHECK (inspection_result IN ('on_going','inspected_verified','rejected','partial'));
 ALTER TABLE iars ALTER COLUMN inspection_result SET DEFAULT 'on_going';
+
+-- Update acceptance values
+ALTER TABLE iars DROP CONSTRAINT IF EXISTS iars_acceptance_check;
+ALTER TABLE iars ALTER COLUMN acceptance TYPE VARCHAR(30);
+ALTER TABLE iars ADD CONSTRAINT iars_acceptance_check
+  CHECK (acceptance IN ('to_be_checked','complete','partial'));
+ALTER TABLE iars ALTER COLUMN acceptance SET DEFAULT 'to_be_checked';
 
 -- ============================================================
 -- DONE! All status values now match user-specified labels.

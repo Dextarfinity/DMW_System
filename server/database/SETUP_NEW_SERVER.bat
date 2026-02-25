@@ -8,8 +8,9 @@ echo.
 echo This will set up the ENTIRE database on this server
 echo with ALL the latest inserted data.
 echo.
-echo PostgreSQL 18 must be installed and running on port 5433.
-echo PostgreSQL password: kurt09908
+echo PostgreSQL 18 must be installed and running on port 5432.
+echo Server: dmw_database
+echo PostgreSQL password: dmw123
 echo.
 echo Data included:
 echo   - 44 database tables (consolidated schema)
@@ -45,9 +46,9 @@ echo.
 pause
 
 set PSQL="C:\Program Files\PostgreSQL\18\bin\psql.exe"
-set PGPASSWORD=kurt09908
-set DB=dmw_db
-set PORT=5433
+set PGPASSWORD=dmw123
+set DB=dmw_database
+set PORT=5432
 set USER=postgres
 
 echo.
@@ -195,7 +196,7 @@ echo --- Employees ---
 %PSQL% -U %USER% -p %PORT% -d %DB% -c "SELECT COUNT(*) AS total_employees FROM employees;"
 echo.
 echo --- Data Summary ---
-%PSQL% -U %USER% -p %PORT% -d %DB% -c "SELECT 'Items' AS entity, COUNT(*) AS count FROM items UNION ALL SELECT 'Suppliers', COUNT(*) FROM suppliers UNION ALL SELECT 'POs', COUNT(*) FROM purchaseorders UNION ALL SELECT 'PRs', COUNT(*) FROM purchaserequests UNION ALL SELECT 'RFQs', COUNT(*) FROM rfqs UNION ALL SELECT 'Abstracts', COUNT(*) FROM abstracts UNION ALL SELECT 'BAC Resolutions', COUNT(*) FROM bac_resolutions UNION ALL SELECT 'NOAs', COUNT(*) FROM notices_of_award UNION ALL SELECT 'PPMP Items', COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL UNION ALL SELECT 'IARs', COUNT(*) FROM iars UNION ALL SELECT 'Trip Tickets', COUNT(*) FROM trip_tickets ORDER BY entity;"
+%PSQL% -U %USER% -p %PORT% -d %DB% -c "SELECT 'Items' AS entity, COUNT(*) AS count FROM items UNION ALL SELECT 'Suppliers', COUNT(*) FROM suppliers UNION ALL SELECT 'POs', COUNT(*) FROM purchaseorders UNION ALL SELECT 'PRs', COUNT(*) FROM purchaserequests UNION ALL SELECT 'RFQs', COUNT(*) FROM rfqs UNION ALL SELECT 'Abstracts', COUNT(*) FROM abstracts UNION ALL SELECT 'BAC Resolutions', COUNT(*) FROM bac_resolutions UNION ALL SELECT 'NOAs', COUNT(*) FROM notices_of_award UNION ALL SELECT 'PPMP Items', COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND id > 5 UNION ALL SELECT 'IARs', COUNT(*) FROM iars UNION ALL SELECT 'Trip Tickets', COUNT(*) FROM trip_tickets ORDER BY entity;"
 echo.
 
 echo =====================================================
@@ -206,10 +207,11 @@ echo All data has been loaded successfully.
 echo.
 echo DATABASE CONNECTION:
 echo   Host: localhost
-echo   Port: 5433
-echo   Database: dmw_db
+echo   Port: 5432
+echo   Database: dmw_database
+echo   Server: dmw_database (PostgreSQL 18)
 echo   User: postgres
-echo   Password: kurt09908
+echo   Password: dmw123
 echo.
 echo USER ACCOUNTS:
 echo   admin          (password: admin123, role: admin)

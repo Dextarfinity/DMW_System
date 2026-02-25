@@ -245,17 +245,27 @@ CREATE INDEX IF NOT EXISTS idx_entity_attachments_attachment  ON entity_attachme
 -- 15. PROCUREMENT PLANS (PPMP / APP)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS procurementplans (
-    id           SERIAL PRIMARY KEY,
-    dept_id      INT REFERENCES departments(id) ON DELETE SET NULL,
-    fiscal_year  INT DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
-    status       VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','submitted','approved','rejected','completed')),
-    remarks      TEXT,
-    total_amount DECIMAL(12,2) DEFAULT 0,
-    created_by   INT REFERENCES users(id) ON DELETE SET NULL,
-    approved_by  INT REFERENCES users(id) ON DELETE SET NULL,
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    approved_at  TIMESTAMP
+    id               SERIAL PRIMARY KEY,
+    dept_id          INT REFERENCES departments(id) ON DELETE SET NULL,
+    fiscal_year      INT DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
+    status           VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','submitted','approved','rejected','completed')),
+    ppmp_no          VARCHAR(50),
+    description      TEXT,
+    project_type     VARCHAR(50),
+    quantity_size    VARCHAR(100),
+    procurement_mode VARCHAR(100),
+    pre_procurement  VARCHAR(10),
+    start_date       VARCHAR(50),
+    end_date         VARCHAR(50),
+    delivery_period  VARCHAR(50),
+    fund_source      VARCHAR(50),
+    remarks          TEXT,
+    total_amount     DECIMAL(12,2) DEFAULT 0,
+    created_by       INT REFERENCES users(id) ON DELETE SET NULL,
+    approved_by      INT REFERENCES users(id) ON DELETE SET NULL,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_at      TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_plans_dept   ON procurementplans(dept_id);
