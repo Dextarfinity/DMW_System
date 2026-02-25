@@ -185,7 +185,7 @@ function getPrintHeaderCSS() {
 }
 
 // API Configuration
-const API_URL = 'http://192.168.100.235:3000/api';
+const API_URL = 'http://localhost:3000/api';
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
 
@@ -215,6 +215,81 @@ function getMergedPermissions(rolePermissions) {
 // Global data caches for filtering
 let cachedPR = [], cachedRFQ = [], cachedAbstract = [], cachedPostQual = [];
 let cachedBACRes = [], cachedNOA = [], cachedPO = [], cachedIAR = [];
+
+// Global caches for divisions & procurement modes (populated once from DB)
+let cachedDivisions = [];
+let cachedProcModes = [];
+
+// Fetch and cache divisions from DB
+async function ensureDivisionsLoaded() {
+  if (cachedDivisions.length) return cachedDivisions;
+  try {
+    cachedDivisions = await apiRequest('/divisions');
+  } catch (e) { cachedDivisions = []; }
+  return cachedDivisions;
+}
+
+// Fetch and cache procurement modes from DB
+async function ensureProcModesLoaded() {
+  if (cachedProcModes.length) return cachedProcModes;
+  try {
+    cachedProcModes = await apiRequest('/procurement-modes');
+  } catch (e) { cachedProcModes = []; }
+  return cachedProcModes;
+}
+
+// Build <option> HTML for divisions
+function buildDivisionOptions(selectedCode, includeEmpty = true) {
+  let html = includeEmpty ? '<option value="">-- Select Division --</option>' : '';
+  cachedDivisions.forEach(d => {
+    const code = d.code || d.abbreviation || d.name;
+    const sel = (code === selectedCode) ? ' selected' : '';
+    html += `<option value="${code}" data-deptid="${d.id}"${sel}>${code}</option>`;
+  });
+  return html;
+}
+
+// Build <option> HTML for divisions using ID as value (for user/employee/office forms)
+function buildDivisionOptionsById(selectedId, includeEmpty = true, labelStyle = 'short') {
+  let html = includeEmpty ? '<option value="">-- Select --</option>' : '';
+  cachedDivisions.forEach(d => {
+    const code = d.code || d.abbreviation || d.name;
+    const sel = (String(d.id) === String(selectedId)) ? ' selected' : '';
+    const label = labelStyle === 'long' ? `${code} - ${d.name}` : code;
+    html += `<option value="${d.id}"${sel}>${label}</option>`;
+  });
+  return html;
+}
+
+// Build <option> HTML for procurement modes
+function buildProcModeOptions(selectedMode, includeEmpty = false) {
+  let html = includeEmpty ? '<option value="">-- Select Mode --</option>' : '';
+  cachedProcModes.forEach(m => {
+    const sel = (m.name === selectedMode) ? ' selected' : '';
+    html += `<option value="${m.name}"${sel}>${m.name}</option>`;
+  });
+  return html;
+}
+
+// Populate the signup division dropdown from DB
+async function populateSignupDivision() {
+  const sel = document.getElementById('signupDivision');
+  if (!sel) return;
+  try {
+    await ensureDivisionsLoaded();
+  } catch (e) {
+    // Divisions API requires auth - skip silently on login page
+    return;
+  }
+  sel.innerHTML = '<option value="">Select Division...</option>';
+  cachedDivisions.forEach(d => {
+    const code = d.code || d.abbreviation || d.name;
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = `${d.name} (${code})`;
+    sel.appendChild(opt);
+  });
+}
 
 // API Helper Functions
 async function apiRequest(endpoint, method = 'GET', data = null) {
@@ -402,6 +477,43 @@ function initPPMPFilters() {
   const yearFilter = document.getElementById('ppmpYearFilter');
   const searchInput = document.getElementById('ppmpSearchInput');
   
+  // Populate division filter from DB
+  if (divFilter && divFilter.options.length <= 1) {
+    apiRequest('/divisions').then(divisions => {
+      divisions.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.code || d.name;
+        divFilter.appendChild(opt);
+      });
+    }).catch(() => {});
+  }
+
+  // Populate mode filter from DB
+  if (modeFilter && modeFilter.options.length <= 1) {
+    apiRequest('/procurement-modes').then(modes => {
+      modes.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        modeFilter.appendChild(opt);
+      });
+    }).catch(() => {});
+  }
+
+  // Populate PR division filter from DB
+  const prDivFilter = document.getElementById('prDivisionFilter');
+  if (prDivFilter && prDivFilter.options.length <= 1) {
+    apiRequest('/divisions').then(divisions => {
+      divisions.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.code || d.name;
+        opt.textContent = d.code || d.name;
+        prDivFilter.appendChild(opt);
+      });
+    }).catch(() => {});
+  }
+
   if (divFilter) divFilter.onchange = function() { loadPPMP(); };
   if (modeFilter) modeFilter.onchange = function() { loadPPMP(); };
   if (yearFilter) yearFilter.onchange = function() { loadPPMP(); };
@@ -786,6 +898,7 @@ async function loadDivisions() {
   try {
     const divisions = await apiRequest('/divisions');
     renderDivisionsTable(divisions);
+    renderDivisionsGrid(divisions);
     return divisions;
   } catch (err) { console.log('Using demo divisions data'); return []; }
 }
@@ -806,12 +919,22 @@ async function loadProcurementModes() {
   } catch (err) { console.log('Using demo procurement modes data'); return []; }
 }
 
+let cachedUACSCodes = [];
+
 async function loadUACSCodes() {
   try {
     const codes = await apiRequest('/uacs-codes');
-    renderUACSCodesTable(codes);
+    cachedUACSCodes = codes;
+    filterUACSTable();
     return codes;
   } catch (err) { console.log('Using demo UACS codes data'); return []; }
+}
+
+function filterUACSTable() {
+  const catVal = document.getElementById('uacsCategoryFilter')?.value || '';
+  let data = cachedUACSCodes;
+  if (catVal) data = data.filter(c => (c.category || '').toUpperCase() === catVal.toUpperCase());
+  renderUACSCodesTable(data);
 }
 
 async function loadUOMs() {
@@ -1124,12 +1247,22 @@ function updateDashboardDivisionPPMP(divData, totalBudget, canSeeAll, userDiv) {
   const container = document.getElementById('ppmpDivisionStats');
   if (!container) return;
   
-  const allDivisions = [
-    { code: 'FAD', color: '#3182ce', label: 'Finance & Admin Division' },
-    { code: 'WRSD', color: '#38a169', label: 'Welfare & Reintegration Services' },
-    { code: 'MWPSD', color: '#d69e2e', label: 'Migrant Workers Processing' },
-    { code: 'MWPTD', color: '#e53e3e', label: 'Migrant Workers Protection' }
-  ];
+  // Color map for divisions
+  const divColorMap = { 'FAD': '#3182ce', 'WRSD': '#38a169', 'MWPSD': '#d69e2e', 'MWPTD': '#e53e3e', 'ORD': '#805ad5' };
+  
+  // Build from cached divisions (from DB), fallback to minimal list
+  const allDivisions = cachedDivisions.length
+    ? cachedDivisions.map(d => ({
+        code: d.code || d.abbreviation || d.name,
+        color: divColorMap[d.code || d.abbreviation] || '#718096',
+        label: d.name
+      }))
+    : [
+        { code: 'FAD', color: '#3182ce', label: 'Finance & Admin Division' },
+        { code: 'WRSD', color: '#38a169', label: 'Welfare & Reintegration Services' },
+        { code: 'MWPSD', color: '#d69e2e', label: 'Migrant Workers Processing' },
+        { code: 'MWPTD', color: '#e53e3e', label: 'Migrant Workers Protection' }
+      ];
   
   // Filter: chiefs see only their division, admin/ORD see all
   const divisions = canSeeAll ? allDivisions : allDivisions.filter(d => d.code === userDiv);
@@ -1220,8 +1353,7 @@ function renderItemsTable(items) {
       <td>${item.uacs_code || '-'}</td>
       <td>
         <div class="action-buttons">
-          ${item.category === 'EXPENDABLE' ? `<button class="btn-icon" title="View Stock Card" onclick="viewItemStockCard(${item.id})"><i class="fas fa-layer-group"></i></button>` : ''}
-          ${isSemiOrCapital ? `<button class="btn-icon" title="View Property Card" onclick="viewItemPropertyCard(${item.id})"><i class="fas fa-id-card"></i></button>` : ''}
+          <button class="btn-icon" title="View" onclick="showViewItemModal(${item.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" data-action="edit-item" title="Edit" onclick="showEditItemModal(${item.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon danger" data-action="delete-item" title="Delete" onclick="showDeleteConfirmModal('Item', ${item.id})"><i class="fas fa-trash"></i></button>
         </div>
@@ -1232,7 +1364,8 @@ function renderItemsTable(items) {
 
 function renderSuppliersTable(suppliers) {
   const tbody = document.getElementById('suppliersTableBody');
-  if (!tbody || !suppliers.length) return;
+  if (!tbody) return;
+  if (!suppliers || !suppliers.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center">No suppliers found</td></tr>'; return; }
   
   tbody.innerHTML = suppliers.map(s => `
     <tr>
@@ -1929,7 +2062,7 @@ function renderPostQualTable(postQual) {
       <td>${statusBadge(statusLabel, statusClass)}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" title="View" onclick="showViewPostQualModal(${p.id})"><i class="fas fa-folder-open"></i></button>
+          <button class="btn-icon" title="View" onclick="showViewPostQualModal(${p.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon" title="Print" onclick="printRecord('TWG Report', '${p.postqual_number || p.twg_number}')"><i class="fas fa-print"></i></button>
           <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -2376,7 +2509,7 @@ function renderPropertyCardsTable(cards) {
       <td><span class="status-badge ${statusBadgeClass[c.status] || 'draft'}">${(c.status || 'active').replace('_', ' ')}</span></td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" title="View Ledger" onclick="showViewPropertyLedgerModal(${c.id})"><i class="fas fa-book"></i></button>
+          <button class="btn-icon" title="View" onclick="showViewPropertyLedgerModal(${c.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" title="Issue ICS" onclick="showNewICSFromPropertyModal('${c.property_number}')"><i class="fas fa-exchange-alt"></i></button>
           <button class="btn-icon" data-action="edit-property" title="Edit" onclick="showEditPropertyCardModal(${c.id})"><i class="fas fa-edit"></i></button>
         </div>
@@ -2426,7 +2559,7 @@ function renderEmployeesTable(employees) {
       <td><span class="status-badge ${statusClass[e.status] || 'draft'}">${e.status || 'active'}</span></td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" title="View Property" onclick="viewEmployeeProperty(${e.id})"><i class="fas fa-id-card"></i></button>
+          <button class="btn-icon" title="View" onclick="showViewEmployeeModal(${e.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" data-action="edit-employee" title="Edit" onclick="showEditEmployeeModal(${e.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon danger" data-action="delete-employee" title="Delete" onclick="showDeleteConfirmModal('Employee', ${e.id})"><i class="fas fa-trash"></i></button>
         </div>
@@ -2724,6 +2857,43 @@ function renderDivisionsTable(divisions) {
   `).join('');
 }
 
+function renderDivisionsGrid(divisions) {
+  const grid = document.getElementById('divisionsGrid');
+  if (!grid) return;
+  if (!divisions || !divisions.length) { grid.innerHTML = '<p style="text-align:center;color:#666;">No divisions found</p>'; return; }
+  
+  const iconMap = {
+    'FAD': { icon: 'fa-calculator', bg: 'bg-primary' },
+    'WRSD': { icon: 'fa-hands-helping', bg: 'bg-success' },
+    'MWPSD': { icon: 'fa-shield-alt', bg: 'bg-warning' },
+    'MWPTD': { icon: 'fa-chalkboard-teacher', bg: 'bg-info' },
+    'ORD': { icon: 'fa-user-tie', bg: 'bg-danger' }
+  };
+  const defaultIcon = { icon: 'fa-building', bg: 'bg-primary' };
+  
+  grid.innerHTML = divisions.map(d => {
+    const code = (d.code || '').toUpperCase();
+    const style = iconMap[code] || defaultIcon;
+    const head = d.head_name || d.division_head || '';
+    const role = d.head_role || ('Chief ' + code);
+    return `
+      <div class="division-card">
+        <div class="division-icon ${style.bg}">
+          <i class="fas ${style.icon}"></i>
+        </div>
+        <h3>${d.name || ''}</h3>
+        <p class="division-code">${code}</p>
+        ${head ? `<p class="division-head"><strong>Division Head:</strong> ${head}</p>` : ''}
+        ${role ? `<p class="division-role">${role}</p>` : ''}
+        <div class="division-stats-small">
+          <span><i class="fas fa-clipboard-list"></i> ${d.ppmp_count || 0} PPMP Items</span>
+          <span><i class="fas fa-file-signature"></i> ${d.pr_count || 0} Active PRs</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function renderFundClustersTable(fc) {
   const tbody = document.getElementById('fundClustersTableBody');
   if (!tbody) return;
@@ -2880,42 +3050,40 @@ function filterTripTickets(status) {
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
   switch(pageId) {
-    case 'dashboard': loadDashboardStats(); break;
-    case 'items': loadItems(); break;
-    case 'suppliers': loadSuppliers(); break;
-    case 'users': loadUsers(); break;
-    case 'ppmp': initPPMPFilters(); loadPPMP(); break;
-    case 'app': loadAPP(); break;
-    case 'purchase-requests': loadPR(); break;
-    case 'rfq': loadRFQ(); break;
-    case 'abstract': loadAbstract(); break;
-    case 'post-qual': loadPostQual(); break;
-    case 'bac-resolution': loadBACResolution(); break;
-    case 'noa': loadNOA(); break;
-    case 'purchase-orders': loadPO(); break;
-    case 'iar': loadIAR(); break;
-    case 'po-packet': loadPOPacket(); break;
-    case 'coa': loadCOA(); break;
-    case 'stock-cards': loadStockCards(); break;
-    case 'property-cards': loadPropertyCards(); break;
-    case 'ics': loadICS(); break;
-    case 'employees': loadEmployees(); break;
-    case 'par': loadPAR(); break;
-    case 'ptr': loadPTR(); break;
-    case 'ris': loadRIS(); break;
-    case 'supplies-ledger': loadSuppliesLedger(); break;
-    case 'semi-expendable': loadSemiExpendable(); break;
-    case 'capital-outlay': loadCapitalOutlay(); break;
-    case 'trip-tickets': loadTripTickets(); break;
-    case 'offices': loadOffices(); break;
-    case 'designations': loadDesignations(); break;
-    case 'divisions': loadDivisions(); break;
-    case 'fund-clusters': loadFundClusters(); break;
-    case 'procurement-modes': loadProcurementModes(); break;
-    case 'uacs-codes': loadUACSCodes(); break;
-    case 'uoms': loadUOMs(); break;
-    case 'settings': loadSettings(); break;
+    case 'dashboard': await loadDashboardStats(); break;
+    case 'items': await loadItems(); break;
+    case 'suppliers': await loadSuppliers(); break;
+    case 'users': await loadUsers(); break;
+    case 'ppmp': initPPMPFilters(); await loadPPMP(); break;
+    case 'app': await loadAPP(); break;
+    case 'purchase-requests': await loadPR(); break;
+    case 'rfq': await loadRFQ(); break;
+    case 'abstract': await loadAbstract(); break;
+    case 'post-qual': await loadPostQual(); break;
+    case 'bac-resolution': await loadBACResolution(); break;
+    case 'noa': await loadNOA(); break;
+    case 'purchase-orders': await loadPO(); break;
+    case 'iar': await loadIAR(); break;
+    case 'po-packet': await loadPOPacket(); break;
+    case 'coa': await loadCOA(); break;
+    case 'stock-cards': await loadStockCards(); break;
+    case 'property-cards': await loadPropertyCards(); break;
+    case 'ics': await loadICS(); break;
+    case 'employees': await loadEmployees(); break;
+    case 'ris': await loadRIS(); break;
+    case 'supplies-ledger': await loadSuppliesLedger(); break;
+    case 'trip-tickets': await loadTripTickets(); break;
+    case 'designations': await loadDesignations(); break;
+    case 'divisions': await loadDivisions(); break;
+    case 'fund-clusters': await loadFundClusters(); break;
+    case 'procurement-modes': await loadProcurementModes(); break;
+    case 'uacs-codes': await loadUACSCodes(); break;
+    case 'uoms': await loadUOMs(); break;
+    case 'settings': await loadSettings(); break;
+    case 'reports': /* Static page with report generators */ break;
   }
+  // Apply action permissions AFTER data has fully loaded into the DOM
+  applyActionPermissions();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2999,6 +3167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function init() {
     setCurrentDate();
     setupEventListeners();
+    populateSignupDivision(); // Populate signup division dropdown (API is public)
     checkSession();
   }
 
@@ -3627,7 +3796,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Apply action-level permissions to buttons and UI elements
-  function applyActionPermissions() {
+  window.applyActionPermissions = function() {
     const perms = getUserPermissions();
 
     // Map of permission to button selectors
@@ -3725,8 +3894,18 @@ document.addEventListener('DOMContentLoaded', () => {
     tables.forEach(table => {
       const actionHeader = table.querySelector('th:last-child');
       if (actionHeader && actionHeader.textContent.trim().toLowerCase() === 'actions') {
-        // Check if there are any visible action buttons
+        // Get data rows (skip empty/no-data rows)
+        const dataRows = table.querySelectorAll('tbody tr');
         const actionCells = table.querySelectorAll('td:last-child');
+        
+        // If table has no data rows yet, always show the action column header
+        // (data may still be loading from API)
+        if (dataRows.length === 0 || actionCells.length === 0) {
+          actionHeader.style.display = '';
+          return;
+        }
+
+        // Check if there are any visible action buttons
         let hasVisibleActions = false;
         
         actionCells.forEach(cell => {
@@ -3808,13 +3987,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
     }
 
-    // Load data from API for this page
+    // Load data from API for this page (applyActionPermissions is called inside after data loads)
     loadPageData(pageId);
-
-    // Re-apply action permissions for the current page
-    setTimeout(() => {
-      applyActionPermissions();
-    }, 50);
   }
   
   // Show access denied message
@@ -4681,13 +4855,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Modal Templates (As-Is PPMP per NGPA Form)
-  window.showNewPPMPModal = function() {
+  window.showNewPPMPModal = async function() {
     // Only 4 chief accounts + admin can submit PPMPs
     const allowedCreators = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd', 'admin'];
     if (!userHasAnyRole(allowedCreators)) {
       alert('Only Division Chiefs (FAD, WRSD, MWPSD, MWPTD) can submit PPMP entries.');
       return;
     }
+    // Ensure divisions and procurement modes are loaded from DB
+    await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+
     // Determine if user is a chief (auto-select their division)
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
@@ -4715,12 +4892,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="form-group">
             <label>End-User / Division <span class="text-danger">*</span></label>
             <select class="form-select" id="ppmpDivisionSelect" required ${isChief ? 'disabled' : ''} onchange="generatePPMPNumber()">
-              <option value="">-- Select Division --</option>
-              <option value="FAD" data-deptid="1" ${isChief && chiefDivision === 'FAD' ? 'selected' : ''}>FAD</option>
-              <option value="WRSD" data-deptid="4" ${isChief && chiefDivision === 'WRSD' ? 'selected' : ''}>WRSD</option>
-              <option value="MWPSD" data-deptid="3" ${isChief && chiefDivision === 'MWPSD' ? 'selected' : ''}>MWPSD</option>
-              <option value="MWPTD" data-deptid="2" ${isChief && chiefDivision === 'MWPTD' ? 'selected' : ''}>MWPTD</option>
-              <option value="ORD" data-deptid="5">ORD</option>
+              ${buildDivisionOptions(isChief ? chiefDivision : '')}
             </select>
             ${isChief ? '<input type="hidden" name="division" value="' + chiefDivision + '">' : ''}
           </div>
@@ -4763,17 +4935,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="form-group">
             <label>Mode of Procurement <span class="text-danger">*</span></label>
             <select class="form-select" id="ppmpProcMode" required>
-              <option value="Competitive Bidding">Competitive Bidding</option>
-              <option value="Limited Source Bidding">Limited Source Bidding</option>
-              <option value="Competitive Dialogue">Competitive Dialogue</option>
-              <option value="Unsolicited Offer with Bid Matching">Unsolicited Offer with Bid Matching</option>
-              <option value="Direct Contracting">Direct Contracting</option>
-              <option value="Direct Acquisition">Direct Acquisition</option>
-              <option value="Repeat Order">Repeat Order</option>
-              <option value="Small Value Procurement" selected>Small Value Procurement</option>
-              <option value="Negotiated Procurement">Negotiated Procurement</option>
-              <option value="Direct Sales">Direct Sales</option>
-              <option value="Direct Procurement for Science, Technology and Innovation">Direct Procurement for STI</option>
+              ${buildProcModeOptions('Small Value Procurement')}
             </select>
           </div>
           <div class="form-group">
@@ -5482,7 +5644,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('Issue Notice of Award (NOA)', html);
   };
 
-  window.showNewPOModal = function() {
+  window.showNewPOModal = async function() {
+    await ensureProcModesLoaded();
     const html = `
       <form id="poForm" onsubmit="saveNewPO(event)">
         <div class="info-banner" style="margin-bottom: 0;">
@@ -5517,13 +5680,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Mode of Procurement</label>
             <select class="form-select" id="poProcMode" required>
-              <option value="">-- Select Mode --</option>
-              <option value="SVP - Shopping" selected>SVP - Shopping</option>
-              <option value="SVP - NP (53.9)">SVP - NP (Sec. 53.9)</option>
-              <option value="Direct Contracting">Direct Contracting</option>
-              <option value="Competitive Bidding">Competitive Bidding</option>
-              <option value="Repeat Order">Repeat Order</option>
-              <option value="Agency-to-Agency">Agency-to-Agency</option>
+              ${buildProcModeOptions('Small Value Procurement', true)}
             </select>
           </div>
         </div>
@@ -6053,9 +6210,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // --- EDIT BAC RESOLUTION ---
-  window.showEditBACResolutionModal = function(id) {
+  window.showEditBACResolutionModal = async function(id) {
     const b = cachedBACRes.find(x => x.id === id);
     if (!b) { alert('Record not found'); return; }
+    await ensureProcModesLoaded();
     const html = `
       <form id="editBACForm" onsubmit="saveEditBACResolution(event, ${id})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit BAC Resolution</strong></div>
@@ -6067,10 +6225,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Procurement Mode</label>
             <select id="editBacMode" class="form-select">
-              <option value="SVP" ${b.procurement_mode==='SVP'?'selected':''}>SVP</option>
-              <option value="SVPDC" ${b.procurement_mode==='SVPDC'?'selected':''}>SVPDC</option>
-              <option value="DC_SHOPPING" ${b.procurement_mode==='DC_SHOPPING'?'selected':''}>DC Shopping</option>
-              <option value="OTHERS" ${b.procurement_mode==='OTHERS'?'selected':''}>Others</option>
+              ${buildProcModeOptions(b.procurement_mode || '')}
             </select>
           </div>
           <div class="form-group"><label>ABC Amount</label><input type="number" step="0.01" id="editBacAbc" value="${b.abc_amount || 0}"></div>
@@ -7466,9 +7621,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   window.showNewUserModal = async function() {
-    // Load employees for linking
+    // Load employees for linking and ensure divisions cached
     let employees = [];
-    try { employees = await apiRequest('/employees'); } catch(e) {}
+    try { [employees] = await Promise.all([apiRequest('/employees'), ensureDivisionsLoaded()]); } catch(e) {}
     const empOptions = employees.map(e => `<option value="${e.id}">${e.full_name} (${e.employee_code || 'N/A'})</option>`).join('');
     
     const allRoles = [
@@ -7526,11 +7681,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Division</label>
             <select class="form-select" id="newDivision">
               <option value="">None</option>
-              <option value="1">FAD - Finance & Administrative</option>
-              <option value="2">WRSD - Welfare Reintegration Services</option>
-              <option value="3">MWPSD - Migrant Workers Protection Services</option>
-              <option value="4">MWPTD - Migrant Workers Protection Training</option>
-              <option value="5">ORD - Office of Regional Director</option>
+              ${buildDivisionOptionsById('', false, 'long')}
             </select>
           </div>
         </div>
@@ -7668,7 +7819,8 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Property Card Modal
-  window.showNewPropertyCardModal = function() {
+  window.showNewPropertyCardModal = async function() {
+    await ensureDivisionsLoaded();
     const html = `
       <form id="propertyCardForm" onsubmit="saveNewPropertyCard(event)">
         <div class="form-row">
@@ -7722,11 +7874,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <option value="2">WRSD</option>
               <option value="3">MWPSD</option>
               <option value="4">MWPTD</option>
-              <option value="5">ORD</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
+              ${buildDivisionOptionsById('', false)}
           <label>Remarks</label>
           <textarea id="pcRemarks" rows="2" placeholder="Optional remarks"></textarea>
         </div>
@@ -7860,7 +8008,8 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Employee Modal
-  window.showNewEmployeeModal = function() {
+  window.showNewEmployeeModal = async function() {
+    await ensureDivisionsLoaded();
     const html = `
       <form id="employeeForm" onsubmit="saveNewEmployee(event)">
         <div class="form-row">
@@ -7909,11 +8058,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <option value="5">ORD</option>
             </select>
           </div>
-        </div>
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Save Employee</button>
-        </div>
+        </div>${buildDivisionOptionsById('', false)}
       </form>
     `;
     openModal('Add New Employee', html);
@@ -8001,8 +8146,30 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Placeholder functions for inventory actions
-  window.showViewPropertyLedgerModal = function(id) {
-    openModal('Property Ledger', '<div class="view-details"><p>Loading property ledger for ID: ' + id + '...</p></div>');
+  window.showViewPropertyLedgerModal = async function(id) {
+    openModal('Property Card Details', '<div class="view-details"><p>Loading property card...</p></div>');
+    try {
+      const pc = await apiRequest('/property-cards/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-id-card"></i> <strong>Property Card: ${pc.property_number || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">Property Number</span><span class="value">${pc.property_number || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Description</span><span class="value">${pc.description || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Acquisition Cost</span><span class="value">₱${parseFloat(pc.acquisition_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Acquisition Date</span><span class="value">${pc.acquisition_date ? new Date(pc.acquisition_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Custodian</span><span class="value">${pc.custodian_name || pc.issued_to || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Department</span><span class="value">${pc.department_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">ICS No.</span><span class="value">${pc.ics_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${(pc.status || 'active').replace('_', ' ')}</span></div>
+            <div class="detail-item"><span class="label">Item ID</span><span class="value">${pc.item_id || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Created At</span><span class="value">${pc.created_at ? new Date(pc.created_at).toLocaleDateString() : 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('Property Card Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading property card: ' + err.message + '</p></div>');
+    }
   };
   window.showNewICSFromPropertyModal = function(propertyNo) {
     showNewICSModal();
@@ -8061,8 +8228,32 @@ Failure to submit the above requirements within the prescribed period shall cons
       showToast('Property Card updated!', 'success'); closeModal(); loadPropertyCards();
     } catch (err) { alert('Error: ' + err.message); }
   };
-  window.showViewICSModal = function(id) {
-    openModal('ICS Details', '<div class="view-details"><p>Loading ICS ID: ' + id + '...</p></div>');
+  window.showViewICSModal = async function(id) {
+    openModal('ICS Details', '<div class="view-details"><p>Loading ICS...</p></div>');
+    try {
+      const ics = await apiRequest('/ics/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-exchange-alt"></i> <strong>ICS No: ${ics.ics_no || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">ICS No.</span><span class="value">${ics.ics_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Issue</span><span class="value">${ics.date_of_issue ? new Date(ics.date_of_issue).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Property Number</span><span class="value">${ics.property_number || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Description</span><span class="value">${ics.description || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Inventory No.</span><span class="value">${ics.inventory_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Quantity</span><span class="value">${ics.quantity || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit</span><span class="value">${ics.unit || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit Cost</span><span class="value">₱${parseFloat(ics.unit_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Total Cost</span><span class="value">₱${parseFloat(ics.total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Issued To</span><span class="value">${ics.issued_to_name || ics.issued_to || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Received By</span><span class="value">${ics.received_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">IAR Ref</span><span class="value">${ics.iar_reference || 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('ICS Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading ICS: ' + err.message + '</p></div>');
+    }
   };
   window.showEditEmployeeModal = async function(id) {
     let emp = {};
@@ -8124,6 +8315,27 @@ Failure to submit the above requirements within the prescribed period shall cons
       });
       showToast('Employee updated!', 'success'); closeModal(); loadEmployees();
     } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewEmployeeModal = async function(id) {
+    let emp = {};
+    try { emp = await apiRequest('/employees/' + id); } catch(e) { alert('Could not load employee'); return; }
+    const statusClass = { active: 'approved', inactive: 'rejected', retired: 'draft', resigned: 'rejected' };
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Employee Code:</label><span>${emp.employee_code || '-'}</span></div>
+        <div class="detail-row"><label>Full Name:</label><span>${emp.full_name || '-'}</span></div>
+        <div class="detail-row"><label>Designation:</label><span>${emp.designation_name || '-'}</span></div>
+        <div class="detail-row"><label>Division:</label><span>${emp.department_name || '-'}</span></div>
+        <div class="detail-row"><label>Email:</label><span>${emp.email || '-'}</span></div>
+        <div class="detail-row"><label>Phone:</label><span>${emp.phone || '-'}</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge ${statusClass[emp.status] || 'draft'}">${emp.status || 'active'}</span></span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showEditEmployeeModal(${id});"><i class="fas fa-edit"></i> Edit</button>
+      </div>
+    `;
+    openModal('View Employee Profile', html);
   };
   window.viewEmployeeProperty = function(id) {
     openModal('Employee Property Accountability', '<div class="view-details"><p>Loading property accountability for employee ID: ' + id + '...</p></div>');
@@ -8373,7 +8585,8 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // RIS Modals
-  window.showNewRISModal = function() {
+  window.showNewRISModal = async function() {
+    await ensureDivisionsLoaded();
     const html = `
       <form id="risForm" onsubmit="saveNewRIS(event)">
         <div class="form-row">
@@ -8385,11 +8598,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Division</label>
             <select class="form-select" id="risDivision">
               <option value="">-- Select --</option>
-              <option value="FAD">FAD</option>
-              <option value="WRSD">WRSD</option>
-              <option value="MWPD">MWPD</option>
-              <option value="MWProD">MWProD</option>
-              <option value="ORD">ORD</option>
+              ${buildDivisionOptions('')}
             </select>
           </div>
         </div>
@@ -8487,7 +8696,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     };
     try { if (!confirm('Are you sure you want to save this RIS?')) return; await apiRequest('/ris', 'POST', data); alert('RIS saved!'); closeModal(); loadRIS(); } catch (err) { alert('Error: ' + err.message); }
   };
-  window.showViewRISModal = function(id) { openModal('RIS Details', '<div class="view-details"><p>Loading RIS #' + id + '...</p></div>'); };
+  window.showViewRISModal = async function(id) {
+    openModal('RIS Details', '<div class="view-details"><p>Loading RIS...</p></div>');
+    try {
+      const ris = await apiRequest('/ris/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-clipboard-list"></i> <strong>RIS No: ${ris.ris_no || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">RIS No.</span><span class="value">${ris.ris_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date</span><span class="value">${ris.ris_date ? new Date(ris.ris_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Division</span><span class="value">${ris.division || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Office</span><span class="value">${ris.office || ris.division || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Purpose</span><span class="value">${ris.purpose || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Requested By</span><span class="value">${ris.requested_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Approved By</span><span class="value">${ris.approved_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Issued By</span><span class="value">${ris.issued_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Received By</span><span class="value">${ris.received_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${ris.status || 'draft'}</span></div>
+          </div>
+        </div>`;
+      openModal('RIS Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading RIS: ' + err.message + '</p></div>');
+    }
+  };
   window.showEditRISModal = async function(id) {
     let ris = {};
     try { ris = await apiRequest('/ris/' + id); } catch (err) { alert('Could not load RIS'); return; }
@@ -8495,6 +8728,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <form id="editRISForm" onsubmit="saveEditRIS(event, ${id})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit RIS #${ris.ris_no || id}</strong></div>
         <div class="form-row">
+    await ensureDivisionsLoaded();
           <div class="form-group"><label>RIS No.</label><input type="text" id="editRISNo" value="${ris.ris_no || ''}"></div>
           <div class="form-group"><label>Date</label><input type="date" id="editRISDate" value="${ris.ris_date ? ris.ris_date.split('T')[0] : ''}"></div>
         </div>
@@ -8508,12 +8742,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <option value="MWPD" ${ris.division==='MWPD'?'selected':''}>MWPD</option>
               <option value="MWProD" ${ris.division==='MWProD'?'selected':''}>MWProD</option>
               <option value="ORD" ${ris.division==='ORD'?'selected':''}>ORD</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Purpose</label><input type="text" id="editRISPurpose" value="${(ris.purpose || '').replace(/"/g, '&quot;')}"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Requested By</label><select class="form-select" id="editRISRequestedBy"><option value="">-- Select Employee --</option></select></div>
+            </${buildDivisionOptions(ris.division || '')}ect" id="editRISRequestedBy"><option value="">-- Select Employee --</option></select></div>
           <div class="form-group"><label>Approved By</label><select class="form-select" id="editRISApprovedBy"><option value="">-- Select Employee --</option></select></div>
         </div>
         <div class="form-row">
@@ -8655,7 +8884,35 @@ Failure to submit the above requirements within the prescribed period shall cons
     };
     try { if (!confirm('Are you sure you want to save this trip ticket?')) return; await apiRequest('/trip-tickets', 'POST', data); alert('Trip ticket saved!'); closeModal(); loadTripTickets(); } catch (err) { alert('Error: ' + err.message); }
   };
-  window.showViewTripTicketModal = function(id) { openModal('Trip Ticket Details', '<div class="view-details"><p>Loading trip ticket #' + id + '...</p></div>'); };
+  window.showViewTripTicketModal = async function(id) {
+    openModal('Trip Ticket Details', '<div class="view-details"><p>Loading trip ticket #' + id + '...</p></div>');
+    try {
+      const tt = await apiRequest('/trip-tickets/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-car"></i> <strong>Trip Ticket #${tt.trip_ticket_no || id}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">Trip Ticket No.</span><span class="value">${tt.trip_ticket_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Requesting Party</span><span class="value">${tt.requesting_party || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Request</span><span class="value">${tt.date_of_request ? new Date(tt.date_of_request).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Travel</span><span class="value">${tt.date_of_travel ? new Date(tt.date_of_travel).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Return Date</span><span class="value">${tt.return_date ? new Date(tt.return_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Time of Departure</span><span class="value">${tt.time_of_departure || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Destination</span><span class="value">${tt.destination || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Purpose</span><span class="value">${tt.purpose || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Contact No.</span><span class="value">${tt.contact_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Vehicle ID</span><span class="value">${tt.vehicle_id || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Passengers</span><span class="value">${typeof tt.passengers === 'object' ? JSON.stringify(tt.passengers) : (tt.passengers || 'N/A')}</span></div>
+            <div class="detail-item"><span class="label">Requested By</span><span class="value">${tt.requested_by_employee || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Approved By</span><span class="value">${tt.approved_by_employee || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${tt.status || 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('Trip Ticket Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading trip ticket: ' + err.message + '</p></div>');
+    }
+  };
   window.showEditTripTicketModal = async function(id) {
     let tt = {};
     try { tt = await apiRequest('/trip-tickets/' + id); } catch (err) { alert('Could not load trip ticket'); return; }
@@ -8730,14 +8987,15 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewCapitalOutlayModal = function(id) { openModal('Capital Outlay Item', '<div class="view-details"><p>Loading capital outlay item #' + id + '...</p></div>'); };
 
   // Office Modals
-  window.showNewOfficeModal = function() {
+  window.showNewOfficeModal = async function() {
+    await ensureDivisionsLoaded();
     const html = `
       <form id="officeForm" onsubmit="saveNewOffice(event)">
         <div class="form-group"><label>Office Name</label><input type="text" id="officeName" placeholder="Office name" required></div>
         <div class="form-group"><label>Division</label>
           <select class="form-select" id="officeDivision">
             <option value="">-- Select Division --</option>
-            <option value="1">FAD</option><option value="2">WRSD</option><option value="3">MWPSD</option><option value="4">MWPTD</option><option value="5">ORD</option>
+            ${buildDivisionOptionsById('', false)}
           </select>
         </div>
         <div class="form-group"><label>Description</label><textarea id="officeDesc" rows="2" placeholder="Description"></textarea></div>
@@ -10498,17 +10756,19 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // View Supplier Details
-  window.showViewSupplierModal = function(supplierId) {
+  window.showViewSupplierModal = async function(supplierId) {
+    let s = {};
+    try { s = await apiRequest('/suppliers/' + supplierId); } catch(e) { alert('Could not load supplier'); return; }
     const html = `
       <div class="view-details">
-        <div class="detail-row"><label>Supplier ID:</label><span>${supplierId || 'SUP-001'}</span></div>
-        <div class="detail-row"><label>Company Name:</label><span>ABC Security Agency</span></div>
-        <div class="detail-row"><label>Address:</label><span>Butuan City, Agusan del Norte</span></div>
-        <div class="detail-row"><label>Contact:</label><span>+63 85 123 4567</span></div>
-        <div class="detail-row"><label>PhilGEPS Status:</label><span><span class="status-badge philgeps-platinum">Platinum</span></span></div>
-        <div class="detail-row"><label>TIN:</label><span>123-456-789-000</span></div>
-        <div class="detail-row"><label>Email:</label><span>info@abcsecurity.ph</span></div>
-        <div class="detail-row"><label>Contact Person:</label><span>Juan Dela Cruz</span></div>
+        <div class="detail-row"><label>Supplier ID:</label><span>${s.supplier_code || supplierId}</span></div>
+        <div class="detail-row"><label>Company Name:</label><span>${s.company_name || s.name || 'N/A'}</span></div>
+        <div class="detail-row"><label>Address:</label><span>${s.address || 'N/A'}</span></div>
+        <div class="detail-row"><label>Contact:</label><span>${s.contact_number || s.phone || 'N/A'}</span></div>
+        <div class="detail-row"><label>PhilGEPS Status:</label><span><span class="status-badge">${s.philgeps_registration || 'N/A'}</span></span></div>
+        <div class="detail-row"><label>TIN:</label><span>${s.tin || 'N/A'}</span></div>
+        <div class="detail-row"><label>Email:</label><span>${s.email || 'N/A'}</span></div>
+        <div class="detail-row"><label>Contact Person:</label><span>${s.contact_person || 'N/A'}</span></div>
       </div>
       <h4 style="margin-top: 15px;">Transaction History</h4>
       <table class="data-table" style="font-size: 12px; margin-top: 8px;">
@@ -10710,6 +10970,44 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) { alert('Error: ' + err.message); }
   };
 
+  // View Item Modal
+  window.showViewItemModal = async function(itemId) {
+    openModal('Item Details', '<div class="view-details"><p>Loading item...</p></div>');
+    try {
+      const item = await apiRequest('/items/' + itemId);
+      const qty = parseInt(item.quantity) || 0;
+      const reorder = parseInt(item.reorder_point) || 0;
+      const isService = (item.category || '').toLowerCase() === 'services';
+      let stockStatus = 'N/A';
+      if (!isService) {
+        if (qty === 0) stockStatus = 'Out of Stock';
+        else if (qty <= reorder) stockStatus = 'Low Stock';
+        else stockStatus = 'In Stock';
+      }
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-box"></i> <strong>Item: ${item.name || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">Item Code</span><span class="value">${item.code || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Stock No.</span><span class="value">${item.stock_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Item Name</span><span class="value">${item.name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Description</span><span class="value">${item.description || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Category</span><span class="value">${item.category || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit</span><span class="value">${item.unit || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit Price</span><span class="value">₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Quantity</span><span class="value">${isService ? 'N/A' : qty}</span></div>
+            <div class="detail-item"><span class="label">Reorder Point</span><span class="value">${isService ? 'N/A' : reorder}</span></div>
+            <div class="detail-item"><span class="label">Stock Status</span><span class="value">${stockStatus}</span></div>
+            <div class="detail-item"><span class="label">UACS Code</span><span class="value">${item.uacs_code || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Supplier</span><span class="value">${item.supplier_name || 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('Item Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading item: ' + err.message + '</p></div>');
+    }
+  };
+
   // Edit Item Modal
   window.showEditItemModal = async function(itemId) {
     let item = {};
@@ -10894,11 +11192,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Status</label>
             <select class="form-select" id="editIsActive">
-              <option value="true" ${user.is_active !== false ? 'selected' : ''}>Active</option>
-              <option value="false" ${user.is_active === false ? 'selected' : ''}>Inactive</option>
-            </select>
-          </div>
-          <div class="form-group">
+              ${buildDivisionOptionsById(user.dept_id || '', false, 'long')}
             <label>Linked Employee</label>
             <select class="form-select" id="editEmployeeId">
               <option value="">-- No linked employee --</option>
@@ -11326,7 +11620,11 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Add Quotation Modal
-  window.showAddQuotationModal = function(rfqNo) {
+  window.showAddQuotationModal = async function(rfqNo) {
+    // Load suppliers from DB
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
+    const supplierOpts = suppliers.map(s => `<option value="${s.id}">${s.company_name || s.name}</option>`).join('');
     const html = `
       <form id="addQuotationForm" onsubmit="handleAddQuotation(event)">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -11334,17 +11632,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           Add a quotation received for this RFQ.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || 'RFQ-${getCurrentFiscalYear()}-002'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>IT Equipment Upgrade</span></div>
-          <div class="detail-row"><label>ABC:</label><span>₱320,000.00</span></div>
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || ''}</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Supplier <span class="text-danger">*</span></label>
           <select class="form-select" required>
             <option value="">Select Supplier</option>
-            <option value="abc">ABC Security Agency</option>
-            <option value="pldt">PLDT Enterprise</option>
-            <option value="xyz">XYZ Office Supplies</option>
+            ${supplierOpts}
           </select>
         </div>
         <div class="form-row">
@@ -11375,7 +11669,16 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Create Abstract from RFQ Modal
-  window.showCreateAbstractFromRFQModal = function(rfqNo) {
+  window.showCreateAbstractFromRFQModal = async function(rfqNo) {
+    // Load actual RFQ data with its quotations
+    let rfq = {}, quotations = [];
+    try { 
+      rfq = await apiRequest('/rfq/' + rfqNo).catch(() => ({}));
+      quotations = rfq.quotations || [];
+    } catch(e) {}
+    const quotationRows = quotations.length
+      ? quotations.map(q => `<tr><td>${q.supplier_name || 'Unknown'}</td><td>₱${(q.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td><td><input type="checkbox" ${q.compliant !== false ? 'checked' : ''}></td></tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;color:#999;">No quotations found for this RFQ</td></tr>';
     const html = `
       <form id="createAbstractFromRFQForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -11383,18 +11686,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           Create Abstract of Quotations from this RFQ.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || 'RFQ-${getCurrentFiscalYear()}-001'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
-          <div class="detail-row"><label>Quotations:</label><span>3</span></div>
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${rfq.project_name || rfq.description || 'N/A'}</span></div>
+          <div class="detail-row"><label>Quotations:</label><span>${quotations.length}</span></div>
         </div>
         <h4 style="margin-top: 15px;">Quotations Summary</h4>
         <table class="data-table" style="font-size: 12px; margin-top: 8px;">
           <thead><tr><th>Supplier</th><th>Amount</th><th>Compliant</th></tr></thead>
-          <tbody>
-            <tr><td>ABC Security Agency</td><td>₱115,000.00</td><td><input type="checkbox" checked></td></tr>
-            <tr><td>XYZ Security Co.</td><td>₱118,500.00</td><td><input type="checkbox" checked></td></tr>
-            <tr><td>SafeGuard Inc.</td><td>₱122,000.00</td><td><input type="checkbox" checked></td></tr>
-          </tbody>
+          <tbody>${quotationRows}</tbody>
         </table>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -11406,7 +11705,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Mark NOA Received Modal
-  window.showMarkNOAReceivedModal = function(noaNo) {
+  window.showMarkNOAReceivedModal = async function(noaNo) {
+    let noa = {};
+    try { noa = await apiRequest('/noa/' + noaNo).catch(() => ({})); } catch(e) {}
     const html = `
       <form id="markNOAReceivedForm" onsubmit="handleMarkNOAReceived(event)">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -11414,8 +11715,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           Record receipt of NOA by the winning bidder.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>NOA No.:</label><span>${noaNo || 'NOA-${getCurrentFiscalYear()}-002'}</span></div>
-          <div class="detail-row"><label>Winning Bidder:</label><span>PLDT Enterprise</span></div>
+          <div class="detail-row"><label>NOA No.:</label><span>${noaNo || ''}</span></div>
+          <div class="detail-row"><label>Winning Bidder:</label><span>${noa.supplier_name || noa.winning_bidder || 'N/A'}</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Date Received by Bidder <span class="text-danger">*</span></label>
@@ -11528,21 +11829,18 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('Export to Excel', html);
   };
 
-  // =====================================================
-  // PRINT & UTILITY FUNCTIONS
-  // =====================================================
-
-  // Get document-specific print content
-  function getPrintContent(recordType, recordId) {
+  // Get Print Content
+  function getPrintContent(docType, recordId, record) {
     const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const r = record || {};
     
     const templates = {
       'PR': `
         <div class="doc-title">PURCHASE REQUEST</div>
         <table class="info-table">
-          <tr><td width="30%"><strong>PR Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
-          <tr><td><strong>Division:</strong></td><td>FAD</td><td><strong>Fund Cluster:</strong></td><td>GAA-MOOE</td></tr>
-          <tr><td><strong>Purpose:</strong></td><td colspan="3">Procurement of supplies/services for agency operations</td></tr>
+          <tr><td width="30%"><strong>PR Number:</strong></td><td>${r.pr_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.pr_date ? new Date(r.pr_date).toLocaleDateString('en-PH') : today}</td></tr>
+          <tr><td><strong>Division:</strong></td><td>${r.department_code || r.division || 'N/A'}</td><td><strong>Fund Cluster:</strong></td><td>${r.fund_cluster || 'N/A'}</td></tr>
+          <tr><td><strong>Purpose:</strong></td><td colspan="3">${r.purpose || 'Procurement of supplies/services for agency operations'}</td></tr>
         </table>
         <table class="items-table">
           <thead><tr><th>Item No.</th><th>Unit</th><th>Item Description</th><th>Quantity</th><th>Unit Cost</th><th>Total Cost</th></tr></thead>
@@ -11557,10 +11855,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       'PO': `
         <div class="doc-title">PURCHASE ORDER</div>
         <table class="info-table">
-          <tr><td width="30%"><strong>PO Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
-          <tr><td><strong>Supplier:</strong></td><td colspan="3">ABC Security Agency</td></tr>
-          <tr><td><strong>Address:</strong></td><td colspan="3">Butuan City, Agusan del Norte</td></tr>
-          <tr><td><strong>TIN:</strong></td><td>123-456-789-000</td><td><strong>Mode:</strong></td><td>SVP</td></tr>
+          <tr><td width="30%"><strong>PO Number:</strong></td><td>${r.po_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.po_date ? new Date(r.po_date).toLocaleDateString('en-PH') : today}</td></tr>
+          <tr><td><strong>Supplier:</strong></td><td colspan="3">${r.supplier_name || 'N/A'}</td></tr>
+          <tr><td><strong>Address:</strong></td><td colspan="3">${r.supplier_address || r.address || 'N/A'}</td></tr>
+          <tr><td><strong>TIN:</strong></td><td>${r.tin || 'N/A'}</td><td><strong>Mode:</strong></td><td>${r.mode_of_procurement || r.procurement_mode || 'N/A'}</td></tr>
         </table>
         <table class="items-table">
           <thead><tr><th>Stock No.</th><th>Unit</th><th>Description</th><th>Quantity</th><th>Unit Cost</th><th>Amount</th></tr></thead>
@@ -11580,11 +11878,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           <tr><td><strong>Mode of Procurement:</strong></td><td colspan="3">Small Value Procurement (SVP)</td></tr>
         </table>
         <table class="items-table">
-          <thead><tr><th>Supplier</th><th>Unit Price</th><th>Total Price</th><th>Remarks</th></tr></thead>
+          <thead><tr><th>Supplier</th><th>Unit Price</th><th>Total</th><th>Remarks</th></tr></thead>
           <tbody>
-            <tr><td>Supplier A</td><td>See quotation</td><td>See quotation</td><td></td></tr>
-            <tr><td>Supplier B</td><td>See quotation</td><td>See quotation</td><td></td></tr>
-            <tr><td>Supplier C</td><td>See quotation</td><td>See quotation</td><td></td></tr>
+            <tr><td colspan="4" style="text-align:center;">See attached quotation details</td></tr>
+          </tbody>
+        </table>
           </tbody>
         </table>
         <p style="margin-top:20px;"><strong>Award Recommendation:</strong> Award to lowest calculated responsive quotation</p>
@@ -11934,8 +12232,14 @@ Failure to submit the above requirements within the prescribed period shall cons
             <tbody class="page-body-group">
               <tr><td>${bodyContent}</td></tr>
             </tbody>
-          </table>
-        </body>
+          </table>async function(recordType, recordId) {
+    let record = null;
+    // Try to fetch actual record data from DB for accurate printing
+    try {
+      if (recordType === 'PO') record = cachedPO.find(p => p.id == recordId || p.po_number == recordId);
+      else if (recordType === 'PR') record = cachedPR.find(p => p.id == recordId || p.pr_number == recordId);
+    } catch(e) {}
+    const printContent = getPrintContent(recordType, recordId, recor
       </html>`;
   }
 
@@ -13229,11 +13533,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     `;
     
     const html = buildPrintHTML(reportData.title, bodyContent);
-    const colCount = reportData.headers.length;
-    openPrintPreview(html, { landscape: colCount > 7, title: toFilename(reportData.title) });
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
   }
   
-  window.generatePPMPReport = function() {
+  window.generatePPMPReport = async function() {
+    await ensureDivisionsLoaded();
     showModal('PPMP Summary Report', `
       <div class="view-details">
         <div class="form-grid">
@@ -13247,11 +13555,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Division</label>
             <select class="form-select">
               <option value="all">All Divisions</option>
-              <option value="FAD">FAD</option>
-              <option value="WRSD">WRSD</option>
-              <option value="MWPSD">MWPSD</option>
-              <option value="MWPTD">MWPTD</option>
-              <option value="ORD">ORD</option>
+              ${buildDivisionOptions('', false)}
             </select>
           </div>
           <div class="form-group">
@@ -13265,7 +13569,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Include</label>
             <div>
               <label class="checkbox-label"><input type="checkbox" checked> Approved Items</label>
-              <label class="checkbox-label"><input type="checkbox"> Draft Items</label>
+              <label class="checkbox-label"><input type="checkbox" checked> Pending Items</label>
             </div>
           </div>
         </div>
@@ -13279,7 +13583,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     `);
   };
 
-  window.generateAPPReport = function() {
+  window.generateAPPReport = async function() {
+    await ensureProcModesLoaded();
     showModal('APP Report', `
       <div class="view-details">
         <div class="form-grid">
@@ -13301,8 +13606,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Procurement Mode</label>
             <select class="form-select">
               <option value="all">All Modes</option>
-              <option value="svp">Shopping/SVP Only</option>
-              <option value="bidding">Competitive Bidding</option>
+              ${buildProcModeOptions('')}
             </select>
           </div>
           <div class="form-group">
@@ -13323,7 +13627,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     `);
   };
 
-  window.generatePRStatusReport = function() {
+  window.generatePRStatusReport = async function() {
+    await ensureDivisionsLoaded();
     showModal('PR Status Report', `
       <div class="view-details">
         <div class="form-grid">
@@ -13349,11 +13654,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <label>Division</label>
             <select class="form-select">
               <option value="all">All Divisions</option>
-              <option value="FAD">FAD</option>
-              <option value="WRSD">WRSD</option>
-              <option value="MWPSD">MWPSD</option>
-              <option value="MWPTD">MWPTD</option>
-              <option value="ORD">ORD</option>
+              ${buildDivisionOptions('', false)}
             </select>
           </div>
           <div class="form-group">
@@ -13376,10 +13677,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   window.generateSVPLifecycleReport = function() {
     showModal('SVP Lifecycle Report', `
-      <div class="view-details">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Date Range</label>
             <div style="display:flex;gap:10px;">
               <input type="date" class="form-input" value="${getCurrentFiscalYear()}-01-01">
               <span>to</span>

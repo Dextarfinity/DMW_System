@@ -61,8 +61,8 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'dmw_db',
-  password: process.env.DB_PASSWORD || 'dmw123',
-  port: parseInt(process.env.DB_PORT) || 5432,
+  password: process.env.DB_PASSWORD || 'kurt09908',
+  port: parseInt(process.env.DB_PORT) || 5433,
 });
 
 pool.connect((err, client, release) => {
@@ -519,7 +519,8 @@ app.delete('/api/departments/:id', authenticateToken, async (req, res) => {
 });
 
 // --- Divisions ---
-app.get('/api/divisions', authenticateToken, async (req, res) => {
+// GET divisions is public (no auth) for signup form
+app.get('/api/divisions', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM divisions ORDER BY name');
     res.json(result.rows);

@@ -118,16 +118,23 @@ ON CONFLICT DO NOTHING;
 SELECT setval('offices_id_seq', 5);
 
 -- ============================================================
--- 7. PROCUREMENT MODES (4 records from Excel)
+-- 7. PROCUREMENT MODES (matching PPMP dropdown values)
 -- ============================================================
-INSERT INTO procurement_modes (id, name) VALUES
-    (1, 'Small Value Procurement - SVP'),
-    (2, 'NP - Direct Retail'),
-    (3, 'Public Bidding'),
-    (4, 'Agency -To - Agency')
-ON CONFLICT DO NOTHING;
+INSERT INTO procurement_modes (id, code, name, description) VALUES
+    (1, 'CB', 'Competitive Bidding', 'Open competitive bidding process per RA 9184 (Sec. 10)'),
+    (2, 'LSB', 'Limited Source Bidding', 'Bidding limited to pre-selected list of suppliers (Sec. 49)'),
+    (3, 'CD', 'Competitive Dialogue', 'Dialogue-based procurement for complex requirements'),
+    (4, 'UO-BM', 'Unsolicited Offer with Bid Matching', 'Unsolicited proposals matched through competitive process'),
+    (5, 'DC', 'Direct Contracting', 'Single source procurement without bidding (Sec. 50)'),
+    (6, 'DA', 'Direct Acquisition', 'Direct acquisition of goods or services'),
+    (7, 'RO', 'Repeat Order', 'Re-order from previous winning bidder within threshold (Sec. 51)'),
+    (8, 'SVP', 'Small Value Procurement', 'Procurement not exceeding the SVP threshold (Sec. 53.9)'),
+    (9, 'NP', 'Negotiated Procurement', 'Negotiated procurement under allowed circumstances (Sec. 53)'),
+    (10, 'DS', 'Direct Sales', 'Direct sales procurement from authorized dealers'),
+    (11, 'STI', 'Direct Procurement for Science, Technology and Innovation', 'Direct procurement for STI per RA 11293')
+ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, description = EXCLUDED.description;
 
-SELECT setval('procurement_modes_id_seq', 4);
+SELECT setval('procurement_modes_id_seq', 11);
 
 -- ============================================================
 -- 8. UACS CODES (27 records from Excel)
