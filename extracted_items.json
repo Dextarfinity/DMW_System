@@ -1,0 +1,2228 @@
+[
+  {
+    "stock_no": "12191601-AL-E04",
+    "name": "ALCOHOL, Ethyl, 500 mL",
+    "unit": "bottle",
+    "price": 55.62,
+    "category": "ALCOHOL OR ACETONE BASED ANTISEPTICS"
+  },
+  {
+    "stock_no": "12191601-AL-E03",
+    "name": "ALCOHOL, Ethyl,  1 Gallon",
+    "unit": "gallon",
+    "price": 362.45,
+    "category": "ALCOHOL OR ACETONE BASED ANTISEPTICS"
+  },
+  {
+    "stock_no": "60121413-CB-P01",
+    "name": "CLEARBOOK, A4 size",
+    "unit": "piece",
+    "price": 35.52,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121413-CB-P02",
+    "name": "CLEARBOOK, Legal size",
+    "unit": "piece",
+    "price": 38.23,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121534-ER-P01",
+    "name": "ERASER, plastic/rubber",
+    "unit": "piece",
+    "price": 9.34,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G01",
+    "name": "SIGN PEN, Extra Fine Tip, Black",
+    "unit": "piece",
+    "price": 27.11,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G02",
+    "name": "SIGN PEN, Extra Fine Tip, Blue",
+    "unit": "piece",
+    "price": 27.11,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G03",
+    "name": "SIGN PEN, Extra Fine Tip, Red",
+    "unit": "piece",
+    "price": 27.11,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G04",
+    "name": "SIGN PEN, Fine Tip, Black",
+    "unit": "piece",
+    "price": 30.91,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G05",
+    "name": "SIGN PEN, Fine Tip, Blue",
+    "unit": "piece",
+    "price": 30.91,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G06",
+    "name": "SIGN PEN, Fine Tip, Red",
+    "unit": "piece",
+    "price": 30.91,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G07",
+    "name": "SIGN PEN, Medium Tip, Black",
+    "unit": "piece",
+    "price": 63.62,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G08",
+    "name": "SIGN PEN, Medium Tip, Blue",
+    "unit": "piece",
+    "price": 63.62,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121524-SP-G09",
+    "name": "SIGN PEN, Medium Tip, Red",
+    "unit": "piece",
+    "price": 63.62,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "60121124-WR-P01",
+    "name": "WRAPPING PAPER",
+    "unit": "pack",
+    "price": 163.62,
+    "category": "ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "45121517-DO-C02",
+    "name": "DOCUMENT CAMERA",
+    "unit": "unit",
+    "price": 23977.95,
+    "category": "AUDIO AND VISUAL EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "45111609-MM-P01",
+    "name": "MULTIMEDIA PROJECTOR",
+    "unit": "unit",
+    "price": 16836.82,
+    "category": "AUDIO AND VISUAL EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "26111702-BT-A02",
+    "name": "BATTERY, dry cell, size AA",
+    "unit": "pack",
+    "price": 20.8,
+    "category": "BATTERIES AND CELLS AND ACCESSORIES"
+  },
+  {
+    "stock_no": "26111702-BT-A01",
+    "name": "BATTERY, dry cell, size AAA",
+    "unit": "pack",
+    "price": 18.61,
+    "category": "BATTERIES AND CELLS AND ACCESSORIES"
+  },
+  {
+    "stock_no": "47131812-AF-A01",
+    "name": "AIR FRESHENER",
+    "unit": "can",
+    "price": 126.67,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131604-BR-S01",
+    "name": "BROOM (Walis Tambo)",
+    "unit": "piece",
+    "price": 126.67,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131604-BR-T01",
+    "name": "BROOM (Walis Ting-ting)",
+    "unit": "piece",
+    "price": 26.39,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131829-TB-C01",
+    "name": "CLEANER, Toilet Bowl and Urinal",
+    "unit": "bottle",
+    "price": 42.22,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131805-CL-P01",
+    "name": "CLEANSER, Scouring Powder",
+    "unit": "can",
+    "price": 42.22,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131811-DE-B02",
+    "name": "DETERGENT BAR",
+    "unit": "piece",
+    "price": 9.48,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131811-DE-P03",
+    "name": "DETERGENT POWDER, all purpose",
+    "unit": "pouch",
+    "price": 54.89,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131803-DS-A01",
+    "name": "DISINFECTANT SPRAY",
+    "unit": "can",
+    "price": 141.98,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131601-DU-P01",
+    "name": "DUST PAN",
+    "unit": "piece",
+    "price": 47.5,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131802-FW-P02",
+    "name": "FLOOR WAX, paste type, red",
+    "unit": "can",
+    "price": 314.41,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131830-FC-A01",
+    "name": "FURNITURE CLEANER",
+    "unit": "can",
+    "price": 143.51,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "73101612-HS-L01",
+    "name": "HAND SOAP, liquid, 500mL",
+    "unit": "bottle",
+    "price": 43.6,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47121804-MP-B01",
+    "name": "MOP BUCKET",
+    "unit": "unit",
+    "price": 2322.32,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131501-RG-C01",
+    "name": "RAGS",
+    "unit": "bundle",
+    "price": 78.11,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47131602-SC-N01",
+    "name": "SCOURING PAD",
+    "unit": "pack",
+    "price": 86.92,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47121701-TB-P04",
+    "name": "TRASHBAG, XXL size",
+    "unit": "pack",
+    "price": 131.95,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47121701-TB-P05",
+    "name": "TRASHBAG, Large size",
+    "unit": "pack",
+    "price": 59.28,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47121701-TB-P06",
+    "name": "TRASHBAG, XL size",
+    "unit": "pack",
+    "price": 92.56,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "47121702-WB-P01",
+    "name": "WASTEBASKET",
+    "unit": "piece",
+    "price": 44.34,
+    "category": "CLEANING EQUIPMENT AND SUPPLIES"
+  },
+  {
+    "stock_no": "12171703-SI-P01",
+    "name": "STAMP PAD, INK",
+    "unit": "bottle",
+    "price": 29.22,
+    "category": "COLOR COMPOUNDS AND DISPERSIONS"
+  },
+  {
+    "stock_no": "52161535-DV-R01",
+    "name": "DIGITAL VOICE RECORDER",
+    "unit": "unit",
+    "price": 7449.24,
+    "category": "CONSUMER ELECTRONICS"
+  },
+  {
+    "stock_no": "13111203-AC-F01",
+    "name": "ACETATE",
+    "unit": "roll",
+    "price": 1262.5,
+    "category": "FILMS"
+  },
+  {
+    "stock_no": "13111201-CF-P02",
+    "name": "CARBON FILM, Legal size",
+    "unit": "box",
+    "price": 357.11,
+    "category": "FILMS"
+  },
+  {
+    "stock_no": "46191601-FE-M01",
+    "name": "FIRE EXTINGUISHER, dry chemical",
+    "unit": "unit",
+    "price": 1161.16,
+    "category": "FIRE FIGHTING EQUIPMENT"
+  },
+  {
+    "stock_no": "55121905-PH-F01",
+    "name": "PHILIPPINE NATIONAL FLAG",
+    "unit": "piece",
+    "price": 289.11,
+    "category": "FLAG OR ACCESSORIES"
+  },
+  {
+    "stock_no": "56101504-CM-B01",
+    "name": "MONOBLOC CHAIR, beige",
+    "unit": "piece",
+    "price": 359.96,
+    "category": "FURNITURE AND FURNISHINGS"
+  },
+  {
+    "stock_no": "56101504-CM-W01",
+    "name": "MONOBLOC CHAIR, white",
+    "unit": "piece",
+    "price": 359.96,
+    "category": "FURNITURE AND FURNISHINGS"
+  },
+  {
+    "stock_no": "40101604-EF-C01",
+    "name": "ELECTRIC FAN, ceiling mount, orbit type",
+    "unit": "unit",
+    "price": 1459.89,
+    "category": "HEATING AND VENTILATION AND AIR CIRCULATION"
+  },
+  {
+    "stock_no": "40101604-EF-G01",
+    "name": "ELECTRIC FAN, industrial, ground type",
+    "unit": "unit",
+    "price": 1372.28,
+    "category": "HEATING AND VENTILATION AND AIR CIRCULATION"
+  },
+  {
+    "stock_no": "40101604-EF-S01",
+    "name": "ELECTRIC FAN, stand type",
+    "unit": "unit",
+    "price": 1583.4,
+    "category": "HEATING AND VENTILATION AND AIR CIRCULATION"
+  },
+  {
+    "stock_no": "40101604-EF-W01",
+    "name": "ELECTRIC FAN, wall mount",
+    "unit": "unit",
+    "price": 915.21,
+    "category": "HEATING AND VENTILATION AND AIR CIRCULATION"
+  },
+  {
+    "stock_no": "43211507-DSK001",
+    "name": "DESKTOP, for Basic Users",
+    "unit": "unit",
+    "price": 25165.5,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43211507-DSK002",
+    "name": "DESKTOP, for Mid-Range Users",
+    "unit": "unit",
+    "price": 43026.26,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43201827-HD-X02",
+    "name": "EXTERNAL HARD DRIVE",
+    "unit": "unit",
+    "price": 3060.18,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43202010-FD-U04",
+    "name": "FLASH DRIVE",
+    "unit": "piece",
+    "price": 155.04,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43211503-LAP001",
+    "name": "LAPTOP COMPUTER, Mid-range",
+    "unit": "unit",
+    "price": 43015.7,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43211503-LAP002",
+    "name": "LAPTOP COMPUTER, Lightweight",
+    "unit": "unit",
+    "price": 47502,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43211708-MO-O02",
+    "name": "COMPUTER MOUSE, Wireless",
+    "unit": "unit",
+    "price": 161.79,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "43212105-PR-L01",
+    "name": "PRINTER, Laser, Monochrome",
+    "unit": "unit",
+    "price": 9339.95,
+    "category": "INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "39101628-LB-L01",
+    "name": "LIGHT-EMITTING DIODE (LED) LIGHT BULB, 7 watts",
+    "unit": "piece",
+    "price": 76.74,
+    "category": "LIGHTING AND FIXTURES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "39101628-LT-L01",
+    "name": "LIGHT-EMITTING DIODE (LED) LINEAR TUBE, 18 watts",
+    "unit": "piece",
+    "price": 208.9,
+    "category": "LIGHTING AND FIXTURES AND ACCESSORIES"
+  },
+  {
+    "stock_no": "31201610-GL-J01",
+    "name": "GLUE, all-purpose",
+    "unit": "bottle",
+    "price": 63.07,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31151804-SW-H01",
+    "name": "STAPLE WIRE, heavy duty (binder type), 23/13",
+    "unit": "box",
+    "price": 36.95,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31151804-SW-S01",
+    "name": "STAPLE WIRE, standard",
+    "unit": "box",
+    "price": 28.5,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201502-TA-E01",
+    "name": "TAPE, electrical",
+    "unit": "roll",
+    "price": 19.74,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201503-TA-M01",
+    "name": "TAPE, masking, 24mm",
+    "unit": "roll",
+    "price": 59.11,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201503-TA-M02",
+    "name": "TAPE, masking, 48 mm",
+    "unit": "roll",
+    "price": 140.39,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201517-TA-P01",
+    "name": "TAPE, packaging, 48 mm",
+    "unit": "roll",
+    "price": 29.56,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201512-TA-T01",
+    "name": "TAPE, transparent, 24mm",
+    "unit": "roll",
+    "price": 17.95,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31201512-TA-T02",
+    "name": "TAPE, transparent, 48 mm",
+    "unit": "roll",
+    "price": 29.56,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "31151507-TW-P01",
+    "name": "TWINE, plastic",
+    "unit": "roll",
+    "price": 71.78,
+    "category": "MANUFACTURING COMPONENTS AND SUPPLIES"
+  },
+  {
+    "stock_no": "41111604-RU-P02",
+    "name": "RULER, plastic, 450mm",
+    "unit": "piece",
+    "price": 20.23,
+    "category": "MEASURING AND OBSERVING AND TESTING EQUIPMENT"
+  },
+  {
+    "stock_no": "44121612-BL-H01",
+    "name": "BLADE, for general purpose cutter/utility knife",
+    "unit": "tube",
+    "price": 16.62,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44101602-PB-M01",
+    "name": "BINDING AND PUNCHING MACHINE",
+    "unit": "unit",
+    "price": 13287.89,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122037-RB-P10",
+    "name": "BINDING RING/COMB, plastic, 32 mm",
+    "unit": "bundle",
+    "price": 222.49,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44101807-CA-C01",
+    "name": "CALCULATOR, Compact",
+    "unit": "unit",
+    "price": 220.49,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121710-CH-W01",
+    "name": "CHALK, white enamel",
+    "unit": "box",
+    "price": 33.46,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122105-BF-C01",
+    "name": "CLIP, backfold, 19mm",
+    "unit": "box",
+    "price": 11.29,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122105-BF-C02",
+    "name": "CLIP, backfold, 25mm",
+    "unit": "box",
+    "price": 19.91,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122105-BF-C03",
+    "name": "CLIP, backfold, 32mm",
+    "unit": "box",
+    "price": 29.35,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122105-BF-C04",
+    "name": "CLIP, backfold, 50mm",
+    "unit": "box",
+    "price": 63.83,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121801-CT-R02",
+    "name": "CORRECTION TAPE",
+    "unit": "piece",
+    "price": 19.48,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121612-CU-H01",
+    "name": "CUTTER/UTILITY KNIFE, HEAVY DUTY",
+    "unit": "piece",
+    "price": 30.08,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44111515-DF-B01",
+    "name": "DATA FILE BOX",
+    "unit": "piece",
+    "price": 151.25,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-DF-F01",
+    "name": "DATA FOLDER",
+    "unit": "piece",
+    "price": 101.34,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44103202-DS-M01",
+    "name": "DATER STAMP",
+    "unit": "piece",
+    "price": 432.16,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121506-EN-D01",
+    "name": "ENVELOPE, Documentary, A4",
+    "unit": "box",
+    "price": 860.31,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121506-EN-D02",
+    "name": "ENVELOPE, Documentary, legal,",
+    "unit": "box",
+    "price": 1033.38,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121506-EN-X01",
+    "name": "ENVELOPE, Expanding, Kraft",
+    "unit": "box",
+    "price": 975.37,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121506-EN-X02",
+    "name": "ENVELOPE, Expanding, Plastic",
+    "unit": "piece",
+    "price": 30.95,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121506-EN-M02",
+    "name": "ENVELOPE, Mailing",
+    "unit": "box",
+    "price": 467.42,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121504-EN-W02",
+    "name": "ENVELOPE, Mailing, with window",
+    "unit": "box",
+    "price": 531.81,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44111912-ER-B01",
+    "name": "ERASER, felt, for blackboard/whiteboard",
+    "unit": "piece",
+    "price": 14.69,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122118-FA-P01",
+    "name": "FASTENER, METAL, NON-SHARP EDGES",
+    "unit": "box",
+    "price": 96.06,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44111515-FO-X01",
+    "name": "FILE ORGANIZER",
+    "unit": "piece",
+    "price": 129.31,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122018-FT-D01",
+    "name": "FILE TAB DIVIDER, A4",
+    "unit": "set",
+    "price": 11.29,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122018-FT-D02",
+    "name": "FILE TAB DIVIDER, Legal",
+    "unit": "set",
+    "price": 14.44,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-F01",
+    "name": "FOLDER, MOROCCO WITH SLIDE, A4",
+    "unit": "bundle",
+    "price": 274.46,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-F02",
+    "name": "FOLDER, MOROCCO WITH SLIDE, LEGAL",
+    "unit": "bundle",
+    "price": 306.12,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-L01",
+    "name": "FOLDER, L-type, A4",
+    "unit": "pack",
+    "price": 192.44,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-L02",
+    "name": "FOLDER, L-type, Legal",
+    "unit": "pack",
+    "price": 252.82,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122027-FO-P01",
+    "name": "FOLDER, pressboard",
+    "unit": "box",
+    "price": 1979.25,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-T01",
+    "name": "FOLDER with tab, A4",
+    "unit": "pack",
+    "price": 385.29,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122011-FO-T02",
+    "name": "FOLDER with tab, Legal",
+    "unit": "pack",
+    "price": 420.13,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122008-IT-T01",
+    "name": "INDEX TAB",
+    "unit": "box",
+    "price": 69.44,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121716-MA-F01",
+    "name": "MARKER, Flourescent",
+    "unit": "set",
+    "price": 31.57,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MP-B01",
+    "name": "MARKER, Permanent, Black",
+    "unit": "piece",
+    "price": 15.83,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MP-B02",
+    "name": "MARKER, Permanent, Blue",
+    "unit": "piece",
+    "price": 15.32,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MP-B03",
+    "name": "MARKER, Permanent, Red",
+    "unit": "piece",
+    "price": 15.13,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MW-B01",
+    "name": "MARKER, Whiteboard, Black",
+    "unit": "piece",
+    "price": 22.17,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MW-B02",
+    "name": "MARKER, Whiteboard, Blue",
+    "unit": "piece",
+    "price": 22.17,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121708-MW-B03",
+    "name": "MARKER, Whiteboard, Red",
+    "unit": "piece",
+    "price": 22.17,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122104-PC-G01",
+    "name": "PAPER CLIP, vinly/plastic coated, 33mm",
+    "unit": "box",
+    "price": 8.97,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122104-PC-J02",
+    "name": "PAPER CLIP, vinly/plastic coated, jumbo, 50mm",
+    "unit": "box",
+    "price": 19.53,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44101603-PS-M02",
+    "name": "PAPER SHREDDER",
+    "unit": "unit",
+    "price": 16349.13,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44101601-PT-M02",
+    "name": "PAPER TRIMMER/CUTTING MACHINE",
+    "unit": "unit",
+    "price": 10021.87,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121706-PE-L01",
+    "name": "PENCIL, lead/graphite, with eraser",
+    "unit": "box",
+    "price": 45.38,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121619-PS-M01",
+    "name": "PENCIL SHARPENER",
+    "unit": "piece",
+    "price": 241.73,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44101602-PU-P01",
+    "name": "PUNCHER, paper, heavy duty",
+    "unit": "piece",
+    "price": 156.76,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44122101-RU-B01",
+    "name": "RUBBER BAND No. 18",
+    "unit": "box",
+    "price": 146.73,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121905-SP-F01",
+    "name": "STAMP PAD, felt",
+    "unit": "piece",
+    "price": 40.51,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121618-SS-S01",
+    "name": "SCISSORS, symmetrical/asymmetrical",
+    "unit": "pair",
+    "price": 37.23,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121615-ST-S01",
+    "name": "STAPLER, standard type",
+    "unit": "piece",
+    "price": 200.56,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121615-ST-B01",
+    "name": "STAPLER, heavy duty (binder)",
+    "unit": "unit",
+    "price": 597.87,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121613-SR-P02",
+    "name": "STAPLE REMOVER, plier-type",
+    "unit": "piece",
+    "price": 35.89,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "44121605-TD-T01",
+    "name": "TAPE DISPENSER, table top",
+    "unit": "unit",
+    "price": 78.52,
+    "category": "OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES"
+  },
+  {
+    "stock_no": "14111525-CA-A01",
+    "name": "CARTOLINA, assorted colors",
+    "unit": "pack",
+    "price": 84.98,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111506-CF-L11",
+    "name": "COMPUTER CONTINUOUS FORM, 1 ply, 280mm x 241mm",
+    "unit": "box",
+    "price": 985.93,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111506-CF-L12",
+    "name": "COMPUTER CONTINUOUS FORM, 1 ply, 280mm x 378mm",
+    "unit": "box",
+    "price": 1817.22,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111514-NP-S02",
+    "name": "NOTEPAD, stick-on, 50mm x 76mm",
+    "unit": "pad",
+    "price": 37.61,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111514-NP-S04",
+    "name": "NOTEPAD, stick-on, 76mm x 100mm",
+    "unit": "pad",
+    "price": 60.17,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111514-NP-S03",
+    "name": "NOTEPAD, stick-on, 76mm x 76mm",
+    "unit": "pad",
+    "price": 52.78,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111514-NB-S02",
+    "name": "STENO NOTEBOOK",
+    "unit": "piece",
+    "price": 11.45,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111507-PP-M01",
+    "name": "PAPER, MULTICOPY A4",
+    "unit": "ream",
+    "price": 213.86,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111507-PP-M02",
+    "name": "PAPER, MULTICOPY LEGAL",
+    "unit": "ream",
+    "price": 227.64,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111507-PP-C01",
+    "name": "PAPER, MULTIPURPOSE A4",
+    "unit": "ream",
+    "price": 139.8,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111507-PP-C02",
+    "name": "PAPER, MULTIPURPOSE LEGAL",
+    "unit": "ream",
+    "price": 161.3,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111531-PP-R01",
+    "name": "PAD PAPER, ruled",
+    "unit": "pad",
+    "price": 43.79,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111503-PA-P01",
+    "name": "PAPER, parchment",
+    "unit": "box",
+    "price": 156.52,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111531-RE-B01",
+    "name": "RECORD BOOK, 300 PAGES",
+    "unit": "book",
+    "price": 93.07,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111531-RE-B02",
+    "name": "RECORD BOOK, 500 PAGES",
+    "unit": "book",
+    "price": 126.43,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111704-TT-P04",
+    "name": "TISSUE, INTERFOLDED PAPER TOWEL",
+    "unit": "pack",
+    "price": 34.31,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "14111704-TT-P02",
+    "name": "TOILET TISSUE PAPER, 2 ply",
+    "unit": "pack",
+    "price": 100.88,
+    "category": "PAPER MATERIALS AND PRODUCTS"
+  },
+  {
+    "stock_no": "53131626-HS-S01",
+    "name": "HAND SANITIZER",
+    "unit": "bottle",
+    "price": 84.45,
+    "category": "PERFUMES OR COLOGNES OR FRAGRANCES"
+  },
+  {
+    "stock_no": "10191509-IN-A01",
+    "name": "INSECTICIDE",
+    "unit": "can",
+    "price": 260.47,
+    "category": "PESTICIDES OR PEST REPELLENTS"
+  },
+  {
+    "stock_no": "55101524-RA-H01",
+    "name": "HANDBOOK ON PHILIPPINE GOVERNMENT PROCUREMENT (RA 9184 and its IRR)",
+    "unit": "book",
+    "price": 37.77,
+    "category": "PRINTED PUBLICATIONS"
+  },
+  {
+    "stock_no": "44103109-BR-D05",
+    "name": "DRUM CARTRIDGE, BROTHER DR-3455, Black",
+    "unit": "cart",
+    "price": 7051.41,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-EP-M17",
+    "name": "INK CARTRIDGE, EPSON C13T664300 (T6643), Magenta",
+    "unit": "cart",
+    "price": 245.83,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-EP-Y17",
+    "name": "INK CARTRIDGE, EPSON C13T664400 (T6644), Yellow",
+    "unit": "cart",
+    "price": 245.83,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-HP-B20",
+    "name": "INK CARTRIDGE, HP CH561WA (HP61), Black",
+    "unit": "cart",
+    "price": 878.26,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-HX-M43",
+    "name": "INK CARTRIDGE, HP CN047AA (HP951XL), Magenta",
+    "unit": "cart",
+    "price": 1540.12,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-HP-T36",
+    "name": "INK CARTRIDGE, HP CN693AA (HP704), Tri-color",
+    "unit": "cart",
+    "price": 425.41,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-HP-B33",
+    "name": "INK CARTRIDGE, HP CZ107AA (HP678), Black",
+    "unit": "cart",
+    "price": 410.63,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103105-HP-T33",
+    "name": "INK CARTRIDGE, HP CZ108AA (HP678), Tri-color",
+    "unit": "cart",
+    "price": 410.63,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103112-EP-R05",
+    "name": "RIBBON CARTRIDGE, EPSON C13S015516 (#8750), Black",
+    "unit": "cart",
+    "price": 78.59,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103112-EP-R13",
+    "name": "RIBBON CARTRIDGE, EPSON C13S015632, Black",
+    "unit": "cart",
+    "price": 79.11,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103112-EP-R07",
+    "name": "RIBBON CARTRIDGE, EPSON C13S015531 (S015086)",
+    "unit": "cart",
+    "price": 830.76,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-B09",
+    "name": "TONER CARTRIDGE, BROTHER TN-3320, Black",
+    "unit": "cart",
+    "price": 3620.71,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-B11",
+    "name": "TONER CARTRIDGE, BROTHER TN-3350, Black",
+    "unit": "cart",
+    "price": 5077.44,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-B15",
+    "name": "TONER CARTRIDGE, BROTHER TN-3478, Black",
+    "unit": "cart",
+    "price": 5659.07,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-B16",
+    "name": "TONER CARTRIDGE, BROTHER TN-456 Black, High Yield",
+    "unit": "cart",
+    "price": 4633.03,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-C03",
+    "name": "TONER CARTRIDGE, BROTHER TN-456 Cyan, High Yield",
+    "unit": "cart",
+    "price": 7832.55,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-M03",
+    "name": "TONER CARTRIDGE, BROTHER TN-456 Magenta, High Yield",
+    "unit": "cart",
+    "price": 7832.55,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-BR-Y03",
+    "name": "TONER CARTRIDGE, BROTHER TN-456 Yellow, High Yield",
+    "unit": "cart",
+    "price": 7832.55,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-CA-B00",
+    "name": "TONER CARTRIDGE, CANON CRG-324 II",
+    "unit": "cart",
+    "price": 14145.04,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B12",
+    "name": "TONER CARTRIDGE, HP CB435A, Black",
+    "unit": "cart",
+    "price": 3490.87,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B18",
+    "name": "TONER CARTRIDGE, HP CE255A, Black",
+    "unit": "cart",
+    "price": 7820.94,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B21",
+    "name": "TONER CARTRIDGE, HP CE278A, Black",
+    "unit": "cart",
+    "price": 4215.01,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B22",
+    "name": "TONER CARTRIDGE, HP CE285A (HP85A), Black",
+    "unit": "cart",
+    "price": 3652.38,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B23",
+    "name": "TONER CARTRIDGE, HP CE310A, Black",
+    "unit": "cart",
+    "price": 2647.44,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B28",
+    "name": "TONER CARTRIDGE, HP CE505A, Black",
+    "unit": "cart",
+    "price": 4563.36,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B52",
+    "name": "TONER CARTRIDGE, HP CF217A (HP17A), Black LaserJet",
+    "unit": "cart",
+    "price": 3242.8,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B56",
+    "name": "TONER CARTRIDGE, HP CF281A (HP81A), Black LaserJet",
+    "unit": "cart",
+    "price": 8787.87,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B58",
+    "name": "TONER CARTRIDGE, HP CF287A (HP87), Black",
+    "unit": "cart",
+    "price": 11072.19,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B60",
+    "name": "TONER CARTRIDGE, HP CF350A, Black Laserjet",
+    "unit": "cart",
+    "price": 2899.73,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-C60",
+    "name": "TONER CARTRIDGE, HP CF351A, Cyan Laserjet",
+    "unit": "cart",
+    "price": 2987.35,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-Y60",
+    "name": "TONER CARTRIDGE, HP CF352A, Yellow Laserjet",
+    "unit": "cart",
+    "price": 2987.35,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-M60",
+    "name": "TONER CARTRIDGE, HP CF353A, Magenta Laserjet",
+    "unit": "cart",
+    "price": 2987.35,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B62",
+    "name": "TONER CARTRIDGE, HP CF400A (HP201A), Black LaserJet",
+    "unit": "cart",
+    "price": 3490.87,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-M62",
+    "name": "TONER CARTRIDGE, HP CF403A (HP201A), Magenta LaserJet",
+    "unit": "cart",
+    "price": 4124.23,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-M63",
+    "name": "TONER CARTRIDGE, HP CF413A (HP410A), Magenta",
+    "unit": "cart",
+    "price": 5675.96,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B34",
+    "name": "TONER CARTRIDGE, HP Q2612A, Black",
+    "unit": "cart",
+    "price": 4218.18,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "44103103-HP-B48",
+    "name": "TONER CARTRIDGE, HP Q7553A, Black",
+    "unit": "cart",
+    "price": 4750.2,
+    "category": "PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)"
+  },
+  {
+    "stock_no": "43231513-SFT-001",
+    "name": "Business function specific software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43231602-SFT-002",
+    "name": "Finance accounting and enterprise resource planning ERP software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232004-SFT-003",
+    "name": "Interactive or entertainment software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232107-SFT-004",
+    "name": "Content authoring and editing software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232202-SFT-005",
+    "name": "Content management software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232304-SFT-006",
+    "name": "Data management and query software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232402-SFT-007",
+    "name": "Development software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232505-SFT-008",
+    "name": "Educational or reference software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232603-SFT-009",
+    "name": "Industry specific software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43233501-SFT-016",
+    "name": "Information exchange software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232701-SFT-010",
+    "name": "Network applications software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232802-SFT-011",
+    "name": "Network management software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43232905-SFT-012",
+    "name": "Networking software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43233004-SFT-013",
+    "name": "Operating environment software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43233205-SFT-014",
+    "name": "Security and protection software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "43233405-SFT-015",
+    "name": "Utility and device driver software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-066",
+    "name": "Electrical Equipment Software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-067",
+    "name": "System Management Software",
+    "unit": "license",
+    "price": 0,
+    "category": "SOFTWARE (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-051",
+    "name": "AIRLINE TICKETS (DOMESTIC)",
+    "unit": "ticket",
+    "price": 0,
+    "category": "AIRLINE TICKETS (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-052",
+    "name": "AIRLINE TICKETS (INTERNATIONAL)",
+    "unit": "ticket",
+    "price": 0,
+    "category": "AIRLINE TICKETS (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-060",
+    "name": "ALL-TERRAIN VEHICLE (ATV)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-068",
+    "name": "ALTERNATE FUELED VEHICLE (AFV)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-061",
+    "name": "ASSEMBLED OWNER-TYPE JEEP",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-062",
+    "name": "ASSEMBLED PASSENGER JEEPNEY-TYPE VEHICLE",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-BU-V01",
+    "name": "BUS (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-BU-V02",
+    "name": "BUS (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-BU-V03",
+    "name": "BUS (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-CA-V01",
+    "name": "CAR (SEDAN OR HATCHBACK) (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-CA-V02",
+    "name": "CAR (SEDAN OR HATCHBACK) (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-CA-V03",
+    "name": "CAR (SEDAN OR HATCHBACK) (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-MI-V01",
+    "name": "MINI BUS (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-MI-V02",
+    "name": "MINI BUS (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-MI-V03",
+    "name": "MINI BUS (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-063",
+    "name": "MOTORCYCLE",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-MU-V01",
+    "name": "MULTI-PURPOSE VEHICLE (MPV)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PA-V01",
+    "name": "PASSENGER VAN (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PA-V02",
+    "name": "PASSENGER VAN (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PA-V03",
+    "name": "PASSENGER VAN (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PI-V01",
+    "name": "PICK-UP TRUCK (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PI-V02",
+    "name": "PICK-UP TRUCK (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-PI-V03",
+    "name": "PICK-UP TRUCK (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-SP-V01",
+    "name": "SPORTS UTILITY VEHICLE (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-SP-V03",
+    "name": "SPORTS UTILITY VEHICLE (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-058",
+    "name": "TRI-WHEEL VEHICLE",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-UT-V01",
+    "name": "UTILITY VAN (ENTRY LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-UT-V02",
+    "name": "UTILITY VAN (MID LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "25101503-UT-V03",
+    "name": "UTILITY VAN (TOP LEVEL)",
+    "unit": "unit",
+    "price": 0,
+    "category": "MOTOR VEHICLE (Note: Please indicate price of items)\r\nPlease refer to the Budget Circular No. 2022-1, Omnibus Guidelines on the Acquisition, Use, Rental, and Replacement of Government Motor Vehicles."
+  },
+  {
+    "stock_no": "80141505-TS-069",
+    "name": "CLOUD COMPUTING SERVICES",
+    "unit": "license",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-072",
+    "name": "AIR CONDITIONING UNIT, 1.0 HP, CEILING TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-078",
+    "name": "AIR CONDITIONING UNIT, 1.0 HP, SPLIT TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-075",
+    "name": "AIR CONDITIONING UNIT, 1.0 HP, WALL TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-011",
+    "name": "AIR CONDITIONING UNIT, 1.0 HP, WINDOW TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-073",
+    "name": "AIR CONDITIONING UNIT, 1.5 HP, CEILING TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-079",
+    "name": "AIR CONDITIONING UNIT, 1.5 HP, SPLIT TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-076",
+    "name": "AIR CONDITIONING UNIT, 1.5 HP, WALL TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-070",
+    "name": "AIR CONDITIONING UNIT, 1.5 HP, WINDOW TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-074",
+    "name": "AIR CONDITIONING UNIT, 2.0 HP, CEILING TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-080",
+    "name": "AIR CONDITIONING UNIT, 2.0 HP, SPLIT TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-077",
+    "name": "AIR CONDITIONING UNIT, 2.0 HP, WALL TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-071",
+    "name": "AIR CONDITIONING UNIT, 2.0 HP, WINDOW TYPE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-103",
+    "name": "AIR COOLER",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-036",
+    "name": "AMPLIFIER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-104",
+    "name": "ARROW FLAG (SIGN HERE)",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-032",
+    "name": "AUTOMOTIVE BATTERIES",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-001",
+    "name": "BALLPOINT PEN, EXTRA FINE TIP",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-081",
+    "name": "BALLPOINT PEN, FINE TIP",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-082",
+    "name": "BALLPOINT PEN, MEDIUM TIP",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-007",
+    "name": "BLEACHING SOLUTION",
+    "unit": "bottle",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-044",
+    "name": "BLUETOOTH SPEAKER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-023",
+    "name": "BOND PAPER",
+    "unit": "ream",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-083",
+    "name": "CCTV CAMERA",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-008",
+    "name": "CERTIFICATE FRAME",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-084",
+    "name": "CERTIFICATE HOLDER, DOUBLE-SIDED, A4",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-009",
+    "name": "CERTIFICATE HOLDER, SINGLE-SIDED, A4",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-035",
+    "name": "COMPACT DISC",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-014",
+    "name": "CONFERENCE MICROPHONE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-085",
+    "name": "CONFERENCE SPEAKERPHONE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-028",
+    "name": "DEODORANT CAKE",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-016",
+    "name": "DISHWASHING LIQUID",
+    "unit": "bottle",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-087",
+    "name": "DISPOSABLE GLOVES, LARGE",
+    "unit": "box",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-086",
+    "name": "DISPOSABLE GLOVES, NITRILE, MEDIUM",
+    "unit": "box",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-029",
+    "name": "DISPOSABLE GLOVES, NITRILE, SMALL",
+    "unit": "box",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-039",
+    "name": "DOCUMENT SCANNER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-025",
+    "name": "DOOR MAT",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-005",
+    "name": "DOUBLE-SIDED TAPE, FOAM, 12mm",
+    "unit": "roll",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-088",
+    "name": "DOUBLE-SIDED TAPE, FOAM, 24mm",
+    "unit": "roll",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-089",
+    "name": "DOUBLE-SIDED TAPE, TISSUE, 12mm",
+    "unit": "roll",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-090",
+    "name": "DOUBLE-SIDED TAPE, TISSUE, 24mm",
+    "unit": "roll",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-047",
+    "name": "DSLR CAMERA",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-020",
+    "name": "EXTENSION CORD",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-091",
+    "name": "EXTERNAL DRIVE, SOLID STATE DRIVE, 1TB",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-050",
+    "name": "FUEL FILTERS",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-042",
+    "name": "GLUE GUN",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-027",
+    "name": "GLUE STICK (FOR GLUE GUN)",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-092",
+    "name": "GLUE STICK PASTE, 15g",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-026",
+    "name": "GLUE STICK PASTE, 8g",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-105",
+    "name": "INTERACTIVE/DIGITAL WHITEBOARD",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-046",
+    "name": "KEYBOARD",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-003",
+    "name": "LAMINATING FILM",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-049",
+    "name": "LAMINATING MACHINE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-107",
+    "name": "LAPTOP FOR CREATIVE AND TECHNICAL USE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-108",
+    "name": "LOGISTICS SERVICES",
+    "unit": "lot",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-015",
+    "name": "MEDAL",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-034",
+    "name": "MOBILE PHONE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-002",
+    "name": "MULTIFUNCTION PRINTER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-030",
+    "name": "OFFICE CHAIR",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-033",
+    "name": "PADLOCK, 40mm",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-093",
+    "name": "PADLOCK, 50mm",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-021",
+    "name": "PAINT",
+    "unit": "gallon",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-022",
+    "name": "PAPER, COLORED, A4",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-094",
+    "name": "PAPER, LAID",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-031",
+    "name": "PAPER, MANILA",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-041",
+    "name": "PARACETAMOL",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-006",
+    "name": "PHOTO PAPER, MATTE",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-095",
+    "name": "PHOTO PAPER, SATIN",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-038",
+    "name": "PLASTIC ENVELOPE",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-017",
+    "name": "PLASTIC FASTENER",
+    "unit": "box",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-045",
+    "name": "POVIDONE IODINE",
+    "unit": "bottle",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-096",
+    "name": "PROFESSIONAL WIRELESS HEADSET",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-024",
+    "name": "PUSH PIN",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-097",
+    "name": "SCHOOL CHAIR",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-012",
+    "name": "SMART TELEVISION",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-018",
+    "name": "STEEL FILING CABINET",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-048",
+    "name": "STEEL RACK",
+    "unit": "set",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-004",
+    "name": "STICKER PAPER, MATTE",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-037",
+    "name": "STORAGE BOX, FOR LEGAL SIZE",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-098",
+    "name": "TABLET COMPUTER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-010",
+    "name": "UNINTERRUPTIBLE POWER SUPPLY, TOWER TYPE, 650VA",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-019",
+    "name": "VELLUM BOARD PAPER",
+    "unit": "pack",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-099",
+    "name": "VIDEO CONFERENCING CAMERA",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-040",
+    "name": "WATER DISPENSER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-106",
+    "name": "WATER FILTER/PURIFIER FOR FAUCET",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-013",
+    "name": "WHITEBOARD",
+    "unit": "piece",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-100",
+    "name": "WIFI EXTENDER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-101",
+    "name": "WIRELESS MICROPHONE",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  },
+  {
+    "stock_no": "80141505-TS-102",
+    "name": "WIRELESS PRESENTER",
+    "unit": "unit",
+    "price": 0,
+    "category": "CLOUD COMPUTING SERVICES (Note: Please indicate price of items)"
+  }
+]

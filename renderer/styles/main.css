@@ -1920,6 +1920,258 @@ body {
   font-size: 16px;
 }
 
+/* ==================== PPMP 3-Level Hierarchy: Section → Category → Items ==================== */
+
+/* LEVEL 1: Section header (yellow bg, blue bold text — matches Excel PPMP template) */
+.ppmp-section-header {
+  background: #fff2cc !important;
+  cursor: default;
+  border-top: 2px solid #b8860b;
+  border-bottom: 2px solid #b8860b;
+}
+.ppmp-section-header td {
+  padding: 10px 14px !important;
+  font-size: 13px;
+}
+.ppmp-section-title {
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  font-size: 13.5px !important;
+  color: #00008b !important;
+}
+.ppmp-section-budget {
+  font-weight: 700;
+  font-size: 12px !important;
+  text-align: right;
+  white-space: nowrap;
+  color: #1a365d !important;
+}
+.ppmp-section-count {
+  font-size: 11px !important;
+  text-align: center;
+  white-space: nowrap;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+/* LEVEL 2: Category/Subsection header (bold underlined, white bg — subcategory under section) */
+.ppmp-category-header {
+  background: #f8f9fa !important;
+  cursor: default;
+  border-bottom: 1px solid #cbd5e0;
+}
+.ppmp-category-header td {
+  padding: 8px 14px 8px 28px !important;
+  font-size: 12.5px;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+.ppmp-category-title {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 12px !important;
+  color: #1a202c;
+  text-decoration: underline;
+}
+.ppmp-category-title i {
+  margin-right: 8px;
+  opacity: 0.8;
+  font-size: 14px;
+}
+.ppmp-category-budget {
+  font-weight: 600;
+  font-size: 12px !important;
+  text-align: right;
+  white-space: nowrap;
+  color: #2d3748 !important;
+}
+.ppmp-category-count {
+  font-size: 11px !important;
+  opacity: 0.75;
+  text-align: center;
+  white-space: nowrap;
+  color: #4a5568;
+}
+.ppmp-item-row td:first-child {
+  padding-left: 36px !important;
+  font-size: 12px;
+  color: #4a5568;
+}
+.ppmp-item-row td {
+  font-size: 12px;
+}
+/* PPMP description bullet details (matches Excel PPMP format) */
+.ppmp-desc-cell {
+  max-width: 350px;
+  min-width: 200px;
+  white-space: normal;
+  line-height: 1.4;
+}
+.ppmp-desc-cell strong {
+  display: block;
+  font-size: 12px;
+  color: #1a202c;
+}
+.ppmp-desc-details {
+  margin-top: 2px;
+  padding-left: 16px;
+}
+.ppmp-desc-line {
+  font-size: 11px;
+  color: #4a5568;
+  line-height: 1.45;
+  font-style: italic;
+  position: relative;
+}
+/* Grand total footer */
+.ppmp-grand-total-row td {
+  background: #edf2f7 !important;
+  font-weight: 700;
+  font-size: 13px;
+  border-top: 2px solid #cbd5e0;
+  padding: 10px 14px !important;
+}
+
+/* ==================== PPMP Multi-Item List (New PPMP modal) ==================== */
+#ppmpItemsListContainer {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+#ppmpItemsListContainer table {
+  border-collapse: collapse;
+  width: 100%;
+}
+#ppmpItemsListContainer thead th {
+  background: #f7fafc;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 6px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #4a5568;
+  letter-spacing: 0.3px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+#ppmpItemsListContainer tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+#ppmpItemsListContainer tbody tr:hover {
+  background: #f7fafc;
+}
+#ppmpItemsListContainer input[type="number"] {
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+#ppmpItemsListContainer input[type="number"]:focus {
+  border-color: #2b6cb0;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, 0.15);
+}
+
+/* ===== Edit PPMP — Checkbox Item List ===== */
+.ppmp-checkbox-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #fafbfc;
+}
+.ppmp-item-checkbox-row {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e8ecf0;
+  transition: background 0.15s;
+}
+.ppmp-item-checkbox-row:last-child { border-bottom: none; }
+.ppmp-item-checkbox-row:hover { background: #f0f4f8; }
+.ppmp-item-checkbox-row.checked { background: #ebf5ff; }
+.ppmp-item-checkbox-row.original { background: #e8f7ed; }
+.ppmp-item-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ppmp-item-check-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2b6cb0;
+  flex-shrink: 0;
+}
+.ppmp-item-check-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ppmp-item-check-info strong {
+  font-size: 13px;
+  color: #1a202c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ppmp-item-check-meta {
+  font-size: 11px;
+  color: #718096;
+}
+.ppmp-item-orig-badge {
+  display: inline-block;
+  background: #38a169;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.ppmp-item-desc-input {
+  margin: 6px 0 2px 24px;
+}
+.ppmp-item-desc-input textarea {
+  width: 100%;
+  min-height: 50px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 12px;
+  resize: vertical;
+  font-family: inherit;
+}
+.ppmp-item-desc-input textarea:focus {
+  border-color: #2b6cb0;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, 0.15);
+}
+#ppmpEditCheckedSummary {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #ebf8ff;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #2b6cb0;
+  font-weight: 500;
+}
+/* ===== End Checkbox Item List ===== */
+
+/* 3-column form row for procurement dates */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
 /* APP Version Status Banner */
 .app-version-banner {
   background: #fff;

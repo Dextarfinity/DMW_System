@@ -7,6 +7,10 @@
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_DATE = new Date();
 
+// Global caches for UOMs and item categories
+let cachedUOMs = [];
+let cachedItemCategories = [];
+
 /** Get current fiscal year (same as calendar year for Philippine govt) */
 function getCurrentFiscalYear() {
   return new Date().getFullYear();
@@ -354,11 +358,41 @@ async function loadItems() {
   try {
     const items = await apiRequest('/items');
     renderItemsTable(items);
+    // Extract and cache distinct categories
+    const cats = [...new Set(items.map(i => i.category).filter(Boolean))].sort();
+    cachedItemCategories = cats;
+    populateItemCategoryFilter(cats);
     return items;
   } catch (err) {
     console.log('Using demo items data');
     return [];
   }
+}
+
+/** Populate the itemCategoryFilter dropdown dynamically from loaded items */
+function populateItemCategoryFilter(categories) {
+  const sel = document.getElementById('itemCategoryFilter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Categories</option>' +
+    categories.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+}
+
+/** Build <option> list for category dropdowns in modals */
+function buildCategoryOptions(selectedValue) {
+  return '<option value="">-- Select Category --</option>' +
+    cachedItemCategories.map(c =>
+      `<option value="${c}" ${c === selectedValue ? 'selected' : ''}>${c}</option>`
+    ).join('');
+}
+
+/** Build <option> list for UOM dropdowns in modals */
+function buildUOMOptions(selectedValue) {
+  const sv = (selectedValue || '').toUpperCase();
+  return '<option value="">-- Select Unit --</option>' +
+    cachedUOMs.map(u =>
+      `<option value="${u.abbreviation}" ${u.abbreviation === sv ? 'selected' : ''}>${u.abbreviation} - ${u.name}</option>`
+    ).join('');
 }
 
 async function loadSuppliers() {
@@ -391,6 +425,7 @@ async function loadPPMP() {
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
+    const catFilter = document.getElementById('ppmpCategoryFilter');
     const yearFilter = document.getElementById('ppmpYearFilter');
     const searchInput = document.getElementById('ppmpSearchInput');
 
@@ -422,9 +457,19 @@ async function loadPPMP() {
     
     // Apply client-side text search across ALL visible columns
     const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const selectedCategory = catFilter ? catFilter.value : '';
     let filtered = ppmp;
+
+    // Category filter (also matches section)
+    if (selectedCategory) {
+      filtered = filtered.filter(p => 
+        (p.item_category || p.category || '') === selectedCategory ||
+        (p.section || '') === selectedCategory
+      );
+    }
+
     if (searchText) {
-      filtered = ppmp.filter(p =>
+      filtered = filtered.filter(p =>
         (p.ppmp_no || '').toLowerCase().includes(searchText) ||
         (p.description || '').toLowerCase().includes(searchText) ||
         (p.remarks || '').toLowerCase().includes(searchText) ||
@@ -437,9 +482,33 @@ async function loadPPMP() {
         (p.delivery_period || '').toLowerCase().includes(searchText) ||
         (p.department_code || '').toLowerCase().includes(searchText) ||
         (p.department_name || '').toLowerCase().includes(searchText) ||
+        (p.category || '').toLowerCase().includes(searchText) ||
+        (p.item_category || '').toLowerCase().includes(searchText) ||
+        (p.item_name || '').toLowerCase().includes(searchText) ||
+        (p.item_description || '').toLowerCase().includes(searchText) ||
+        (p.section || '').toLowerCase().includes(searchText) ||
         (p.status || '').toLowerCase().includes(searchText) ||
         String(p.total_amount || '').includes(searchText)
       );
+    }
+
+    // Populate category filter dropdown from loaded data (sections + categories)
+    if (catFilter) {
+      const currentVal = catFilter.value;
+      const sections = [...new Set(ppmp.map(p => p.section).filter(Boolean))].sort();
+      const cats = [...new Set(ppmp.map(p => p.item_category || p.category).filter(Boolean))].sort();
+      let optionsHtml = '<option value="">All Sections / Categories</option>';
+      if (sections.length > 0) {
+        optionsHtml += '<optgroup label="── Sections ──">';
+        sections.forEach(s => { optionsHtml += `<option value="${s}" ${s === currentVal ? 'selected' : ''}>${s}</option>`; });
+        optionsHtml += '</optgroup>';
+      }
+      if (cats.length > 0) {
+        optionsHtml += '<optgroup label="── Categories ──">';
+        cats.forEach(c => { optionsHtml += `<option value="${c}" ${c === currentVal ? 'selected' : ''}>${c}</option>`; });
+        optionsHtml += '</optgroup>';
+      }
+      catFilter.innerHTML = optionsHtml;
     }
     
     renderPPMPTable(filtered);
@@ -517,6 +586,10 @@ function initPPMPFilters() {
       });
     }).catch(() => {});
   }
+
+  // Category filter
+  const catFilter = document.getElementById('ppmpCategoryFilter');
+  if (catFilter) catFilter.onchange = function() { loadPPMP(); };
 
   if (divFilter) divFilter.onchange = function() { loadPPMP(); };
   if (modeFilter) modeFilter.onchange = function() { loadPPMP(); };
@@ -944,6 +1017,7 @@ function filterUACSTable() {
 async function loadUOMs() {
   try {
     const uoms = await apiRequest('/uoms');
+    cachedUOMs = uoms;
     renderUOMsTable(uoms);
     return uoms;
   } catch (err) { console.log('Using demo UOMs data'); return []; }
@@ -1452,6 +1526,54 @@ function renderUsersTable(users) {
   }).join('');
 }
 
+/** Format PPMP description for table display.
+ *  Format:
+ *    Other Supplies and Materials (...)    (bold title = General Description)
+ *    ALCOHOL, Ethyl, 1 Gallon              (item name from catalog)
+ *       Type: Steel,                       (item_description = additional info)
+ *       Size: Width: 39 cm...
+ */
+function formatPPMPDescription(p) {
+  const generalDesc = (p.description || '').trim();
+  const itemName    = (p.item_name || '').trim();
+  const itemDesc    = (p.item_description || '').trim();
+
+  if (!generalDesc && !itemName && !itemDesc) return escapeHtml(p.remarks || '-');
+
+  let html = '';
+
+  // 1) General Description — bold title
+  if (generalDesc) {
+    html += '<strong>' + escapeHtml(generalDesc) + '</strong>';
+  }
+
+  // 2) Item Name from catalog — second line, semi-bold
+  if (itemName) {
+    html += '<div style="margin-top:2px;font-size:12px;font-weight:600;color:#2d3748;">' + escapeHtml(itemName) + '</div>';
+  }
+
+  // 3) item_description — additional specs/details, indented
+  if (itemDesc) {
+    const allLines = itemDesc.split('\n');
+    html += '<div class="ppmp-desc-details">';
+    allLines.forEach(l => {
+      const trimmed = l.trim();
+      if (trimmed) {
+        html += '<div class="ppmp-desc-line">' + escapeHtml(trimmed) + '</div>';
+      } else {
+        html += '<div class="ppmp-desc-line" style="height:6px;"></div>';
+      }
+    });
+    html += '</div>';
+  }
+  return html || escapeHtml(p.remarks || '-');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function renderPPMPTable(ppmp) {
   const tbody = document.getElementById('ppmpTableBody');
   if (!tbody) return;
@@ -1459,7 +1581,6 @@ function renderPPMPTable(ppmp) {
   // Store all data globally
   window._ppmpData = ppmp;
 
-  // All items from server already have ppmp_no (server filters ppmp_no IS NOT NULL)
   const ppmpItems = ppmp;
   
   if (!ppmpItems.length) { 
@@ -1471,7 +1592,6 @@ function renderPPMPTable(ppmp) {
     return; 
   }
   
-  // Determine department code from name or code field
   function getDeptCode(plan) {
     if (plan.department_code) return plan.department_code;
     const name = plan.department_name;
@@ -1485,7 +1605,6 @@ function renderPPMPTable(ppmp) {
     return name.substring(0,3).toUpperCase();
   }
 
-  // Get procurement mode badge class
   function getModeBadge(mode) {
     if (!mode) return { css: 'svp', label: 'Small Value Procurement' };
     const m = mode.toLowerCase();
@@ -1506,67 +1625,125 @@ function renderPPMPTable(ppmp) {
   if (gtVal) gtVal.textContent = '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits: 2});
   if (gtCount) gtCount.textContent = ppmpItems.length + ' items';
 
-  tbody.innerHTML = ppmpItems.map((p, idx) => {
-    const deptCode = getDeptCode(p);
-    const ppmpNo = p.ppmp_no || `PPMP-${deptCode}-${p.fiscal_year}-${String(p.id).padStart(3, '0')}`;
-    const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'pending' ? 'pending' : p.status === 'draft' ? 'draft' : p.status;
-    const mode = getModeBadge(p.procurement_mode);
-    
-    // Build approval info badges
-    let approvalInfo = '';
-    if (p.status === 'pending') {
-      const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by Chief FAD: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> Chief FAD</span>` : `<span class="approval-badge chief-pending" title="Awaiting Chief FAD approval"><i class="fas fa-clock"></i> Chief FAD</span>`;
-      const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
-      approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}</div>`;
+  // Group items by item catalog category (from JOIN), fallback to ppmp category
+  // 3-LEVEL HIERARCHY: Section → Category → Items
+  const sectionMap = {}; // section → { categories: { cat → items[] } }
+  const sectionOrder = [];
+  ppmpItems.forEach(p => {
+    const section = p.section || 'GENERAL PROCUREMENT';
+    const cat = p.item_category || p.category || 'GENERAL PROCUREMENT';
+    if (!sectionMap[section]) {
+      sectionMap[section] = { categories: {}, categoryOrder: [] };
+      sectionOrder.push(section);
     }
+    if (!sectionMap[section].categories[cat]) {
+      sectionMap[section].categories[cat] = [];
+      sectionMap[section].categoryOrder.push(cat);
+    }
+    sectionMap[section].categories[cat].push(p);
+  });
 
-    // Determine if current user can approve this PPMP
-    const userRole = window.currentUser?.role || '';
-    const userRoles = currentUser.roles || [userRole];
-    const canApprove = p.status === 'pending' && userRoles.some(r => ['chief_fad', 'hope', 'admin'].includes(r));
-    // Check if user already approved (chief_fad can't approve again if already done)
-    const alreadyApprovedByChief = !!p.approved_by_chief;
-    const alreadyApprovedByHope = !!p.approved_by_hope;
-    const userAlreadyApproved = (userHasRole('chief_fad') && alreadyApprovedByChief) || (userHasRole('hope') && alreadyApprovedByHope);
-    const showApproveBtn = canApprove && !userAlreadyApproved;
+  let html = '';
+  sectionOrder.forEach(section => {
+    const sectionData = sectionMap[section];
+    // Calculate section totals
+    let sectionTotal = 0;
+    let sectionCount = 0;
+    sectionData.categoryOrder.forEach(cat => {
+      sectionData.categories[cat].forEach(p => {
+        sectionTotal += parseFloat(p.total_amount || 0);
+        sectionCount++;
+      });
+    });
 
-    return `
-    <tr data-division="${deptCode}" data-mode="${p.procurement_mode || ''}">
-      <td>${ppmpNo}</td>
-      <td>${p.description || p.remarks || '-'}</td>
-      <td>${p.project_type || 'Goods'}</td>
-      <td>${p.quantity_size || '-'}</td>
-      <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
-      <td>${p.pre_procurement || 'NO'}</td>
-      <td>${p.start_date || '-'}</td>
-      <td>${p.end_date || '-'}</td>
-      <td>${p.delivery_period || '-'}</td>
-      <td>${p.fund_source || 'GAA'}</td>
-      <td class="text-right">₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-      <td>${deptCode} - FY ${p.fiscal_year}</td>
-      <td>
-        <span class="status-badge ${statusClass}">${p.status}</span>
-        ${approvalInfo}
-      </td>
-      <td>
-        <div class="action-buttons">
-          <button class="btn-icon" data-action="view-ppmp" title="View" onclick="showViewPPMPModal(${p.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" data-action="edit-ppmp" title="Edit" onclick="showEditPPMPModal(${p.id})"><i class="fas fa-edit"></i></button>
-          ${showApproveBtn ? `<button class="btn-icon success" data-action="approve-ppmp" title="Approve PPMP" onclick="showApprovePPMPModal(${p.id})"><i class="fas fa-check"></i></button>` : ''}
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PPMP', ${p.id})"><i class="fas fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>
-  `;
-  }).join('') + `
+    // LEVEL 1: Section header row (yellow background, blue bold text — matches Excel PPMP)
+    html += `
+    <tr class="ppmp-section-header" data-section="${section}">
+      <td colspan="12" class="ppmp-section-title">${section}</td>
+      <td class="ppmp-section-budget text-right" colspan="1">₱${sectionTotal.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td colspan="1" class="ppmp-section-count">${sectionCount} item${sectionCount !== 1 ? 's' : ''}</td>
+    </tr>`;
+
+    // Iterate categories under this section
+    sectionData.categoryOrder.forEach(cat => {
+      const items = sectionData.categories[cat];
+      const catTotal = items.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0);
+
+      // LEVEL 2: Category/Subsection header — SKIP if category matches section name (avoid doubling)
+      const catNorm = (cat || '').replace(/[^A-Z]/gi, '').toUpperCase();
+      const secNorm = (section || '').replace(/[^A-Z]/gi, '').toUpperCase();
+      const isDuplicate = catNorm === secNorm || cat === section;
+      if (!isDuplicate) {
+        html += `
+    <tr class="ppmp-category-header" data-category="${cat}" data-section="${section}">
+      <td colspan="11" class="ppmp-category-title">${cat}</td>
+      <td class="ppmp-category-budget text-right" colspan="1">₱${catTotal.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+      <td colspan="2" class="ppmp-category-count">${items.length} item${items.length > 1 ? 's' : ''}</td>
+    </tr>`;
+      }
+
+    // LEVEL 3: Item rows under this category
+    items.forEach(p => {
+      const deptCode = getDeptCode(p);
+      const ppmpNo = p.ppmp_no || `PPMP-${deptCode}-${p.fiscal_year}-${String(p.id).padStart(3, '0')}`;
+      const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'pending' ? 'pending' : p.status === 'draft' ? 'draft' : p.status;
+      const mode = getModeBadge(p.procurement_mode);
+      
+      let approvalInfo = '';
+      if (p.status === 'pending') {
+        const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by Chief FAD: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> Chief FAD</span>` : `<span class="approval-badge chief-pending" title="Awaiting Chief FAD approval"><i class="fas fa-clock"></i> Chief FAD</span>`;
+        const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
+        approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}</div>`;
+      }
+
+      const userRole = window.currentUser?.role || '';
+      const userRoles = currentUser.roles || [userRole];
+      const canApprove = p.status === 'pending' && userRoles.some(r => ['chief_fad', 'hope', 'admin'].includes(r));
+      const alreadyApprovedByChief = !!p.approved_by_chief;
+      const alreadyApprovedByHope = !!p.approved_by_hope;
+      const userAlreadyApproved = (userHasRole('chief_fad') && alreadyApprovedByChief) || (userHasRole('hope') && alreadyApprovedByHope);
+      const showApproveBtn = canApprove && !userAlreadyApproved;
+
+      html += `
+      <tr class="ppmp-item-row" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
+        <td class="ppmp-no-cell">${ppmpNo}</td>
+        <td class="ppmp-desc-cell">${formatPPMPDescription(p)}</td>
+        <td>${p.project_type || 'Goods'}</td>
+        <td>${p.quantity_size || '-'}</td>
+        <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
+        <td>${p.pre_procurement || 'NO'}</td>
+        <td>${p.start_date || '-'}</td>
+        <td>${p.end_date || '-'}</td>
+        <td>${p.delivery_period || '-'}</td>
+        <td>${p.fund_source || 'GAA'}</td>
+        <td class="text-right">₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+        <td>${deptCode} - FY ${p.fiscal_year}</td>
+        <td>
+          <span class="status-badge ${statusClass}">${p.status}</span>
+          ${approvalInfo}
+        </td>
+        <td>
+          <div class="action-buttons">
+            <button class="btn-icon" data-action="view-ppmp" title="View" onclick="showViewPPMPModal(${p.id})"><i class="fas fa-eye"></i></button>
+            <button class="btn-icon" data-action="edit-ppmp" title="Edit" onclick="showEditPPMPModal(${p.id})"><i class="fas fa-edit"></i></button>
+            ${showApproveBtn ? `<button class="btn-icon success" data-action="approve-ppmp" title="Approve PPMP" onclick="showApprovePPMPModal(${p.id})"><i class="fas fa-check"></i></button>` : ''}
+            <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PPMP', ${p.id})"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    }); // end categoryOrder.forEach
+  }); // end sectionOrder.forEach
+
+  // Grand total footer
+  html += `
     <tr style="background:#f0f4f8;font-weight:bold;border-top:2px solid #1a365d;">
-      <td colspan="10" style="text-align:right;padding-right:15px;">Total (${ppmpItems.length} items):</td>
+      <td colspan="10" style="text-align:right;padding-right:15px;">Grand Total (${ppmpItems.length} items):</td>
       <td class="text-right">₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td colspan="3"></td>
-    </tr>
-  `;
+    </tr>`;
 
-
+  tbody.innerHTML = html;
 }
 
 function renderAPPTable(items, appStatus) {
@@ -3056,7 +3233,7 @@ function filterTripTickets(status) {
 async function loadPageData(pageId) {
   switch(pageId) {
     case 'dashboard': await loadDashboardStats(); break;
-    case 'items': await loadItems(); break;
+    case 'items': await loadItems(); if (!cachedUOMs.length) await loadUOMs(); break;
     case 'suppliers': await loadSuppliers(); break;
     case 'users': await loadUsers(); break;
     case 'ppmp': initPPMPFilters(); await loadPPMP(); break;
@@ -4867,10 +5044,15 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Only Division Chiefs (FAD, WRSD, MWPSD, MWPTD) can submit PPMP entries.');
       return;
     }
-    // Ensure divisions and procurement modes are loaded from DB
+    // Ensure divisions, procurement modes, items, and UOMs are loaded
     await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+    let allItems = [];
+    try { allItems = await apiRequest('/items'); } catch(e) { console.warn('Could not load items'); }
 
-    // Determine if user is a chief (auto-select their division)
+    // Build category filter from items catalog categories only
+    const itemCats = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+    const categoryOptions = itemCats.map(c => `<option value="${c}">${c}</option>`).join('');
+
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
     const chiefDivision = currentUser.division || currentUser.department_code || '';
@@ -4915,12 +5097,57 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Project Details</div>
-
-        <div class="form-group">
-          <label>General Description & Objective <span class="text-danger">*</span></label>
-          <textarea rows="2" id="ppmpDescription" placeholder="E.g., Hiring of Security Guard Services" required></textarea>
+        <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Section <span class="text-danger">*</span></label>
+            <select class="form-select" id="ppmpSection" required>
+              <option value="OFFICE OPERATION">OFFICE OPERATION</option>
+              <option value="SEMI- FURNITURE & FIXTURES">SEMI- FURNITURE & FIXTURES</option>
+              <option value="TRAININGS & ACTIVITIES">TRAININGS & ACTIVITIES</option>
+              <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
+              <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Filter by Category <small style="color:#999;">(narrows item list)</small></label>
+            <select class="form-select" id="ppmpCategoryFilterModal" onchange="filterPPMPItemsByCategory(this.value)">
+              <option value="">-- All Categories --</option>
+              ${categoryOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Select Item to Add</label>
+            <select class="form-select" id="ppmpItemSelect">
+              <option value="">-- Select Item --</option>
+              ${allItems.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('')}
+            </select>
+          </div>
         </div>
+        <div style="margin-bottom:12px;">
+          <button type="button" class="btn btn-sm btn-primary" onclick="addPPMPItemToList()" style="padding:6px 16px;">
+            <i class="fas fa-plus"></i> Add Item to List
+          </button>
+          <span id="ppmpItemCount" style="margin-left:12px; font-size:12px; color:#4a5568;"></span>
+        </div>
+        <div id="ppmpItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
+          <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+            <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
+              <th style="width:30px;">#</th>
+              <th>Item Name</th>
+              <th>Description</th>
+              <th style="width:60px;">Unit</th>
+              <th style="width:90px;">Unit Price</th>
+              <th style="width:80px;">Qty</th>
+              <th style="width:90px;">Budget</th>
+              <th style="width:40px;"></th>
+            </tr></thead>
+            <tbody id="ppmpItemsListBody"></tbody>
+          </table>
+        </div>
+        <input type="hidden" id="ppmpCategory" value="">
+
+        <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
 
         <div class="form-row">
           <div class="form-group">
@@ -4932,22 +5159,27 @@ document.addEventListener('DOMContentLoaded', () => {
             </select>
           </div>
           <div class="form-group">
-            <label>Quantity & Size <span class="text-danger">*</span></label>
-            <input type="number" id="ppmpQuantity" placeholder="E.g., 4" min="1" step="1" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
             <label>Mode of Procurement <span class="text-danger">*</span></label>
             <select class="form-select" id="ppmpProcMode" required>
               ${buildProcModeOptions('Small Value Procurement')}
             </select>
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label>Pre-Procurement Conference</label>
             <select class="form-select" id="ppmpPreProc">
               <option value="NO">NO</option>
               <option value="YES">YES</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Source of Funds <span class="text-danger">*</span></label>
+            <select class="form-select" id="ppmpFundSource" required>
+              <option value="GAA ${getCurrentFiscalYear()} - Current Appropriation" selected>GAA ${getCurrentFiscalYear()} - Current Appropriation</option>
+              <option value="GAA ${getCurrentFiscalYear()}">GAA ${getCurrentFiscalYear()}</option>
+              <option value="GAA">GAA</option>
+              <option value="Special Fund">Special Fund</option>
             </select>
           </div>
         </div>
@@ -4968,25 +5200,6 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <div class="form-section-header section-funding"><i class="fas fa-coins"></i> Funding Details</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Source of Funds <span class="text-danger">*</span></label>
-            <select class="form-select" id="ppmpFundSource" required>
-              <option value="GAA ${getCurrentFiscalYear()}" selected>GAA ${getCurrentFiscalYear()}</option>
-              <option value="GAA">GAA</option>
-              <option value="Special Fund">Special Fund</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Estimated Budget <span class="text-danger">*</span></label>
-            <div style="position:relative;">
-              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:#333; font-size:14px;">₱</span>
-              <input type="text" id="ppmpBudget" placeholder="0.00" required style="padding-left:28px;" oninput="this.value=this.value.replace(/[^0-9.]/g,'')">
-            </div>
-          </div>
-        </div>
-
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments & Remarks</div>
         <div class="form-group">
           <label>Supporting Documents <small style="color:#999;">(optional)</small></label>
@@ -5004,12 +5217,17 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <div id="ppmpTotalDisplay" style="display:inline-block; margin-right:20px; font-size:14px; font-weight:700; color:#1a365d;"></div>
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PPMP Entry</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PPMP Entries</button>
         </div>
       </form>
     `;
     openModal('New PPMP Entry', html);
+    // Store items data for dropdown filtering
+    window._ppmpItemsCache = allItems;
+    // Initialize the items list
+    window._ppmpSelectedItems = [];
     // Auto-generate PPMP number if division is pre-selected (chief)
     if (isChief && chiefDivision) generatePPMPNumber();
   };
@@ -6731,6 +6949,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   window.showNewItemModal = function() {
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      apiRequest('/uoms').then(uoms => { cachedUOMs = uoms; }).catch(() => {});
+    }
     const html = `
       <form id="itemForm" onsubmit="saveNewItem(event)">
         <div class="form-row">
@@ -6747,15 +6969,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Category</label>
             <select class="form-select" id="itemCategory" required>
-              <option value="">-- Select Category --</option>
-              <option value="Office Supplies">Office Supplies</option>
-              <option value="IT Equipment">IT Equipment</option>
-              <option value="Furniture">Furniture</option>
-              <option value="Services">Services</option>
-              <option value="EXPENDABLE">Expendable</option>
-              <option value="SEMI-EXPENDABLE">Semi-Expendable</option>
-              <option value="CAPITAL OUTLAY">Capital Outlay</option>
-              <option value="Other">Other</option>
+              ${buildCategoryOptions('')}
             </select>
           </div>
           <div class="form-group">
@@ -6775,12 +6989,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Unit of Measure</label>
             <select class="form-select" id="itemUnit" required>
-              <option value="pc">Piece (pc)</option>
-              <option value="box">Box</option>
-              <option value="ream">Ream</option>
-              <option value="set">Set</option>
-              <option value="lot">Lot</option>
-              <option value="unit">Unit</option>
+              ${buildUOMOptions('')}
             </select>
           </div>
           <div class="form-group">
@@ -6989,64 +7198,382 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
-   * Save New PPMP Entry
+   * Save New PPMP Entries (batch — one per selected item)
    */
   window.saveNewPPMP = async function(e) {
     e.preventDefault();
-    const ppmpNo = document.getElementById('ppmpNumber')?.value || '';
+    const items = window._ppmpSelectedItems || [];
+    if (items.length === 0) {
+      alert('Please add at least one item from the catalog.');
+      return;
+    }
+
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
-    const description = document.getElementById('ppmpDescription')?.value || '';
+    const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
-    const quantitySize = document.getElementById('ppmpQuantity')?.value || '';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
     const startDate = document.getElementById('ppmpStartDate')?.value || '';
     const endDate = document.getElementById('ppmpEndDate')?.value || '';
     const deliveryPeriod = document.getElementById('ppmpDeliveryPeriod')?.value || '';
     const fundSource = document.getElementById('ppmpFundSource')?.value || 'GAA';
-    const budget = parseFloat(document.getElementById('ppmpBudget')?.value) || 0;
     const remarks = document.getElementById('ppmpRemarks')?.value || '';
     const isIndicative = document.getElementById('ppmpIndicative')?.checked || false;
     const isFinal = document.getElementById('ppmpFinal')?.checked || false;
 
-    if (!ppmpNo) { alert('Please select a division first to generate a PPMP number.'); return; }
-    if (!description) { alert('Please enter a project description.'); return; }
     if (!division) { alert('Please select a division.'); return; }
-    if (budget <= 0) { alert('Please enter a valid estimated budget.'); return; }
-    if (!confirm('Save this PPMP entry?\n\n' + ppmpNo + '\n' + description + '\n₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}))) return;
+
+    const totalBudget = items.reduce((sum, it) => sum + it.budget, 0);
+    const itemSummary = items.map((it, i) => `  ${i+1}. ${it.item_name} (x${it.quantity}) = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}`).join('\n');
+    if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
 
     try {
-      const data = {
-        ppmp_no: ppmpNo,
-        dept_id: deptIdMap[division] || null,
-        fiscal_year: parseInt(fiscalYear),
-        description: description,
-        project_type: projectType,
-        quantity_size: quantitySize,
-        procurement_mode: procurementMode,
-        pre_procurement: preProc,
-        start_date: startDate || null,
-        end_date: endDate || null,
-        delivery_period: deliveryPeriod || null,
-        fund_source: fundSource,
-        total_amount: budget,
-        status: 'pending',
-        remarks: remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')
-      };
-      const result = await apiRequest('/plans', 'POST', data);
-      const planId = result.id || result.plan_id;
-      if (planId) {
-        await uploadAttachments('plan', planId, [
+      // Generate PPMP numbers for the batch
+      const year = String(fiscalYear).slice(-2);
+      const prefix = 'PPMP-' + division + '-' + year + '-';
+      let maxSeq = 0;
+      try {
+        const existing = await apiRequest('/plans');
+        (existing || []).forEach(p => {
+          if (p.ppmp_no && p.ppmp_no.startsWith(prefix)) {
+            const seq = parseInt(p.ppmp_no.replace(prefix, ''), 10);
+            if (seq > maxSeq) maxSeq = seq;
+          }
+        });
+      } catch(e) { /* fallback below */ }
+
+      const entries = items.map((it, idx) => {
+        const seqNum = maxSeq + idx + 1;
+        const ppmpNo = prefix + String(seqNum).padStart(3, '0');
+        return {
+          ppmp_no: ppmpNo,
+          dept_id: deptIdMap[division] || null,
+          fiscal_year: parseInt(fiscalYear),
+          section: section,
+          category: it.item_category || '',
+          item_id: it.item_id,
+          description: it.description,
+          item_description: it.description,
+          project_type: projectType,
+          quantity_size: String(it.quantity),
+          procurement_mode: procurementMode,
+          pre_procurement: preProc,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          delivery_period: deliveryPeriod || null,
+          fund_source: fundSource,
+          total_amount: it.budget,
+          status: 'pending',
+          remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim()
+        };
+      });
+
+      // Try batch endpoint first, fall back to individual creates
+      let savedCount = 0;
+      let lastPlanId = null;
+      try {
+        const result = await apiRequest('/plans/batch', 'POST', { entries });
+        savedCount = result.count || entries.length;
+        lastPlanId = result.ids ? result.ids[0] : null;
+      } catch(batchErr) {
+        // Fallback: create one by one
+        for (const entry of entries) {
+          try {
+            const result = await apiRequest('/plans', 'POST', entry);
+            savedCount++;
+            if (!lastPlanId) lastPlanId = result.id || result.plan_id;
+          } catch(e) {
+            console.error('Failed to save entry:', entry.ppmp_no, e);
+          }
+        }
+      }
+
+      // Upload attachment to first entry if provided
+      if (lastPlanId) {
+        await uploadAttachments('plan', lastPlanId, [
           { inputId: 'ppmpAttachment', description: 'PPMP Supporting Document' }
         ]);
       }
-      alert('PPMP entry saved successfully!\n' + ppmpNo);
+
+      alert(`Successfully saved ${savedCount} of ${entries.length} PPMP entries!`);
       closeModal();
       if (typeof loadPlans === 'function') loadPlans();
       else if (typeof loadPageData === 'function') loadPageData();
     } catch (err) {
-      alert('Error saving PPMP: ' + err.message);
+      alert('Error saving PPMP entries: ' + err.message);
+    }
+  };
+
+  /** Filter the items catalog dropdown by selected PPMP category */
+  window.filterPPMPItemsByCategory = function(category) {
+    const itemSelect = document.getElementById('ppmpItemSelect');
+    if (!itemSelect) return;
+    const allItems = window._ppmpItemsCache || [];
+    // Filter items matching category (exact match on item catalog category)
+    const filtered = category ? allItems.filter(i => {
+      return (i.category || '').toUpperCase() === category.toUpperCase();
+    }) : allItems;
+    const items = filtered.length > 0 ? filtered : allItems;
+    itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
+      items.map(i => `<option value="${i.id}" data-unit="${i.unit || ''}" data-price="${i.unit_price || 0}" data-desc="${(i.description || '').replace(/"/g, '&quot;')}" data-name="${(i.name || '').replace(/"/g, '&quot;')}" data-category="${(i.category || '').replace(/"/g, '&quot;')}">${i.code} - ${i.name} (${i.unit || ''} @ ₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</option>`
+      ).join('');
+  };
+
+  // Category → Section mapping (matches migrate_ppmp_section.js)
+  const CATEGORY_TO_SECTION = {
+    'EXPENDABLE': 'OFFICE OPERATION',
+    'ICT OFFICE SUPPLIES EXPENSES': 'OFFICE OPERATION',
+    'OFFICE SUPPLIES EXPENSES': 'OFFICE OPERATION',
+    'CLEANING EQUIPMENT AND SUPPLIES': 'OFFICE OPERATION',
+    'PAPER MATERIALS AND PRODUCTS': 'OFFICE OPERATION',
+    'OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES': 'OFFICE OPERATION',
+    'INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES': 'OFFICE OPERATION',
+    'PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)': 'OFFICE OPERATION',
+    'OTHER SUPPLIES AND MATERIALS': 'OFFICE OPERATION',
+    'OTHER MOOE': 'OFFICE OPERATION',
+    'SOFTWARE': 'OFFICE OPERATION',
+    'SEMI-ICT EQUIPMENT': 'OFFICE OPERATION',
+    'SEMI-OFFICE EQUIPMENT': 'OFFICE OPERATION',
+    'SEMI-EXPENDABLE': 'OFFICE OPERATION',
+    'ALCOHOL OR ACETONE BASED ANTISEPTICS': 'OFFICE OPERATION',
+    'BATTERIES AND CELLS AND ACCESSORIES': 'OFFICE OPERATION',
+    'COLOR COMPOUNDS AND DISPERSIONS': 'OFFICE OPERATION',
+    'CONSUMER ELECTRONICS': 'OFFICE OPERATION',
+    'FILMS': 'OFFICE OPERATION',
+    'FLAG OR ACCESSORIES': 'OFFICE OPERATION',
+    'LIGHTING AND FIXTURES AND ACCESSORIES': 'OFFICE OPERATION',
+    'MANUFACTURING COMPONENTS AND SUPPLIES': 'OFFICE OPERATION',
+    'MEASURING AND OBSERVING AND TESTING EQUIPMENT': 'OFFICE OPERATION',
+    'PERFUMES OR COLOGNES OR FRAGRANCES': 'OFFICE OPERATION',
+    'PESTICIDES OR PEST REPELLENTS': 'OFFICE OPERATION',
+    'PRINTED PUBLICATIONS': 'OFFICE OPERATION',
+    'ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES': 'OFFICE OPERATION',
+    'AUDIO AND VISUAL EQUIPMENT AND SUPPLIES': 'OFFICE OPERATION',
+    'HEATING AND VENTILATION AND AIR CIRCULATION': 'OFFICE OPERATION',
+    'FIRE FIGHTING EQUIPMENT': 'OFFICE OPERATION',
+    'CLOUD COMPUTING SERVICES': 'OFFICE OPERATION',
+    'AIRLINE TICKETS': 'OFFICE OPERATION',
+    'SEMI-FURNITURE & FIXTURES': 'SEMI- FURNITURE & FIXTURES',
+    'FURNITURE AND FURNISHINGS': 'SEMI- FURNITURE & FIXTURES',
+    'TRAININGS & ACTIVITIES': 'TRAININGS & ACTIVITIES',
+    'CAPITAL OUTLAY': 'CAPITAL OUTLAY',
+    'MOTOR VEHICLE': 'CAPITAL OUTLAY',
+  };
+
+  /**
+   * Build a formatted description from an item catalog entry.
+   * Format: HEADER\n   detail1\n   detail2\n   Unit: XYZ
+   */
+  window.buildItemDescription = function(item) {
+    if (!item) return '';
+    const name = (item.name || '').trim();
+    let header = name;
+    let details = [];
+    // Split on comma or dash to extract detail parts
+    const commaPos = name.indexOf(',');
+    const dashPos = name.indexOf(' - ');
+    if (commaPos > 0) {
+      header = name.substring(0, commaPos).trim();
+      const rest = name.substring(commaPos + 1).trim();
+      if (rest) details.push(rest);
+    } else if (dashPos > 0) {
+      header = name.substring(0, dashPos).trim();
+      const rest = name.substring(dashPos + 3).trim();
+      if (rest) details.push(rest);
+    }
+    // Add description if different from name
+    if (item.description && item.description.trim() !== name && item.description.trim() !== header) {
+      const descNorm = item.description.trim();
+      if (!details.some(d => d.toUpperCase().includes(descNorm.toUpperCase()) || descNorm.toUpperCase().includes(d.toUpperCase()))) {
+        details.push(descNorm);
+      }
+    }
+    // Add unit info
+    if (item.unit) details.push('Unit: ' + item.unit);
+    let desc = header;
+    details.forEach(d => { desc += '\n   ' + d; });
+    return desc;
+  };
+
+  /**
+   * Add a selected item from the catalog dropdown to the PPMP items list.
+   */
+  window.addPPMPItemToList = function() {
+    const itemSelect = document.getElementById('ppmpItemSelect');
+    if (!itemSelect || !itemSelect.value) {
+      alert('Please select an item from the catalog first.');
+      return;
+    }
+    const itemId = itemSelect.value;
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => String(i.id) === String(itemId));
+    if (!item) { alert('Item not found in cache.'); return; }
+
+    // Prevent duplicates
+    if (window._ppmpSelectedItems.some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.');
+      return;
+    }
+
+    const description = buildItemDescription(item);
+    const unitPrice = parseFloat(item.unit_price || 0);
+
+    // Auto-set section and category from the first item added
+    const catField = document.getElementById('ppmpCategory');
+    const sectionField = document.getElementById('ppmpSection');
+    const catFilterField = document.getElementById('ppmpCategoryFilterModal');
+    if (catField && item.category) catField.value = item.category;
+    if (sectionField && item.category) {
+      const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+      sectionField.value = autoSection;
+    }
+
+    // Add to the selected items array
+    const entry = {
+      item_id: parseInt(itemId),
+      item_name: item.name || '',
+      item_code: item.code || '',
+      item_unit: item.unit || '',
+      item_category: item.category || '',
+      item_description: item.description || '',
+      description: description,
+      unit_price: unitPrice,
+      quantity: 1,
+      budget: unitPrice
+    };
+    window._ppmpSelectedItems.push(entry);
+
+    // Render the list
+    renderPPMPItemsList();
+
+    // Reset the dropdown selection
+    itemSelect.value = '';
+  };
+
+  /**
+   * Remove an item from the PPMP items list by index.
+   */
+  window.removePPMPItem = function(index) {
+    window._ppmpSelectedItems.splice(index, 1);
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Update quantity for an item in the list and recalculate budget.
+   */
+  window.updatePPMPItemQty = function(index, qty) {
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._ppmpSelectedItems[index].quantity = q;
+    window._ppmpSelectedItems[index].budget = q * window._ppmpSelectedItems[index].unit_price;
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Allow manual editing of the unit price for an item in the list.
+   */
+  window.updatePPMPItemPrice = function(index, price) {
+    const p = Math.max(0, parseFloat(price) || 0);
+    window._ppmpSelectedItems[index].unit_price = p;
+    window._ppmpSelectedItems[index].budget = window._ppmpSelectedItems[index].quantity * p;
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Render the selected items list table and update totals.
+   */
+  window.renderPPMPItemsList = function() {
+    const tbody = document.getElementById('ppmpItemsListBody');
+    const container = document.getElementById('ppmpItemsListContainer');
+    const countEl = document.getElementById('ppmpItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+
+    const items = window._ppmpSelectedItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      if (totalEl) totalEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      // Format description for display: show first line bold, rest as sub-details
+      const descLines = (it.description || '').split('\n');
+      const descDisplay = descLines.map((line, li) => {
+        const trimmed = line.trim();
+        if (li === 0) return '<strong style="font-size:11px;">' + escapeHtml(trimmed) + '</strong>';
+        return '<div style="font-size:10px; color:#4a5568; font-style:italic; padding-left:8px;">' + escapeHtml(trimmed) + '</div>';
+      }).join('');
+      return `<tr>
+        <td style="text-align:center; color:#888;">${idx + 1}</td>
+        <td style="font-weight:600; font-size:11px;">${escapeHtml(it.item_code)} - ${escapeHtml(it.item_name)}</td>
+        <td style="max-width:180px;">${descDisplay}</td>
+        <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
+        <td><input type="number" value="${it.unit_price.toFixed(2)}" min="0" step="0.01" 
+              style="width:80px; font-size:11px; text-align:right; padding:2px 4px;"
+              onchange="updatePPMPItemPrice(${idx}, this.value)"></td>
+        <td><input type="number" value="${it.quantity}" min="1" step="1" 
+              style="width:60px; font-size:11px; text-align:center; padding:2px 4px;"
+              onchange="updatePPMPItemQty(${idx}, this.value)"></td>
+        <td style="text-align:right; font-weight:600; font-size:11px;">₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        <td style="text-align:center;">
+          <button type="button" class="btn btn-sm" onclick="removePPMPItem(${idx})" 
+            style="color:#e53e3e; background:none; border:none; cursor:pointer; padding:2px 6px;" title="Remove">
+            <i class="fas fa-times"></i>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+  };
+
+  /** Auto-fill description, budget, and category from selected item (for edit modal single-item mode). */
+  window.autofillFromItem = function(itemId) {
+    if (!itemId) return;
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+    const descField = document.getElementById('ppmpDescription');
+    const budgetField = document.getElementById('ppmpBudget');
+    const catField = document.getElementById('ppmpCategory');
+    const sectionField = document.getElementById('ppmpSection');
+
+    // Auto-fill category from item catalog category
+    if (catField && item.category) {
+      // Handle both <select> and <input type="hidden">
+      if (catField.tagName === 'SELECT') {
+        let found = false;
+        for (let i = 0; i < catField.options.length; i++) {
+          if (catField.options[i].value === item.category) { found = true; break; }
+        }
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = item.category;
+          opt.textContent = item.category;
+          catField.appendChild(opt);
+        }
+      }
+      catField.value = item.category;
+    }
+    // Auto-fill section from category→section mapping
+    if (sectionField && item.category) {
+      const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+      sectionField.value = autoSection;
+    }
+    // Build description in Excel PPMP bullet format
+    if (descField) {
+      descField.value = buildItemDescription(item);
+    }
+    if (budgetField && (!budgetField.value || budgetField.value === '0' || budgetField.value === '0.00')) {
+      budgetField.value = parseFloat(item.unit_price || 0).toFixed(2);
     }
   };
 
@@ -10136,7 +10663,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo}</span></div>
           <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
           <div class="detail-row"><label>Fiscal Year:</label><span>${plan.fiscal_year}</span></div>
-          <div class="detail-row"><label>Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
+          <div class="detail-row"><label>Section:</label><span style="font-weight:700; color:#b8860b; text-transform:uppercase;">${plan.section || '-'}</span></div>
+          <div class="detail-row"><label>Category:</label><span style="font-weight:600; color:#1565c0;">${plan.item_category || plan.category || '-'}</span></div>
+          ${plan.item_name ? `<div class="detail-row"><label>Linked Item:</label><span style="font-weight:600;">${plan.item_name} <span style="color:#4a5568;">(${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</span></span></div>` : ''}
+          ${plan.item_description ? `<div class="detail-row"><label>Item Description:</label><span style="white-space:pre-line;">${plan.item_description}</span></div>` : ''}
+          <div class="detail-row"><label>General Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
           <div class="detail-row"><label>Project Type:</label><span>${plan.project_type || 'Goods'}</span></div>
           <div class="detail-row"><label>Quantity/Size:</label><span>${plan.quantity_size || '-'}</span></div>
           <div class="detail-row"><label>Mode of Procurement:</label><span>${plan.procurement_mode || 'Small Value Procurement'}</span></div>
@@ -10799,6 +11330,23 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showEditPPMPModal = async function(planId) {
     try {
       const plan = await apiRequest('/plans/' + planId);
+      await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+      
+      // Load items catalog for item selector
+      let allItems = [];
+      try { allItems = await apiRequest('/items'); } catch(e) { console.warn('Could not load items'); }
+      window._ppmpItemsCache = allItems;
+
+      // Build category filter options from item catalog
+      const itemCats = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+      const catFilterOptions = itemCats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      // Build item options (all items, pre-select linked one)
+      const itemOptions = allItems.map(i => `<option value="${i.id}" ${String(i.id) === String(plan.item_id) ? 'selected' : ''} data-category="${(i.category || '').replace(/"/g, '&quot;')}">${i.code} - ${i.name} (${i.unit || ''} @ ₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</option>`).join('');
+
+      // Current section value
+      const currentSection = plan.section || 'GENERAL PROCUREMENT';
+
       function getDeptCode(name) {
         if (!name) return 'DMW';
         const lower = name.toLowerCase();
@@ -10809,21 +11357,28 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (lower.includes('director')) return 'ORD';
         return name.substring(0,3).toUpperCase();
       }
-      const deptCode = getDeptCode(plan.department_name);
-      const ppmpNo = 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
+      const deptCode = plan.department_code || getDeptCode(plan.department_name);
+      const ppmpNo = plan.ppmp_no || 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
       const totalAmt = parseFloat(plan.total_amount || 0);
       const statusVal = plan.status || 'draft';
+
+      // Build item info for display (read-only linked item)
+      const linkedItem = allItems.find(i => String(i.id) === String(plan.item_id));
+      
+      // Item description: use item_description column, fallback to description
+      const currentItemDesc = plan.item_description || plan.description || '';
 
       const html = `
         <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
           <div class="form-row">
             <div class="form-group">
               <label>PPMP No.</label>
-              <input type="text" value="${ppmpNo}" readonly style="background: #f5f5f5;">
+              <input type="text" name="ppmp_no" value="${ppmpNo}" readonly style="background: #f5f5f5;">
             </div>
             <div class="form-group">
               <label>Division</label>
               <input type="text" value="${deptCode} - ${plan.department_name || ''}" readonly style="background: #f5f5f5;">
+              <input type="hidden" name="dept_id" value="${plan.dept_id || ''}">
             </div>
           </div>
           <div class="form-row">
@@ -10835,23 +11390,115 @@ Failure to submit the above requirements within the prescribed period shall cons
               <label>Status <span class="text-danger">*</span></label>
               <select class="form-select" name="status" required>
                 <option value="draft" ${statusVal==='draft'?'selected':''}>Draft</option>
+                <option value="pending" ${statusVal==='pending'?'selected':''}>Pending</option>
                 <option value="submitted" ${statusVal==='submitted'?'selected':''}>Submitted</option>
                 <option value="approved" ${statusVal==='approved'?'selected':''}>Approved</option>
                 <option value="rejected" ${statusVal==='rejected'?'selected':''}>Rejected</option>
               </select>
             </div>
           </div>
+
+          <div class="form-section-header"><i class="fas fa-layer-group"></i> Linked Items <small style="font-weight:400; color:#4a5568;">(check items to link, each with its own description)</small></div>
+          ${plan.item_id && linkedItem ? `
+          <div style="background:#e8f7ed; border:1px solid #c6f6d5; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
+            <div style="font-size:12px; font-weight:600; color:#276749; margin-bottom:4px;"><i class="fas fa-link"></i> Currently Linked Item</div>
+            <div style="font-size:13px; font-weight:700; color:#1a202c;">${escapeHtml(linkedItem.code || '')} — ${escapeHtml(linkedItem.name || '')}</div>
+            <div style="font-size:11px; color:#4a5568;">${linkedItem.unit || ''} @ ₱${parseFloat(linkedItem.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
+            ${currentItemDesc ? `<div style="margin-top:6px; font-size:12px; color:#2d3748; white-space:pre-line; background:#fff; padding:6px 8px; border-radius:4px; border:1px solid #e2e8f0;"><strong>Item Description:</strong>\n${escapeHtml(currentItemDesc)}</div>` : ''}
+          </div>` : (plan.item_description ? `
+          <div style="background:#ebf8ff; border:1px solid #bee3f8; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
+            <div style="font-size:12px; font-weight:600; color:#2b6cb0; margin-bottom:4px;"><i class="fas fa-info-circle"></i> Current Item Description</div>
+            <div style="font-size:12px; color:#2d3748; white-space:pre-line;">${escapeHtml(plan.item_description)}</div>
+          </div>` : '')}
+          <div class="form-row">
+            <div class="form-group">
+              <label>Section <span class="text-danger">*</span></label>
+              <select class="form-select" id="ppmpSection" name="section" required>
+                <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
+                <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
+                <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
+                <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
+                <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Filter / Search Items</label>
+              <input type="text" id="ppmpEditItemSearch" placeholder="Type to filter items..." oninput="filterEditPPMPItems()" style="font-size:12px;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Filter by Category</label>
+            <select class="form-select" id="ppmpEditCatFilter" onchange="filterEditPPMPItems()" style="font-size:12px;">
+              <option value="">-- All Categories --</option>
+              ${catFilterOptions}
+            </select>
+          </div>
+
+          <div id="ppmpEditItemsList" class="ppmp-checkbox-list" style="max-height:280px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; background:#fff;">
+            <!-- Items rendered by JS -->
+          </div>
+          <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
+
+          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Details</div>
+          <div class="form-group">
+            <label>General Description & Objective</label>
+            <textarea name="description" rows="2" id="ppmpDescription" >${plan.description || ''}</textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type of Project</label>
+              <select class="form-select" name="project_type">
+                <option value="Goods" ${plan.project_type==='Goods'?'selected':''}>Goods</option>
+                <option value="Infrastructure" ${plan.project_type==='Infrastructure'?'selected':''}>Infrastructure</option>
+                <option value="Consulting Services" ${plan.project_type==='Consulting Services'?'selected':''}>Consulting Services</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Quantity & Size</label>
+              <input type="text" name="quantity_size" value="${plan.quantity_size || ''}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mode of Procurement</label>
+              <select class="form-select" name="procurement_mode">
+                ${buildProcModeOptions(plan.procurement_mode || 'Small Value Procurement')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Pre-Procurement Conference</label>
+              <select class="form-select" name="pre_procurement">
+                <option value="NO" ${plan.pre_procurement!=='YES'?'selected':''}>NO</option>
+                <option value="YES" ${plan.pre_procurement==='YES'?'selected':''}>YES</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Start of Procurement</label>
+              <input type="text" name="start_date" value="${plan.start_date || ''}" placeholder="MM/YYYY or text">
+            </div>
+            <div class="form-group">
+              <label>End of Procurement</label>
+              <input type="text" name="end_date" value="${plan.end_date || ''}" placeholder="MM/YYYY or text">
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery</label>
+              <input type="text" name="delivery_period" value="${plan.delivery_period || ''}" placeholder="MM/YYYY or text">
+            </div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Total Amount (ABC) <span class="text-danger">*</span></label>
-              <input type="number" name="total_amount" step="0.01" value="${totalAmt.toFixed(2)}" required>
+              <input type="number" name="total_amount" id="ppmpBudget" step="0.01" value="${totalAmt.toFixed(2)}" required>
             </div>
             <div class="form-group">
               <label>Funding Source</label>
               <select class="form-select" name="fund_source">
-                <option value="GAA-MOOE" selected>GAA-MOOE</option>
-                <option value="GAA-CO">GAA-CO</option>
-                <option value="Trust Fund">Trust Fund</option>
+                <option value="GAA ${plan.fiscal_year} - Current Appropriation" ${(plan.fund_source||'').includes('Current') ? 'selected' : ''}>GAA ${plan.fiscal_year} - Current Appropriation</option>
+                <option value="GAA ${plan.fiscal_year}" ${plan.fund_source===('GAA '+plan.fiscal_year) ? 'selected' : ''}>GAA ${plan.fiscal_year}</option>
+                <option value="GAA" ${plan.fund_source==='GAA'?'selected':''}>GAA</option>
+                <option value="Special Fund" ${plan.fund_source==='Special Fund'?'selected':''}>Special Fund</option>
               </select>
             </div>
           </div>
@@ -10866,25 +11513,259 @@ Failure to submit the above requirements within the prescribed period shall cons
         </form>
       `;
       openModal('Edit PPMP', html);
+
+      // Store edit context
+      window._ppmpEditPlanId = planId;
+      window._ppmpEditPlan = plan;
+      window._ppmpEditCheckedItems = {};
+      
+      // Pre-check the currently linked item with its description
+      if (plan.item_id && linkedItem) {
+        window._ppmpEditCheckedItems[String(plan.item_id)] = {
+          item_id: plan.item_id,
+          item: linkedItem,
+          description: currentItemDesc,
+          isOriginal: true
+        };
+      }
+
+      // Render the checkbox items list
+      renderEditPPMPItemsList();
     } catch (err) {
       alert('Failed to load PPMP for editing: ' + err.message);
     }
   };
 
-  // Submit Edit PPMP
+  /**
+   * Filter the edit modal items checkbox list by search text and category.
+   */
+  window.filterEditPPMPItems = function() {
+    renderEditPPMPItemsList();
+  };
+
+  /**
+   * Render the checkbox items list in the edit modal.
+   * Shows all items with checkboxes; checked items show a description textarea.
+   */
+  window.renderEditPPMPItemsList = function() {
+    const container = document.getElementById('ppmpEditItemsList');
+    const summaryEl = document.getElementById('ppmpEditCheckedSummary');
+    if (!container) return;
+
+    const allItems = window._ppmpItemsCache || [];
+    const checked = window._ppmpEditCheckedItems || {};
+    const searchText = (document.getElementById('ppmpEditItemSearch')?.value || '').trim().toUpperCase();
+    const catFilter = document.getElementById('ppmpEditCatFilter')?.value || '';
+
+    // Always show checked items regardless of filter
+    const checkedIds = Object.keys(checked);
+    const checkedItems = allItems.filter(i => checkedIds.includes(String(i.id)));
+
+    // Filter UNCHECKED items only
+    let filteredUnchecked = allItems.filter(i => !checkedIds.includes(String(i.id)));
+    if (catFilter) {
+      filteredUnchecked = filteredUnchecked.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+    if (searchText) {
+      filteredUnchecked = filteredUnchecked.filter(i => {
+        const searchable = ((i.code || '') + ' ' + (i.name || '') + ' ' + (i.category || '')).toUpperCase();
+        return searchable.includes(searchText);
+      });
+    }
+
+    // Checked items always on top, then filtered unchecked
+    const sortedItems = [...checkedItems, ...filteredUnchecked];
+
+    if (sortedItems.length === 0) {
+      container.innerHTML = '<div style="padding:20px; text-align:center; color:#999; font-size:12px;">No items match your filter.</div>';
+      return;
+    }
+
+    container.innerHTML = sortedItems.map(item => {
+      const id = String(item.id);
+      const isChecked = !!checked[id];
+      const desc = isChecked ? (checked[id].description || '') : '';
+      const isOrig = isChecked && checked[id].isOriginal;
+      const price = parseFloat(item.unit_price || 0);
+      return `
+        <div class="ppmp-item-checkbox-row ${isChecked ? 'checked' : ''} ${isOrig ? 'original' : ''}" data-item-id="${id}">
+          <label class="ppmp-item-check-label">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} 
+              onchange="toggleEditPPMPItem('${id}', this.checked)">
+            <span class="ppmp-item-check-info">
+              <strong>${escapeHtml(item.code)}</strong> — ${escapeHtml(item.name)}
+              <span class="ppmp-item-check-meta">${item.unit || ''} @ ₱${price.toLocaleString('en-PH', {minimumFractionDigits:2})}${item.category ? ' · ' + item.category : ''}</span>
+            </span>
+            ${isOrig ? '<span class="ppmp-item-orig-badge">current</span>' : ''}
+          </label>
+          ${isChecked ? `
+          <div class="ppmp-item-desc-input">
+            <textarea rows="2" placeholder="Item description (specs, size, color, etc.)"
+              oninput="updateEditPPMPItemDesc('${id}', this.value)">${escapeHtml(desc)}</textarea>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    // Update summary
+    if (summaryEl) {
+      const count = checkedIds.length;
+      summaryEl.textContent = count > 0 ? count + ' item' + (count > 1 ? 's' : '') + ' selected' : '';
+    }
+  };
+
+  /**
+   * Toggle an item checkbox in the edit modal.
+   */
+  window.toggleEditPPMPItem = function(itemId, isChecked) {
+    const allItems = window._ppmpItemsCache || [];
+    if (isChecked) {
+      const item = allItems.find(i => String(i.id) === String(itemId));
+      if (!item) return;
+      window._ppmpEditCheckedItems[itemId] = {
+        item_id: parseInt(itemId),
+        item: item,
+        description: buildItemDescription(item),
+        isOriginal: false
+      };
+      // Auto-set section from first checked item's category
+      const sectionField = document.getElementById('ppmpSection');
+      if (sectionField && item.category) {
+        const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+        sectionField.value = autoSection;
+      }
+    } else {
+      delete window._ppmpEditCheckedItems[itemId];
+    }
+    renderEditPPMPItemsList();
+  };
+
+  /**
+   * Update the item description for a checked item in the edit modal.
+   */
+  window.updateEditPPMPItemDesc = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      window._ppmpEditCheckedItems[itemId].description = value;
+    }
+  };
+
+  // syncDescToCheckedItem removed — general description and item_description are independent fields
+
+  // Submit Edit PPMP — handles multiple checked items or no items
   window.submitEditPPMP = async function(e, planId) {
     e.preventDefault();
-    if (!confirm('Are you sure you want to save these PPMP changes?')) return;
+    const checked = window._ppmpEditCheckedItems || {};
+    const checkedIds = Object.keys(checked);
+
     const form = e.target;
-    const data = {
+    const deptId = form.querySelector('input[name="dept_id"]')?.value || window._ppmpEditPlan?.dept_id || null;
+    const commonData = {
+      dept_id: deptId ? parseInt(deptId) : null,
       fiscal_year: parseInt(form.fiscal_year.value),
       status: form.status.value,
+      section: form.section?.value || 'GENERAL PROCUREMENT',
+      description: form.description?.value || null,
+      project_type: form.project_type?.value || 'Goods',
+      quantity_size: form.quantity_size?.value || null,
+      procurement_mode: form.procurement_mode?.value || null,
+      pre_procurement: form.pre_procurement?.value || 'NO',
+      start_date: form.start_date?.value || null,
+      end_date: form.end_date?.value || null,
+      delivery_period: form.delivery_period?.value || null,
       total_amount: parseFloat(form.total_amount.value),
+      fund_source: form.fund_source?.value || 'GAA',
       remarks: form.remarks.value
     };
+
+    // Separate: the original item (update existing plan) vs new items (batch create)
+    const originalEntry = checkedIds.find(id => checked[id].isOriginal);
+    const newEntries = checkedIds.filter(id => !checked[id].isOriginal);
+
+    // Build confirmation message
+    if (checkedIds.length === 0) {
+      if (!confirm('Save PPMP changes? (No items linked)')) return;
+    } else {
+      const totalItems = checkedIds.length;
+      const itemSummary = checkedIds.map((id, i) => {
+        const c = checked[id];
+        return '  ' + (i+1) + '. ' + (c.item?.name || 'Item #' + id) + (c.isOriginal ? ' (current)' : ' (NEW)');
+      }).join('\n');
+      if (!confirm('Save changes for ' + totalItems + ' item(s)?\n\n' + itemSummary + '\n\n' + (newEntries.length > 0 ? newEntries.length + ' new PPMP entries will be created.' : 'Updating existing entry.'))) return;
+    }
+
     try {
-      await apiRequest('/plans/' + planId, 'PUT', data);
-      alert('PPMP updated successfully');
+      let savedCount = 0;
+
+      if (checkedIds.length === 0) {
+        // No items checked — update plan fields, preserve existing item linkage
+        const data = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: window._ppmpEditPlan?.item_id || null,
+          category: window._ppmpEditPlan?.category || null,
+          item_description: window._ppmpEditPlan?.item_description || null
+        };
+        await apiRequest('/plans/' + planId, 'PUT', data);
+        savedCount = 1;
+      } else {
+      // 1. Update the original PPMP entry
+      if (originalEntry) {
+        const origDesc = checked[originalEntry].description || null;
+        const origData = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: parseInt(originalEntry),
+          category: checked[originalEntry].item?.category || null,
+          item_description: origDesc
+        };
+        await apiRequest('/plans/' + planId, 'PUT', origData);
+        savedCount++;
+      } else if (checkedIds.length > 0) {
+        // No original item — update with the first checked item
+        const firstId = checkedIds[0];
+        const firstDesc = checked[firstId].description || null;
+        const firstData = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: parseInt(firstId),
+          category: checked[firstId].item?.category || null,
+          item_description: firstDesc
+        };
+        await apiRequest('/plans/' + planId, 'PUT', firstData);
+        savedCount++;
+        // Remove from newEntries since it was used for the update
+        const idx = newEntries.indexOf(firstId);
+        if (idx > -1) newEntries.splice(idx, 1);
+      }
+
+      // 2. Batch create new PPMP entries for additional checked items
+      if (newEntries.length > 0) {
+        const entries = newEntries.map(id => {
+          const c = checked[id];
+          return {
+            ...commonData,
+            item_id: parseInt(id),
+            category: c.item?.category || null,
+            item_description: c.description || null,
+            description: c.description || commonData.description
+          };
+        });
+
+        try {
+          const result = await apiRequest('/plans/batch', 'POST', { entries });
+          savedCount += result.count || entries.length;
+        } catch(batchErr) {
+          // Fallback: create one by one
+          for (const entry of entries) {
+            try {
+              await apiRequest('/plans', 'POST', entry);
+              savedCount++;
+            } catch(e) { console.error('Failed to save new entry:', e); }
+          }
+        }
+      }
+      } // end else (items checked)
+
+      alert('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!');
       closeModal();
       loadPPMP();
     } catch (err) {
@@ -11018,6 +11899,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showEditItemModal = async function(itemId) {
     let item = {};
     try { item = await apiRequest('/items/' + itemId); } catch (err) { alert('Could not load item'); return; }
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      try { cachedUOMs = await apiRequest('/uoms'); } catch(e) {}
+    }
     const html = `
       <form id="editItemForm" onsubmit="saveEditItem(event, ${itemId})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Item #${itemId}</strong></div>
@@ -11041,8 +11926,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Unit</label>
-            <input type="text" id="editItemUnit" value="${item.unit || ''}">
+            <label>Unit of Measure</label>
+            <select class="form-select" id="editItemUnit" required>
+              ${buildUOMOptions(item.unit)}
+            </select>
           </div>
           <div class="form-group">
             <label>Unit Price</label>
@@ -11053,12 +11940,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Category</label>
             <select class="form-select" id="editItemCategory">
-              <option value="">-- Select --</option>
-              <option value="supplies" ${item.category==='supplies'?'selected':''}>Supplies</option>
-              <option value="equipment" ${item.category==='equipment'?'selected':''}>Equipment</option>
-              <option value="services" ${item.category==='services'?'selected':''}>Services</option>
-              <option value="semi_expendable" ${item.category==='semi_expendable'?'selected':''}>Semi-Expendable</option>
-              <option value="capital_outlay" ${item.category==='capital_outlay'?'selected':''}>Capital Outlay</option>
+              ${buildCategoryOptions(item.category)}
             </select>
           </div>
           <div class="form-group">

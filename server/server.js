@@ -1143,13 +1143,17 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               u.username as created_by_name,
               au.username as approved_by_name,
               cu.username as chief_approver_name,
-              hu.username as hope_approver_name
+              hu.username as hope_approver_name,
+              it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
+              it.category as item_category, it.description as item_description_detail,
+              pp.item_description, pp.section as section
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
        LEFT JOIN users u ON pp.created_by = u.id
        LEFT JOIN users au ON pp.approved_by = au.id
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
-       LEFT JOIN users hu ON pp.approved_by_hope = hu.id`;
+       LEFT JOIN users hu ON pp.approved_by_hope = hu.id
+       LEFT JOIN items it ON pp.item_id = it.id`;
     const params = [];
     const conditions = [];
     
@@ -1189,7 +1193,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
       query += ` WHERE ` + conditions.join(' AND ');
     }
     
-    query += ` ORDER BY pp.ppmp_no ASC, pp.created_at DESC`;
+    query += ` ORDER BY pp.section ASC NULLS LAST, pp.category ASC NULLS LAST, pp.ppmp_no ASC, pp.created_at DESC`;
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1198,7 +1202,13 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
 app.get('/api/plans/:id', authenticateToken, async (req, res) => {
   try {
     const plan = await pool.query(
-      `SELECT pp.*, d.name as department_name, d.code as department_code FROM procurementplans pp LEFT JOIN departments d ON pp.dept_id = d.id WHERE pp.id = $1`,
+      `SELECT pp.*, d.name as department_name, d.code as department_code,
+              it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
+              it.category as item_category, it.description as item_description_detail
+       FROM procurementplans pp 
+       LEFT JOIN departments d ON pp.dept_id = d.id 
+       LEFT JOIN items it ON pp.item_id = it.id
+       WHERE pp.id = $1`,
       [req.params.id]
     );
     if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
@@ -1213,7 +1223,8 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     await client.query('BEGIN');
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
-            pre_procurement, start_date, end_date, delivery_period, fund_source } = req.body;
+            pre_procurement, start_date, end_date, delivery_period, fund_source,
+            category, item_id, section, item_description } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1235,11 +1246,13 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
 
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
-        ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+        ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
+        category, item_id, section, item_description) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
-       pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA']
+       pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1257,22 +1270,79 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
+// Batch create multiple PPMP entries at once
+app.post('/api/plans/batch', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { entries } = req.body;
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: 'No entries provided' });
+    }
+
+    const createdIds = [];
+    for (const entry of entries) {
+      const { dept_id, fiscal_year, status, remarks, total_amount,
+              ppmp_no, description, project_type, quantity_size, procurement_mode,
+              pre_procurement, start_date, end_date, delivery_period, fund_source,
+              category, item_id, section, item_description } = entry;
+
+      const deptId = dept_id || req.user.dept_id;
+      const fy = fiscal_year || new Date().getFullYear();
+
+      // Auto-generate PPMP number if not provided
+      let finalPpmpNo = ppmp_no;
+      if (!finalPpmpNo && deptId) {
+        const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
+        const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
+        const prefix = `PPMP-${deptCode}-${fy}-`;
+        const seqResult = await client.query(
+          `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+           FROM procurementplans WHERE ppmp_no LIKE $2`,
+          [prefix, prefix + '%']
+        );
+        const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1 + createdIds.length).padStart(3, '0');
+        finalPpmpNo = prefix + nextSeq;
+      }
+
+      const planResult = await client.query(
+        `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
+          ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
+          category, item_id, section, item_description) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id`,
+        [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
+         finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
+         pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
+         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
+      );
+      createdIds.push(planResult.rows[0].id);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ count: createdIds.length, ids: createdIds });
+  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+  finally { client.release(); }
+});
+
 app.put('/api/plans/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
-            pre_procurement, start_date, end_date, delivery_period, fund_source } = req.body;
+            pre_procurement, start_date, end_date, delivery_period, fund_source,
+            category, item_id, section, item_description } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
+        category=$17, item_id=$18, section=$19, item_description=$20,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
-       pre_procurement, start_date, end_date, delivery_period, fund_source]
+       pre_procurement, start_date, end_date, delivery_period, fund_source,
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);

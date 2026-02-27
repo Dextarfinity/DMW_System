@@ -528,6 +528,10 @@
                 <option value="">All Modes</option>
                 <!-- Populated dynamically from database -->
               </select>
+              <select class="form-select" id="ppmpCategoryFilter">
+                <option value="">All Categories</option>
+                <!-- Populated dynamically -->
+              </select>
               <select class="form-select dynamic-fy-select" id="ppmpYearFilter" data-prefix="FY">
               </select>
               <div id="ppmpGrandTotal" style="display:inline-flex;align-items:center;background:linear-gradient(135deg,#1a365d,#2d4a7a);color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;margin-left:8px;white-space:nowrap;">
@@ -1274,10 +1278,7 @@
             </div>
             <select class="form-select" id="itemCategoryFilter" onchange="filterItemsByCategory(this.value)">
               <option value="">All Categories</option>
-              <option value="EXPENDABLE">Expendable</option>
-              <option value="SEMI-EXPENDABLE">Semi-Expendable</option>
-              <option value="CAPITAL OUTLAY">Capital Outlay</option>
-              <option value="Services">Services</option>
+              <!-- Populated dynamically from loaded items -->
             </select>
             <select class="form-select" id="itemStockFilter" onchange="filterItemsByStock(this.value)">
               <option value="">All Stock Status</option>
