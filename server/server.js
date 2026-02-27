@@ -1682,12 +1682,22 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     const pr = await pool.query(
       `SELECT pr.*, d.name as department_name, d.code as department_code,
-              u1.full_name as requested_by_name, u1.designation as requested_by_designation,
-              u2.full_name as approved_by_name, u2.designation as approved_by_designation
+              u1.full_name as requested_by_name,
+              u2.full_name as approved_by_name,
+              chief.full_name as chief_name,
+              chief_desig.name as chief_designation,
+              hope_user.full_name as hope_name,
+              hope_desig.name as hope_designation
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON pr.requested_by = u1.id
        LEFT JOIN users u2 ON pr.approved_by = u2.id
+       LEFT JOIN users chief ON chief.dept_id = pr.dept_id AND chief.role LIKE 'chief_%'
+       LEFT JOIN employees chief_emp ON chief.employee_id = chief_emp.id
+       LEFT JOIN designations chief_desig ON chief_emp.designation_id = chief_desig.id
+       LEFT JOIN users hope_user ON hope_user.role = 'hope'
+       LEFT JOIN employees hope_emp ON hope_user.employee_id = hope_emp.id
+       LEFT JOIN designations hope_desig ON hope_emp.designation_id = hope_desig.id
        WHERE pr.id = $1`,
       [req.params.id]
     );
@@ -1701,7 +1711,7 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { pr_number, purpose, total_amount, dept_id, status, items } = req.body;
+    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items } = req.body;
     const deptId = dept_id || req.user.dept_id;
     const fy = new Date().getFullYear();
 
@@ -1721,9 +1731,9 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
     }
 
     const prResult = await client.query(
-      `INSERT INTO purchaserequests (pr_number, purpose, total_amount, dept_id, status, requested_by) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [finalPrNumber, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id]
+      `INSERT INTO purchaserequests (pr_number, purpose, total_amount, dept_id, status, requested_by, item_specifications) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [finalPrNumber, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id, item_specifications || null]
     );
     const pr = prResult.rows[0];
     if (items && items.length > 0) {
@@ -1758,20 +1768,20 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { pr_number, purpose, total_amount, dept_id, status, items } = req.body;
+    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items } = req.body;
     // Only update dept_id if explicitly provided, otherwise preserve existing value
     let result;
     if (dept_id !== undefined && dept_id !== null) {
       result = await client.query(
-        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$6 RETURNING *`,
-        [pr_number, purpose, total_amount, dept_id, status, req.params.id]
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, item_specifications=$6, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$7 RETURNING *`,
+        [pr_number, purpose, total_amount, dept_id, status, item_specifications || null, req.params.id]
       );
     } else {
       result = await client.query(
-        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, status=$4, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$5 RETURNING *`,
-        [pr_number, purpose, total_amount, status, req.params.id]
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, status=$4, item_specifications=$5, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$6 RETURNING *`,
+        [pr_number, purpose, total_amount, status, item_specifications || null, req.params.id]
       );
     }
     if (items) {
@@ -1839,9 +1849,12 @@ app.put('/api/purchase-requests/:id/set-status', authenticateToken, async (req, 
 app.get('/api/rfqs', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT r.*, pr.pr_number, u.username as created_by_name
+      `SELECT r.*, pr.pr_number, u.username as created_by_name,
+              pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name
        FROM rfqs r LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
-       LEFT JOIN users u ON r.created_by = u.id ORDER BY r.created_at DESC`
+       LEFT JOIN users u ON r.created_by = u.id
+       LEFT JOIN LATERAL (SELECT quantity, unit, item_name FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
+       ORDER BY r.created_at DESC`
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1866,11 +1879,11 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, items, suppliers } = req.body;
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers } = req.body;
     const rfqResult = await client.query(
-      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id]
+      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null]
     );
     const rfq = rfqResult.rows[0];
     if (items) for (const it of items) {
@@ -1893,15 +1906,30 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status } = req.body;
-    const result = await pool.query(
-      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$8 RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, req.params.id]
+    await client.query('BEGIN');
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items } = req.body;
+    const result = await client.query(
+      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$9 RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications||null, req.params.id]
     );
+    // Update rfq_items if items array is provided
+    if (items && Array.isArray(items)) {
+      await client.query('DELETE FROM rfq_items WHERE rfq_id = $1', [req.params.id]);
+      for (const it of items) {
+        await client.query(
+          `INSERT INTO rfq_items (rfq_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [req.params.id, it.item_code||'', it.item_name||'', it.item_description||null, it.unit||'', it.category||null, it.quantity||1, it.abc_unit_cost||0]
+        );
+      }
+    }
+    await client.query('COMMIT');
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+  finally { client.release(); }
 });
 
 app.delete('/api/rfqs/:id', authenticateToken, async (req, res) => {
@@ -1956,11 +1984,11 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, quotations } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications, quotations } = req.body;
     const absResult = await client.query(
-      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id, recommended_amount||0, req.user.id]
+      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, created_by, item_specifications)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id, recommended_amount||0, req.user.id, item_specifications || null]
     );
     const abs = absResult.rows[0];
     if (quotations) for (const q of quotations) {
@@ -1983,11 +2011,11 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
 
 app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   try {
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications } = req.body;
     const result = await pool.query(
-      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_amount=$7, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$8 RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, req.params.id]
+      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_amount=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$9 RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications || null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2231,13 +2259,13 @@ app.post('/api/purchase-orders', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { po_number, pr_id, noa_id, supplier_id, total_amount, payment_terms, delivery_address,
-            status, workflow_status, expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, items } = req.body;
+            status, workflow_status, expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, item_specifications, items } = req.body;
     const poResult = await client.query(
       `INSERT INTO purchaseorders (po_number, pr_id, noa_id, supplier_id, total_amount, payment_terms, delivery_address,
-       status, workflow_status, expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+       status, workflow_status, expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, created_by, item_specifications)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [po_number, pr_id, noa_id, supplier_id, total_amount||0, payment_terms, delivery_address,
-       status||'for_signing', workflow_status||'pending', expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, req.user.id]
+       status||'for_signing', workflow_status||'pending', expected_delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, req.user.id, item_specifications || null]
     );
     const po = poResult.rows[0];
     if (items && items.length > 0) {
@@ -2273,13 +2301,13 @@ app.put('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { po_number, pr_id, noa_id, supplier_id, total_amount, payment_terms, delivery_address,
-            status, workflow_status, expected_delivery_date, delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, items } = req.body;
+            status, workflow_status, expected_delivery_date, delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, item_specifications, items } = req.body;
     const result = await client.query(
       `UPDATE purchaseorders SET po_number=$1, pr_id=$2, noa_id=$3, supplier_id=$4, total_amount=$5, payment_terms=$6, delivery_address=$7,
-       status=$8, workflow_status=$9, expected_delivery_date=$10, delivery_date=$11, po_date=$12, purpose=$13, mode_of_procurement=$14, place_of_delivery=$15, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$16 RETURNING *`,
+       status=$8, workflow_status=$9, expected_delivery_date=$10, delivery_date=$11, po_date=$12, purpose=$13, mode_of_procurement=$14, place_of_delivery=$15, item_specifications=$16, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$17 RETURNING *`,
       [po_number, pr_id, noa_id, supplier_id, total_amount, payment_terms, delivery_address,
-       status, workflow_status, expected_delivery_date, delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, req.params.id]
+       status, workflow_status, expected_delivery_date, delivery_date, po_date, purpose, mode_of_procurement, place_of_delivery, item_specifications || null, req.params.id]
     );
     if (items) {
       await client.query('DELETE FROM po_items WHERE po_id = $1', [req.params.id]);
@@ -2376,13 +2404,13 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
     const iarResult = await client.query(
       `INSERT INTO iars (iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by, item_specifications)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id]
+       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id, item_specifications || null]
     );
     const iar = iarResult.rows[0];
     if (items && items.length > 0) {
@@ -2419,11 +2447,11 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
     const result = await client.query(
       `UPDATE iars SET iar_number=$1, po_id=$2, inspection_date=$3, delivery_date=$4, invoice_number=$5, invoice_date=$6,
-       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$12 RETURNING *`,
-      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, req.params.id]
+       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, item_specifications=$12, updated_at=CURRENT_TIMESTAMP WHERE id=$13 RETURNING *`,
+      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications || null, req.params.id]
     );
     if (items) {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);

@@ -519,6 +519,13 @@
               <i class="fas fa-search"></i>
               <input type="text" id="ppmpSearchInput" placeholder="Search PPMP...">
             </div>
+            <div id="ppmpGrandTotal" style="display:inline-flex;align-items:center;background:linear-gradient(135deg,#1a365d,#2d4a7a);color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+              <i class="fas fa-peso-sign" style="margin-right:6px;opacity:0.8;"></i>
+              <span>Grand Total: </span>
+              <span id="ppmpGrandTotalValue" style="margin-left:4px;font-size:15px;">--</span>
+              <span style="margin-left:10px;opacity:0.7;">|</span>
+              <span id="ppmpGrandTotalCount" style="margin-left:10px;font-size:12px;opacity:0.9;">-- items</span>
+            </div>
             <div class="filter-group">
               <select class="form-select" id="ppmpDivisionFilter">
                 <option value="all" selected>All Divisions</option>
@@ -534,13 +541,6 @@
               </select>
               <select class="form-select dynamic-fy-select" id="ppmpYearFilter" data-prefix="FY">
               </select>
-              <div id="ppmpGrandTotal" style="display:inline-flex;align-items:center;background:linear-gradient(135deg,#1a365d,#2d4a7a);color:#fff;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;margin-left:8px;white-space:nowrap;">
-                <i class="fas fa-peso-sign" style="margin-right:6px;opacity:0.8;"></i>
-                <span>Grand Total: </span>
-                <span id="ppmpGrandTotalValue" style="margin-left:4px;font-size:15px;">--</span>
-                <span style="margin-left:10px;opacity:0.7;">|</span>
-                <span id="ppmpGrandTotalCount" style="margin-left:10px;font-size:12px;opacity:0.9;">-- items</span>
-              </div>
             </div>
           </div>
 
@@ -2178,7 +2178,20 @@
                     <label for="signupPassword">Password</label>
                     <div class="input-icon">
                       <i class="fas fa-lock"></i>
-                      <input type="password" id="signupPassword" placeholder="Create a password" required>
+                      <input type="password" id="signupPassword" placeholder="Create a strong password" required oninput="checkPasswordStrength(this.value)">
+                    </div>
+                    <div class="pwd-strength-container" id="pwdStrengthContainer" style="display:none;">
+                      <div class="pwd-strength-bar">
+                        <div class="pwd-strength-fill" id="pwdStrengthFill"></div>
+                      </div>
+                      <span class="pwd-strength-label" id="pwdStrengthLabel"></span>
+                    </div>
+                    <div class="pwd-requirements" id="pwdRequirements">
+                      <div class="pwd-req" id="pwdReqLength"><i class="fas fa-circle"></i> At least 8 characters</div>
+                      <div class="pwd-req" id="pwdReqUpper"><i class="fas fa-circle"></i> Uppercase letter (A-Z)</div>
+                      <div class="pwd-req" id="pwdReqLower"><i class="fas fa-circle"></i> Lowercase letter (a-z)</div>
+                      <div class="pwd-req" id="pwdReqNumber"><i class="fas fa-circle"></i> Number (0-9)</div>
+                      <div class="pwd-req" id="pwdReqSpecial"><i class="fas fa-circle"></i> Special character (!@#$...)</div>
                     </div>
                   </div>
                 </div>

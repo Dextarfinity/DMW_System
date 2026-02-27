@@ -1,26 +1,39 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 
 let mainWindow;
 
+function getAppIconPath() {
+  if (process.platform === 'win32') {
+    return path.join(__dirname, 'build', 'icon.ico');
+  }
+  return path.join(__dirname, 'renderer', 'assets', 'dmw-logo.png');
+}
+
 function createWindow() {
+  const appIcon = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
     minHeight: 700,
+    fullscreen: false,
     title: 'Procurement Plan System',
-    icon: path.join(__dirname, 'renderer/assets/dmw-logo.png'),
+    icon: appIcon,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
     }
   });
 
+  // Hide the menu bar visually but keep keyboard shortcuts (Ctrl+Shift+I for DevTools)
+  mainWindow.setMenuBarVisibility(false);
+
   mainWindow.loadFile('renderer/index.html');
-  
-  // Open DevTools in development
-  mainWindow.webContents.openDevTools();
+
+  // Start maximized while keeping Windows taskbar visible
+  mainWindow.maximize();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -28,6 +41,10 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.dmwfad.procurement');
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

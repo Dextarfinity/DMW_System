@@ -2135,7 +2135,14 @@ function renderPRTable(pr) {
     const statusClass = p.status === 'approved' ? 'completed' : p.status === 'pending_approval' ? 'on_going' : p.status === 'rejected' ? 'rejected' : 'cancelled';
     const itemCount = parseInt(p.item_count || 0);
     const itemDesc = p.first_item_description || p.first_item_name || p.purpose || '';
-    const descDisplay = itemCount > 1 ? itemDesc + ` <span style="font-size:10px;color:#666;">(+${itemCount - 1} more)</span>` : itemDesc;
+    let descDisplay = itemCount > 1 ? itemDesc + ` <span style="font-size:10px;color:#666;">(+${itemCount - 1} more)</span>` : itemDesc;
+    // If item_specifications exist, show them as bullets below the description
+    if (p.item_specifications) {
+      const specs = p.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        descDisplay += '<ul style="margin:2px 0 0;padding-left:16px;">' + specs.slice(0, 3).map(s => `<li style="font-size:11px;">${s.trim()}</li>`).join('') + (specs.length > 3 ? `<li style="font-size:10px;color:#666;">+${specs.length - 3} more...</li>` : '') + '</ul>';
+      }
+    }
     const qty = p.item_quantity || '-';
     const unit = p.item_unit || '-';
     const unitCost = p.item_unit_price ? '₱' + parseFloat(p.item_unit_price).toLocaleString('en-PH', {minimumFractionDigits: 2}) : '-';
@@ -2171,13 +2178,39 @@ function renderRFQTable(rfq) {
   tbody.innerHTML = rfq.map(r => {
     const statusLabel = r.status === 'completed' ? 'RFQ COMPLETED' : r.status === 'on_going' ? 'RFQ ON-GOING' : r.status === 'cancelled' ? 'CANCELLED' : r.status.toUpperCase();
     const statusClass = r.status === 'completed' ? 'completed' : r.status === 'on_going' ? 'on_going' : 'cancelled';
+
+    // Get quantity and unit from server's PR item data
+    let prQty = '-';
+    let prUnit = '-';
+    if (r.pr_id) {
+      if (r.pr_item_quantity) {
+        prQty = r.pr_item_quantity;
+        prUnit = r.pr_item_unit || '-';
+      } else {
+        const linkedPR = (cachedPR || []).find(p => p.id == r.pr_id);
+        if (linkedPR) {
+          prQty = linkedPR.item_quantity || '-';
+          prUnit = linkedPR.item_unit || '-';
+        }
+      }
+    }
+
+    // Get item specifications directly from rfqs.item_specifications column
+    let itemSpecHtml = '';
+    if (r.item_specifications) {
+      const specs = r.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        itemSpecHtml = '<ul style="margin:0;padding-left:18px;text-align:left;">' + specs.map(s => `<li style="font-size:12px;">${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+
     return `<tr>
       <td>${r.rfq_number || ''}</td>
       <td>${r.date_prepared ? new Date(r.date_prepared).toLocaleDateString() : ''}</td>
       <td>${r.pr_number || ''}</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
+      <td>${prQty}</td>
+      <td>${prUnit}</td>
+      <td>${itemSpecHtml || '-'}</td>
       <td>₱${parseFloat(r.abc_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td>${r.submission_deadline ? new Date(r.submission_deadline).toLocaleDateString() : ''}</td>
       <td>${statusBadge(statusLabel, statusClass)}</td>
@@ -2202,12 +2235,20 @@ function renderAbstractTable(abstract) {
   tbody.innerHTML = abstract.map(a => {
     const statusLabel = a.status === 'completed' ? 'ABSTRACT COMPLETED' : a.status === 'on_going' ? 'ABSTRACT ON-GOING' : a.status === 'cancelled' ? 'CANCELLED' : a.status.toUpperCase();
     const statusClass = a.status === 'completed' ? 'completed' : a.status === 'on_going' ? 'on_going' : 'cancelled';
+    // Item specifications display
+    let itemSpecHtml = '-';
+    if (a.item_specifications) {
+      const specs = a.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        itemSpecHtml = '<ul style="margin:0;padding-left:18px;text-align:left;">' + specs.map(s => `<li style="font-size:12px;">${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
     return `<tr>
       <td>${a.abstract_number || ''}</td>
       <td>${a.date_prepared ? new Date(a.date_prepared).toLocaleDateString() : ''}</td>
       <td>${a.rfq_number || ''}</td>
       <td>${a.purpose || ''}</td>
-      <td>-</td>
+      <td>${itemSpecHtml}</td>
       <td>-</td>
       <td>${a.recommended_supplier_name || ''}</td>
       <td>₱${parseFloat(a.recommended_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
@@ -5331,6 +5372,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <textarea rows="2" id="prPurpose" placeholder="Purpose of the purchase request" required></textarea>
         </div>
 
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="prItemSpecs" placeholder="Enter item specifications, one per line...
+Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded"></textarea>
+        </div>
+
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
         <div class="form-attachment-section">
           <div class="attachment-box" style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 2px dashed #ffc107;">
@@ -5549,6 +5597,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </table>
         <button type="button" class="btn btn-sm btn-outline" onclick="addRFQItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
         </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="rfqItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+        </div>
+
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
@@ -5706,6 +5761,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <label>CERTIFICATION / RECOMMENDATION</label>
           <textarea rows="3" placeholder="We, the undersigned, hereby certify that the above prices are fair and reasonable after canvassing and that the lowest/single calculated and responsive quotation is from [Supplier Name] with a total bid price of [Amount].">${'We, the undersigned, hereby certify that the above prices of the listed articles/items are fair and reasonable after personal canvass and that the lowest/single calculated and responsive quotation is hereby recommended for award.'}</textarea>
         </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="abstractItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+        </div>
+
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
         <div class="form-attachment-section">
           <div class="attachment-box box-green" style="padding: 12px; border-radius: 6px; border: 2px dashed #4caf50; background: #e8f5e9;">
@@ -5984,6 +6046,13 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-note">
           <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> In case of failure to make the full delivery within the time specified above, a penalty of one-tenth (1/10) of one percent for every day of delay shall be imposed.
         </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="poItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+        </div>
+
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
@@ -6151,6 +6220,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           <label>Purpose</label>
           <textarea rows="2" id="editPrPurpose" placeholder="Purpose of the purchase request">${(pr.purpose || '').replace(/</g, '&lt;')}</textarea>
         </div>
+        <div class="form-section-header section-items"><i class="fas fa-clipboard-list"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editPrItemSpecs" placeholder="Enter specifications, one per line...">${(pr.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
         ${getEditAttachmentSectionHTML('purchase_request', id, 'editPrAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -6250,6 +6324,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       total_amount: totalAmount,
       status: document.getElementById('editPrStatus').value,
       dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+      item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
       items: items
     };
     try {
@@ -6261,15 +6336,28 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // --- EDIT RFQ ---
-  window.showEditRFQModal = function(id) {
+  window.showEditRFQModal = async function(id) {
     const r = cachedRFQ.find(x => x.id === id);
     if (!r) { alert('Record not found'); return; }
+    // Build PR options from cached PRs
+    const prOptions = (cachedPR || []).map(p => 
+      `<option value="${p.id}" ${r.pr_id == p.id ? 'selected' : ''}>${p.pr_number}</option>`
+    ).join('');
+
+    // Load saved specs directly from rfqs.item_specifications column
+    let savedSpecsText = r.item_specifications || '';
+
     const html = `
       <form id="editRFQForm" onsubmit="saveEditRFQ(event, ${id})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit RFQ</strong></div>
         <div class="form-row">
           <div class="form-group"><label>RFQ Number</label><input type="text" id="editRfqNumber" value="${r.rfq_number || ''}" required></div>
-          <div class="form-group"><label>PR Reference</label><input type="text" id="editRfqPrRef" value="${r.pr_number || ''}" readonly></div>
+          <div class="form-group"><label>PR Reference</label>
+            <select id="editRfqPrId" class="form-select" onchange="loadPRItemsForRFQ()">
+              <option value="">-- No PR Reference --</option>
+              ${prOptions}
+            </select>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Date Prepared</label><input type="date" id="editRfqDate" value="${r.date_prepared ? r.date_prepared.substring(0,10) : ''}"></div>
@@ -6293,6 +6381,31 @@ Failure to submit the above requirements within the prescribed period shall cons
             <option value="true" ${r.philgeps_required?'selected':''}>Yes</option>
           </select>
         </div>
+
+        <!-- PR Items Reference (Quantity & Unit from PR) -->
+        <div class="form-group" style="margin-top:15px;">
+          <label><i class="fas fa-list"></i> PR Items (Quantity & Unit)</label>
+          <div id="rfqPrItemsContainer" style="border:1px solid #ddd;border-radius:6px;padding:10px;background:#f9f9f9;min-height:40px;">
+            <span style="color:#999;font-size:13px;">Select a PR Reference to load items...</span>
+          </div>
+        </div>
+
+        <!-- Item Specifications (Bullet Form Input) -->
+        <div class="form-group" style="margin-top:10px;">
+          <label><i class="fas fa-clipboard-list"></i> Item Specifications (one per line = one bullet)</label>
+          <textarea id="editRfqItemSpecs" class="form-control" rows="6" placeholder="Enter item specifications, one per line...&#10;Example:&#10;Brand new, original&#10;Compatible with HP LaserJet Pro&#10;Yield: 2,500 pages"
+            style="font-size:13px;line-height:1.6;">${savedSpecsText}</textarea>
+          <small style="color:#888;">Each line will appear as a bullet point (•) in the RFQ table and print.</small>
+        </div>
+
+        <!-- Bullet Preview -->
+        <div class="form-group" style="margin-top:5px;">
+          <label style="font-size:12px;color:#666;">Preview:</label>
+          <div id="rfqSpecPreview" style="border:1px dashed #ccc;border-radius:4px;padding:8px;background:#fff;min-height:30px;font-size:12px;">
+            <span style="color:#ccc;">Type specifications above to preview...</span>
+          </div>
+        </div>
+
         ${getEditAttachmentSectionHTML('rfq', id, 'editRfqAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -6300,18 +6413,92 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>`;
     openModal('Edit RFQ', html);
+
+    // Attach live preview for specs textarea
+    const specsTA = document.getElementById('editRfqItemSpecs');
+    if (specsTA) {
+      specsTA.addEventListener('input', updateRfqSpecPreview);
+      // Trigger initial preview if there are saved specs
+      if (savedSpecsText) updateRfqSpecPreview();
+    }
+
+    // Auto-load PR items if PR is already selected
+    if (r.pr_id) loadPRItemsForRFQ();
   };
+
+  // Load PR items into the RFQ edit modal
+  window.loadPRItemsForRFQ = async function() {
+    const prId = document.getElementById('editRfqPrId')?.value;
+    const container = document.getElementById('rfqPrItemsContainer');
+    if (!container) return;
+    if (!prId) {
+      container.innerHTML = '<span style="color:#999;font-size:13px;">Select a PR Reference to load items...</span>';
+      return;
+    }
+    container.innerHTML = '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+    try {
+      const prDetail = await apiRequest('/purchase-requests/' + prId);
+      const items = prDetail.items || [];
+      if (items.length === 0) {
+        container.innerHTML = '<span style="color:#999;font-size:13px;">No items found in this PR.</span>';
+        return;
+      }
+      container.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#e9ecef;font-weight:bold;">
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:center;width:15%;">Quantity</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:center;width:15%;">Unit</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Item Name</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;width:20%;">Unit Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${it.quantity || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${it.unit || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;">${it.item_name || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">₱${parseFloat(it.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } catch (err) {
+      container.innerHTML = '<span style="color:red;font-size:13px;">Error loading PR items: ' + err.message + '</span>';
+    }
+  };
+
+  // Live preview of bullet specs
+  window.updateRfqSpecPreview = function() {
+    const ta = document.getElementById('editRfqItemSpecs');
+    const preview = document.getElementById('rfqSpecPreview');
+    if (!ta || !preview) return;
+    const lines = ta.value.split('\n').filter(l => l.trim() !== '');
+    if (lines.length === 0) {
+      preview.innerHTML = '<span style="color:#ccc;">Type specifications above to preview...</span>';
+    } else {
+      preview.innerHTML = '<ul style="margin:0;padding-left:18px;">' + lines.map(l => `<li>${l.trim()}</li>`).join('') + '</ul>';
+    }
+  };
+
   window.saveEditRFQ = async function(e, id) {
     e.preventDefault();
     if (!confirm('Are you sure you want to save these changes?')) return;
     const data = {
       rfq_number: document.getElementById('editRfqNumber').value,
+      pr_id: document.getElementById('editRfqPrId').value || null,
       date_prepared: document.getElementById('editRfqDate').value || null,
       submission_deadline: document.getElementById('editRfqDeadline').value || null,
       abc_amount: parseFloat(document.getElementById('editRfqAbc').value) || 0,
       philgeps_required: document.getElementById('editRfqPhilgeps').value === 'true',
       status: document.getElementById('editRfqStatus').value
     };
+
+    // Send item_specifications directly to server
+    const specsText = document.getElementById('editRfqItemSpecs')?.value || '';
+    data.item_specifications = specsText.trim() || null;
+
     try {
       await apiRequest('/rfqs/' + id, 'PUT', data);
       await uploadEditAttachments('rfq', id, 'editRfqAttachment');
@@ -6346,6 +6533,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
         </div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editAbsItemSpecs" placeholder="Enter specifications, one per line...">${(a.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
         ${getEditAttachmentSectionHTML('abstract', id, 'editAbsAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -6365,7 +6556,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       purpose: document.getElementById('editAbsPurpose').value,
       recommended_supplier_id: a ? a.recommended_supplier_id : null,
       recommended_amount: parseFloat(document.getElementById('editAbsAmount').value) || 0,
-      status: document.getElementById('editAbsStatus').value
+      status: document.getElementById('editAbsStatus').value,
+      item_specifications: document.getElementById('editAbsItemSpecs')?.value.trim() || null
     };
     try {
       await apiRequest('/abstracts/' + id, 'PUT', data);
@@ -6597,6 +6789,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
         </div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editPoItemSpecs" placeholder="Enter specifications, one per line...">${(p.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
         ${getEditAttachmentSectionHTML('purchase_order', id, 'editPoAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -6624,7 +6820,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       po_date: p ? p.po_date : null,
       purpose: document.getElementById('editPoPurpose').value,
       mode_of_procurement: document.getElementById('editPoMode').value,
-      place_of_delivery: document.getElementById('editPoPlace').value
+      place_of_delivery: document.getElementById('editPoPlace').value,
+      item_specifications: document.getElementById('editPoItemSpecs')?.value.trim() || null
     };
     try {
       await apiRequest('/purchase-orders/' + id, 'PUT', data);
@@ -6676,6 +6873,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             <small id="editIarAccHint" style="color:#b7791f;display:${i.inspection_result==='on_going'?'block':'none'};">Acceptance locked while inspection is on going.</small>
           </div>
         </div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editIarItemSpecs" placeholder="Enter specifications, one per line...">${(i.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
         ${getEditAttachmentSectionHTML('iar', id, 'editIarAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -6712,7 +6913,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       inspection_result: document.getElementById('editIarInspResult').value,
       findings: document.getElementById('editIarFindings').value,
       purpose: document.getElementById('editIarPurpose').value,
-      acceptance: document.getElementById('editIarAcceptance').value
+      acceptance: document.getElementById('editIarAcceptance').value,
+      item_specifications: document.getElementById('editIarItemSpecs')?.value.trim() || null
     };
     try {
       await apiRequest('/iars/' + id, 'PUT', data);
@@ -6898,6 +7100,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             </div>
           </div>
         </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="iarItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+        </div>
+
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
         <div class="form-attachment-section">
           <div class="attachment-box box-green" style="padding: 12px; border-radius: 6px; border: 2px dashed #4caf50; background: #e8f5e9;">
@@ -7623,6 +7832,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         purpose: purpose,
         total_amount: totalAmount,
         status: 'pending_approval',
+        item_specifications: document.getElementById('prItemSpecs')?.value.trim() || null,
         items: items
       };
       const result = await apiRequest('/purchase-requests', 'POST', data);
@@ -7686,6 +7896,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
         status: 'on_going',
+        item_specifications: document.getElementById('rfqItemSpecs')?.value.trim() || null,
         items: items
       };
       const result = await apiRequest('/rfqs', 'POST', data);
@@ -7723,7 +7934,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         rfq_id: rfqId ? parseInt(rfqId) : null,
         date_prepared: abstractDate || null,
         purpose: purpose,
-        status: 'on_going'
+        status: 'on_going',
+        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null
       };
       const result = await apiRequest('/abstracts', 'POST', data);
       const absId = result.id || result.abstract_id;
@@ -7834,6 +8046,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         purpose: purpose,
         mode_of_procurement: procMode,
         place_of_delivery: placeDelivery,
+        item_specifications: document.getElementById('poItemSpecs')?.value.trim() || null,
         items: items
       };
       const result = await apiRequest('/purchase-orders', 'POST', data);
@@ -7897,6 +8110,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         delivery_date: iarDate || null,
         invoice_number: invoiceNo,
         acceptance: acceptance,
+        item_specifications: document.getElementById('iarItemSpecs')?.value.trim() || null,
         items: items
       };
       const result = await apiRequest('/iars', 'POST', data);
@@ -8671,7 +8885,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       designations.forEach(d => {
         const opt = document.createElement('option');
         opt.value = d.id;
-        opt.textContent = d.title;
+        opt.textContent = d.name;
         select.appendChild(opt);
       });
     } catch (err) { console.error('Error loading designations dropdown:', err); }
@@ -10854,6 +11068,14 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewPRModal = function(id) {
     const p = cachedPR.find(r => r.id === id);
     if (!p) { alert('Purchase Request not found'); return; }
+    // Build specs display
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (p.item_specifications) {
+      const specs = p.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>PR No.:</label><span><strong>${p.pr_number || '-'}</strong></span></div>
@@ -10863,6 +11085,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Amount:</label><span>${viewCurrency(p.total_amount)}</span></div>
         <div class="detail-row"><label>Qty / Unit / Unit Cost:</label><span>${p.item_qty || '-'} ${p.item_unit || ''} @ ${p.item_unit_price ? viewCurrency(p.item_unit_price) : '-'}</span></div>
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(p.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
       ${getViewAttachmentSectionHTML('purchase_request', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
@@ -10877,6 +11100,28 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewRFQModal = function(id) {
     const r = cachedRFQ.find(x => x.id === id);
     if (!r) { alert('RFQ not found'); return; }
+
+    // Get PR qty/unit from server data or cachedPR
+    let prQty = '-', prUnit = '-';
+    if (r.pr_id) {
+      if (r.pr_item_quantity) {
+        prQty = r.pr_item_quantity;
+        prUnit = r.pr_item_unit || '-';
+      } else {
+        const linkedPR = (cachedPR || []).find(p => p.id == r.pr_id);
+        if (linkedPR) { prQty = linkedPR.item_quantity || '-'; prUnit = linkedPR.item_unit || '-'; }
+      }
+    }
+
+    // Get item specifications directly from rfqs.item_specifications column
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (r.item_specifications) {
+      const specs = r.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>RFQ No.:</label><span><strong>${r.rfq_number || '-'}</strong></span></div>
@@ -10884,8 +11129,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Date Prepared:</label><span>${viewDate(r.date_prepared)}</span></div>
         <div class="detail-row"><label>Submission Deadline:</label><span>${viewDate(r.submission_deadline)}</span></div>
         <div class="detail-row"><label>ABC Amount:</label><span>${viewCurrency(r.abc_amount)}</span></div>
+        <div class="detail-row"><label>Quantity:</label><span>${prQty}</span></div>
+        <div class="detail-row"><label>Unit:</label><span>${prUnit}</span></div>
         <div class="detail-row"><label>PhilGEPS Required:</label><span>${r.philgeps_required ? '<i class="fas fa-check text-success"></i> Yes' : 'No'}</span></div>
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(r.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
       ${getViewAttachmentSectionHTML('rfq', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
@@ -10900,6 +11148,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewAbstractModal = function(id) {
     const a = cachedAbstract.find(x => x.id === id);
     if (!a) { alert('Abstract not found'); return; }
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (a.item_specifications) {
+      const specs = a.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>Abstract No.:</label><span><strong>${a.abstract_number || '-'}</strong></span></div>
@@ -10909,6 +11164,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Recommended Supplier:</label><span>${a.supplier_name || '-'}</span></div>
         <div class="detail-row"><label>Recommended Amount:</label><span>${viewCurrency(a.recommended_amount)}</span></div>
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(a.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
       ${getViewAttachmentSectionHTML('abstract', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
@@ -10986,6 +11242,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewPOModal = function(id) {
     const p = cachedPO.find(x => x.id === id);
     if (!p) { alert('Purchase Order not found'); return; }
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (p.item_specifications) {
+      const specs = p.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>PO No.:</label><span><strong>${p.po_number || '-'}</strong></span></div>
@@ -10999,6 +11262,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Payment Terms:</label><span>${p.payment_terms || '-'}</span></div>
         <div class="detail-row"><label>Doc Status:</label><span>${viewStatusBadge(p.status)}</span></div>
         <div class="detail-row"><label>Workflow:</label><span>${viewStatusBadge(p.workflow_status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
       ${getViewAttachmentSectionHTML('purchase_order', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
@@ -11013,6 +11277,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewIARModal = function(id) {
     const i = cachedIAR.find(x => x.id === id);
     if (!i) { alert('IAR not found'); return; }
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (i.item_specifications) {
+      const specs = i.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>IAR No.:</label><span><strong>${i.iar_number || '-'}</strong></span></div>
@@ -11022,6 +11293,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Invoice No.:</label><span>${i.invoice_number || '-'}</span></div>
         <div class="detail-row"><label>Req. Office:</label><span>${i.requisitioning_office || '-'}</span></div>
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(i.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
       ${getViewAttachmentSectionHTML('iar', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
@@ -13149,14 +13421,21 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       let itemsRows = '';
       if (iar.items && iar.items.length > 0) {
+        // Inject item_specifications from iars table into the first item if available
+        if (iar.item_specifications && iar.items.length > 0) {
+          iar.items[0].item_name = (iar.items[0].item_name || '') + '\n' + iar.item_specifications;
+        }
         itemsRows = iar.items.map((item, idx) => `
           <tr>
             <td style="text-align:center;">${item.stock_no || item.item_code || (idx + 1)}</td>
-            <td>${item.item_name || ''}</td>
+            <td>${(item.item_name || '').replace(/\n/g, '<br>')}</td>
             <td style="text-align:center;">${item.quantity || ''}</td>
             <td style="text-align:right;">${item.unit_cost ? '₱' + parseFloat(item.unit_cost).toLocaleString('en-PH', {minimumFractionDigits:2}) : ''}</td>
             <td style="text-align:right;">${item.unit_cost && item.quantity ? '₱' + (parseFloat(item.unit_cost) * parseFloat(item.quantity)).toLocaleString('en-PH', {minimumFractionDigits:2}) : ''}</td>
           </tr>`).join('');
+      } else if (iar.item_specifications) {
+        // No items but specs exist - show specs as a row
+        itemsRows = `<tr><td style="text-align:center;">1</td><td>${iar.item_specifications.replace(/\n/g, '<br>')}</td><td></td><td></td><td></td></tr>`;
       } else {
         itemsRows = '<tr><td colspan="5" style="text-align:center;">No items recorded</td></tr>';
       }
@@ -13239,6 +13518,30 @@ Failure to submit the above requirements within the prescribed period shall cons
       const pr = await apiRequest('/purchase-requests/' + id);
       if (!pr) { showNotification('Purchase Request not found', 'error'); return; }
 
+      // Fetch chief and HOPE names + designations from users & employees
+      let chiefName = '', chiefDesignation = '', hopeName = '', hopeDesignation = 'Regional Director';
+      try {
+        const [allUsers, allEmployees] = await Promise.all([
+          apiRequest('/users'),
+          apiRequest('/employees')
+        ]);
+        // Find division chief for this PR's department
+        const chiefUser = allUsers.find(u => u.role && u.role.startsWith('chief_') && u.department_code === pr.department_code);
+        if (chiefUser) {
+          chiefName = chiefUser.full_name || '';
+          // Match employee by full_name (case-insensitive trim)
+          const chiefEmp = allEmployees.find(e => e.full_name && chiefUser.full_name && e.full_name.trim().toLowerCase() === chiefUser.full_name.trim().toLowerCase());
+          if (chiefEmp) chiefDesignation = chiefEmp.designation_name || '';
+        }
+        // Find HOPE / Regional Director
+        const hopeUser = allUsers.find(u => u.role === 'hope');
+        if (hopeUser) {
+          hopeName = hopeUser.full_name || '';
+          const hopeEmp = allEmployees.find(e => e.full_name && hopeUser.full_name && e.full_name.trim().toLowerCase() === hopeUser.full_name.trim().toLowerCase());
+          if (hopeEmp && hopeEmp.designation_name) hopeDesignation = hopeEmp.designation_name;
+        }
+      } catch (e) { console.warn('Could not fetch chief/HOPE data:', e); }
+
       const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
       const fmtCurrency = (v) => {
         const num = parseFloat(v || 0);
@@ -13249,6 +13552,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       const items = pr.items || [];
       let itemsHTML = '';
       let grandTotal = 0;
+
+      // Inject item_specifications from purchaserequests table into the first item's description for print
+      if (pr.item_specifications && items.length > 0 && !items[0].item_description) {
+        items[0].item_description = pr.item_specifications;
+      } else if (pr.item_specifications && items.length === 0) {
+        items.push({ quantity: 1, unit: 'LOT', item_name: '', item_description: pr.item_specifications, unit_price: pr.total_amount || 0 });
+      }
 
       if (items.length > 0) {
         items.forEach((item, idx) => {
@@ -13264,20 +13574,20 @@ Failure to submit the above requirements within the prescribed period shall cons
               <td class="pr-cell-center">${item.unit || ''}</td>
               <td class="pr-cell-desc"><strong>${item.item_name || ''}</strong></td>
               <td class="pr-cell-center">${qty}</td>
-              <td class="pr-cell-right">${fmtCurrency(unitCost)}</td>
-              <td class="pr-cell-right">${fmtCurrency(totalCost)}</td>
+              <td class="pr-cell-right" style="padding-right:10px;">${fmtCurrency(unitCost)}</td>
+              <td class="pr-cell-right" style="padding-right:10px;">${fmtCurrency(totalCost)}</td>
             </tr>`;
 
-          // Description/specs row (if any)
-          if (item.item_description) {
+          // Description/specs row (only if different from item name)
+          if (item.item_description && item.item_description.trim().toLowerCase() !== (item.item_name || '').trim().toLowerCase()) {
             itemsHTML += `
             <tr>
               <td class="pr-cell-center"></td>
               <td class="pr-cell-center"></td>
               <td class="pr-cell-desc pr-item-specs">${item.item_description}</td>
               <td class="pr-cell-center"></td>
-              <td class="pr-cell-right"></td>
-              <td class="pr-cell-right"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-center"></td>
             </tr>`;
           }
         });
@@ -13290,7 +13600,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Add empty rows to fill space (minimum ~15 visible rows for form look)
       const minRows = 15;
-      const currentRows = items.length + items.filter(i => i.item_description).length;
+      const currentRows = items.length + items.filter(i => i.item_description && i.item_description.trim().toLowerCase() !== (i.item_name || '').trim().toLowerCase()).length;
       for (let i = currentRows; i < minRows; i++) {
         itemsHTML += `
             <tr>
@@ -13311,8 +13621,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-size: 16pt;
             font-weight: bold;
             font-family: Arial, sans-serif;
-            margin: 8px 0 2px 0;
+            margin: 4px 0 2px 0;
             letter-spacing: 1px;
+            padding: 6px 0;
           }
           .pr-appendix {
             text-align: center;
@@ -13355,14 +13666,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-size: 9pt;
             font-weight: bold;
             text-align: center;
-            background: #f5f5f5;
             vertical-align: middle;
           }
           .pr-items-table tbody td {
             border: 1px solid #333;
-            padding: 3px 6px;
+            padding: 4px 6px;
             font-size: 10pt;
-            vertical-align: top;
+            vertical-align: middle;
           }
           .pr-cell-center { text-align: center; }
           .pr-cell-right { text-align: right; }
@@ -13370,8 +13680,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           .pr-item-specs {
             font-weight: normal;
             font-size: 9pt;
-            color: #444;
-            padding-left: 20px !important;
+            color: #555;
+            padding-left: 24px !important;
+            vertical-align: top;
             white-space: pre-line;
           }
           .pr-total-row td {
@@ -13379,12 +13690,6 @@ Failure to submit the above requirements within the prescribed period shall cons
             padding: 5px 6px;
             font-size: 10pt;
             font-weight: bold;
-          }
-          .pr-purpose-row td {
-            border: 1px solid #333;
-            padding: 6px 8px;
-            font-size: 10pt;
-            vertical-align: top;
           }
           .pr-sig-table {
             width: 100%;
@@ -13403,7 +13708,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-weight: bold;
             font-size: 10pt;
             text-transform: uppercase;
-            padding-top: 30px !important;
+            padding-top: 60px !important;
           }
           .pr-sig-designation {
             text-align: center;
@@ -13433,43 +13738,42 @@ Failure to submit the above requirements within the prescribed period shall cons
         <table class="pr-items-table">
           <thead>
             <tr>
-              <th style="width:8%;">Item No.</th>
-              <th style="width:10%;">Unit</th>
-              <th>Item Description</th>
-              <th style="width:10%;">Quantity</th>
-              <th style="width:13%;">Unit Cost</th>
-              <th style="width:15%;">Total Cost</th>
+              <th style="width:8%;">ITEM NO.</th>
+              <th style="width:8%;">UNIT</th>
+              <th>ITEM DESCRIPTION</th>
+              <th style="width:12%;">QUANTITY</th>
+              <th style="width:14%;">UNIT COST</th>
+              <th style="width:14%;">TOTAL COST</th>
             </tr>
           </thead>
           <tbody>
             ${itemsHTML}
             <tr class="pr-total-row">
               <td colspan="3"></td>
-              <td colspan="2" style="text-align:right;">TOTAL AMOUNT</td>
-              <td style="text-align:right;">₱${fmtCurrency(totalAmount)}</td>
+              <td colspan="2" style="text-align:center; font-weight:bold;">TOTAL AMOUNT</td>
+              <td style="text-align:center;">₱${fmtCurrency(totalAmount)}</td>
+            </tr>
+            <tr>
+              <td colspan="6" style="padding:6px 8px; font-size:10pt;"><span style="font-weight:bold; color:red;">Purpose: </span><span style="color:red; font-weight:bold;">${pr.purpose || ''}</span></td>
             </tr>
           </tbody>
         </table>
 
-        <table class="pr-info-table" style="margin:0;">
-          <tr class="pr-purpose-row">
-            <td style="width:12%; font-weight:bold;">Purpose:</td>
-            <td colspan="3">${pr.purpose || ''}</td>
-          </tr>
-        </table>
-
         <table class="pr-sig-table">
           <tr>
-            <td style="width:50%; text-align:center; padding-top:5px;">Requested by:</td>
-            <td style="width:50%; text-align:center; padding-top:5px;">Approved by:</td>
+            <td style="width:18%;"></td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Requested by:</td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Approved by:</td>
           </tr>
           <tr>
-            <td class="pr-sig-name">${pr.requested_by_name || ''}</td>
-            <td class="pr-sig-name">${pr.approved_by_name || ''}</td>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:bottom;">Printed Name</td>
+            <td class="pr-sig-name">${chiefName}</td>
+            <td class="pr-sig-name">${hopeName}</td>
           </tr>
           <tr>
-            <td class="pr-sig-designation">Division Head</td>
-            <td class="pr-sig-designation">Head of Procuring Entity / Authorized Representative</td>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:top;">Designation</td>
+            <td class="pr-sig-designation">${chiefDesignation}</td>
+            <td class="pr-sig-designation">${hopeDesignation}</td>
           </tr>
         </table>
       `;
@@ -13495,6 +13799,46 @@ Failure to submit the above requirements within the prescribed period shall cons
       const rfq = await apiRequest('/rfqs/' + id);
       if (!rfq) { showNotification('RFQ not found', 'error'); return; }
 
+      // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
+      let bacSecName = 'GIOVANNI S. PAREDES', bacSecDesignation = '';
+      let bacChairName = '', bacChairDesignation = '';
+      let markName = 'MARK E. MARASIGAN', markDesignation = '';
+      let prPurpose = '';
+      try {
+        const [allUsers, allEmployees] = await Promise.all([
+          apiRequest('/users'),
+          apiRequest('/employees')
+        ]);
+        // BAC Secretariat
+        const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
+        if (bacSecUser) {
+          bacSecName = bacSecUser.full_name || bacSecName;
+          const bacSecEmp = allEmployees.find(e => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
+          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || '';
+        }
+        // BAC Chairperson (primary or secondary role)
+        const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
+        if (bacChairUser) {
+          bacChairName = bacChairUser.full_name || '';
+          const bacChairEmp = allEmployees.find(e => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
+          if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || '';
+        }
+        // Mark E. Marasigan
+        const markEmp = allEmployees.find(e => e.full_name && e.full_name.trim().toLowerCase().includes('marasigan'));
+        if (markEmp) {
+          markName = markEmp.full_name || markName;
+          markDesignation = markEmp.designation_name || '';
+        }
+      } catch (e) { console.warn('Could not fetch BAC/employee data:', e); }
+
+      // Fetch Purpose from linked PR
+      if (rfq.pr_id) {
+        try {
+          const pr = await apiRequest('/purchase-requests/' + rfq.pr_id);
+          if (pr && pr.purpose) prPurpose = pr.purpose;
+        } catch (e) { console.warn('Could not fetch PR purpose:', e); }
+      }
+
       const fmtDate = (d) => {
         if (!d) return '';
         const dt = new Date(d);
@@ -13510,6 +13854,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       const items = rfq.items || [];
       let itemsHTML = '';
       let abcTotal = 0;
+
+      // Inject item_specifications from rfqs table into the first item's description for print
+      if (rfq.item_specifications && items.length > 0) {
+        items[0].item_description = rfq.item_specifications;
+      } else if (rfq.item_specifications && items.length === 0) {
+        // If no rfq_items exist but specs are set, create a virtual item for print
+        items.push({ quantity: 1, unit: 'LOT', item_name: '', item_description: rfq.item_specifications, abc_unit_cost: rfq.abc_amount || 0 });
+      }
 
       if (items.length > 0) {
         items.forEach((item) => {
@@ -13534,7 +13886,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             const specLines = item.item_description.split(/\\n|\n/).filter(l => l.trim());
             specLines.forEach(line => {
               itemsHTML += `
-            <tr>
+            <tr class="rfq-spec-row">
               <td class="rfq-cell-center"></td>
               <td class="rfq-cell-center"></td>
               <td class="rfq-cell-specs">${line.trim()}</td>
@@ -13596,10 +13948,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-size: 9.5pt;
             line-height: 1.5;
             margin: 6px 0;
-            text-align: justify;
+            text-align: center;
           }
           .rfq-body-text.indent {
-            text-indent: 30px;
+            text-indent: 0;
           }
           .rfq-items-table {
             width: 100%;
@@ -13613,7 +13965,6 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-size: 9pt;
             font-weight: bold;
             text-align: center;
-            background: #f5f5f5;
           }
           .rfq-items-table tbody td {
             border: 1px solid #333;
@@ -13629,6 +13980,12 @@ Failure to submit the above requirements within the prescribed period shall cons
             font-size: 9pt;
             padding-left: 15px !important;
             color: #333;
+          }
+          .rfq-spec-row td {
+            border-top: 1px dashed #999 !important;
+            border-bottom: 1px dashed #999 !important;
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
           }
           .rfq-total-row td {
             border: 1px solid #333;
@@ -13648,7 +14005,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             width: 250px;
           }
           .rfq-sig-label {
-            font-size: 8.5pt;
+            font-size: 9pt;
             color: #444;
             text-align: center;
             width: 250px;
@@ -13678,6 +14035,16 @@ Failure to submit the above requirements within the prescribed period shall cons
           }
           .rfq-col-left { width: 48%; }
           .rfq-col-right { width: 48%; text-align: center; }
+          .rfq-checkbox {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1.5px solid #333;
+            margin-right: 4px;
+            vertical-align: middle;
+            position: relative;
+            top: -1px;
+          }
         </style>
 
         <div class="rfq-title">REQUEST FOR QUOTATION</div>
@@ -13695,23 +14062,28 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="rfq-info-row"><span class="rfq-label">TIN:</span> ___________________________________</div>
 
         <div style="margin-top:10px;">
-          <div class="rfq-body-text">Sir/Madam:</div>
+          <div class="rfq-body-text" style="text-align:left;">Sir/Madam:</div>
           <div class="rfq-body-text indent">May we invite your company to quote for the lowest price/s, VAT included, on the item/s listed and described hereunder.</div>
-          <div class="rfq-body-text">Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary <strong>GIOVANNI S. PAREDES</strong>__________________, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City, Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which shall be stamped thereon the date and time received by the BAC Secretariat.</div>
+          <div class="rfq-body-text">Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary <strong><u>${bacSecName.toUpperCase()}</u></strong>, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City, Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which shall be stamped thereon the date and time received by the BAC Secretariat.</div>
           <div class="rfq-body-text indent">The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond 8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically disqualified.</div>
           <div class="rfq-body-text indent">The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and those submitted after the deadline.</div>
         </div>
 
-        <div class="rfq-sig-section">
-          <div style="text-align:right; margin-right:40px;">Very truly yours,</div>
+        <div class="rfq-sig-section" style="margin-top:20px;">
           <div class="rfq-two-col" style="margin-top:5px;">
             <div class="rfq-col-left">
               <div>Served by:</div>
               <div class="rfq-sig-line"></div>
-              <div style="margin-top:15px;">Date:________________________</div>
+              <div class="rfq-sig-label"><strong>${bacSecName.toUpperCase()}</strong></div>
+              <div class="rfq-sig-label">BAC Secretariat</div>
+              <div style="margin-top:10px;">Date:________________________</div>
             </div>
             <div class="rfq-col-right">
+              <div style="text-align:center;">Very truly yours,</div>
               <div class="rfq-sig-line" style="margin:10px auto 3px auto;"></div>
+              <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase;">${bacChairName}</div>
+              <div style="font-size:9pt; color:#444;">${bacChairDesignation}</div>
+              <div style="font-size:9pt; color:#444;">BAC Chairperson</div>
             </div>
           </div>
         </div>
@@ -13731,6 +14103,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </thead>
           <tbody>
             ${itemsHTML}
+            ${prPurpose ? `<tr><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="padding:4px 5px; font-size:9.5pt; color:red; font-weight:bold; border:1px solid #333;"><span style="color:red; font-weight:bold;">PURPOSE: ${prPurpose}</span></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td></tr>` : ''}
             <tr class="rfq-total-row">
               <td colspan="3" style="text-align:right;">VAT INCLUSIVE</td>
               <td style="text-align:right;">₱${fmtCurrency(totalABC)}</td>
@@ -13752,25 +14125,31 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
 
         <div style="margin-top:12px;">
-          <div class="rfq-info-row"><span class="rfq-label">PR No.:</span> ${rfq.pr_number || ''}</div>
+          <div class="rfq-info-row"><span class="rfq-label">PR No.:</span> <strong>${rfq.pr_number || ''}</strong></div>
         </div>
 
         <div class="rfq-terms" style="margin-top:8px;">
           <div style="font-weight:bold; margin-bottom:4px;">Terms &amp; Conditions:</div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">1.</span><span>Award shall be made on &emsp; ___Per Item Basis &emsp; ___Lot/Package &emsp; ___Total Quoted</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">2.</span><span>Quotation validity shall not be less than 30 calendar days</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">1.</span><span>Award shall be made on &emsp; <span class="rfq-checkbox"></span> Per Item Basis &emsp; <span class="rfq-checkbox"></span> Lot/Package &emsp; <span class="rfq-checkbox"></span> Total Quoted</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">2.</span><span>Quotation validity shall not be less than <strong><u>30</u></strong> calendar days</span></div>
           <div class="rfq-terms-row"><span class="rfq-terms-num">3.</span><span>Must be registered with PhilGEPS.</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">4.</span><span>Goods shall be delivered within: one to three working days after the award has been made</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">5.</span><span>Place of delivery: 3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">6.</span><span>Term of Payment is Check / ADA</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">7.</span><span>Liquidated Damages/Penalty: (1/10) of one percent for every days of delay shall be imposed</span></div>
-          <div class="rfq-terms-row"><span class="rfq-terms-num">8.</span><span>In case of discrepancy between unit and total cost, unit cost shall prevail</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">4.</span><span>Goods shall be delivered within: <strong><u>one to three working days after the award has made</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">5.</span><span>Place of delivery: <strong><u>3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">6.</span><span>Term of Payment is <strong><u>Check</u></strong> / ADA</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">7.</span><span>Liquidated Damages/Penalty: <strong><u>(1/10) of one percent for every days of delay shall be imposed</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">8.</span><span>In case of discrepancy between unit and total cost, until cost shall prevail</span></div>
         </div>
 
-        <div class="rfq-conforme" style="text-align:right; margin-right:40px;">
-          <div>Conforme:</div>
-          <div class="rfq-sig-line" style="margin:25px 0 3px auto;"></div>
-          <div class="rfq-sig-label" style="margin-left:auto;">Name &amp; Signature of Proprietor/<br>Authorized Representative</div>
+        <div class="rfq-two-col" style="margin-top:30px;">
+          <div class="rfq-col-left rfq-sig-section" style="display:flex; flex-direction:column; justify-content:flex-end;">
+            <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase; border-bottom:1px solid #333; display:inline-block; padding-bottom:2px;">${markName}</div>
+            <div style="font-size:9pt; color:#444;">AO I / SUPPLY OFFICER I</div>
+          </div>
+          <div class="rfq-col-right rfq-conforme" style="margin-top:0;">
+            <div>Conforme:</div>
+            <div class="rfq-sig-line" style="margin:25px auto 3px auto;"></div>
+            <div class="rfq-sig-label" style="margin:0 auto;">Name &amp; Signature of Proprietor/<br>Authorized Representative</div>
+          </div>
         </div>
       `;
 
@@ -14510,6 +14889,49 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Signup function
+  // Real-time password strength checker for signup form
+  window.checkPasswordStrength = function(pwd) {
+    const container = document.getElementById('pwdStrengthContainer');
+    const fill = document.getElementById('pwdStrengthFill');
+    const label = document.getElementById('pwdStrengthLabel');
+    if (!container || !fill || !label) return;
+
+    // Show/hide
+    container.style.display = pwd.length > 0 ? 'flex' : 'none';
+
+    // Requirements
+    const checks = {
+      length:  pwd.length >= 8,
+      upper:   /[A-Z]/.test(pwd),
+      lower:   /[a-z]/.test(pwd),
+      number:  /[0-9]/.test(pwd),
+      special: /[^A-Za-z0-9]/.test(pwd)
+    };
+
+    // Update requirement indicators
+    const reqMap = { length: 'pwdReqLength', upper: 'pwdReqUpper', lower: 'pwdReqLower', number: 'pwdReqNumber', special: 'pwdReqSpecial' };
+    Object.keys(reqMap).forEach(key => {
+      const el = document.getElementById(reqMap[key]);
+      if (el) el.classList.toggle('met', checks[key]);
+    });
+
+    // Score
+    const passed = Object.values(checks).filter(Boolean).length;
+    const levels = [
+      { min: 0, label: 'Too Weak', color: '#e53e3e', width: '10%' },
+      { min: 1, label: 'Weak',     color: '#e53e3e', width: '25%' },
+      { min: 2, label: 'Fair',     color: '#dd6b20', width: '45%' },
+      { min: 3, label: 'Good',     color: '#d69e2e', width: '65%' },
+      { min: 4, label: 'Strong',   color: '#38a169', width: '85%' },
+      { min: 5, label: 'Excellent',color: '#276749', width: '100%' }
+    ];
+    const level = levels[passed];
+    fill.style.width = level.width;
+    fill.style.background = level.color;
+    label.textContent = level.label;
+    label.style.color = level.color;
+  };
+
   window.doSignup = async function() {
     const fullName = document.getElementById('signupFullName')?.value?.trim();
     const username = document.getElementById('signupUsername')?.value?.trim();
@@ -14529,9 +14951,24 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     
-    if (password.length < 4) {
+    // Enforce strong password
+    const pwdChecks = {
+      length:  password.length >= 8,
+      upper:   /[A-Z]/.test(password),
+      lower:   /[a-z]/.test(password),
+      number:  /[0-9]/.test(password),
+      special: /[^A-Za-z0-9]/.test(password)
+    };
+    const pwdPassed = Object.values(pwdChecks).filter(Boolean).length;
+    if (pwdPassed < 4) {
+      const missing = [];
+      if (!pwdChecks.length)  missing.push('at least 8 characters');
+      if (!pwdChecks.upper)   missing.push('an uppercase letter');
+      if (!pwdChecks.lower)   missing.push('a lowercase letter');
+      if (!pwdChecks.number)  missing.push('a number');
+      if (!pwdChecks.special) missing.push('a special character');
       if (signupError) {
-        signupError.textContent = 'Password must be at least 4 characters';
+        signupError.textContent = 'Password needs: ' + missing.join(', ');
         signupError.style.display = 'block';
       }
       return;

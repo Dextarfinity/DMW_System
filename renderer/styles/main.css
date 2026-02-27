@@ -3026,6 +3026,65 @@ body {
 
 .login-overlay.hidden { display: none; }
 
+/* Password Strength Meter */
+.pwd-strength-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pwd-strength-bar {
+  flex: 1;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pwd-strength-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.pwd-strength-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: right;
+}
+.pwd-requirements {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+}
+.pwd-req {
+  font-size: 10px;
+  color: #a0aec0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.2s;
+}
+.pwd-req i {
+  font-size: 6px;
+}
+.pwd-req.met {
+  color: #38a169;
+}
+.pwd-req.met i::before {
+  content: '\f00c';
+  font-size: 9px;
+}
+
+/* Hide body scrollbar when login overlay is visible */
+body:has(.login-overlay:not(.hidden)) {
+  overflow: hidden;
+}
+
 /* ---- Landscape Card ---- */
 .login-card {
   position: relative;
