@@ -5236,96 +5236,91 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
         <div id="ppmpPAPsSection" style="display:none;">
           <div class="form-section-header" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left-color:#2e7d32;">
-            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> Quick Add PAPs Expense <small style="font-weight:400;color:#4a5568;">(for items not yet in catalog)</small>
+            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> PAP Details (Programs, Activities & Projects)
           </div>
-          <div class="info-banner" style="margin-bottom:12px; background:#fff8e1; border-left:4px solid #f9a825; padding:8px 12px;">
-            <i class="fas fa-exclamation-triangle" style="color:#f9a825;"></i>
-            <small>Use this section to quickly add PAPs expenses that are <strong>not yet in the Items Catalog</strong>. If the PAPs item already exists in the catalog, select it from the catalog list above instead.</small>
-          </div>
-          <div class="form-row-3">
-            <div class="form-group">
-              <label>Section <span class="text-danger">*</span></label>
-              <select class="form-select" id="ppmpPAPsSection_select">
-                <option value="WELFARE AND REINTEGRATION SERVICES DIVISION ACTIVITIES">WELFARE AND REINTEGRATION SERVICES DIVISION ACTIVITIES</option>
-                <option value="MWPSD ACTIVITIES">MWPSD ACTIVITIES</option>
-                <option value="MWPTD ACTIVITIES">MWPTD ACTIVITIES</option>
-                <option value="FAD ACTIVITIES">FAD ACTIVITIES</option>
-                <option value="TRAININGS & SEMINARS">TRAININGS & SEMINARS</option>
-                <option value="REPRESENTATION EXPENSES">REPRESENTATION EXPENSES</option>
-                <option value="PRINTING AND BINDING EXPENSES">PRINTING AND BINDING EXPENSES</option>
-                <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
-              </select>
+
+          <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+            <!-- Left: PAP Name + Budget -->
+            <div style="flex:2;padding:14px 18px;">
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
+                <input type="text" id="papName" placeholder="e.g., Pantry Renovation" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="color:#555;font-size:13px;">Php</span>
+                  <input type="number" id="papEstimatedBudget" step="0.01" min="0" placeholder="0.00" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+                </div>
+              </div>
             </div>
-            <div class="form-group">
-              <label>PAP Category</label>
-              <select class="form-select" id="ppmpPAPsCategory">
-                <option value="REPRESENTATION EXPENSES">REPRESENTATION EXPENSES</option>
-                <option value="MEALS AND SNACKS">MEALS AND SNACKS</option>
-                <option value="TRAINING MATERIALS">TRAINING MATERIALS</option>
-                <option value="TARPAULIN PRINTING">TARPAULIN PRINTING</option>
-                <option value="TRANSPORTATION RENTAL">TRANSPORTATION RENTAL</option>
-                <option value="HONORARIUM">HONORARIUM</option>
-                <option value="PERSONALIZED TOKENS">PERSONALIZED TOKENS</option>
-                <option value="SUPPLIES AND MATERIALS">SUPPLIES AND MATERIALS</option>
-                <option value="PRINTED POLO/TSHIRT">PRINTED POLO/TSHIRT</option>
-                <option value="OTHER SUPPLIES AND MATERIALS">OTHER SUPPLIES AND MATERIALS</option>
-                <option value="FINANCIAL LITERACY">FINANCIAL LITERACY</option>
-                <option value="CAPABILITY BUILDING">CAPABILITY BUILDING</option>
-                <option value="PRINTING AND PUBLICATION">PRINTING AND PUBLICATION</option>
-                <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
-                <option value="OTHER PAPs EXPENSES">OTHER PAPs EXPENSES</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Activity / Program Name <span class="text-danger">*</span></label>
-              <input type="text" id="ppmpPAPsActivityName" placeholder="e.g., Pre-Migration Orientation Seminar">
+            <!-- Vertical separator -->
+            <div style="width:1px;background:#ccc;"></div>
+            <!-- Right: Description -->
+            <div style="flex:1;padding:14px 18px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
+              <textarea id="papDescription" rows="4" placeholder="PAP description" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;"></textarea>
             </div>
           </div>
-          <div id="ppmpPAPsItemsContainer">
-            <div class="form-row" style="margin-bottom:4px;">
-              <div class="form-group" style="flex:3;">
-                <label>Expense Description <span class="text-danger">*</span></label>
-                <input type="text" id="ppmpPAPsExpenseDesc" placeholder="e.g., MEALS: AM Snacks, Lunch, PM Snacks with Free Use of Venue">
-              </div>
-              <div class="form-group" style="flex:1;">
-                <label>Unit</label>
-                <input type="text" id="ppmpPAPsUnit" placeholder="e.g., pax, lot, piece" value="lot">
-              </div>
-            </div>
-            <div class="form-row-3" style="margin-bottom:4px;">
-              <div class="form-group">
-                <label>Quantity / Size</label>
-                <input type="text" id="ppmpPAPsQtySize" placeholder="e.g., 100pax@₱2,000/pax">
-              </div>
-              <div class="form-group">
-                <label>Total Budget (₱) <span class="text-danger">*</span></label>
-                <input type="number" id="ppmpPAPsBudget" step="0.01" min="0" placeholder="0.00">
-              </div>
-              <div class="form-group" style="display:flex;align-items:flex-end;">
-                <button type="button" class="btn btn-sm btn-primary" onclick="addPAPsItemToList()" style="padding:6px 16px;width:100%;">
-                  <i class="fas fa-plus"></i> Add PAPs Expense
-                </button>
-              </div>
-            </div>
+
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 4px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+              Create PAP to Centralize?
+              <input type="checkbox" id="papCentralize" style="width:16px;height:16px;">
+            </label>
           </div>
-          <span id="ppmpPAPsItemCount" style="font-size:12px; color:#4a5568;"></span>
-          <div id="ppmpPAPsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
-            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
-              <thead><tr style="background:#e8f5e9; position:sticky; top:0; z-index:1;">
-                <th style="width:30px;">#</th>
-                <th>Activity</th>
-                <th>Expense Description</th>
-                <th style="width:80px;">Category</th>
-                <th style="width:80px;">Unit</th>
-                <th style="width:100px;">Qty/Size</th>
-                <th style="width:100px;">Budget</th>
-                <th style="width:40px;"></th>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 4px;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:13px;">Period:</span>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan"> Jan</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb"> Feb</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar"> Mar</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr"> Apr</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay"> May</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun"> Jun</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul"> Jul</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug"> Aug</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep"> Sep</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct"> Oct</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov"> Nov</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec"> Dec</label>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal()" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-plus"></i> Select on Non-PSDBM
+            </button>
+            <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#17a2b8;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-pen"></i> Add Manual Item
+            </button>
+            <span style="font-weight:600;font-size:13px;margin-left:8px;">Search</span>
+            <input type="text" id="papItemSearch" placeholder="" oninput="filterPAPItemsInModal(this.value)" style="flex:1;padding:5px 10px;border:1px solid #aaa;font-size:12px;">
+          </div>
+
+          <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin-bottom:8px;">
+            <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
+              <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
+                <th style="padding:6px 8px;">Command</th>
+                <th style="padding:6px 8px;">Item Code</th>
+                <th style="padding:6px 8px;">Product Category</th>
+                <th style="padding:6px 8px;">Account Code</th>
+                <th style="padding:6px 8px;">Product Description</th>
+                <th style="padding:6px 8px;">Available At</th>
+                <th style="padding:6px 4px;text-align:center;">Qty</th>
+                <th style="padding:6px 8px;">UOM</th>
+                <th style="padding:6px 8px;">Unit Price (Php)</th>
               </tr></thead>
-              <tbody id="ppmpPAPsListBody"></tbody>
+              <tbody id="papItemsListBody"></tbody>
             </table>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;border-top:1px solid #ddd;padding-top:6px;">
+            <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
+            <span style="font-size:12px;color:#888;">items</span>
           </div>
         </div>
 
+        <div id="ppmpNonPAPDetails">
         <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
 
         <div class="form-row">
@@ -5378,6 +5373,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="month" id="ppmpDeliveryPeriod" required>
           </div>
         </div>
+        </div>
 
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments & Remarks</div>
         <div class="form-group">
@@ -5407,7 +5403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window._ppmpItemsCache = allItems;
     // Initialize the items list
     window._ppmpSelectedItems = [];
-    window._ppmpPAPsItems = [];
+    window._papSelectedItems = [];
     // Auto-generate PPMP number if division is pre-selected (chief)
     if (isChief && chiefDivision) generatePPMPNumber();
     // Pre-select procurement source if provided
@@ -7691,20 +7687,87 @@ Failure to submit the above requirements within the prescribed period shall cons
     const procSource = document.getElementById('ppmpProcurementSource')?.value || 'NON PS-DBM';
     const isPAPs = procSource === 'PAPs';
     
+    // --- PAPs Mode: Save as a PAP entity via /api/paps ---
+    if (isPAPs) {
+      const papName = document.getElementById('papName')?.value?.trim() || '';
+      if (!papName) { alert('Please enter the PAP Name.'); return; }
+      
+      const papItems = window._papSelectedItems || [];
+      if (papItems.length === 0) {
+        alert('Please add at least one item to the PAP.');
+        return;
+      }
+      
+      const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
+      const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
+      const deptId = deptIdMap[division] || (parseInt(division) || null);
+      
+      const estimatedBudget = parseFloat(document.getElementById('papEstimatedBudget')?.value) || 0;
+      const description = document.getElementById('papDescription')?.value?.trim() || '';
+      const centralize = document.getElementById('papCentralize')?.checked || false;
+      
+      const papData = {
+        pap_name: papName,
+        description: description,
+        dept_id: deptId,
+        fiscal_year: parseInt(fiscalYear),
+        estimated_budget: estimatedBudget,
+        account_code: null,
+        centralize: centralize,
+        period_jan: document.getElementById('papPeriodJan')?.checked || false,
+        period_feb: document.getElementById('papPeriodFeb')?.checked || false,
+        period_mar: document.getElementById('papPeriodMar')?.checked || false,
+        period_apr: document.getElementById('papPeriodApr')?.checked || false,
+        period_may: document.getElementById('papPeriodMay')?.checked || false,
+        period_jun: document.getElementById('papPeriodJun')?.checked || false,
+        period_jul: document.getElementById('papPeriodJul')?.checked || false,
+        period_aug: document.getElementById('papPeriodAug')?.checked || false,
+        period_sep: document.getElementById('papPeriodSep')?.checked || false,
+        period_oct: document.getElementById('papPeriodOct')?.checked || false,
+        period_nov: document.getElementById('papPeriodNov')?.checked || false,
+        period_dec: document.getElementById('papPeriodDec')?.checked || false,
+        items: papItems.map(it => ({
+          item_id: it.item_id || null,
+          item_code: it.item_code || null,
+          product_category: it.product_category || null,
+          account_code: it.account_code || null,
+          product_description: it.product_description || null,
+          available_at: it.available_at || null,
+          quantity: parseFloat(it.quantity || 0),
+          uom: it.uom || null,
+          unit_price: parseFloat(it.unit_price || 0),
+          total_amount: parseFloat(it.total_amount || 0),
+          procurement_source: 'PAPs'
+        }))
+      };
+      
+      const totalBudget = papData.estimated_budget || papItems.reduce((sum, it) => sum + (parseFloat(it.quantity || 0) * parseFloat(it.unit_price || 0)), 0);
+      if (!confirm('Create PAP "' + papName + '" with ' + papItems.length + ' items?\n\nEstimated Budget: Php ' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}))) return;
+      
+      try {
+        await apiRequest('/paps', 'POST', papData);
+        alert('PAP created successfully!');
+        closeModal();
+        if (typeof loadPAPs === 'function') loadPAPs();
+        if (typeof loadPlans === 'function') loadPlans();
+      } catch (err) {
+        alert('Error creating PAP: ' + err.message);
+      }
+      return;
+    }
+    
+    // --- PS-DBM / NON PS-DBM Mode: Save as procurement plan entries ---
     const catalogItems = window._ppmpSelectedItems || [];
-    const papsItems = window._ppmpPAPsItems || [];
-    const items = isPAPs ? papsItems : catalogItems;
+    const items = catalogItems;
     
     if (items.length === 0) {
-      alert(isPAPs ? 'Please add at least one PAPs expense.' : 'Please add at least one item from the catalog.');
+      alert('Please add at least one item from the catalog.');
       return;
     }
 
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
-    const section = isPAPs 
-      ? (document.getElementById('ppmpPAPsSection_select')?.value || 'GENERAL PROCUREMENT')
-      : (document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT');
+    const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
@@ -7720,7 +7783,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const totalBudget = items.reduce((sum, it) => sum + it.budget, 0);
     const itemSummary = items.map((it, i) => `  ${i+1}. ${it.item_name || it.description} (x${it.quantity}) = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}`).join('\n');
-    if (!confirm(`Save ${items.length} ${isPAPs ? 'PAPs' : 'PPMP'} entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
+    if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
 
     try {
       // Generate PPMP numbers for the batch
@@ -7745,12 +7808,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           dept_id: deptIdMap[division] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: it.item_category || (isPAPs ? 'PAPs' : ''),
+          category: it.item_category || '',
           item_id: it.item_id || null,
           description: it.description,
           item_description: it.description,
-          project_type: isPAPs ? 'Activity/Program' : projectType,
-          quantity_size: isPAPs ? (it.qty_size || String(it.quantity)) : String(it.quantity),
+          project_type: projectType,
+          quantity_size: String(it.quantity),
           procurement_mode: procurementMode,
           pre_procurement: preProc,
           start_date: startDate || null,
@@ -7896,39 +7959,57 @@ Failure to submit the above requirements within the prescribed period shall cons
    */
   /**
    * Toggle between Catalog Items mode (PS-DBM / NON PS-DBM) and PAPs mode.
+   * When PAPs is selected: hide catalog section + common procurement details + timeline,
+   * show PAP-style form with PAP Name, Budget, Description, Centralize, Period, manual items table.
    */
   window.togglePPMPSourceMode = function(source) {
     const catalogSection = document.getElementById('ppmpCatalogSection');
     const papsSection = document.getElementById('ppmpPAPsSection');
+    const nonPAPDetails = document.getElementById('ppmpNonPAPDetails');
     
-    // Always show catalog section — PAPs items are also in the catalog
-    if (catalogSection) catalogSection.style.display = 'block';
-    
-    // Show ADDITIONAL PAPs manual entry section when PAPs is selected
     if (source === 'PAPs') {
+      // Hide catalog items section
+      if (catalogSection) catalogSection.style.display = 'none';
+      // Show PAP-style form
       if (papsSection) papsSection.style.display = 'block';
+      // Hide common procurement details + timeline (PAPs have their own period/budget)
+      if (nonPAPDetails) nonPAPDetails.style.display = 'none';
+      // Remove required from hidden fields to prevent form validation errors
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.removeAttribute('required');
+      });
+      // Initialize PAP items list if not already done
+      if (!window._papSelectedItems) window._papSelectedItems = [];
+      renderPAPModalItemsList();
     } else {
+      // Show catalog section for PS-DBM / NON PS-DBM
+      if (catalogSection) catalogSection.style.display = 'block';
+      // Hide PAP-style form
       if (papsSection) papsSection.style.display = 'none';
-    }
-    
-    // Filter the catalog item dropdown by procurement source
-    const itemSelect = document.getElementById('ppmpItemSelect');
-    if (itemSelect) {
-      const allItems = window._ppmpItemsCache || [];
-      const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
-      itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
-        filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
-    }
-    
-    // Update section label based on source
-    const sectionHeader = catalogSection ? catalogSection.querySelector('.form-section-header') : null;
-    if (sectionHeader) {
-      if (source === 'PAPs') {
-        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PAPs Items from Catalog';
-      } else if (source === 'PS-DBM') {
-        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PS-DBM Items from Catalog';
-      } else {
-        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> Items from Catalog';
+      // Show common procurement details + timeline
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+      // Filter the catalog item dropdown by procurement source
+      const itemSelect = document.getElementById('ppmpItemSelect');
+      if (itemSelect) {
+        const allItems = window._ppmpItemsCache || [];
+        const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
+        itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
+          filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
+      }
+      // Update section label based on source
+      const sectionHeader = catalogSection ? catalogSection.querySelector('.form-section-header') : null;
+      if (sectionHeader) {
+        if (source === 'PS-DBM') {
+          sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PS-DBM Items from Catalog';
+        } else {
+          sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> Items from Catalog';
+        }
       }
     }
   };

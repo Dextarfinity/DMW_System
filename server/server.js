@@ -59,7 +59,7 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // PostgreSQL Connection Pool
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || '192.168.100.235',
   database: process.env.DB_NAME || 'dmw_db',
   password: process.env.DB_PASSWORD || 'dmw123',
   port: parseInt(process.env.DB_PORT) || 5432,
