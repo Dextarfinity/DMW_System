@@ -685,6 +685,10 @@ function filterPRTable() {
 
 async function loadRFQ() {
   try {
+    // Always ensure PR data is loaded so we can show quantity/unit from linked PRs
+    if (!cachedPR || cachedPR.length === 0) {
+      try { cachedPR = await apiRequest('/pr'); } catch(e) { console.log('Could not pre-load PRs for RFQ'); }
+    }
     const rfq = await apiRequest('/rfq');
     cachedRFQ = rfq;
     filterRFQTable();
@@ -2179,7 +2183,7 @@ function renderRFQTable(rfq) {
     const statusLabel = r.status === 'completed' ? 'RFQ COMPLETED' : r.status === 'on_going' ? 'RFQ ON-GOING' : r.status === 'cancelled' ? 'CANCELLED' : r.status.toUpperCase();
     const statusClass = r.status === 'completed' ? 'completed' : r.status === 'on_going' ? 'on_going' : 'cancelled';
 
-    // Get quantity and unit from server's PR item data
+    // Get quantity and unit — try from server LATERAL JOIN first, then fall back to cachedPR
     let prQty = '-';
     let prUnit = '-';
     if (r.pr_id) {
@@ -2189,7 +2193,7 @@ function renderRFQTable(rfq) {
       } else {
         const linkedPR = (cachedPR || []).find(p => p.id == r.pr_id);
         if (linkedPR) {
-          prQty = linkedPR.item_quantity || '-';
+          prQty = linkedPR.item_quantity || linkedPR.total_quantity || '-';
           prUnit = linkedPR.item_unit || '-';
         }
       }
@@ -2257,7 +2261,7 @@ function renderAbstractTable(abstract) {
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewAbstractModal(${a.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>
-          <button class="btn-icon" title="Print" onclick="printRecord('Abstract', '${a.abstract_number}')"><i class="fas fa-print"></i></button>
+          <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
           <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -5526,7 +5530,15 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  window.showNewRFQModal = function() {
+  window.showNewRFQModal = async function(preselectedPrNumber) {
+    // Ensure PR data is loaded
+    if (!cachedPR || cachedPR.length === 0) { try { cachedPR = await apiRequest('/pr'); } catch(e) {} }
+    // Build PR options from cachedPR, sorted alphabetically by PR number
+    const sortedPRs = [...(cachedPR || [])].sort((a, b) => (a.pr_number || '').localeCompare(b.pr_number || ''));
+    const prOptions = sortedPRs.map(p => {
+      const sel = (preselectedPrNumber && (p.pr_number === preselectedPrNumber || String(p.id) === String(preselectedPrNumber))) ? ' selected' : '';
+      return `<option value="${p.id}"${sel}>${p.pr_number || ''} — ${(p.purpose || p.first_item_name || '').substring(0,60)} (₱${Number(p.total_amount||0).toLocaleString('en-PH',{minimumFractionDigits:2})})</option>`;
+    }).join('');
     const html = `
       <form id="rfqForm" onsubmit="saveNewRFQ(event)">
         <div class="info-banner" style="margin-bottom: 0;">
@@ -5557,8 +5569,9 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
         <div class="form-group">
           <label>Linked Purchase Request (Approved)</label>
-          <select class="form-select" id="rfqLinkedPR" required>
+          <select class="form-select" id="rfqLinkedPR" required onchange="onRFQLinkedPRChange(this.value)">
             <option value="">-- Select Approved PR --</option>
+            ${prOptions}
           </select>
         </div>
         <div class="form-group">
@@ -5633,6 +5646,48 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       </form>
     `;
     openModal('Create Request for Quotation (RFQ)', html);
+    // If a PR was preselected, auto-fill items
+    if (preselectedPrNumber) {
+      const sel = document.getElementById('rfqLinkedPR');
+      if (sel && sel.value) onRFQLinkedPRChange(sel.value);
+    }
+  };
+
+  // When user selects a PR in the RFQ form, auto-fill items from that PR
+  window.onRFQLinkedPRChange = async function(prId) {
+    if (!prId) return;
+    try {
+      const pr = await apiRequest('/purchase-requests/' + prId);
+      if (!pr) return;
+      // Set ABC amount
+      const abcInput = document.getElementById('rfqABC');
+      if (abcInput) abcInput.value = parseFloat(pr.total_amount || 0).toFixed(2);
+      // Populate items table
+      const tbody = document.getElementById('rfqItemsBody');
+      if (tbody && pr.items && pr.items.length > 0) {
+        tbody.innerHTML = '';
+        pr.items.forEach((item, idx) => {
+          const row = document.createElement('tr');
+          const abcId = idx === 0 ? ' id="rfqABC"' : '';
+          row.innerHTML = `
+            <td><input type="number" value="${item.quantity || 0}" style="width: 70px;" min="0"></td>
+            <td>
+              <select class="form-select" style="width: 75px;">
+                ${['Lot','Pax','Pcs','Unit','Sq.ft','Gal','Ltrs','Box','Ream','Set'].map(u => `<option value="${u}" ${(item.unit||'').toLowerCase() === u.toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}
+              </select>
+            </td>
+            <td><textarea rows="2" style="width: 100%;">${item.item_description || item.item_name || ''}</textarea></td>
+            <td><input type="number"${abcId} value="${parseFloat(item.total_price || item.unit_price || 0).toFixed(2)}" step="0.01" style="width: 100px;" min="0"></td>
+            <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+            <td><input type="number" placeholder="0.00" step="0.01" style="width: 100px;" disabled></td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+      // Fill item specifications
+      const specsField = document.getElementById('rfqItemSpecs');
+      if (specsField && pr.item_specifications) specsField.value = pr.item_specifications;
+    } catch(e) { console.error('Error loading PR items for RFQ:', e); }
   };
 
   window.addRFQItemRow = function() {
@@ -5660,7 +5715,18 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
 
   window.sendRFQ = function() {
     if(!validateAttachment('rfqDocument', 'RFQ Document')) return;
-    const abc = parseFloat(document.getElementById('rfqABC').value) || 0;
+    // Compute ABC: use #rfqABC if it exists, otherwise sum all item ABC cells in the table
+    let abc = 0;
+    const abcEl = document.getElementById('rfqABC');
+    if (abcEl) {
+      abc = parseFloat(abcEl.value) || 0;
+    } else {
+      const rows = document.getElementById('rfqItemsBody')?.querySelectorAll('tr') || [];
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 4) abc += parseFloat(cells[3].querySelector('input')?.value) || 0;
+      });
+    }
     if (abc >= 200000) {
       if(confirm('ABC ≥ ₱200,000. This RFQ will be posted to PhilGEPS for 3 calendar days. Continue?')) {
         alert('RFQ sent to suppliers and posted to PhilGEPS. Status: RFQ Posted');
@@ -5674,7 +5740,14 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  window.showNewAbstractModal = function() {
+  window.showNewAbstractModal = async function() {
+    // Ensure RFQ data is loaded
+    if (!cachedRFQ || cachedRFQ.length === 0) { try { cachedRFQ = await apiRequest('/rfq'); } catch(e) {} }
+    // Build RFQ options sorted by rfq_number
+    const sortedRFQs = [...(cachedRFQ || [])].sort((a, b) => (a.rfq_number || '').localeCompare(b.rfq_number || ''));
+    const rfqOptions = sortedRFQs.map(r => {
+      return `<option value="${r.id}">${r.rfq_number || ''} — ${(r.purpose || '').substring(0,50) || 'No purpose'} (ABC: ₱${Number(r.abc_amount||0).toLocaleString('en-PH',{minimumFractionDigits:2})})</option>`;
+    }).join('');
     const html = `
       <form id="abstractForm" onsubmit="saveNewAbstract(event)">
         <div class="info-banner" style="margin-bottom: 0;">
@@ -5693,13 +5766,14 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
         <div class="form-group">
           <label>Linked RFQ</label>
-          <select class="form-select" id="abstractLinkedRFQ" required>
+          <select class="form-select" id="abstractLinkedRFQ" required onchange="onAbstractLinkedRFQChange(this.value)">
             <option value="">-- Select RFQ with Quotations Received --</option>
+            ${rfqOptions}
           </select>
         </div>
         <div class="form-group">
           <label>PURPOSE</label>
-          <textarea rows="2" id="abstractPurpose" placeholder="State the purpose of the procurement..." required></textarea>
+          <textarea rows="2" id="abstractPurpose" placeholder="Auto-filled from linked PR when RFQ is selected..." required></textarea>
         </div>
         <div class="form-section-header section-items"><i class="fas fa-table"></i> Particulars & Supplier Quotations</div>
         <div class="form-items-section">
@@ -5729,9 +5803,9 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
                 <td colspan="4" style="padding: 4px;">
                   <strong>Supplier Names:</strong>
                 </td>
-                <td colspan="2" style="background: #e3f2fd;"><input type="text" placeholder="Supplier 1 Name" style="width: 100%; font-size: 11px;"></td>
-                <td colspan="2" style="background: #e8f5e9;"><input type="text" placeholder="Supplier 2 Name" style="width: 100%; font-size: 11px;"></td>
-                <td colspan="2" style="background: #fff8e1;"><input type="text" placeholder="Supplier 3 Name" style="width: 100%; font-size: 11px;"></td>
+                <td colspan="2" style="background: #e3f2fd;"><input type="text" id="absSupplier1Name" placeholder="Supplier 1 Name" style="width: 100%; font-size: 11px;"></td>
+                <td colspan="2" style="background: #e8f5e9;"><input type="text" id="absSupplier2Name" placeholder="Supplier 2 Name" style="width: 100%; font-size: 11px;"></td>
+                <td colspan="2" style="background: #fff8e1;"><input type="text" id="absSupplier3Name" placeholder="Supplier 3 Name" style="width: 100%; font-size: 11px;"></td>
               </tr>
             </tbody>
             <tbody id="abstractItemsBody">
@@ -5759,13 +5833,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         <div class="form-section-header"><i class="fas fa-certificate"></i> Certification / Recommendation</div>
         <div class="form-group">
           <label>CERTIFICATION / RECOMMENDATION</label>
-          <textarea rows="3" placeholder="We, the undersigned, hereby certify that the above prices are fair and reasonable after canvassing and that the lowest/single calculated and responsive quotation is from [Supplier Name] with a total bid price of [Amount].">${'We, the undersigned, hereby certify that the above prices of the listed articles/items are fair and reasonable after personal canvass and that the lowest/single calculated and responsive quotation is hereby recommended for award.'}</textarea>
+          <textarea rows="3" id="abstractCertification" placeholder="We, the undersigned, hereby certify that the above prices are fair and reasonable after canvassing and that the lowest/single calculated and responsive quotation is from [Supplier Name] with a total bid price of [Amount].">${'We, the undersigned, hereby certify that the above prices of the listed articles/items are fair and reasonable after personal canvass and that the lowest/single calculated and responsive quotation is hereby recommended for award.'}</textarea>
         </div>
 
         <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
         <div class="form-group">
           <label>Specifications (one per line)</label>
-          <textarea rows="4" id="abstractItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+          <textarea rows="4" id="abstractItemSpecs" placeholder="Auto-filled from RFQ specifications when RFQ is selected..."></textarea>
         </div>
 
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
@@ -5796,6 +5870,60 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       </form>
     `;
     openModal('Create Abstract of Quotations (AOQ)', html);
+  };
+
+  // When user selects an RFQ in the Abstract form, auto-fill items, purpose, ABC, specs from that RFQ + linked PR
+  window.onAbstractLinkedRFQChange = async function(rfqId) {
+    if (!rfqId) return;
+    try {
+      // Fetch full RFQ details (includes items)
+      const rfq = await apiRequest('/rfqs/' + rfqId);
+      if (!rfq) return;
+
+      // Fill purpose from linked PR
+      if (rfq.pr_id) {
+        try {
+          const pr = await apiRequest('/purchase-requests/' + rfq.pr_id);
+          if (pr && pr.purpose) {
+            const purposeField = document.getElementById('abstractPurpose');
+            if (purposeField) purposeField.value = pr.purpose;
+          }
+        } catch(e) {}
+      }
+
+      // Fill item specifications
+      if (rfq.item_specifications) {
+        const specsField = document.getElementById('abstractItemSpecs');
+        if (specsField) specsField.value = rfq.item_specifications;
+      }
+
+      // Populate items table from RFQ items
+      const tbody = document.getElementById('abstractItemsBody');
+      if (tbody && rfq.items && rfq.items.length > 0) {
+        tbody.innerHTML = '';
+        rfq.items.forEach(item => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><input type="number" value="${item.quantity || 0}" style="width: 45px; font-size: 11px;" min="0"></td>
+            <td>
+              <select class="form-select" style="width: 50px; font-size: 11px;">
+                ${['Lot','Pax','Pcs','Unit','Ltrs','Gal','Set','Box','Ream'].map(u => `<option value="${u}" ${(item.unit||'').toLowerCase() === u.toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}
+              </select>
+            </td>
+            <td><input type="text" value="${item.item_description || item.item_name || ''}" style="width: 100%; font-size: 11px;"></td>
+            <td><input type="number" value="${parseFloat(item.abc_total_cost || item.abc_unit_cost || 0).toFixed(2)}" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+            <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+            <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+            <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+            <td style="background: #f5fff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+            <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+            <td style="background: #fffef5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+
+    } catch(e) { console.error('Error loading RFQ data for Abstract:', e); }
   };
 
   window.addAbstractItemRow = function() {
@@ -7926,6 +8054,46 @@ Failure to submit the above requirements within the prescribed period shall cons
     const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
     const purpose = document.getElementById('abstractPurpose')?.value || '';
 
+    // Gather supplier names
+    const supplier1Name = document.getElementById('absSupplier1Name')?.value?.trim() || '';
+    const supplier2Name = document.getElementById('absSupplier2Name')?.value?.trim() || '';
+    const supplier3Name = document.getElementById('absSupplier3Name')?.value?.trim() || '';
+
+    // Calculate totals for each supplier from the items table
+    let s1Total = 0, s2Total = 0, s3Total = 0;
+    const itemRows = document.querySelectorAll('#abstractItemsBody tr');
+    itemRows.forEach(row => {
+      const inputs = row.querySelectorAll('input[type="number"]');
+      if (inputs.length >= 8) {
+        s1Total += parseFloat(inputs[4]?.value) || 0; // S1 total price
+        s2Total += parseFloat(inputs[6]?.value) || 0; // S2 total price
+        s3Total += parseFloat(inputs[8]?.value) || 0; // S3 total price  -- CORRECTED: indexes are 0=qty, 1=abc, 2=s1unit, 3=s1total, 4=s2unit, 5=s2total, 6=s3unit, 7=s3total
+      }
+    });
+
+    // Re-calculate — supplier totals based on readonly total fields
+    s1Total = 0; s2Total = 0; s3Total = 0;
+    itemRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 10) {
+        // Total price fields are at index 5 (s1), 7 (s2), 9 (s3) — the readonly ones
+        const s1t = parseFloat(cells[5]?.querySelector('input')?.value) || 0;
+        const s2t = parseFloat(cells[7]?.querySelector('input')?.value) || 0;
+        const s3t = parseFloat(cells[9]?.querySelector('input')?.value) || 0;
+        s1Total += s1t;
+        s2Total += s2t;
+        s3Total += s3t;
+      }
+    });
+
+    // Determine recommended (lowest) supplier
+    const supplierBids = [];
+    if (supplier1Name && s1Total > 0) supplierBids.push({ name: supplier1Name, total: s1Total });
+    if (supplier2Name && s2Total > 0) supplierBids.push({ name: supplier2Name, total: s2Total });
+    if (supplier3Name && s3Total > 0) supplierBids.push({ name: supplier3Name, total: s3Total });
+    supplierBids.sort((a, b) => a.total - b.total);
+    const recommendedSupplier = supplierBids.length > 0 ? supplierBids[0] : null;
+
     if (!confirm('Are you sure you want to submit this Abstract of Quotations?')) return;
 
     try {
@@ -7935,7 +8103,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         date_prepared: abstractDate || null,
         purpose: purpose,
         status: 'on_going',
-        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null
+        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
+        recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
+        recommended_amount: recommendedSupplier ? recommendedSupplier.total : null
       };
       const result = await apiRequest('/abstracts', 'POST', data);
       const absId = result.id || result.abstract_id;
@@ -10465,7 +10635,12 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // COA Submission Modal
-  window.showNewCOASubmissionModal = function() {
+  window.showNewCOASubmissionModal = async function() {
+    // Load PO and IAR data dynamically
+    if (!cachedPO || cachedPO.length === 0) { try { cachedPO = await apiRequest('/po'); } catch(e) {} }
+    if (!cachedIAR || cachedIAR.length === 0) { try { cachedIAR = await apiRequest('/iar'); } catch(e) {} }
+    const poOpts = (cachedPO || []).map(p => `<option value="${p.id}">${p.po_number || ''} - ${p.purpose || ''}</option>`).join('');
+    const iarOpts = (cachedIAR || []).map(i => `<option value="${i.id}">${i.iar_number || ''}</option>`).join('');
     const html = `
       <form id="coaForm">
         <div class="info-banner warning-banner" style="margin-bottom: 15px;">
@@ -10486,15 +10661,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           <label>Linked Purchase Order</label>
           <select class="form-select" required>
             <option value="">-- Select PO --</option>
-            <option value="po-001">PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001 - Security Services</option>
-            <option value="po-002">PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-002 - Internet Subscription</option>
+            ${poOpts}
           </select>
         </div>
         <div class="form-group">
           <label>Linked IAR</label>
           <select class="form-select" required>
             <option value="">-- Select IAR --</option>
-            <option value="iar-001">IAR-${getCurrentFiscalYear()}-001</option>
+            ${iarOpts}
           </select>
         </div>
         <div class="form-group">
@@ -10643,7 +10817,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Compile Packet Modal (NEW - per spec v1.2)
-  window.showCompilePacketModal = function() {
+  window.showCompilePacketModal = async function() {
+    // Load PO data dynamically
+    if (!cachedPO || cachedPO.length === 0) { try { cachedPO = await apiRequest('/po'); } catch(e) {} }
+    const poOpts = (cachedPO || []).map(p => `<option value="${p.id}">${p.po_number || ''} - ${p.purpose || ''} (${p.workflow_status || p.status || ''})</option>`).join('');
     const html = `
       <form id="compilePacketForm" onsubmit="handleCompilePacket(event)">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -10654,8 +10831,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <label>Select Purchase Order <span class="text-danger">*</span></label>
           <select class="form-select" required>
             <option value="">-- Select PO --</option>
-            <option value="po-001">PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001 - Security Services (Paid)</option>
-            <option value="po-002">PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-002 - Office Supplies (For Payment)</option>
+            ${poOpts}
           </select>
         </div>
         <div class="form-group">
@@ -11545,20 +11721,26 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // View COA Submission Details
-  window.showViewCOAModal = function(coaNo) {
+  window.showViewCOAModal = async function(coaId) {
+    let coa = {};
+    try { coa = await apiRequest('/coa/' + coaId); } catch(e) {
+      // fallback to cached
+      const allCoa = window._cachedCOA || [];
+      coa = allCoa.find(c => c.id === coaId || c.submission_number === coaId) || {};
+    }
     const html = `
       <div class="view-details">
-        <div class="detail-row"><label>Submission No.:</label><span>${coaNo || 'COA-${getCurrentFiscalYear()}-001'}</span></div>
-        <div class="detail-row"><label>PO Reference:</label><span>PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001</span></div>
-        <div class="detail-row"><label>Packet Status:</label><span><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></span></div>
-        <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
-        <div class="detail-row"><label>Submitted:</label><span>${formatDateNice()}</span></div>
-        <div class="detail-row"><label>Received by COA:</label><span>${formatDateNice()}</span></div>
-        <div class="detail-row"><label>Status:</label><span><span class="status-badge submitted-to-coa">COA Submitted</span></span></div>
+        <div class="detail-row"><label>Submission No.:</label><span>${coa.submission_number || coaId || ''}</span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>${coa.po_number || 'N/A'}</span></div>
+        <div class="detail-row"><label>Packet Status:</label><span><span class="status-badge ${coa.packet_status || 'signed'}">${coa.packet_status || 'N/A'}</span></span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(coa.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+        <div class="detail-row"><label>Submitted:</label><span>${coa.submission_date ? new Date(coa.submission_date).toLocaleDateString('en-PH') : 'N/A'}</span></div>
+        <div class="detail-row"><label>Received by COA:</label><span>${coa.received_by || 'N/A'}</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge submitted-to-coa">${coa.status || 'N/A'}</span></span></div>
       </div>
       <div class="form-group" style="text-align: right; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-        <button type="button" class="btn btn-outline" onclick="printRecord('COA', '${coaNo}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('COA', '${coa.submission_number || coaId}');"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
     openModal('View COA Submission', html);
@@ -11583,7 +11765,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <table class="data-table" style="font-size: 12px; margin-top: 8px;">
         <thead><tr><th>PO No.</th><th>Project</th><th>Amount</th><th>Date</th></tr></thead>
         <tbody>
-          <tr><td>PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001</td><td>Security Services Q1</td><td>₱115,000.00</td><td>${formatDateNice()}</td></tr>
+          ${(() => { const pos = (cachedPO || []).filter(p => p.supplier_id == supplierId); return pos.length ? pos.map(p => `<tr><td>${p.po_number||''}</td><td>${p.purpose||''}</td><td>₱${parseFloat(p.total_amount||0).toLocaleString('en-PH',{minimumFractionDigits:2})}</td><td>${p.po_date ? new Date(p.po_date).toLocaleDateString('en-PH') : ''}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#999;">No transactions found</td></tr>'; })()}
         </tbody>
       </table>
       <div class="form-group" style="text-align: right; margin-top: 20px;">
@@ -12560,6 +12742,12 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Submit PPMP to APP Modal
   window.showSubmitToAPPModal = function(ppmpNo) {
+    // Dynamically look up PPMP data
+    const ppmpList = window._ppmpData || [];
+    const ppmp = ppmpList.find(p => p.ppmp_number === ppmpNo || p.code === ppmpNo || String(p.id) === String(ppmpNo));
+    const pNo = ppmp ? (ppmp.ppmp_number || ppmp.code || ppmpNo) : (ppmpNo || '-');
+    const pDesc = ppmp ? (ppmp.description || ppmp.item_description || '-') : '-';
+    const pABC = ppmp ? '₱' + Number(ppmp.estimated_budget || ppmp.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) : '-';
     const html = `
       <form id="submitToAPPForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12567,9 +12755,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           Submit this PPMP item to be included in the APP.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo || 'PPMP-WRSD-${getCurrentFiscalYear()}-001'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Reintegration</span></div>
-          <div class="detail-row"><label>ABC:</label><span>₱45,000.00</span></div>
+          <div class="detail-row"><label>PPMP No.:</label><span>${pNo}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pDesc}</span></div>
+          <div class="detail-row"><label>ABC:</label><span>${pABC}</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Remarks (Optional)</label>
@@ -12625,7 +12813,16 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Approve PR Modal
-  window.showApprovePRModal = function(prNo) {
+  window.showApprovePRModal = async function(prIdOrNo) {
+    // Fetch actual PR data dynamically
+    let pr = null;
+    if (typeof prIdOrNo === 'number') {
+      pr = (cachedPR || []).find(p => p.id === prIdOrNo);
+      if (!pr) { try { pr = await apiRequest('/purchase-requests/' + prIdOrNo); } catch(e) {} }
+    } else {
+      pr = (cachedPR || []).find(p => p.pr_number === prIdOrNo);
+    }
+    if (!pr) { alert('PR not found'); return; }
     const html = `
       <form id="approvePRForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12633,10 +12830,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           Approve this Purchase Request as HoPE (Head of Procuring Entity).
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-002'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Office Supplies - Q1</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱85,000.00</span></div>
-          <div class="detail-row"><label>Requested By:</label><span>End-User (FAD)</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ''} (${pr.department_name || pr.department_code || ''})</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Approval Remarks (Optional)</label>
@@ -12652,7 +12849,15 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Return PR Modal
-  window.showReturnPRModal = function(prNo) {
+  window.showReturnPRModal = async function(prIdOrNo) {
+    let pr = null;
+    if (typeof prIdOrNo === 'number') {
+      pr = (cachedPR || []).find(p => p.id === prIdOrNo);
+      if (!pr) { try { pr = await apiRequest('/purchase-requests/' + prIdOrNo); } catch(e) {} }
+    } else {
+      pr = (cachedPR || []).find(p => p.pr_number === prIdOrNo);
+    }
+    if (!pr) { alert('PR not found'); return; }
     const html = `
       <form id="returnPRForm">
         <div class="info-banner warning-banner" style="margin-bottom: 15px;">
@@ -12660,9 +12865,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           Return this PR to the requesting division for revision.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-002'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Office Supplies - Q1</span></div>
-          <div class="detail-row"><label>Requested By:</label><span>End-User (FAD)</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ''} (${pr.department_name || pr.department_code || ''})</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Reason for Return <span class="text-danger">*</span></label>
@@ -12679,6 +12884,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Attach Annex 1 Modal
   window.showAttachAnnex1Modal = function(prNo) {
+    const pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo) || {};
     const html = `
       <form id="attachAnnex1Form" onsubmit="handleAttachAnnex1(event)">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12686,8 +12892,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           Attach Route Slip (Annex 1) and other required documents.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-003'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Orientation</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || prNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Route Slip (Annex 1) <span class="text-danger">*</span></label>
@@ -12716,6 +12922,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Submit PR for Approval Modal
   window.showSubmitPRForApprovalModal = function(prNo) {
+    const pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo) || {};
     const html = `
       <form id="submitPRForApprovalForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12723,9 +12930,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           Submit this PR for HoPE approval.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-003'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Training Meals - OWWA Orientation</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱45,000.00</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || prNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
           <div class="detail-row"><label>Annex 1:</label><span><i class="fas fa-check-circle text-success"></i> Attached</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
@@ -12742,7 +12949,15 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Create RFQ from PR Modal
-  window.showCreateRFQFromPRModal = function(prNo) {
+  window.showCreateRFQFromPRModal = async function(prNo) {
+    // Fetch actual PR data
+    let pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo);
+    if (!pr && typeof prNo === 'number') { try { pr = await apiRequest('/purchase-requests/' + prNo); } catch(e) {} }
+    if (!pr) { alert('PR not found'); return; }
+    const amt = parseFloat(pr.total_amount || 0);
+    const philgepsNote = amt >= 200000 
+      ? '<span style="color:#d32f2f;"><i class="fas fa-exclamation-triangle"></i> ABC ≥ ₱200,000 - PhilGEPS posting REQUIRED (3 calendar days)</span>'
+      : '<i class="fas fa-info-circle"></i> ABC < ₱200,000 - PhilGEPS posting not required';
     const html = `
       <form id="createRFQFromPRForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12750,9 +12965,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           Issue Request for Quotation based on this PR.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${prNo || 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001'}</span></div>
-          <div class="detail-row"><label>Project:</label><span>Security Services - Q1</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱120,000.00</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${amt.toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Division:</label><span>${pr.department_name || pr.department_code || 'N/A'}</span></div>
         </div>
         <div class="form-row" style="margin-top: 15px;">
           <div class="form-group">
@@ -12767,7 +12983,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-group">
           <label>PhilGEPS Posting</label>
           <div style="font-size: 13px; color: #666;">
-            <i class="fas fa-info-circle"></i> ABC < ₱200,000 - PhilGEPS posting not required
+            ${philgepsNote}
           </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
@@ -12900,7 +13116,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Submit to COA Modal
-  window.showSubmitToCOAModal = function(packetId) {
+  window.showSubmitToCOAModal = async function(packetId) {
+    // Fetch actual packet data
+    let packet = {};
+    try { 
+      const packets = window._poPacketData || [];
+      packet = packets.find(p => p.id === packetId || p.packet_number === packetId) || {};
+    } catch(e) {}
     const html = `
       <form id="submitToCOAForm">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -12908,11 +13130,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           Submit this PO Packet to COA.
         </div>
         <div class="view-details">
-          <div class="detail-row"><label>Packet ID:</label><span>${packetId || 'PKT-${getCurrentFiscalYear()}-001'}</span></div>
-          <div class="detail-row"><label>PO Reference:</label><span>PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱115,000.00</span></div>
-          <div class="detail-row"><label>Chief Signed:</label><span><i class="fas fa-check text-success"></i> Yes</span></div>
-          <div class="detail-row"><label>Director Signed:</label><span><i class="fas fa-check text-success"></i> Yes</span></div>
+          <div class="detail-row"><label>Packet ID:</label><span>${packet.packet_number || packetId || ''}</span></div>
+          <div class="detail-row"><label>PO Reference:</label><span>${packet.po_number || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(packet.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Chief Signed:</label><span>${packet.chief_signed ? '<i class="fas fa-check text-success"></i> Yes' : '<i class="fas fa-times text-danger"></i> No'}</span></div>
+          <div class="detail-row"><label>Director Signed:</label><span>${packet.director_signed ? '<i class="fas fa-check text-success"></i> Yes' : '<i class="fas fa-times text-danger"></i> No'}</span></div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Submission Date <span class="text-danger">*</span></label>
@@ -14105,7 +14327,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             ${itemsHTML}
             ${prPurpose ? `<tr><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="padding:4px 5px; font-size:9.5pt; color:red; font-weight:bold; border:1px solid #333;"><span style="color:red; font-weight:bold;">PURPOSE: ${prPurpose}</span></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td></tr>` : ''}
             <tr class="rfq-total-row">
-              <td colspan="3" style="text-align:right;">VAT INCLUSIVE</td>
+              <td colspan="3" style="text-align:center;">VAT INCLUSIVE</td>
               <td style="text-align:right;">₱${fmtCurrency(totalABC)}</td>
               <td style="text-align:right;"></td>
               <td style="text-align:right;"></td>
@@ -14141,8 +14363,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
 
         <div class="rfq-two-col" style="margin-top:30px;">
-          <div class="rfq-col-left rfq-sig-section" style="display:flex; flex-direction:column; justify-content:flex-end;">
-            <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase; border-bottom:1px solid #333; display:inline-block; padding-bottom:2px;">${markName}</div>
+          <div class="rfq-col-left rfq-sig-section" style="text-align:center;">
+            <div class="rfq-sig-line" style="margin:25px auto 3px auto;"></div>
+            <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase;">${markName}</div>
             <div style="font-size:9pt; color:#444;">AO I / SUPPLY OFFICER I</div>
           </div>
           <div class="rfq-col-right rfq-conforme" style="margin-top:0;">
@@ -14158,6 +14381,343 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       console.error('Print RFQ error:', err);
       showNotification('Failed to print RFQ: ' + err.message, 'error');
+    }
+  };
+
+  // Print Abstract of Quotation — matching government AOQ form (ABS JAN 2026.xlsx template)
+  window.printAbstract = async function(abstractId) {
+    try {
+      showNotification('Loading Abstract data for print...', 'info');
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) { showNotification('Abstract not found', 'error'); return; }
+
+      // Fetch RFQ details for ABC amount and items
+      let rfqData = null;
+      let prPurpose = abs.purpose || '';
+      if (abs.rfq_id) {
+        try {
+          rfqData = await apiRequest('/rfqs/' + abs.rfq_id);
+          if (rfqData && rfqData.pr_id) {
+            try {
+              const pr = await apiRequest('/purchase-requests/' + rfqData.pr_id);
+              if (pr && pr.purpose) prPurpose = pr.purpose;
+            } catch(e) {}
+          }
+        } catch(e) { console.warn('Could not fetch RFQ data:', e); }
+      }
+
+      // Fetch BAC members from users/employees
+      let bacChairName = 'REGIENALD S. ESPALDON', bacChairDesignation = 'BAC Chairperson';
+      let bacViceChairName = 'EVAL B. MAKINANO', bacViceChairDesignation = 'BAC Vice-Chairperson';
+      let bacMembers = [
+        { name: 'REYNON E. ARLAN', title: 'BAC Member' },
+        { name: 'MARISSA A. GARAY', title: 'BAC Member' },
+        { name: 'GARY P. SALADORES', title: 'BAC Member' }
+      ];
+      let bacSecName = 'GIOVANNI S. PAREDES', bacSecTitle = 'Chairperson, BAC Secretariat';
+      let rdName = 'RITCHEL M. BUTAO', rdTitle = 'Regional Director';
+      try {
+        const [allUsers, allEmployees] = await Promise.all([apiRequest('/users'), apiRequest('/employees')]);
+        const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
+        if (bacChairUser) {
+          bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
+          const emp = allEmployees.find(e => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
+          if (emp && emp.designation_name) bacChairDesignation = 'BAC Chairperson';
+        }
+        const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
+        if (bacSecUser) {
+          bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
+        }
+      } catch(e) { console.warn('Could not fetch BAC members:', e); }
+
+      const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const months = ['Jan.','Feb.','Mar.','Apr.','May','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Build supplier columns from quotations
+      const quotations = abs.quotations || [];
+      // Pad to at least 3 suppliers
+      while (quotations.length < 3) quotations.push({ supplier_name: '', items: [], bid_amount: 0 });
+
+      // Build unique items from RFQ or from the first quotation
+      let abstractItems = [];
+      if (rfqData && rfqData.items && rfqData.items.length > 0) {
+        abstractItems = rfqData.items.map(it => ({
+          qty: parseFloat(it.quantity || 0),
+          unit: it.unit || '',
+          description: it.item_name || it.item_description || '',
+          abc: parseFloat(it.abc_total_cost || it.abc_unit_cost || 0)
+        }));
+      } else if (quotations[0] && quotations[0].items && quotations[0].items.length > 0) {
+        abstractItems = quotations[0].items.map(it => ({
+          qty: parseFloat(it.quantity || 0),
+          unit: it.unit || '',
+          description: it.item_description || '',
+          abc: 0
+        }));
+      }
+
+      // Get total ABC from RFQ
+      const totalABC = rfqData ? parseFloat(rfqData.abc_amount || 0) : abstractItems.reduce((s, i) => s + i.abc, 0);
+
+      // Build header columns for suppliers
+      let supplierHeaders = '';
+      let supplierSubHeaders = '';
+      const supplierColors = ['#e3f2fd', '#e8f5e9', '#fff8e1'];
+      for (let si = 0; si < 3; si++) {
+        const sName = (quotations[si] && quotations[si].supplier_name) ? quotations[si].supplier_name.toUpperCase() : '';
+        supplierHeaders += `<th colspan="2" style="text-align:center; background:${supplierColors[si]}; font-size:8pt; padding:4px;">${sName}</th>`;
+        supplierSubHeaders += `<th style="width:10%; background:${supplierColors[si]}; font-size:7.5pt;">Unit Price</th><th style="width:10%; background:${supplierColors[si]}; font-size:7.5pt;">Total Price</th>`;
+      }
+
+      // Build item rows
+      let itemsHTML = '';
+      abstractItems.forEach((item) => {
+        let supplierCells = '';
+        for (let si = 0; si < 3; si++) {
+          const q = quotations[si];
+          let unitPrice = '', totalPrice = '';
+          if (q && q.items && q.items.length > 0) {
+            // Match by description or use first item
+            const matchItem = q.items.find(qi => qi.item_description && item.description && qi.item_description.toLowerCase().includes(item.description.toLowerCase().substring(0, 15))) || q.items[0];
+            if (matchItem) {
+              unitPrice = fmtCurrency(matchItem.unit_price || 0);
+              totalPrice = fmtCurrency(matchItem.total_price || 0);
+            }
+          }
+          const bg = si === 0 ? '#f5f9ff' : si === 1 ? '#f5fff5' : '#fffef5';
+          supplierCells += `<td style="text-align:right; background:${bg}; font-size:9pt;">${unitPrice}</td><td style="text-align:right; background:${bg}; font-size:9pt;">${totalPrice}</td>`;
+        }
+        itemsHTML += `<tr>
+          <td style="text-align:center; font-size:9pt;">${item.qty}</td>
+          <td style="text-align:center; font-size:9pt;">${item.unit}</td>
+          <td style="text-align:left; font-size:9pt;">${item.description}</td>
+          <td style="text-align:right; font-size:9pt;">${fmtCurrency(item.abc)}</td>
+          ${supplierCells}
+        </tr>`;
+      });
+
+      // Specs / Notes rows
+      if (abs.item_specifications) {
+        const specs = abs.item_specifications.split(/\n|\r\n/).filter(l => l.trim());
+        itemsHTML += `<tr><td colspan="10" style="border:none;"></td></tr>`;
+        itemsHTML += `<tr><td></td><td></td><td colspan="8" style="text-align:left; font-size:9pt; font-weight:bold;">Note:</td></tr>`;
+        specs.forEach((spec, i) => {
+          itemsHTML += `<tr><td></td><td></td><td colspan="8" style="text-align:left; font-size:9pt;">${(i + 1)}. ${spec.trim()}</td></tr>`;
+        });
+      }
+
+      // Fill empty rows for form look
+      const currentRowCount = abstractItems.length + (abs.item_specifications ? abs.item_specifications.split(/\n/).filter(l => l.trim()).length + 2 : 0);
+      for (let i = currentRowCount; i < 8; i++) {
+        itemsHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      }
+
+      // PURPOSE row with supplier totals
+      let purposeTotalCells = '';
+      for (let si = 0; si < 3; si++) {
+        const q = quotations[si];
+        const total = q ? parseFloat(q.bid_amount || 0) : 0;
+        const bg = si === 0 ? '#f5f9ff' : si === 1 ? '#f5fff5' : '#fffef5';
+        purposeTotalCells += `<td style="background:${bg};"></td><td style="text-align:right; background:${bg}; font-size:9pt; font-weight:bold;">${total > 0 ? fmtCurrency(total) : ''}</td>`;
+      }
+
+      // Determine recommended supplier name
+      const recommendedName = abs.recommended_supplier_name || (quotations[0] ? quotations[0].supplier_name : '');
+      const recommendedAmount = fmtCurrency(abs.recommended_amount || 0);
+
+      const bodyContent = `
+        <style>
+          .abs-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 8px 0 15px 0;
+            letter-spacing: 1px;
+          }
+          .abs-info-row {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            margin: 4px 0;
+            line-height: 1.5;
+          }
+          .abs-info-row .abs-label {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 100px;
+          }
+          .abs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 0 0;
+            font-family: Arial, sans-serif;
+          }
+          .abs-table thead th {
+            border: 1px solid #333;
+            padding: 4px;
+            font-size: 8pt;
+            font-weight: bold;
+            text-align: center;
+          }
+          .abs-table tbody td {
+            border: 1px solid #333;
+            padding: 2px 5px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .abs-cert {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            line-height: 1.6;
+            margin-top: 12px;
+          }
+          .abs-sig-section {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            margin-top: 20px;
+          }
+          .abs-sig-block {
+            display: inline-block;
+            width: 30%;
+            text-align: center;
+            vertical-align: top;
+            margin-bottom: 15px;
+          }
+          .abs-sig-line {
+            border-bottom: 1px solid #333;
+            height: 25px;
+            margin: 15px auto 3px auto;
+            width: 85%;
+          }
+          .abs-sig-name {
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+          }
+          .abs-sig-title {
+            font-size: 8pt;
+            color: #444;
+          }
+          .abs-sig-label {
+            font-size: 8pt;
+            font-style: italic;
+            color: #666;
+            margin-bottom: 3px;
+          }
+        </style>
+
+        <div class="abs-title">ABSTRACT OF QUOTATION</div>
+
+        <div style="display:flex; justify-content:space-between;">
+          <div>
+            <div class="abs-info-row"><span class="abs-label">AOQ No.:</span> ${abs.abstract_number || ''}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="abs-info-row"><span class="abs-label">Date:</span> ${fmtDate(abs.date_prepared)}</div>
+          </div>
+        </div>
+
+        <table class="abs-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:6%;">Qty.</th>
+              <th rowspan="2" style="width:6%;">Unit</th>
+              <th rowspan="2" style="width:22%;">Items</th>
+              <th rowspan="2" style="width:10%;">ABC</th>
+              ${supplierHeaders}
+            </tr>
+            <tr>
+              ${supplierSubHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+            <tr style="font-weight:bold;">
+              <td></td>
+              <td></td>
+              <td style="text-align:left; font-size:9pt; color:red; font-weight:bold;">PURPOSE: ${prPurpose}</td>
+              <td></td>
+              ${purposeTotalCells}
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="abs-cert">
+          <p>We <strong>CERTIFY</strong> that we opened and recorded herein quotations received in respond to the RFQ.</p>
+          <p style="margin-top:6px;">We therefore <strong>RECOMMEND</strong> to award to <strong><u>${recommendedName}</u></strong> with a total bid price of <strong><u>₱${recommendedAmount}</u></strong> having submitted the most responsive quotation.</p>
+          <p style="margin-top:6px;">We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
+        </div>
+
+        <div class="abs-sig-section">
+          <div style="text-align:left; margin-bottom:5px;"><em>Recommended By:</em></div>
+          <div style="display:flex; flex-wrap:wrap; justify-content:space-between;">
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacViceChairName}</div>
+              <div class="abs-sig-title">${bacViceChairDesignation}</div>
+            </div>
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacMembers[0].name}</div>
+              <div class="abs-sig-title">${bacMembers[0].title}</div>
+            </div>
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacMembers[1].name}</div>
+              <div class="abs-sig-title">${bacMembers[1].title}</div>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; justify-content:space-between;">
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacMembers[2].name}</div>
+              <div class="abs-sig-title">${bacMembers[2].title}</div>
+            </div>
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacSecName}</div>
+              <div class="abs-sig-title">${bacSecTitle}</div>
+            </div>
+            <div class="abs-sig-block">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacChairName}</div>
+              <div class="abs-sig-title">${bacChairDesignation}</div>
+            </div>
+          </div>
+
+          <div style="margin-top:25px; text-align:left;"><em>Approved By:</em></div>
+          <div style="display:flex; justify-content:center;">
+            <div class="abs-sig-block" style="width:40%;">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${rdName}</div>
+              <div class="abs-sig-title">${rdTitle}</div>
+            </div>
+          </div>
+
+          <div style="margin-top:25px; text-align:left;"><em>Prepared By:</em></div>
+          <div style="display:flex; justify-content:center;">
+            <div class="abs-sig-block" style="width:40%;">
+              <div class="abs-sig-line"></div>
+              <div class="abs-sig-name">${bacSecName}</div>
+              <div class="abs-sig-title">${bacSecTitle}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const html = buildPrintHTML('Abstract of Quotation - ' + abs.abstract_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('AOQ_' + abs.abstract_number), pageSize: 'A4', landscape: true, editable: true });
+    } catch (err) {
+      console.error('Print Abstract error:', err);
+      showNotification('Failed to print Abstract: ' + err.message, 'error');
     }
   };
 
@@ -15310,78 +15870,119 @@ Failure to submit the above requirements within the prescribed period shall cons
     closeModal();
   };
   
-  // Get report data based on report type
+  // Get report data based on report type — fully dynamic from cached DB data
   function getReportData(reportType) {
-    const today = new Date().toLocaleDateString('en-PH');
-    
+    const fmt = v => v != null ? '₱' + Number(v).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}) : '₱0.00';
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH') : '-';
+    const daysBetween = (a,b) => { if(!a||!b) return '-'; const ms = new Date(b)-new Date(a); return Math.max(0,Math.round(ms/86400000)); };
+
     const reports = {
       'PPMP': {
         title: 'PPMP Summary Report',
         headers: ['PPMP No', 'Description', 'Division', 'Category', 'Qty', 'Mode', 'Schedule', 'Est. Budget', 'Status'],
-        data: [
-          { 'PPMP No': 'PPMP-FAD-${getCurrentFiscalYear()}-001', 'Description': 'Security Services', 'Division': 'FAD', 'Category': 'Services', 'Qty': '12 mos', 'Mode': 'SVP', 'Schedule': 'Jan-Dec ${getCurrentFiscalYear()}', 'Est. Budget': '₱480,000.00', 'Status': 'In APP' },
-          { 'PPMP No': 'PPMP-FAD-${getCurrentFiscalYear()}-002', 'Description': 'Janitorial Services', 'Division': 'FAD', 'Category': 'Services', 'Qty': '12 mos', 'Mode': 'SVP', 'Schedule': 'Jan-Dec ${getCurrentFiscalYear()}', 'Est. Budget': '₱360,000.00', 'Status': 'In APP' },
-          { 'PPMP No': 'PPMP-WRSD-${getCurrentFiscalYear()}-001', 'Description': 'Training Meals', 'Division': 'WRSD', 'Category': 'Catering', 'Qty': '200 pax', 'Mode': 'SVP', 'Schedule': 'Feb ${getCurrentFiscalYear()}', 'Est. Budget': '₱45,000.00', 'Status': 'Draft' }
-        ]
+        data: (window._ppmpData || []).map(p => ({
+          'PPMP No': p.ppmp_number || p.code || '-',
+          'Description': p.description || p.item_description || '-',
+          'Division': p.department_name || p.division || '-',
+          'Category': p.category_name || p.category || '-',
+          'Qty': (p.quantity || p.total_quantity || '-') + (p.unit ? ' ' + p.unit : ''),
+          'Mode': p.procurement_mode_name || p.mode_of_procurement || '-',
+          'Schedule': p.schedule || p.milestone || '-',
+          'Est. Budget': fmt(p.estimated_budget || p.total_amount),
+          'Status': p.status || '-'
+        }))
       },
       'APP': {
         title: 'Annual Procurement Plan Report',
         headers: ['APP Code', 'Project', 'Mode', 'ABC', 'Schedule', 'Status'],
-        data: [
-          { 'APP Code': 'APP-${getCurrentFiscalYear()}-001', 'Project': 'Security Services', 'Mode': 'SVP', 'ABC': '₱480,000.00', 'Schedule': 'Q1 ${getCurrentFiscalYear()}', 'Status': 'Active' },
-          { 'APP Code': 'APP-${getCurrentFiscalYear()}-002', 'Project': 'Office Supplies', 'Mode': 'Shopping', 'ABC': '₱85,000.00', 'Schedule': 'Q1 ${getCurrentFiscalYear()}', 'Status': 'Active' }
-        ]
+        data: (window._ppmpData || []).filter(p => (p.status||'').toLowerCase().includes('app') || (p.status||'').toLowerCase() === 'approved').map(p => ({
+          'APP Code': p.ppmp_number || p.code || '-',
+          'Project': p.description || p.item_description || '-',
+          'Mode': p.procurement_mode_name || p.mode_of_procurement || '-',
+          'ABC': fmt(p.estimated_budget || p.total_amount),
+          'Schedule': p.schedule || p.milestone || '-',
+          'Status': p.status || 'Active'
+        }))
       },
       'PR': {
         title: 'PR Status Report',
-        headers: ['PR No', 'Date', 'Description', 'Division', 'Amount', 'Status', 'Timeline Compliant'],
-        data: [
-          { 'PR No': 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001', 'Date': `${getCurrentFiscalYear()}-01-10`, 'Description': 'Security Services Q1', 'Division': 'FAD', 'Amount': '₱120,000.00', 'Status': 'Approved', 'Timeline Compliant': 'Yes' },
-          { 'PR No': 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-002', 'Date': `${getCurrentFiscalYear()}-01-15`, 'Description': 'Office Supplies Q1', 'Division': 'FAD', 'Amount': '₱85,000.00', 'Status': 'For Approval', 'Timeline Compliant': 'Yes' }
-        ]
+        headers: ['PR No', 'Date', 'Description', 'Division', 'Amount', 'Status'],
+        data: (cachedPR || []).map(p => ({
+          'PR No': p.pr_number || '-',
+          'Date': fmtDate(p.pr_date || p.created_at),
+          'Description': p.purpose || p.first_item_name || '-',
+          'Division': p.department_name || p.division || '-',
+          'Amount': fmt(p.total_amount),
+          'Status': p.workflow_status || p.status || '-'
+        }))
       },
       'SVPLifecycle': {
         title: 'SVP Lifecycle Report',
-        headers: ['Transaction', 'PR Stage', 'RFQ Stage', 'Abstract', 'NOA', 'PO', 'IAR', 'COA', 'Total Days'],
-        data: [
-          { 'Transaction': 'PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001', 'PR Stage': '2 days', 'RFQ Stage': '3 days', 'Abstract': '1 day', 'NOA': '1 day', 'PO': '2 days', 'IAR': '5 days', 'COA': 'Pending', 'Total Days': '14' }
-        ]
+        headers: ['PR No', 'PR Date', 'RFQ Date', 'Abstract Date', 'PO Date', 'IAR Date', 'Total Days'],
+        data: (cachedPR || []).map(pr => {
+          const rfq = (cachedRFQ || []).find(r => r.pr_id === pr.id);
+          const abs = (cachedAbstract || []).find(a => a.rfq_id === (rfq||{}).id);
+          const po = (cachedPO || []).find(o => o.pr_id === pr.id || o.abstract_id === (abs||{}).id);
+          const iar = (cachedIAR || []).find(i => i.po_id === (po||{}).id);
+          const startDate = pr.pr_date || pr.created_at;
+          const endDate = iar ? (iar.iar_date || iar.created_at) : (po ? (po.po_date || po.created_at) : null);
+          return {
+            'PR No': pr.pr_number || '-',
+            'PR Date': fmtDate(pr.pr_date || pr.created_at),
+            'RFQ Date': rfq ? fmtDate(rfq.rfq_date || rfq.created_at) : '-',
+            'Abstract Date': abs ? fmtDate(abs.abstract_date || abs.created_at) : '-',
+            'PO Date': po ? fmtDate(po.po_date || po.created_at) : '-',
+            'IAR Date': iar ? fmtDate(iar.iar_date || iar.created_at) : '-',
+            'Total Days': daysBetween(startDate, endDate) + (endDate ? '' : ' (ongoing)')
+          };
+        })
       },
       'TimelineKPI': {
         title: 'Timeline KPI Report',
-        headers: ['KPI Metric', 'Target', 'Actual', 'Status'],
-        data: [
-          { 'KPI Metric': '% PRs ≥15 days prior', 'Target': '100%', 'Actual': '85%', 'Status': 'Needs Improvement' },
-          { 'KPI Metric': 'Avg days PR-to-NOA', 'Target': '≤10 days', 'Actual': '8 days', 'Status': 'On Track' },
-          { 'KPI Metric': '% Complete IARs', 'Target': '100%', 'Actual': '92%', 'Status': 'On Track' },
-          { 'KPI Metric': '% COA ≤5 days post-PO', 'Target': '100%', 'Actual': '78%', 'Status': 'Needs Improvement' }
-        ]
+        headers: ['KPI Metric', 'Value'],
+        data: (() => {
+          const totalPR = (cachedPR||[]).length;
+          const totalRFQ = (cachedRFQ||[]).length;
+          const totalPO = (cachedPO||[]).length;
+          const totalIAR = (cachedIAR||[]).length;
+          const completedIAR = (cachedIAR||[]).filter(i => (i.status||'').toLowerCase()==='completed' || (i.workflow_status||'').toLowerCase()==='completed').length;
+          return [
+            { 'KPI Metric': 'Total Purchase Requests', 'Value': String(totalPR) },
+            { 'KPI Metric': 'Total RFQs Created', 'Value': String(totalRFQ) },
+            { 'KPI Metric': 'Total Purchase Orders', 'Value': String(totalPO) },
+            { 'KPI Metric': 'Total IARs', 'Value': String(totalIAR) },
+            { 'KPI Metric': 'Completed IARs', 'Value': totalIAR > 0 ? completedIAR + ' (' + Math.round(completedIAR/totalIAR*100) + '%)' : '0' }
+          ];
+        })()
       },
       'PhilGEPS': {
         title: 'PhilGEPS Compliance Report',
-        headers: ['RFQ No', 'ABC', 'Posted Date', 'Days Posted', 'Status'],
-        data: [
-          { 'RFQ No': 'RFQ-${getCurrentFiscalYear()}-001', 'ABC': '₱250,000.00', 'Posted Date': `${getCurrentFiscalYear()}-01-15`, 'Days Posted': '5', 'Status': 'Compliant' },
-          { 'RFQ No': 'RFQ-${getCurrentFiscalYear()}-002', 'ABC': '₱180,000.00', 'Posted Date': 'N/A', 'Days Posted': 'N/A', 'Status': 'Below Threshold' }
-        ]
+        headers: ['RFQ No', 'ABC', 'PhilGEPS Required', 'Status'],
+        data: (cachedRFQ || []).map(r => ({
+          'RFQ No': r.rfq_number || '-',
+          'ABC': fmt(r.abc_amount || r.total_amount),
+          'PhilGEPS Required': r.philgeps_required ? 'Yes' : 'No',
+          'Status': r.workflow_status || r.status || '-'
+        }))
       },
       'COA': {
         title: 'COA Submission Report',
-        headers: ['Packet No', 'PO Reference', 'Submitted Date', 'Days After PO', 'Status', 'Compliant'],
-        data: [
-          { 'Packet No': 'PKT-${getCurrentFiscalYear()}-001', 'PO Reference': 'PO-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001', 'Submitted Date': `${getCurrentFiscalYear()}-01-20`, 'Days After PO': '3', 'Status': 'Submitted', 'Compliant': 'Yes' }
-        ]
+        headers: ['PO No', 'Supplier', 'Amount', 'PO Date', 'Status'],
+        data: (cachedPO || []).map(p => ({
+          'PO No': p.po_number || '-',
+          'Supplier': p.supplier_name || '-',
+          'Amount': fmt(p.total_amount || p.grand_total),
+          'PO Date': fmtDate(p.po_date || p.created_at),
+          'Status': p.workflow_status || p.status || '-'
+        }))
       },
       'AuditTrail': {
         title: 'Audit Trail Report',
         headers: ['Date/Time', 'User', 'Action', 'Module', 'Details'],
-        data: [
-          { 'Date/Time': `${getCurrentFiscalYear()}-01-20 09:30`, 'User': 'admin', 'Action': 'CREATE', 'Module': 'PR', 'Details': 'Created PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001' },
-          { 'Date/Time': `${getCurrentFiscalYear()}-01-20 10:15`, 'User': 'rd.caraga', 'Action': 'APPROVE', 'Module': 'PR', 'Details': 'Approved PR-${getCurrentMonthShort().toUpperCase()}-${getCurrentFiscalYear()}-001' }
-        ]
+        data: [] // Audit trail requires a dedicated API endpoint — no mock data
       }
     };
-    
+
     return reports[reportType] || { title: reportType, headers: ['Data'], data: [] };
   }
   
