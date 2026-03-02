@@ -14406,7 +14406,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         } catch(e) { console.warn('Could not fetch RFQ data:', e); }
       }
 
-      // Fetch BAC members from users/employees
+      // BAC members (from Excel template)
       let bacChairName = 'REGIENALD S. ESPALDON', bacChairDesignation = 'BAC Chairperson';
       let bacViceChairName = 'EVAL B. MAKINANO', bacViceChairDesignation = 'BAC Vice-Chairperson';
       let bacMembers = [
@@ -14419,16 +14419,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       try {
         const [allUsers, allEmployees] = await Promise.all([apiRequest('/users'), apiRequest('/employees')]);
         const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
-        if (bacChairUser) {
-          bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
-          const emp = allEmployees.find(e => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
-          if (emp && emp.designation_name) bacChairDesignation = 'BAC Chairperson';
-        }
+        if (bacChairUser) bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
         const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
-        if (bacSecUser) {
-          bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
-        }
-      } catch(e) { console.warn('Could not fetch BAC members:', e); }
+        if (bacSecUser) bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
+      } catch(e) {}
 
       const fmtDate = (d) => {
         if (!d) return '';
@@ -14441,12 +14435,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       };
 
-      // Build supplier columns from quotations
+      // Quotations — pad to 3 suppliers
       const quotations = abs.quotations || [];
-      // Pad to at least 3 suppliers
       while (quotations.length < 3) quotations.push({ supplier_name: '', items: [], bid_amount: 0 });
 
-      // Build unique items from RFQ or from the first quotation
+      // Items from RFQ or first quotation
       let abstractItems = [];
       if (rfqData && rfqData.items && rfqData.items.length > 0) {
         abstractItems = rfqData.items.map(it => ({
@@ -14464,20 +14457,16 @@ Failure to submit the above requirements within the prescribed period shall cons
         }));
       }
 
-      // Get total ABC from RFQ
-      const totalABC = rfqData ? parseFloat(rfqData.abc_amount || 0) : abstractItems.reduce((s, i) => s + i.abc, 0);
-
-      // Build header columns for suppliers
+      // Supplier header row — no colors
       let supplierHeaders = '';
       let supplierSubHeaders = '';
-      const supplierColors = ['#e3f2fd', '#e8f5e9', '#fff8e1'];
       for (let si = 0; si < 3; si++) {
         const sName = (quotations[si] && quotations[si].supplier_name) ? quotations[si].supplier_name.toUpperCase() : '';
-        supplierHeaders += `<th colspan="2" style="text-align:center; background:${supplierColors[si]}; font-size:8pt; padding:4px;">${sName}</th>`;
-        supplierSubHeaders += `<th style="width:10%; background:${supplierColors[si]}; font-size:7.5pt;">Unit Price</th><th style="width:10%; background:${supplierColors[si]}; font-size:7.5pt;">Total Price</th>`;
+        supplierHeaders += `<th colspan="2" class="abs-th">${sName}</th>`;
+        supplierSubHeaders += `<th class="abs-th" style="width:9%;">Unit Price</th><th class="abs-th" style="width:9%;">Total Price</th>`;
       }
 
-      // Build item rows
+      // Item rows
       let itemsHTML = '';
       abstractItems.forEach((item) => {
         let supplierCells = '';
@@ -14485,39 +14474,36 @@ Failure to submit the above requirements within the prescribed period shall cons
           const q = quotations[si];
           let unitPrice = '', totalPrice = '';
           if (q && q.items && q.items.length > 0) {
-            // Match by description or use first item
             const matchItem = q.items.find(qi => qi.item_description && item.description && qi.item_description.toLowerCase().includes(item.description.toLowerCase().substring(0, 15))) || q.items[0];
             if (matchItem) {
               unitPrice = fmtCurrency(matchItem.unit_price || 0);
               totalPrice = fmtCurrency(matchItem.total_price || 0);
             }
           }
-          const bg = si === 0 ? '#f5f9ff' : si === 1 ? '#f5fff5' : '#fffef5';
-          supplierCells += `<td style="text-align:right; background:${bg}; font-size:9pt;">${unitPrice}</td><td style="text-align:right; background:${bg}; font-size:9pt;">${totalPrice}</td>`;
+          supplierCells += `<td class="abs-td abs-r">${unitPrice}</td><td class="abs-td abs-r">${totalPrice}</td>`;
         }
         itemsHTML += `<tr>
-          <td style="text-align:center; font-size:9pt;">${item.qty}</td>
-          <td style="text-align:center; font-size:9pt;">${item.unit}</td>
-          <td style="text-align:left; font-size:9pt;">${item.description}</td>
-          <td style="text-align:right; font-size:9pt;">${fmtCurrency(item.abc)}</td>
+          <td class="abs-td abs-c">${item.qty}</td>
+          <td class="abs-td abs-c">${item.unit}</td>
+          <td class="abs-td">${item.description}</td>
+          <td class="abs-td abs-r">${fmtCurrency(item.abc)}</td>
           ${supplierCells}
         </tr>`;
       });
 
-      // Specs / Notes rows
+      // Notes / specs rows
       if (abs.item_specifications) {
         const specs = abs.item_specifications.split(/\n|\r\n/).filter(l => l.trim());
-        itemsHTML += `<tr><td colspan="10" style="border:none;"></td></tr>`;
-        itemsHTML += `<tr><td></td><td></td><td colspan="8" style="text-align:left; font-size:9pt; font-weight:bold;">Note:</td></tr>`;
+        itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8" style="font-weight:bold;">Note:</td></tr>`;
         specs.forEach((spec, i) => {
-          itemsHTML += `<tr><td></td><td></td><td colspan="8" style="text-align:left; font-size:9pt;">${(i + 1)}. ${spec.trim()}</td></tr>`;
+          itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8">${(i + 1)}. ${spec.trim()}</td></tr>`;
         });
       }
 
-      // Fill empty rows for form look
-      const currentRowCount = abstractItems.length + (abs.item_specifications ? abs.item_specifications.split(/\n/).filter(l => l.trim()).length + 2 : 0);
-      for (let i = currentRowCount; i < 8; i++) {
-        itemsHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      // Empty filler rows
+      const totalContentRows = abstractItems.length + (abs.item_specifications ? abs.item_specifications.split(/\n/).filter(l => l.trim()).length + 1 : 0);
+      for (let i = totalContentRows; i < 6; i++) {
+        itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
       }
 
       // PURPOSE row with supplier totals
@@ -14525,189 +14511,101 @@ Failure to submit the above requirements within the prescribed period shall cons
       for (let si = 0; si < 3; si++) {
         const q = quotations[si];
         const total = q ? parseFloat(q.bid_amount || 0) : 0;
-        const bg = si === 0 ? '#f5f9ff' : si === 1 ? '#f5fff5' : '#fffef5';
-        purposeTotalCells += `<td style="background:${bg};"></td><td style="text-align:right; background:${bg}; font-size:9pt; font-weight:bold;">${total > 0 ? fmtCurrency(total) : ''}</td>`;
+        purposeTotalCells += `<td class="abs-td"></td><td class="abs-td abs-r" style="font-weight:bold;">${total > 0 ? fmtCurrency(total) : ''}</td>`;
       }
 
-      // Determine recommended supplier name
       const recommendedName = abs.recommended_supplier_name || (quotations[0] ? quotations[0].supplier_name : '');
       const recommendedAmount = fmtCurrency(abs.recommended_amount || 0);
 
       const bodyContent = `
         <style>
-          .abs-title {
-            text-align: center;
-            font-size: 14pt;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-            margin: 8px 0 15px 0;
-            letter-spacing: 1px;
-          }
-          .abs-info-row {
-            font-family: Arial, sans-serif;
-            font-size: 10pt;
-            margin: 4px 0;
-            line-height: 1.5;
-          }
-          .abs-info-row .abs-label {
-            font-weight: bold;
-            display: inline-block;
-            min-width: 100px;
-          }
-          .abs-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0 0 0;
-            font-family: Arial, sans-serif;
-          }
-          .abs-table thead th {
-            border: 1px solid #333;
-            padding: 4px;
-            font-size: 8pt;
-            font-weight: bold;
-            text-align: center;
-          }
-          .abs-table tbody td {
-            border: 1px solid #333;
-            padding: 2px 5px;
-            font-size: 9pt;
-            vertical-align: top;
-          }
-          .abs-cert {
-            font-family: Arial, sans-serif;
-            font-size: 9.5pt;
-            line-height: 1.6;
-            margin-top: 12px;
-          }
-          .abs-sig-section {
-            font-family: Arial, sans-serif;
-            font-size: 9.5pt;
-            margin-top: 20px;
-          }
-          .abs-sig-block {
-            display: inline-block;
-            width: 30%;
-            text-align: center;
-            vertical-align: top;
-            margin-bottom: 15px;
-          }
-          .abs-sig-line {
-            border-bottom: 1px solid #333;
-            height: 25px;
-            margin: 15px auto 3px auto;
-            width: 85%;
-          }
-          .abs-sig-name {
-            font-weight: bold;
-            font-size: 9pt;
-            text-transform: uppercase;
-          }
-          .abs-sig-title {
-            font-size: 8pt;
-            color: #444;
-          }
-          .abs-sig-label {
-            font-size: 8pt;
-            font-style: italic;
-            color: #666;
-            margin-bottom: 3px;
-          }
+          @page { size: A4 landscape; margin: 8mm 10mm; }
+          .abs-wrap { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; line-height: 1.3; }
+          .abs-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 2px 0 6px 0; letter-spacing: 0.5px; }
+          .abs-info { font-size: 9pt; margin: 2px 0; }
+          .abs-info b { min-width: 70px; display: inline-block; }
+          .abs-tbl { width: 100%; border-collapse: collapse; margin: 4px 0 0 0; }
+          .abs-th { border: 1px solid #000; padding: 2px 3px; font-size: 7.5pt; font-weight: bold; text-align: center; vertical-align: middle; }
+          .abs-td { border: 1px solid #000; padding: 1px 3px; font-size: 8pt; vertical-align: top; }
+          .abs-c { text-align: center; }
+          .abs-r { text-align: right; }
+          .abs-cert { font-size: 8pt; line-height: 1.4; margin-top: 4px; }
+          .abs-cert p { margin: 2px 0; }
+          .abs-sigs { margin-top: 6px; font-size: 8pt; }
+          .abs-sig-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
+          .abs-sb { display: inline-block; width: 30%; text-align: center; vertical-align: top; margin-bottom: 2px; }
+          .abs-sl { border-bottom: 1px solid #000; height: 18px; margin: 8px auto 1px auto; width: 80%; }
+          .abs-sn { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
+          .abs-st { font-size: 7pt; color: #333; }
+          .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
         </style>
 
-        <div class="abs-title">ABSTRACT OF QUOTATION</div>
+        <div class="abs-wrap">
+          <div class="abs-title">ABSTRACT OF QUOTATION</div>
 
-        <div style="display:flex; justify-content:space-between;">
-          <div>
-            <div class="abs-info-row"><span class="abs-label">AOQ No.:</span> ${abs.abstract_number || ''}</div>
-          </div>
-          <div style="text-align:right;">
-            <div class="abs-info-row"><span class="abs-label">Date:</span> ${fmtDate(abs.date_prepared)}</div>
-          </div>
-        </div>
-
-        <table class="abs-table">
-          <thead>
-            <tr>
-              <th rowspan="2" style="width:6%;">Qty.</th>
-              <th rowspan="2" style="width:6%;">Unit</th>
-              <th rowspan="2" style="width:22%;">Items</th>
-              <th rowspan="2" style="width:10%;">ABC</th>
-              ${supplierHeaders}
-            </tr>
-            <tr>
-              ${supplierSubHeaders}
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHTML}
-            <tr style="font-weight:bold;">
-              <td></td>
-              <td></td>
-              <td style="text-align:left; font-size:9pt; color:red; font-weight:bold;">PURPOSE: ${prPurpose}</td>
-              <td></td>
-              ${purposeTotalCells}
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="abs-cert">
-          <p>We <strong>CERTIFY</strong> that we opened and recorded herein quotations received in respond to the RFQ.</p>
-          <p style="margin-top:6px;">We therefore <strong>RECOMMEND</strong> to award to <strong><u>${recommendedName}</u></strong> with a total bid price of <strong><u>₱${recommendedAmount}</u></strong> having submitted the most responsive quotation.</p>
-          <p style="margin-top:6px;">We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
-        </div>
-
-        <div class="abs-sig-section">
-          <div style="text-align:left; margin-bottom:5px;"><em>Recommended By:</em></div>
-          <div style="display:flex; flex-wrap:wrap; justify-content:space-between;">
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacViceChairName}</div>
-              <div class="abs-sig-title">${bacViceChairDesignation}</div>
+          <div style="display:flex; justify-content:space-between;">
+            <div>
+              <div class="abs-info"><b>AOQ No.:</b> ${abs.abstract_number || ''}</div>
             </div>
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacMembers[0].name}</div>
-              <div class="abs-sig-title">${bacMembers[0].title}</div>
-            </div>
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacMembers[1].name}</div>
-              <div class="abs-sig-title">${bacMembers[1].title}</div>
-            </div>
-          </div>
-          <div style="display:flex; flex-wrap:wrap; justify-content:space-between;">
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacMembers[2].name}</div>
-              <div class="abs-sig-title">${bacMembers[2].title}</div>
-            </div>
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacSecName}</div>
-              <div class="abs-sig-title">${bacSecTitle}</div>
-            </div>
-            <div class="abs-sig-block">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacChairName}</div>
-              <div class="abs-sig-title">${bacChairDesignation}</div>
+            <div>
+              <div class="abs-info"><b>DATE:</b> ${fmtDate(abs.date_prepared)}</div>
             </div>
           </div>
 
-          <div style="margin-top:25px; text-align:left;"><em>Approved By:</em></div>
-          <div style="display:flex; justify-content:center;">
-            <div class="abs-sig-block" style="width:40%;">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${rdName}</div>
-              <div class="abs-sig-title">${rdTitle}</div>
-            </div>
+          <table class="abs-tbl">
+            <thead>
+              <tr>
+                <th colspan="3" class="abs-th">PARTICULARS</th>
+                <th rowspan="2" class="abs-th" style="width:10%;">ABC</th>
+                ${supplierHeaders}
+              </tr>
+              <tr>
+                <th class="abs-th" style="width:5%;">Qty.</th>
+                <th class="abs-th" style="width:4%;">Unit</th>
+                <th class="abs-th" style="width:18%;">Items</th>
+                ${supplierSubHeaders}
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+              <tr>
+                <td class="abs-td"></td>
+                <td class="abs-td"></td>
+                <td class="abs-td" style="font-weight:bold;">PURPOSE: ${prPurpose}</td>
+                <td class="abs-td"></td>
+                ${purposeTotalCells}
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="abs-cert">
+            <p>We <b>CERTIFY</b> that we opened and recorded herein quotations received in respond to the RFQ.</p>
+            <p>We therefore <b>RECOMMEND</b> to award to <b><u>${recommendedName}</u></b> with a total bid price of <b><u>₱${recommendedAmount}</u></b> having submitted the most responsive quotation.</p>
+            <p>We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
           </div>
 
-          <div style="margin-top:25px; text-align:left;"><em>Prepared By:</em></div>
-          <div style="display:flex; justify-content:center;">
-            <div class="abs-sig-block" style="width:40%;">
-              <div class="abs-sig-line"></div>
-              <div class="abs-sig-name">${bacSecName}</div>
-              <div class="abs-sig-title">${bacSecTitle}</div>
+          <div class="abs-sigs">
+            <div class="abs-lbl">Recommended By:</div>
+            <div class="abs-sig-row">
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
+            </div>
+            <div class="abs-sig-row">
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacSecName}</div><div class="abs-st">${bacSecTitle}</div></div>
+              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; margin-top:4px;">
+              <div style="width:48%;">
+                <div class="abs-lbl">Approved By:</div>
+                <div style="text-align:center;"><div class="abs-sl" style="width:60%; margin:8px auto 1px auto;"></div><div class="abs-sn">${rdName}</div><div class="abs-st">${rdTitle}</div></div>
+              </div>
+              <div style="width:48%;">
+                <div class="abs-lbl">Prepared By:</div>
+                <div style="text-align:center;"><div class="abs-sl" style="width:60%; margin:8px auto 1px auto;"></div><div class="abs-sn">${bacSecName}</div><div class="abs-st">${bacSecTitle}</div></div>
+              </div>
             </div>
           </div>
         </div>
