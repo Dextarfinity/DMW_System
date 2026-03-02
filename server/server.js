@@ -1624,6 +1624,259 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
 });
 
 // ==============================================================================
+// PAP (Programs, Activities & Projects) MANAGEMENT
+// ==============================================================================
+
+// GET all PAPs
+app.get('/api/paps', authenticateToken, async (req, res) => {
+  try {
+    let query = `SELECT p.*, d.name as department_name, d.code as department_code,
+                        u.username as created_by_name,
+                        COALESCE((SELECT SUM(pi.total_amount) FROM pap_items pi WHERE pi.pap_id = p.id), 0) as items_total,
+                        COALESCE((SELECT COUNT(*) FROM pap_items pi WHERE pi.pap_id = p.id), 0) as item_count
+                 FROM paps p
+                 LEFT JOIN departments d ON p.dept_id = d.id
+                 LEFT JOIN users u ON p.created_by = u.id`;
+    const params = [];
+    const conditions = [];
+
+    if (req.query.dept_id) {
+      params.push(req.query.dept_id);
+      conditions.push(`p.dept_id = $${params.length}`);
+    }
+    if (req.query.fiscal_year) {
+      params.push(req.query.fiscal_year);
+      conditions.push(`p.fiscal_year = $${params.length}`);
+    }
+    if (req.query.status) {
+      params.push(req.query.status);
+      conditions.push(`p.status = $${params.length}`);
+    }
+    // Exclude soft-deleted
+    conditions.push(`(p.is_deleted = false OR p.is_deleted IS NULL)`);
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
+    }
+    query += ` ORDER BY p.created_at DESC`;
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET single PAP with items
+app.get('/api/paps/:id', authenticateToken, async (req, res) => {
+  try {
+    const pap = await pool.query(
+      `SELECT p.*, d.name as department_name, d.code as department_code, u.username as created_by_name
+       FROM paps p
+       LEFT JOIN departments d ON p.dept_id = d.id
+       LEFT JOIN users u ON p.created_by = u.id
+       WHERE p.id = $1`, [req.params.id]
+    );
+    if (pap.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
+
+    const items = await pool.query(
+      `SELECT pi.*, it.name as catalog_item_name, it.code as catalog_item_code,
+              it.category as catalog_category, it.unit as catalog_unit, it.unit_price as catalog_unit_price,
+              it.procurement_source as catalog_procurement_source
+       FROM pap_items pi
+       LEFT JOIN items it ON pi.item_id = it.id
+       WHERE pi.pap_id = $1 ORDER BY pi.id`, [req.params.id]
+    );
+    res.json({ ...pap.rows[0], items: items.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// CREATE PAP
+app.post('/api/paps', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { pap_name, description, dept_id, fiscal_year, estimated_budget, account_code,
+            quarter, mop, centralize, period_jan, period_feb, period_mar, period_apr,
+            period_may, period_jun, period_jul, period_aug, period_sep, period_oct,
+            period_nov, period_dec, items } = req.body;
+
+    if (!pap_name) return res.status(400).json({ error: 'PAP Name is required' });
+
+    const deptId = dept_id || req.user.dept_id;
+    const fy = fiscal_year || new Date().getFullYear();
+
+    // Auto-generate PAP code: PAP-{DEPT}-{YEAR}-{SEQ}
+    let papCode = null;
+    if (deptId) {
+      const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
+      const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
+      const prefix = `PAP-${deptCode}-${fy}-`;
+      const seqResult = await client.query(
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(pap_code FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+         FROM paps WHERE pap_code LIKE $2`,
+        [prefix, prefix + '%']
+      );
+      const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
+      papCode = prefix + nextSeq;
+    }
+
+    const papResult = await client.query(
+      `INSERT INTO paps (pap_code, pap_name, description, dept_id, fiscal_year, estimated_budget,
+        account_code, quarter, mop, centralize, period_jan, period_feb, period_mar, period_apr,
+        period_may, period_jun, period_jul, period_aug, period_sep, period_oct, period_nov,
+        period_dec, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       RETURNING *`,
+      [papCode, pap_name, description || pap_name, deptId, fy, estimated_budget || 0,
+       account_code || null, quarter || 0, mop || null, centralize || false,
+       period_jan || false, period_feb || false, period_mar || false, period_apr || false,
+       period_may || false, period_jun || false, period_jul || false, period_aug || false,
+       period_sep || false, period_oct || false, period_nov || false, period_dec || false,
+       req.user.id]
+    );
+    const pap = papResult.rows[0];
+
+    // Insert PAP items if provided
+    if (items && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO pap_items (pap_id, item_id, item_code, product_category, account_code,
+            product_description, available_at, quantity, uom, unit_price, total_amount,
+            procurement_source, remarks)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [pap.id, item.item_id || null, item.item_code || null, item.product_category || null,
+           item.account_code || null, item.product_description || null, item.available_at || null,
+           item.quantity || 0, item.uom || null, item.unit_price || 0,
+           item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
+           item.procurement_source || 'NON PS-DBM', item.remarks || null]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json(pap);
+  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+  finally { client.release(); }
+});
+
+// UPDATE PAP
+app.put('/api/paps/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { pap_name, description, dept_id, fiscal_year, estimated_budget, account_code,
+            quarter, mop, centralize, period_jan, period_feb, period_mar, period_apr,
+            period_may, period_jun, period_jul, period_aug, period_sep, period_oct,
+            period_nov, period_dec, status, items } = req.body;
+
+    const result = await client.query(
+      `UPDATE paps SET pap_name=$1, description=$2, dept_id=$3, fiscal_year=$4, estimated_budget=$5,
+        account_code=$6, quarter=$7, mop=$8, centralize=$9,
+        period_jan=$10, period_feb=$11, period_mar=$12, period_apr=$13,
+        period_may=$14, period_jun=$15, period_jul=$16, period_aug=$17,
+        period_sep=$18, period_oct=$19, period_nov=$20, period_dec=$21,
+        status=COALESCE($22, status), updated_at=CURRENT_TIMESTAMP
+       WHERE id=$23 RETURNING *`,
+      [pap_name, description, dept_id, fiscal_year, estimated_budget || 0,
+       account_code || null, quarter || 0, mop || null, centralize || false,
+       period_jan || false, period_feb || false, period_mar || false, period_apr || false,
+       period_may || false, period_jun || false, period_jul || false, period_aug || false,
+       period_sep || false, period_oct || false, period_nov || false, period_dec || false,
+       status || null, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'PAP not found' });
+    }
+
+    // Replace items if provided
+    if (items && Array.isArray(items)) {
+      await client.query('DELETE FROM pap_items WHERE pap_id = $1', [req.params.id]);
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO pap_items (pap_id, item_id, item_code, product_category, account_code,
+            product_description, available_at, quantity, uom, unit_price, total_amount,
+            procurement_source, remarks)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [req.params.id, item.item_id || null, item.item_code || null, item.product_category || null,
+           item.account_code || null, item.product_description || null, item.available_at || null,
+           item.quantity || 0, item.uom || null, item.unit_price || 0,
+           item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
+           item.procurement_source || 'NON PS-DBM', item.remarks || null]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+  finally { client.release(); }
+});
+
+// DELETE PAP (soft-delete)
+app.delete('/api/paps/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE paps SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
+    res.json({ message: 'PAP removed successfully', pap: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// UPDATE PAP MOP (Mode of Procurement)
+app.put('/api/paps/:id/mop', authenticateToken, async (req, res) => {
+  try {
+    const { mop } = req.body;
+    const result = await pool.query(
+      `UPDATE paps SET mop = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [mop, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ADD item to PAP
+app.post('/api/paps/:id/items', authenticateToken, async (req, res) => {
+  try {
+    const { item_id, item_code, product_category, account_code, product_description,
+            available_at, quantity, uom, unit_price, total_amount, procurement_source, remarks } = req.body;
+    const result = await pool.query(
+      `INSERT INTO pap_items (pap_id, item_id, item_code, product_category, account_code,
+        product_description, available_at, quantity, uom, unit_price, total_amount,
+        procurement_source, remarks)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [req.params.id, item_id || null, item_code || null, product_category || null,
+       account_code || null, product_description || null, available_at || null,
+       quantity || 0, uom || null, unit_price || 0,
+       total_amount || (parseFloat(quantity || 0) * parseFloat(unit_price || 0)),
+       procurement_source || 'NON PS-DBM', remarks || null]
+    );
+    // Update PAP estimated_budget
+    await pool.query(
+      `UPDATE paps SET estimated_budget = COALESCE((SELECT SUM(total_amount) FROM pap_items WHERE pap_id = $1), 0),
+        updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [req.params.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE item from PAP
+app.delete('/api/paps/:papId/items/:itemId', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM pap_items WHERE id = $1 AND pap_id = $2 RETURNING *',
+      [req.params.itemId, req.params.papId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PAP item not found' });
+    // Update PAP estimated_budget
+    await pool.query(
+      `UPDATE paps SET estimated_budget = COALESCE((SELECT SUM(total_amount) FROM pap_items WHERE pap_id = $1), 0),
+        updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [req.params.papId]
+    );
+    res.json({ message: 'PAP item removed', item: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==============================================================================
 // APP SETTINGS (version tracking)
 // ==============================================================================
 

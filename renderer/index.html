@@ -504,7 +504,22 @@
             <div class="form-title">Project Procurement Management Plan (PPMP)</div>
             <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
-          
+
+          <!-- PPMP Source Tabs -->
+          <div class="ppmp-source-tabs" style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid #e2e8f0;">
+            <button class="ppmp-tab active" data-tab="psdbm-items" onclick="switchPPMPTab('psdbm-items')">
+              <i class="fas fa-store"></i> PS-DBM Items
+            </button>
+            <button class="ppmp-tab" data-tab="non-psdbm-items" onclick="switchPPMPTab('non-psdbm-items')">
+              <i class="fas fa-box"></i> Non-PSDBM Items
+            </button>
+            <button class="ppmp-tab" data-tab="pap" onclick="switchPPMPTab('pap')">
+              <i class="fas fa-project-diagram"></i> PAP
+            </button>
+          </div>
+
+          <!-- ===== TAB 1 & 2: PS-DBM / Non-PSDBM Items (existing PPMP table) ===== -->
+          <div class="ppmp-tab-content active" id="ppmpTabPSDBM" data-tab="psdbm-items">
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-ppmp" onclick="showNewPPMPModal()">
               <i class="fas fa-plus"></i> New PPMP Entry
@@ -575,6 +590,98 @@
               </tbody>
             </table>
           </div>
+          </div>
+
+          <!-- Non-PSDBM items tab (same table, filtered view) -->
+          <div class="ppmp-tab-content" id="ppmpTabNonPSDBM" data-tab="non-psdbm-items" style="display:none;">
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewPPMPModal('NON PS-DBM')">
+              <i class="fas fa-plus"></i> New Non-PSDBM Entry
+            </button>
+            <button class="btn btn-outline" onclick="exportToExcel('PPMP')">
+              <i class="fas fa-file-excel"></i> Export
+            </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="ppmpNonPSDBMSearch" placeholder="Search Non-PSDBM items..." oninput="filterNonPSDBMTable(this.value)">
+            </div>
+          </div>
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>PPMP No.</th>
+                  <th>General Description</th>
+                  <th>Type of Project</th>
+                  <th>Quantity and Size</th>
+                  <th>Mode of Procurement</th>
+                  <th>Source of Funds</th>
+                  <th>Estimated Budget (₱)</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ppmpNonPSDBMTableBody">
+                <tr><td colspan="9" class="text-center">Loading Non-PSDBM items...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          </div>
+
+          <!-- ===== TAB 3: PAP (Programs, Activities & Projects) ===== -->
+          <div class="ppmp-tab-content" id="ppmpTabPAP" data-tab="pap" style="display:none;">
+            <div class="pap-header" style="text-align:center;padding:16px 0 8px;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">
+              <h3 style="font-variant:small-caps;letter-spacing:2px;color:#1a365d;margin:0;font-size:18px;font-weight:700;">PAP (Programs Activities Project)</h3>
+            </div>
+
+            <div class="page-actions">
+              <button class="btn btn-primary" onclick="showCreatePAPModal()">
+                <i class="fas fa-plus"></i> Create PAP
+              </button>
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="papSearchInput" placeholder="Search PAP..." oninput="filterPAPTable(this.value)">
+              </div>
+              <button class="btn btn-outline" onclick="exportToExcel('PAP')">
+                <i class="fas fa-file-excel"></i> Export
+              </button>
+            </div>
+
+            <p style="color:#888;font-size:12px;margin:0 0 8px;">Drag a column header and drop it here to group by that column</p>
+
+            <div class="data-card">
+              <div id="papTotalBadge" style="text-align:right;padding:6px 12px;font-size:13px;font-weight:700;color:#28a745;display:none;"></div>
+              <table class="data-table full-width">
+                <thead>
+                  <tr>
+                    <th style="width:30px;"></th>
+                    <th>Command</th>
+                    <th>PAP Name</th>
+                    <th>Description</th>
+                    <th>Quart...</th>
+                    <th>PAP Estimated B...</th>
+                    <th>MOP</th>
+                    <th>Account Code</th>
+                  </tr>
+                </thead>
+                <tbody id="papTableBody">
+                  <tr><td colspan="8" class="text-center" style="padding:30px;color:#636e78;">Loading PAP data...</td></tr>
+                </tbody>
+              </table>
+              <div id="papPagination" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #e2e8f0;">
+                <span id="papItemRange" style="font-size:12px;color:#666;">0 items</span>
+                <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                  <select id="papPageSize" onchange="loadPAPs()" style="padding:3px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                  <span style="font-size:12px;color:#666;">items per page</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </section>
 
         <!-- APP Page -->

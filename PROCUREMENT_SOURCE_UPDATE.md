@@ -188,3 +188,7 @@ Inventory
 - PAPs items in the catalog are standard items — the only difference is their `procurement_source` value
 - The Quick Add PAPs section in the PPMP modal is a convenience tool for expenses not yet registered in the catalog; if a PAPs item already exists in the catalog, it should be selected from the catalog dropdown instead
 - The migration must be run against the database before the updated server/frontend code is deployed
+
+
+
+psql -U your_user -d your_database -f server/database/migration_pap_management.sql
