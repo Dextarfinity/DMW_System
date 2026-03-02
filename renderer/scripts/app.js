@@ -1429,7 +1429,7 @@ function renderItemsTable(items) {
     }
     const isSemiOrCapital = ['SEMI-EXPENDABLE', 'CAPITAL OUTLAY'].includes(item.category);
     const source = item.procurement_source || 'NON PS-DBM';
-    const sourceBadgeClass = source === 'PS-DBM' ? 'source-badge psdbm' : 'source-badge non-psdbm';
+    const sourceBadgeClass = source === 'PS-DBM' ? 'source-badge psdbm' : source === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
     return `
     <tr>
       <td>${item.code || ''}</td>
@@ -5236,11 +5236,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
         <div id="ppmpPAPsSection" style="display:none;">
           <div class="form-section-header" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left-color:#2e7d32;">
-            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> PAPs — Programs, Activities & Projects
+            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> Quick Add PAPs Expense <small style="font-weight:400;color:#4a5568;">(for items not yet in catalog)</small>
           </div>
           <div class="info-banner" style="margin-bottom:12px; background:#fff8e1; border-left:4px solid #f9a825; padding:8px 12px;">
             <i class="fas fa-exclamation-triangle" style="color:#f9a825;"></i>
-            <small>PAPs are expenses not listed in the Items Catalog (e.g., meals, transportation, honoraria, tarpaulin printing, tokens, etc.). These are budget line items for programs and activities.</small>
+            <small>Use this section to quickly add PAPs expenses that are <strong>not yet in the Items Catalog</strong>. If the PAPs item already exists in the catalog, select it from the catalog list above instead.</small>
           </div>
           <div class="form-row-3">
             <div class="form-group">
@@ -7449,6 +7449,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <select class="form-select" id="itemProcurementSource">
               <option value="NON PS-DBM">NON PS-DBM</option>
               <option value="PS-DBM">PS-DBM</option>
+              <option value="PAPs">PAPs (Programs, Activities & Projects)</option>
             </select>
           </div>
         </div>
@@ -7894,19 +7895,35 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.togglePPMPSourceMode = function(source) {
     const catalogSection = document.getElementById('ppmpCatalogSection');
     const papsSection = document.getElementById('ppmpPAPsSection');
+    
+    // Always show catalog section — PAPs items are also in the catalog
+    if (catalogSection) catalogSection.style.display = 'block';
+    
+    // Show ADDITIONAL PAPs manual entry section when PAPs is selected
     if (source === 'PAPs') {
-      if (catalogSection) catalogSection.style.display = 'none';
       if (papsSection) papsSection.style.display = 'block';
     } else {
-      if (catalogSection) catalogSection.style.display = 'block';
       if (papsSection) papsSection.style.display = 'none';
-      // Filter items by source in the dropdown
-      const itemSelect = document.getElementById('ppmpItemSelect');
-      if (itemSelect) {
-        const allItems = window._ppmpItemsCache || [];
-        const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
-        itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
-          filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
+    }
+    
+    // Filter the catalog item dropdown by procurement source
+    const itemSelect = document.getElementById('ppmpItemSelect');
+    if (itemSelect) {
+      const allItems = window._ppmpItemsCache || [];
+      const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
+      itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
+        filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
+    }
+    
+    // Update section label based on source
+    const sectionHeader = catalogSection ? catalogSection.querySelector('.form-section-header') : null;
+    if (sectionHeader) {
+      if (source === 'PAPs') {
+        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PAPs Items from Catalog';
+      } else if (source === 'PS-DBM') {
+        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PS-DBM Items from Catalog';
+      } else {
+        sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> Items from Catalog';
       }
     }
   };
@@ -12743,6 +12760,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <select class="form-select" id="editItemProcSource">
               <option value="NON PS-DBM" ${(item.procurement_source || 'NON PS-DBM') === 'NON PS-DBM' ? 'selected' : ''}>NON PS-DBM</option>
               <option value="PS-DBM" ${item.procurement_source === 'PS-DBM' ? 'selected' : ''}>PS-DBM</option>
+              <option value="PAPs" ${item.procurement_source === 'PAPs' ? 'selected' : ''}>PAPs (Programs, Activities & Projects)</option>
             </select>
           </div>
         </div>
