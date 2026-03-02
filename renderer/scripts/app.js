@@ -8214,126 +8214,109 @@ Failure to submit the above requirements within the prescribed period shall cons
   /** Show Create PAP Modal */
   window.showCreatePAPModal = async function() {
     await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
-    let allItems = [];
-    try { allItems = await apiRequest('/items'); } catch(e) {}
 
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
     const chiefDivision = currentUser.division || currentUser.department_code || '';
+    const autoDiv = isChief ? chiefDivision : '';
+    const autoDivId = autoDiv ? (deptIdMap[autoDiv] || '') : '';
 
     const html = `
       <form id="papForm" onsubmit="saveNewPAP(event)">
-        <div class="info-banner" style="margin-bottom:16px;background:#e8f5e9;border-left:4px solid #2e7d32;padding:10px 14px;">
-          <i class="fas fa-project-diagram" style="color:#2e7d32;"></i>
-          <strong>Create PAP (Programs Activities Project)</strong>
-        </div>
+        <!-- Hidden auto-populated fields -->
+        <input type="hidden" id="papDivision" value="${autoDivId || ''}">
+        <input type="hidden" id="papFiscalYear" value="${getCurrentFiscalYear()}">
+        <input type="hidden" id="papAccountCode" value="">
 
-        <div class="form-row">
-          <div class="form-group" style="flex:2;">
-            <label>PAP Name <span class="text-danger">*</span></label>
-            <input type="text" id="papName" required placeholder="e.g., Pantry Renovation">
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>PAP Estimated Budget</label>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <span style="color:#666;">Php</span>
-              <input type="number" id="papEstimatedBudget" step="0.01" min="0" placeholder="0.00" style="flex:1;">
+        <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+          <!-- Left: PAP Name + Budget -->
+          <div style="flex:2;padding:14px 18px;">
+            <div style="margin-bottom:12px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
+              <input type="text" id="papName" required placeholder="e.g., Pantry Renovation" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <span style="color:#555;font-size:13px;">Php</span>
+                <input type="number" id="papEstimatedBudget" step="0.01" min="0" placeholder="0.00" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" style="flex:2;">
-            <label>Description</label>
-            <textarea id="papDescription" rows="2" placeholder="PAP description"></textarea>
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>Account Code</label>
-            <input type="text" id="papAccountCode" placeholder="e.g., 5020321099">
+          <!-- Vertical separator -->
+          <div style="width:1px;background:#ccc;"></div>
+          <!-- Right: Description -->
+          <div style="flex:1;padding:14px 18px;">
+            <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
+            <textarea id="papDescription" rows="4" placeholder="PAP description" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;"></textarea>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label>End-User / Division <span class="text-danger">*</span></label>
-            <select class="form-select" id="papDivision" required ${isChief ? 'disabled' : ''}>
-              ${buildDivisionOptions(isChief ? chiefDivision : '')}
-            </select>
-            ${isChief ? '<input type="hidden" name="pap_division" value="' + chiefDivision + '">' : ''}
-          </div>
-          <div class="form-group">
-            <label>Fiscal Year</label>
-            <select class="form-select" id="papFiscalYear">
-              ${getFiscalYearOptions('CY')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label style="display:flex;align-items:center;gap:8px;">
-              Create PAP to Centralize?
-              <input type="checkbox" id="papCentralize">
-            </label>
-          </div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 4px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+            Create PAP to Centralize?
+            <input type="checkbox" id="papCentralize" style="width:16px;height:16px;">
+          </label>
         </div>
 
-        <div class="form-group">
-          <label>Period:</label>
-          <div style="display:flex;flex-wrap:wrap;gap:12px;padding:6px 0;">
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJan"> Jan</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodFeb"> Feb</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodMar"> Mar</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodApr"> Apr</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodMay"> May</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJun"> Jun</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJul"> Jul</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodAug"> Aug</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodSep"> Sep</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodOct"> Oct</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodNov"> Nov</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodDec"> Dec</label>
-          </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 4px;flex-wrap:wrap;">
+          <span style="font-weight:600;font-size:13px;">Period:</span>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan"> Jan</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb"> Feb</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar"> Mar</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr"> Apr</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay"> May</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun"> Jun</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul"> Jul</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug"> Aug</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep"> Sep</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct"> Oct</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov"> Nov</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec"> Dec</label>
         </div>
 
-        <div class="form-section-header" style="background:#e8f5e9;border-left-color:#2e7d32;">
-          <i class="fas fa-box" style="color:#2e7d32;"></i> PAP Items
-          <button type="button" class="btn btn-sm btn-primary" onclick="showSelectPAPItemModal()" style="margin-left:auto;padding:4px 12px;font-size:11px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal()" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
             <i class="fas fa-plus"></i> Select on Non-PSDBM
           </button>
+          <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#17a2b8;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="fas fa-pen"></i> Add Manual Item
+          </button>
+          <span style="font-weight:600;font-size:13px;margin-left:8px;">Search</span>
+          <input type="text" id="papItemSearch" placeholder="" oninput="filterPAPItemsInModal(this.value)" style="flex:1;padding:5px 10px;border:1px solid #aaa;font-size:12px;">
         </div>
 
-        <div class="form-row" style="margin-bottom:8px;">
-          <div class="search-box" style="flex:1;">
-            <i class="fas fa-search"></i>
-            <input type="text" id="papItemSearch" placeholder="Search" oninput="filterPAPItemsInModal(this.value)">
-          </div>
-        </div>
-
-        <div id="papItemsListContainer" style="max-height:250px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;">
-          <table class="data-table full-width" style="font-size:11.5px;margin:0;">
-            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
-              <th>Command</th>
-              <th>Item Code <span style="cursor:pointer;" title="Filter">T</span></th>
-              <th>Product Category <span style="cursor:pointer;" title="Filter">T</span></th>
-              <th>Account Code</th>
-              <th>Product Description <span style="cursor:pointer;" title="Filter">T</span></th>
-              <th>Available At <span style="cursor:pointer;" title="Filter">T</span></th>
-              <th>Qty</th>
-              <th>UOM <span style="cursor:pointer;" title="Filter">T</span></th>
-              <th>Unit Price (Php)</th>
+        <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin-bottom:8px;">
+          <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
+            <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
+              <th style="padding:6px 8px;">Command</th>
+              <th style="padding:6px 8px;">Item Code <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+              <th style="padding:6px 8px;">Product Category <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+              <th style="padding:6px 8px;">Account Code</th>
+              <th style="padding:6px 8px;">Product Description <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+              <th style="padding:6px 8px;">Available At <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+              <th style="padding:6px 4px;text-align:center;">Qty</th>
+              <th style="padding:6px 8px;">UOM <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+              <th style="padding:6px 8px;">Unit Price (Php)</th>
             </tr></thead>
             <tbody id="papItemsListBody"></tbody>
           </table>
         </div>
 
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-          <div id="papItemCount" style="font-size:12px;color:#888;">0 items</div>
-          <div id="papTotalDisplay" style="margin-left:auto;font-size:14px;font-weight:700;color:#1a365d;"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;border-top:1px solid #ddd;padding-top:6px;">
+          <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
+          <span style="font-size:12px;color:#888;">items</span>
+          <select id="papPageSize" style="margin-left:auto;padding:2px 6px;border:1px solid #ccc;border-radius:4px;font-size:11px;">
+            <option value="10" selected>10</option><option value="25">25</option><option value="50">50</option>
+          </select>
+          <span style="font-size:11px;color:#888;">items per page</span>
         </div>
 
-        <div style="display:flex;gap:10px;justify-content:flex-start;margin-top:16px;">
-          <button type="submit" class="btn btn-primary" style="background:#28a745;border-color:#28a745;padding:8px 24px;">
+        <div style="display:flex;gap:10px;justify-content:flex-start;">
+          <button type="submit" class="btn btn-primary" style="background:#28a745;border-color:#28a745;padding:8px 24px;font-weight:600;">
             <i class="fas fa-save"></i> Save
           </button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;font-weight:600;">
             <i class="fas fa-ban"></i> Cancel
           </button>
         </div>
@@ -8350,126 +8333,103 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const pap = await apiRequest('/paps/' + papId);
       await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
-      let allItems = [];
-      try { allItems = await apiRequest('/items'); } catch(e) {}
-
-      const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
-      const isChief = userHasAnyRole(chiefRoles);
-      const chiefDivision = currentUser.division || currentUser.department_code || '';
 
       const html = `
         <form id="papEditForm" onsubmit="updatePAP(event, ${papId})">
-          <div class="info-banner" style="margin-bottom:16px;background:#e8f5e9;border-left:4px solid #2e7d32;padding:10px 14px;">
-            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i>
-            <strong>Edit PAP</strong> <small style="color:#666;">${pap.pap_code || ''}</small>
-          </div>
+          <!-- Hidden auto-populated fields -->
+          <input type="hidden" id="papDivision" value="${pap.dept_id || ''}">
+          <input type="hidden" id="papFiscalYear" value="${pap.fiscal_year || getCurrentFiscalYear()}">
+          <input type="hidden" id="papAccountCode" value="${escapeHtml(pap.account_code || '')}">
 
-          <div class="form-row">
-            <div class="form-group" style="flex:2;">
-              <label>PAP Name <span class="text-danger">*</span></label>
-              <input type="text" id="papName" required value="${escapeHtml(pap.pap_name || '')}">
-            </div>
-            <div class="form-group" style="flex:1;">
-              <label>PAP Estimated Budget</label>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <span style="color:#666;">Php</span>
-                <input type="number" id="papEstimatedBudget" step="0.01" min="0" value="${parseFloat(pap.estimated_budget || 0).toFixed(2)}" style="flex:1;">
+          <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+            <!-- Left: PAP Name + Budget -->
+            <div style="flex:2;padding:14px 18px;">
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
+                <input type="text" id="papName" required value="${escapeHtml(pap.pap_name || '')}" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="color:#555;font-size:13px;">Php</span>
+                  <input type="number" id="papEstimatedBudget" step="0.01" min="0" value="${parseFloat(pap.estimated_budget || 0).toFixed(2)}" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+                </div>
               </div>
             </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group" style="flex:2;">
-              <label>Description</label>
-              <textarea id="papDescription" rows="2">${escapeHtml(pap.description || '')}</textarea>
-            </div>
-            <div class="form-group" style="flex:1;">
-              <label>Account Code</label>
-              <input type="text" id="papAccountCode" value="${escapeHtml(pap.account_code || '')}">
+            <!-- Vertical separator -->
+            <div style="width:1px;background:#ccc;"></div>
+            <!-- Right: Description -->
+            <div style="flex:1;padding:14px 18px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
+              <textarea id="papDescription" rows="4" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;">${escapeHtml(pap.description || '')}</textarea>
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>End-User / Division</label>
-              <select class="form-select" id="papDivision" ${isChief ? 'disabled' : ''}>
-                ${buildDivisionOptionsById(pap.dept_id || '', true)}
-              </select>
-              ${isChief ? '<input type="hidden" name="pap_division" value="' + chiefDivision + '">' : ''}
-            </div>
-            <div class="form-group">
-              <label>Fiscal Year</label>
-              <select class="form-select" id="papFiscalYear">
-                ${getFiscalYearOptions('CY')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;">
-                Create PAP to Centralize?
-                <input type="checkbox" id="papCentralize" ${pap.centralize ? 'checked' : ''}>
-              </label>
-            </div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 4px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+              Create PAP to Centralize?
+              <input type="checkbox" id="papCentralize" ${pap.centralize ? 'checked' : ''} style="width:16px;height:16px;">
+            </label>
           </div>
 
-          <div class="form-group">
-            <label>Period:</label>
-            <div style="display:flex;flex-wrap:wrap;gap:12px;padding:6px 0;">
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJan" ${pap.period_jan ? 'checked' : ''}> Jan</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodFeb" ${pap.period_feb ? 'checked' : ''}> Feb</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodMar" ${pap.period_mar ? 'checked' : ''}> Mar</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodApr" ${pap.period_apr ? 'checked' : ''}> Apr</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodMay" ${pap.period_may ? 'checked' : ''}> May</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJun" ${pap.period_jun ? 'checked' : ''}> Jun</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodJul" ${pap.period_jul ? 'checked' : ''}> Jul</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodAug" ${pap.period_aug ? 'checked' : ''}> Aug</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodSep" ${pap.period_sep ? 'checked' : ''}> Sep</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodOct" ${pap.period_oct ? 'checked' : ''}> Oct</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodNov" ${pap.period_nov ? 'checked' : ''}> Nov</label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" id="papPeriodDec" ${pap.period_dec ? 'checked' : ''}> Dec</label>
-            </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 4px;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:13px;">Period:</span>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan" ${pap.period_jan ? 'checked' : ''}> Jan</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb" ${pap.period_feb ? 'checked' : ''}> Feb</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar" ${pap.period_mar ? 'checked' : ''}> Mar</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr" ${pap.period_apr ? 'checked' : ''}> Apr</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay" ${pap.period_may ? 'checked' : ''}> May</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun" ${pap.period_jun ? 'checked' : ''}> Jun</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul" ${pap.period_jul ? 'checked' : ''}> Jul</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug" ${pap.period_aug ? 'checked' : ''}> Aug</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep" ${pap.period_sep ? 'checked' : ''}> Sep</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct" ${pap.period_oct ? 'checked' : ''}> Oct</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov" ${pap.period_nov ? 'checked' : ''}> Nov</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec" ${pap.period_dec ? 'checked' : ''}> Dec</label>
           </div>
 
-          <div class="form-section-header" style="background:#e8f5e9;border-left-color:#2e7d32;">
-            <i class="fas fa-box" style="color:#2e7d32;"></i> PAP Items
-            <button type="button" class="btn btn-sm btn-primary" onclick="showSelectPAPItemModal()" style="margin-left:auto;padding:4px 12px;font-size:11px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal()" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
               <i class="fas fa-plus"></i> Select on Non-PSDBM
             </button>
+            <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#17a2b8;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-pen"></i> Add Manual Item
+            </button>
+            <span style="font-weight:600;font-size:13px;margin-left:8px;">Search</span>
+            <input type="text" id="papItemSearch" placeholder="" oninput="filterPAPItemsInModal(this.value)" style="flex:1;padding:5px 10px;border:1px solid #aaa;font-size:12px;">
           </div>
 
-          <div class="form-row" style="margin-bottom:8px;">
-            <div class="search-box" style="flex:1;">
-              <i class="fas fa-search"></i>
-              <input type="text" id="papItemSearch" placeholder="Search" oninput="filterPAPItemsInModal(this.value)">
-            </div>
-          </div>
-
-          <div id="papItemsListContainer" style="max-height:250px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;">
-            <table class="data-table full-width" style="font-size:11.5px;margin:0;">
-              <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
-                <th>Command</th>
-                <th>Item Code <span style="cursor:pointer;" title="Filter">T</span></th>
-                <th>Product Category <span style="cursor:pointer;" title="Filter">T</span></th>
-                <th>Account Code</th>
-                <th>Product Description <span style="cursor:pointer;" title="Filter">T</span></th>
-                <th>Available At <span style="cursor:pointer;" title="Filter">T</span></th>
-                <th>Qty</th>
-                <th>UOM <span style="cursor:pointer;" title="Filter">T</span></th>
-                <th>Unit Price (Php)</th>
+          <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin-bottom:8px;">
+            <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
+              <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
+                <th style="padding:6px 8px;">Command</th>
+                <th style="padding:6px 8px;">Item Code <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+                <th style="padding:6px 8px;">Product Category <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+                <th style="padding:6px 8px;">Account Code</th>
+                <th style="padding:6px 8px;">Product Description <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+                <th style="padding:6px 8px;">Available At <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+                <th style="padding:6px 4px;text-align:center;">Qty</th>
+                <th style="padding:6px 8px;">UOM <span style="cursor:pointer;color:#888;" title="Filter">T</span></th>
+                <th style="padding:6px 8px;">Unit Price (Php)</th>
               </tr></thead>
               <tbody id="papItemsListBody"></tbody>
             </table>
           </div>
 
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <div id="papItemCount" style="font-size:12px;color:#888;">0 items</div>
-            <div id="papTotalDisplay" style="margin-left:auto;font-size:14px;font-weight:700;color:#1a365d;"></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;border-top:1px solid #ddd;padding-top:6px;">
+            <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
+            <span style="font-size:12px;color:#888;">items</span>
+            <select id="papPageSize" style="margin-left:auto;padding:2px 6px;border:1px solid #ccc;border-radius:4px;font-size:11px;">
+              <option value="10" selected>10</option><option value="25">25</option><option value="50">50</option>
+            </select>
+            <span style="font-size:11px;color:#888;">items per page</span>
           </div>
 
-          <div style="display:flex;gap:10px;justify-content:flex-start;margin-top:16px;">
-            <button type="submit" class="btn btn-primary" style="background:#28a745;border-color:#28a745;padding:8px 24px;">
+          <div style="display:flex;gap:10px;justify-content:flex-start;">
+            <button type="submit" class="btn btn-primary" style="background:#28a745;border-color:#28a745;padding:8px 24px;font-weight:600;">
               <i class="fas fa-save"></i> Save
             </button>
-            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;font-weight:600;">
               <i class="fas fa-ban"></i> Cancel
             </button>
           </div>
@@ -8478,13 +8438,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       openModal('Edit PAP', html);
 
-      // Set fiscal year
-      const fySelect = document.getElementById('papFiscalYear');
-      if (fySelect && pap.fiscal_year) fySelect.value = String(pap.fiscal_year);
-
       // Load existing items
       window._papSelectedItems = (pap.items || []).map(it => ({
-        item_id: it.item_id,
+        item_id: it.item_id || null,
         item_code: it.item_code || it.catalog_item_code || '',
         product_category: it.product_category || it.catalog_category || '',
         account_code: it.account_code || '',
@@ -8494,7 +8450,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         uom: it.uom || it.catalog_unit || '',
         unit_price: parseFloat(it.unit_price || it.catalog_unit_price || 0),
         total_amount: parseFloat(it.total_amount || 0),
-        procurement_source: it.procurement_source || 'NON PS-DBM'
+        procurement_source: it.procurement_source || 'PAPs'
       }));
       renderPAPModalItemsList();
     } catch (err) {
@@ -8587,7 +8543,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         uom: item.unit || 'lot',
         unit_price: parseFloat(item.unit_price || 0),
         total_amount: parseFloat(item.unit_price || 0),
-        procurement_source: item.procurement_source || 'NON PS-DBM'
+        procurement_source: 'PAPs'
       };
 
       if (!window._papSelectedItems) window._papSelectedItems = [];
@@ -8602,18 +8558,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-  /** Render PAP items list in Create/Edit modal */
+  /** Render PAP items list in Create/Edit modal — ALL fields editable (PAP items are not catalog-linked) */
   window.renderPAPModalItemsList = function() {
     const tbody = document.getElementById('papItemsListBody');
     const countEl = document.getElementById('papItemCount');
-    const totalEl = document.getElementById('papTotalDisplay');
     if (!tbody) return;
 
     const items = window._papSelectedItems || [];
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="color:#888;padding:20px;">No items added yet. Click "Select on Non-PSDBM" to add items.</td></tr>';
-      if (countEl) countEl.textContent = '0 items';
-      if (totalEl) totalEl.textContent = '';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="color:#888;padding:20px;">No items added yet. Click "Select on Non-PSDBM" or "Add Manual Item" to add items.</td></tr>';
+      if (countEl) countEl.textContent = '0';
       return;
     }
 
@@ -8623,28 +8577,58 @@ Failure to submit the above requirements within the prescribed period shall cons
       totalAmount += lineTotal;
       it.total_amount = lineTotal;
       return `<tr>
-        <td>
-          <button type="button" class="btn btn-sm" onclick="removePAPItem(${idx})" style="color:#dc3545;background:none;border:none;cursor:pointer;font-size:11px;">
+        <td style="padding:4px 6px;">
+          <button type="button" onclick="removePAPItem(${idx})" style="color:#dc3545;background:none;border:none;cursor:pointer;font-size:12px;" title="Remove">
             <i class="fas fa-trash"></i>
           </button>
         </td>
-        <td style="font-size:11px;">${escapeHtml(it.item_code)}</td>
-        <td style="font-size:11px;">${escapeHtml(it.product_category)}</td>
-        <td><input type="text" value="${escapeHtml(it.account_code || '')}" onchange="window._papSelectedItems[${idx}].account_code=this.value" style="width:80px;font-size:11px;padding:2px 4px;"></td>
-        <td style="font-size:11px;">${escapeHtml(it.product_description)}</td>
-        <td style="font-size:11px;">${escapeHtml(it.available_at || '')}</td>
-        <td><input type="number" value="${it.quantity}" min="0" step="1" onchange="updatePAPItemQty(${idx}, this.value)" style="width:50px;font-size:11px;text-align:center;padding:2px 4px;"></td>
-        <td style="font-size:11px;">${escapeHtml(it.uom || '')}</td>
-        <td><input type="number" value="${parseFloat(it.unit_price || 0).toFixed(2)}" min="0" step="0.01" onchange="updatePAPItemPrice(${idx}, this.value)" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.item_code || '')}" onchange="window._papSelectedItems[${idx}].item_code=this.value" style="width:70px;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.product_category || '')}" onchange="window._papSelectedItems[${idx}].product_category=this.value" style="width:90px;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.account_code || '')}" onchange="window._papSelectedItems[${idx}].account_code=this.value" style="width:80px;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.product_description || '')}" onchange="window._papSelectedItems[${idx}].product_description=this.value" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.available_at || '')}" onchange="window._papSelectedItems[${idx}].available_at=this.value" style="width:70px;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;text-align:center;"><input type="number" value="${it.quantity}" min="0" step="1" onchange="updatePAPItemQty(${idx}, this.value)" style="width:45px;font-size:11px;text-align:center;padding:3px 2px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="text" value="${escapeHtml(it.uom || '')}" onchange="window._papSelectedItems[${idx}].uom=this.value" style="width:50px;font-size:11px;padding:3px 4px;border:1px solid #ccc;"></td>
+        <td style="padding:2px 4px;"><input type="number" value="${parseFloat(it.unit_price || 0).toFixed(2)}" min="0" step="0.01" onchange="updatePAPItemPrice(${idx}, this.value)" style="width:80px;font-size:11px;text-align:right;padding:3px 4px;border:1px solid #ccc;"></td>
       </tr>`;
     }).join('');
 
-    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '');
-    if (totalEl) totalEl.textContent = 'Total: Php ' + totalAmount.toLocaleString('en-PH', {minimumFractionDigits:2});
+    if (countEl) countEl.textContent = String(items.length);
 
-    // Auto-update the estimated budget field
+    // Auto-update the estimated budget field from items total
     const budgetField = document.getElementById('papEstimatedBudget');
     if (budgetField && totalAmount > 0) budgetField.value = totalAmount.toFixed(2);
+  };
+
+  /** Add a blank manual PAP item row (not from catalog) */
+  window.addManualPAPItem = function() {
+    if (!window._papSelectedItems) window._papSelectedItems = [];
+    window._papSelectedItems.push({
+      item_id: null,
+      item_code: '',
+      product_category: '',
+      account_code: '',
+      product_description: '',
+      available_at: '',
+      quantity: 1,
+      uom: 'lot',
+      unit_price: 0,
+      total_amount: 0,
+      procurement_source: 'PAPs'
+    });
+    renderPAPModalItemsList();
+    // Focus the last product_description input for quick entry
+    setTimeout(() => {
+      const tbody = document.getElementById('papItemsListBody');
+      if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        const lastRow = rows[rows.length - 1];
+        if (lastRow) {
+          const descInput = lastRow.querySelectorAll('input')[4]; // 5th input = product_description
+          if (descInput) descInput.focus();
+        }
+      }
+    }, 50);
   };
 
   /** Remove a PAP item */
@@ -8716,7 +8700,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         uom: it.uom || null,
         unit_price: parseFloat(it.unit_price || 0),
         total_amount: parseFloat(it.total_amount || 0),
-        procurement_source: it.procurement_source || 'NON PS-DBM'
+        procurement_source: it.procurement_source || 'PAPs'
       }))
     };
   }

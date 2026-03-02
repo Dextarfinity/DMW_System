@@ -192,3 +192,5 @@ Inventory
 
 
 psql -U your_user -d your_database -f server/database/migration_pap_management.sql
+
+cd "c:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System"; $env:PGPASSWORD='dmw123'; psql -U postgres -d dmw_db -f server/database/migration_pap_management.sql 2>&1

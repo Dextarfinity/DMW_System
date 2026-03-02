@@ -1746,7 +1746,7 @@ app.post('/api/paps', authenticateToken, async (req, res) => {
            item.account_code || null, item.product_description || null, item.available_at || null,
            item.quantity || 0, item.uom || null, item.unit_price || 0,
            item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
-           item.procurement_source || 'NON PS-DBM', item.remarks || null]
+           item.procurement_source || 'PAPs', item.remarks || null]
         );
       }
     }
@@ -1800,7 +1800,7 @@ app.put('/api/paps/:id', authenticateToken, async (req, res) => {
            item.account_code || null, item.product_description || null, item.available_at || null,
            item.quantity || 0, item.uom || null, item.unit_price || 0,
            item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
-           item.procurement_source || 'NON PS-DBM', item.remarks || null]
+           item.procurement_source || 'PAPs', item.remarks || null]
         );
       }
     }
