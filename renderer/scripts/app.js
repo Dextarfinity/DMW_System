@@ -449,9 +449,12 @@ async function loadPPMP() {
     // Build server query with all filters
     const selectedYear = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
     const selectedMode = modeFilter ? modeFilter.value : '';
+    const sourceFilter = document.getElementById('ppmpSourceFilter');
+    const selectedSource = sourceFilter ? sourceFilter.value : '';
     let url = '/ppmp?fiscal_year=' + selectedYear;
     if (selectedDept && selectedDept !== 'all') url += '&dept_id=' + selectedDept;
     if (selectedMode) url += '&procurement_mode=' + encodeURIComponent(selectedMode);
+    if (selectedSource) url += '&procurement_source=' + encodeURIComponent(selectedSource);
 
     const ppmp = await apiRequest(url);
     
@@ -590,6 +593,10 @@ function initPPMPFilters() {
   // Category filter
   const catFilter = document.getElementById('ppmpCategoryFilter');
   if (catFilter) catFilter.onchange = function() { loadPPMP(); };
+
+  // Procurement Source filter (PS-DBM / NON PS-DBM / PAPs)
+  const sourceFilter = document.getElementById('ppmpSourceFilter');
+  if (sourceFilter) sourceFilter.onchange = function() { loadPPMP(); };
 
   if (divFilter) divFilter.onchange = function() { loadPPMP(); };
   if (modeFilter) modeFilter.onchange = function() { loadPPMP(); };
@@ -1421,12 +1428,15 @@ function renderItemsTable(items) {
       else { stockStatus = 'in-stock'; stockLabel = 'In Stock'; }
     }
     const isSemiOrCapital = ['SEMI-EXPENDABLE', 'CAPITAL OUTLAY'].includes(item.category);
+    const source = item.procurement_source || 'NON PS-DBM';
+    const sourceBadgeClass = source === 'PS-DBM' ? 'source-badge psdbm' : 'source-badge non-psdbm';
     return `
     <tr>
       <td>${item.code || ''}</td>
       <td>${item.stock_no || '-'}</td>
       <td>${item.name || ''}</td>
       <td>${item.category || ''}</td>
+      <td><span class="${sourceBadgeClass}">${source}</span></td>
       <td>${item.unit || ''}</td>
       <td>₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td>${isService ? '-' : qty}</td>
@@ -1693,6 +1703,11 @@ function renderPPMPTable(ppmp) {
       const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'pending' ? 'pending' : p.status === 'draft' ? 'draft' : p.status;
       const mode = getModeBadge(p.procurement_mode);
       
+      // Procurement source badge
+      const itemSource = p.procurement_source || p.item_procurement_source || 'NON PS-DBM';
+      const sourceBadgeClass = itemSource === 'PS-DBM' ? 'source-badge psdbm' : itemSource === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
+      const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${itemSource}</span>`;
+
       let approvalInfo = '';
       if (p.status === 'pending') {
         const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by Chief FAD: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> Chief FAD</span>` : `<span class="approval-badge chief-pending" title="Awaiting Chief FAD approval"><i class="fas fa-clock"></i> Chief FAD</span>`;
@@ -1711,7 +1726,7 @@ function renderPPMPTable(ppmp) {
       html += `
       <tr class="ppmp-item-row" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
         <td class="ppmp-no-cell">${ppmpNo}</td>
-        <td class="ppmp-desc-cell">${formatPPMPDescription(p)}</td>
+        <td class="ppmp-desc-cell">${formatPPMPDescription(p)} ${sourceBadge}</td>
         <td>${p.project_type || 'Goods'}</td>
         <td>${p.quantity_size || '-'}</td>
         <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
@@ -2818,6 +2833,19 @@ function filterItemsByCategory(category) {
     if (cells.length > 3) {
       const cat = cells[3].textContent.trim();
       row.style.display = cat === category ? '' : 'none';
+    }
+  });
+}
+
+function filterItemsBySource(source) {
+  const tbody = document.getElementById('itemsTableBody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    if (!source) { row.style.display = ''; return; }
+    const badge = row.querySelector('.source-badge');
+    if (badge) {
+      row.style.display = badge.textContent.trim() === source ? '' : 'none';
     }
   });
 }
@@ -5130,67 +5158,173 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Plan Type</label>
-          <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
-            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-              <input type="checkbox" id="ppmpIndicative"> INDICATIVE
-            </label>
-            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-              <input type="checkbox" id="ppmpFinal"> FINAL
-            </label>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Plan Type</label>
+            <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" id="ppmpIndicative"> INDICATIVE
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" id="ppmpFinal"> FINAL
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Procurement Source <span class="text-danger">*</span></label>
+            <select class="form-select" id="ppmpProcurementSource" required onchange="togglePPMPSourceMode(this.value)">
+              <option value="NON PS-DBM" selected>NON PS-DBM (Items Catalog)</option>
+              <option value="PS-DBM">PS-DBM (Items Catalog)</option>
+              <option value="PAPs">PAPs (Programs, Activities & Projects)</option>
+            </select>
           </div>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
-        <div class="form-row-3">
-          <div class="form-group">
-            <label>Section <span class="text-danger">*</span></label>
-            <select class="form-select" id="ppmpSection" required>
-              <option value="OFFICE OPERATION">OFFICE OPERATION</option>
-              <option value="SEMI- FURNITURE & FIXTURES">SEMI- FURNITURE & FIXTURES</option>
-              <option value="TRAININGS & ACTIVITIES">TRAININGS & ACTIVITIES</option>
-              <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
-              <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
-            </select>
+        <!-- ===== CATALOG ITEMS SECTION (PS-DBM / NON PS-DBM) ===== -->
+        <div id="ppmpCatalogSection">
+          <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Section <span class="text-danger">*</span></label>
+              <select class="form-select" id="ppmpSection" required>
+                <option value="OFFICE OPERATION">OFFICE OPERATION</option>
+                <option value="SEMI- FURNITURE & FIXTURES">SEMI- FURNITURE & FIXTURES</option>
+                <option value="TRAININGS & ACTIVITIES">TRAININGS & ACTIVITIES</option>
+                <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
+                <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Filter by Category <small style="color:#999;">(narrows item list)</small></label>
+              <select class="form-select" id="ppmpCategoryFilterModal" onchange="filterPPMPItemsByCategory(this.value)">
+                <option value="">-- All Categories --</option>
+                ${categoryOptions}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Select Item to Add</label>
+              <select class="form-select" id="ppmpItemSelect">
+                <option value="">-- Select Item --</option>
+                ${allItems.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('')}
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Filter by Category <small style="color:#999;">(narrows item list)</small></label>
-            <select class="form-select" id="ppmpCategoryFilterModal" onchange="filterPPMPItemsByCategory(this.value)">
-              <option value="">-- All Categories --</option>
-              ${categoryOptions}
-            </select>
+          <div style="margin-bottom:12px;">
+            <button type="button" class="btn btn-sm btn-primary" onclick="addPPMPItemToList()" style="padding:6px 16px;">
+              <i class="fas fa-plus"></i> Add Item to List
+            </button>
+            <span id="ppmpItemCount" style="margin-left:12px; font-size:12px; color:#4a5568;"></span>
           </div>
-          <div class="form-group">
-            <label>Select Item to Add</label>
-            <select class="form-select" id="ppmpItemSelect">
-              <option value="">-- Select Item --</option>
-              ${allItems.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('')}
-            </select>
+          <div id="ppmpItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
+            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+              <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Item Name</th>
+                <th>Description</th>
+                <th style="width:60px;">Unit</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:80px;">Qty</th>
+                <th style="width:90px;">Budget</th>
+                <th style="width:40px;"></th>
+              </tr></thead>
+              <tbody id="ppmpItemsListBody"></tbody>
+            </table>
           </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <button type="button" class="btn btn-sm btn-primary" onclick="addPPMPItemToList()" style="padding:6px 16px;">
-            <i class="fas fa-plus"></i> Add Item to List
-          </button>
-          <span id="ppmpItemCount" style="margin-left:12px; font-size:12px; color:#4a5568;"></span>
-        </div>
-        <div id="ppmpItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
-          <table class="data-table full-width" style="font-size:11.5px; margin:0;">
-            <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
-              <th style="width:30px;">#</th>
-              <th>Item Name</th>
-              <th>Description</th>
-              <th style="width:60px;">Unit</th>
-              <th style="width:90px;">Unit Price</th>
-              <th style="width:80px;">Qty</th>
-              <th style="width:90px;">Budget</th>
-              <th style="width:40px;"></th>
-            </tr></thead>
-            <tbody id="ppmpItemsListBody"></tbody>
-          </table>
         </div>
         <input type="hidden" id="ppmpCategory" value="">
+
+        <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
+        <div id="ppmpPAPsSection" style="display:none;">
+          <div class="form-section-header" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left-color:#2e7d32;">
+            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> PAPs — Programs, Activities & Projects
+          </div>
+          <div class="info-banner" style="margin-bottom:12px; background:#fff8e1; border-left:4px solid #f9a825; padding:8px 12px;">
+            <i class="fas fa-exclamation-triangle" style="color:#f9a825;"></i>
+            <small>PAPs are expenses not listed in the Items Catalog (e.g., meals, transportation, honoraria, tarpaulin printing, tokens, etc.). These are budget line items for programs and activities.</small>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Section <span class="text-danger">*</span></label>
+              <select class="form-select" id="ppmpPAPsSection_select">
+                <option value="WELFARE AND REINTEGRATION SERVICES DIVISION ACTIVITIES">WELFARE AND REINTEGRATION SERVICES DIVISION ACTIVITIES</option>
+                <option value="MWPSD ACTIVITIES">MWPSD ACTIVITIES</option>
+                <option value="MWPTD ACTIVITIES">MWPTD ACTIVITIES</option>
+                <option value="FAD ACTIVITIES">FAD ACTIVITIES</option>
+                <option value="TRAININGS & SEMINARS">TRAININGS & SEMINARS</option>
+                <option value="REPRESENTATION EXPENSES">REPRESENTATION EXPENSES</option>
+                <option value="PRINTING AND BINDING EXPENSES">PRINTING AND BINDING EXPENSES</option>
+                <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>PAP Category</label>
+              <select class="form-select" id="ppmpPAPsCategory">
+                <option value="REPRESENTATION EXPENSES">REPRESENTATION EXPENSES</option>
+                <option value="MEALS AND SNACKS">MEALS AND SNACKS</option>
+                <option value="TRAINING MATERIALS">TRAINING MATERIALS</option>
+                <option value="TARPAULIN PRINTING">TARPAULIN PRINTING</option>
+                <option value="TRANSPORTATION RENTAL">TRANSPORTATION RENTAL</option>
+                <option value="HONORARIUM">HONORARIUM</option>
+                <option value="PERSONALIZED TOKENS">PERSONALIZED TOKENS</option>
+                <option value="SUPPLIES AND MATERIALS">SUPPLIES AND MATERIALS</option>
+                <option value="PRINTED POLO/TSHIRT">PRINTED POLO/TSHIRT</option>
+                <option value="OTHER SUPPLIES AND MATERIALS">OTHER SUPPLIES AND MATERIALS</option>
+                <option value="FINANCIAL LITERACY">FINANCIAL LITERACY</option>
+                <option value="CAPABILITY BUILDING">CAPABILITY BUILDING</option>
+                <option value="PRINTING AND PUBLICATION">PRINTING AND PUBLICATION</option>
+                <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
+                <option value="OTHER PAPs EXPENSES">OTHER PAPs EXPENSES</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Activity / Program Name <span class="text-danger">*</span></label>
+              <input type="text" id="ppmpPAPsActivityName" placeholder="e.g., Pre-Migration Orientation Seminar">
+            </div>
+          </div>
+          <div id="ppmpPAPsItemsContainer">
+            <div class="form-row" style="margin-bottom:4px;">
+              <div class="form-group" style="flex:3;">
+                <label>Expense Description <span class="text-danger">*</span></label>
+                <input type="text" id="ppmpPAPsExpenseDesc" placeholder="e.g., MEALS: AM Snacks, Lunch, PM Snacks with Free Use of Venue">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Unit</label>
+                <input type="text" id="ppmpPAPsUnit" placeholder="e.g., pax, lot, piece" value="lot">
+              </div>
+            </div>
+            <div class="form-row-3" style="margin-bottom:4px;">
+              <div class="form-group">
+                <label>Quantity / Size</label>
+                <input type="text" id="ppmpPAPsQtySize" placeholder="e.g., 100pax@₱2,000/pax">
+              </div>
+              <div class="form-group">
+                <label>Total Budget (₱) <span class="text-danger">*</span></label>
+                <input type="number" id="ppmpPAPsBudget" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;">
+                <button type="button" class="btn btn-sm btn-primary" onclick="addPAPsItemToList()" style="padding:6px 16px;width:100%;">
+                  <i class="fas fa-plus"></i> Add PAPs Expense
+                </button>
+              </div>
+            </div>
+          </div>
+          <span id="ppmpPAPsItemCount" style="font-size:12px; color:#4a5568;"></span>
+          <div id="ppmpPAPsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
+            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+              <thead><tr style="background:#e8f5e9; position:sticky; top:0; z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Activity</th>
+                <th>Expense Description</th>
+                <th style="width:80px;">Category</th>
+                <th style="width:80px;">Unit</th>
+                <th style="width:100px;">Qty/Size</th>
+                <th style="width:100px;">Budget</th>
+                <th style="width:40px;"></th>
+              </tr></thead>
+              <tbody id="ppmpPAPsListBody"></tbody>
+            </table>
+          </div>
+        </div>
 
         <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
 
@@ -5273,6 +5407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window._ppmpItemsCache = allItems;
     // Initialize the items list
     window._ppmpSelectedItems = [];
+    window._ppmpPAPsItems = [];
     // Auto-generate PPMP number if division is pre-selected (chief)
     if (isChief && chiefDivision) generatePPMPNumber();
   };
@@ -7310,9 +7445,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
           <div class="form-group">
-            <label>UACS Code</label>
-            <input type="text" id="itemUacsCode" placeholder="e.g., 1-07-05-010">
+            <label>Procurement Source</label>
+            <select class="form-select" id="itemProcurementSource">
+              <option value="NON PS-DBM">NON PS-DBM</option>
+              <option value="PS-DBM">PS-DBM</option>
+            </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label>UACS Code</label>
+          <input type="text" id="itemUacsCode" placeholder="e.g., 1-07-05-010">
         </div>
         <div class="form-group">
           <label>Item Name</label>
@@ -7366,7 +7508,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       stock_no: document.getElementById('itemStockNo').value || null,
       uacs_code: document.getElementById('itemUacsCode').value || null,
       quantity: parseInt(document.getElementById('itemQuantity').value) || 0,
-      reorder_point: parseInt(document.getElementById('itemReorderPoint').value) || 0
+      reorder_point: parseInt(document.getElementById('itemReorderPoint').value) || 0,
+      procurement_source: document.getElementById('itemProcurementSource')?.value || 'NON PS-DBM'
     };
     
     if (!confirm('Are you sure you want to save this item?')) return;
@@ -7539,15 +7682,23 @@ Failure to submit the above requirements within the prescribed period shall cons
    */
   window.saveNewPPMP = async function(e) {
     e.preventDefault();
-    const items = window._ppmpSelectedItems || [];
+    const procSource = document.getElementById('ppmpProcurementSource')?.value || 'NON PS-DBM';
+    const isPAPs = procSource === 'PAPs';
+    
+    const catalogItems = window._ppmpSelectedItems || [];
+    const papsItems = window._ppmpPAPsItems || [];
+    const items = isPAPs ? papsItems : catalogItems;
+    
     if (items.length === 0) {
-      alert('Please add at least one item from the catalog.');
+      alert(isPAPs ? 'Please add at least one PAPs expense.' : 'Please add at least one item from the catalog.');
       return;
     }
 
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
-    const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
+    const section = isPAPs 
+      ? (document.getElementById('ppmpPAPsSection_select')?.value || 'GENERAL PROCUREMENT')
+      : (document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT');
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
@@ -7562,8 +7713,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!division) { alert('Please select a division.'); return; }
 
     const totalBudget = items.reduce((sum, it) => sum + it.budget, 0);
-    const itemSummary = items.map((it, i) => `  ${i+1}. ${it.item_name} (x${it.quantity}) = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}`).join('\n');
-    if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
+    const itemSummary = items.map((it, i) => `  ${i+1}. ${it.item_name || it.description} (x${it.quantity}) = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}`).join('\n');
+    if (!confirm(`Save ${items.length} ${isPAPs ? 'PAPs' : 'PPMP'} entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
 
     try {
       // Generate PPMP numbers for the batch
@@ -7588,12 +7739,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           dept_id: deptIdMap[division] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: it.item_category || '',
-          item_id: it.item_id,
+          category: it.item_category || (isPAPs ? 'PAPs' : ''),
+          item_id: it.item_id || null,
           description: it.description,
           item_description: it.description,
-          project_type: projectType,
-          quantity_size: String(it.quantity),
+          project_type: isPAPs ? 'Activity/Program' : projectType,
+          quantity_size: isPAPs ? (it.qty_size || String(it.quantity)) : String(it.quantity),
           procurement_mode: procurementMode,
           pre_procurement: preProc,
           start_date: startDate || null,
@@ -7602,6 +7753,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fund_source: fundSource,
           total_amount: it.budget,
           status: 'pending',
+          procurement_source: it.procurement_source || procSource,
           remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim()
         };
       });
@@ -7736,6 +7888,143 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Add a selected item from the catalog dropdown to the PPMP items list.
    */
+  /**
+   * Toggle between Catalog Items mode (PS-DBM / NON PS-DBM) and PAPs mode.
+   */
+  window.togglePPMPSourceMode = function(source) {
+    const catalogSection = document.getElementById('ppmpCatalogSection');
+    const papsSection = document.getElementById('ppmpPAPsSection');
+    if (source === 'PAPs') {
+      if (catalogSection) catalogSection.style.display = 'none';
+      if (papsSection) papsSection.style.display = 'block';
+    } else {
+      if (catalogSection) catalogSection.style.display = 'block';
+      if (papsSection) papsSection.style.display = 'none';
+      // Filter items by source in the dropdown
+      const itemSelect = document.getElementById('ppmpItemSelect');
+      if (itemSelect) {
+        const allItems = window._ppmpItemsCache || [];
+        const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
+        itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
+          filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
+      }
+    }
+  };
+
+  /**
+   * Add a PAPs expense item to the PAPs list.
+   */
+  window.addPAPsItemToList = function() {
+    const activityName = document.getElementById('ppmpPAPsActivityName');
+    const expenseDesc = document.getElementById('ppmpPAPsExpenseDesc');
+    const unit = document.getElementById('ppmpPAPsUnit');
+    const qtySize = document.getElementById('ppmpPAPsQtySize');
+    const budget = document.getElementById('ppmpPAPsBudget');
+    const category = document.getElementById('ppmpPAPsCategory');
+
+    if (!activityName || !activityName.value.trim()) {
+      alert('Please enter the Activity / Program Name.');
+      return;
+    }
+    if (!expenseDesc || !expenseDesc.value.trim()) {
+      alert('Please enter the Expense Description.');
+      return;
+    }
+    if (!budget || !budget.value || parseFloat(budget.value) <= 0) {
+      alert('Please enter the Total Budget.');
+      return;
+    }
+
+    const entry = {
+      item_id: null,
+      item_name: activityName.value.trim(),
+      item_code: 'PAP',
+      item_unit: (unit ? unit.value.trim() : 'lot') || 'lot',
+      item_category: category ? category.value : 'OTHER PAPs EXPENSES',
+      item_description: expenseDesc.value.trim(),
+      description: expenseDesc.value.trim(),
+      unit_price: parseFloat(budget.value) || 0,
+      quantity: 1,
+      qty_size: (qtySize ? qtySize.value.trim() : ''),
+      budget: parseFloat(budget.value) || 0,
+      procurement_source: 'PAPs',
+      activity_name: activityName.value.trim()
+    };
+
+    if (!window._ppmpPAPsItems) window._ppmpPAPsItems = [];
+    window._ppmpPAPsItems.push(entry);
+    renderPAPsItemsList();
+
+    // Clear input fields but keep activity name for batch entry
+    if (expenseDesc) expenseDesc.value = '';
+    if (budget) budget.value = '';
+    if (qtySize) qtySize.value = '';
+  };
+
+  /**
+   * Remove a PAPs item from the list by index.
+   */
+  window.removePAPsItem = function(index) {
+    if (!window._ppmpPAPsItems) return;
+    window._ppmpPAPsItems.splice(index, 1);
+    renderPAPsItemsList();
+  };
+
+  /**
+   * Update the budget for a PAPs item in the list.
+   */
+  window.updatePAPsItemBudget = function(index, val) {
+    if (!window._ppmpPAPsItems || !window._ppmpPAPsItems[index]) return;
+    const b = Math.max(0, parseFloat(val) || 0);
+    window._ppmpPAPsItems[index].budget = b;
+    window._ppmpPAPsItems[index].unit_price = b;
+    renderPAPsItemsList();
+  };
+
+  /**
+   * Render the PAPs items list table.
+   */
+  window.renderPAPsItemsList = function() {
+    const tbody = document.getElementById('ppmpPAPsListBody');
+    const container = document.getElementById('ppmpPAPsListContainer');
+    const countEl = document.getElementById('ppmpPAPsItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+
+    const items = window._ppmpPAPsItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx + 1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.activity_name || it.item_name) + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description) + '</td>' +
+        '<td style="font-size:10px;text-align:center;">' + escapeHtml(it.item_category) + '</td>' +
+        '<td style="text-align:center;">' + escapeHtml(it.item_unit) + '</td>' +
+        '<td style="text-align:center;font-size:11px;">' + escapeHtml(it.qty_size || '-') + '</td>' +
+        '<td><input type="number" value="' + it.budget.toFixed(2) + '" min="0" step="0.01" ' +
+          'style="width:90px;font-size:11px;text-align:right;padding:2px 4px;" ' +
+          'onchange="updatePAPsItemBudget(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:center;">' +
+          '<button type="button" class="btn btn-sm" onclick="removePAPsItem(' + idx + ')" ' +
+            'style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove">' +
+            '<i class="fas fa-times"></i></button>' +
+        '</td></tr>';
+    }).join('');
+
+    if (countEl) countEl.textContent = items.length + ' PAPs expense' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+  };
+
   window.addPPMPItemToList = function() {
     const itemSelect = document.getElementById('ppmpItemSelect');
     if (!itemSelect || !itemSelect.value) {
@@ -7766,6 +8055,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       sectionField.value = autoSection;
     }
 
+    // Determine procurement source from the source dropdown or the item's inherent source
+    const sourceSelect = document.getElementById('ppmpProcurementSource');
+    const procSource = sourceSelect ? sourceSelect.value : (item.procurement_source || 'NON PS-DBM');
+
     // Add to the selected items array
     const entry = {
       item_id: parseInt(itemId),
@@ -7777,7 +8070,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       description: description,
       unit_price: unitPrice,
       quantity: 1,
-      budget: unitPrice
+      budget: unitPrice,
+      procurement_source: procSource
     };
     window._ppmpSelectedItems.push(entry);
 
@@ -11055,6 +11349,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="detail-row"><label>Fiscal Year:</label><span>${plan.fiscal_year}</span></div>
           <div class="detail-row"><label>Section:</label><span style="font-weight:700; color:#b8860b; text-transform:uppercase;">${plan.section || '-'}</span></div>
           <div class="detail-row"><label>Category:</label><span style="font-weight:600; color:#1565c0;">${plan.item_category || plan.category || '-'}</span></div>
+          <div class="detail-row"><label>Procurement Source:</label><span><span class="source-badge ${(plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PS-DBM' ? 'psdbm' : (plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PAPs' ? 'paps' : 'non-psdbm'}" style="font-size:11px;padding:2px 10px;border-radius:10px;">${plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM'}</span></span></div>
           ${plan.item_name ? `<div class="detail-row"><label>Linked Item:</label><span style="font-weight:600;">${plan.item_name} <span style="color:#4a5568;">(${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</span></span></div>` : ''}
           ${plan.item_description ? `<div class="detail-row"><label>Item Description:</label><span style="white-space:pre-line;">${plan.item_description}</span></div>` : ''}
           <div class="detail-row"><label>General Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
@@ -11450,9 +11745,19 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // View IAR Details — dynamic
-  window.showViewIARModal = function(id) {
-    const i = cachedIAR.find(x => x.id === id);
+  window.showViewIARModal = async function(id) {
+    let i = cachedIAR.find(x => x.id === id);
     if (!i) { alert('IAR not found'); return; }
+    // Fetch full IAR detail (includes items with procurement_source)
+    let iarItems = [];
+    try {
+      const detail = await apiRequest('/iars/' + id);
+      if (detail) {
+        i = { ...i, ...detail };
+        iarItems = detail.items || [];
+      }
+    } catch(e) { console.warn('Could not load full IAR details:', e); }
+    
     let specsHtml = '<span style="color:#999;">None</span>';
     if (i.item_specifications) {
       const specs = i.item_specifications.split('\n').filter(l => l.trim());
@@ -11460,6 +11765,30 @@ Failure to submit the above requirements within the prescribed period shall cons
         specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
       }
     }
+
+    // Build items table if items exist
+    let itemsTableHtml = '';
+    if (iarItems.length > 0) {
+      itemsTableHtml = '<div style="margin-top:15px;"><h4 style="margin-bottom:8px;"><i class="fas fa-box-open"></i> IAR Items (' + iarItems.length + ')</h4>' +
+        '<table class="data-table full-width" style="font-size:12px;"><thead><tr>' +
+        '<th>Item</th><th>Description</th><th>Unit</th><th>Qty</th><th>Unit Price</th><th>Amount</th><th>Source</th>' +
+        '</tr></thead><tbody>' +
+        iarItems.map(it => {
+          const src = it.procurement_source || it.item_procurement_source || 'NON PS-DBM';
+          const srcClass = src === 'PS-DBM' ? 'psdbm' : src === 'PAPs' ? 'paps' : 'non-psdbm';
+          return '<tr>' +
+            '<td>' + (it.item_name || it.name || '-') + '</td>' +
+            '<td>' + (it.description || '-') + '</td>' +
+            '<td>' + (it.unit || '-') + '</td>' +
+            '<td>' + (it.quantity || 0) + '</td>' +
+            '<td>₱' + parseFloat(it.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td>₱' + parseFloat(it.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td><span class="source-badge ' + srcClass + '">' + src + '</span></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>IAR No.:</label><span><strong>${i.iar_number || '-'}</strong></span></div>
@@ -11471,6 +11800,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(i.status)}</span></div>
         <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
       </div>
+      ${itemsTableHtml}
       ${getViewAttachmentSectionHTML('iar', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
@@ -11851,6 +12181,16 @@ Failure to submit the above requirements within the prescribed period shall cons
               </select>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Procurement Source</label>
+              <select class="form-select" name="procurement_source">
+                <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM</option>
+                <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM</option>
+                <option value="PAPs" ${(plan.procurement_source||plan.item_procurement_source||'')==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
+              </select>
+            </div>
+          </div>
 
           <div class="form-section-header"><i class="fas fa-layer-group"></i> Linked Items <small style="font-weight:400; color:#4a5568;">(check items to link, each with its own description)</small></div>
           ${plan.item_id && linkedItem ? `
@@ -12127,7 +12467,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       delivery_period: form.delivery_period?.value || null,
       total_amount: parseFloat(form.total_amount.value),
       fund_source: form.fund_source?.value || 'GAA',
-      remarks: form.remarks.value
+      remarks: form.remarks.value,
+      procurement_source: form.procurement_source?.value || 'NON PS-DBM'
     };
 
     // Separate: the original item (update existing plan) vs new items (batch create)
@@ -12398,9 +12739,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
           <div class="form-group">
-            <label>UACS Code</label>
-            <input type="text" id="editItemUACS" value="${item.uacs_code || ''}">
+            <label>Procurement Source</label>
+            <select class="form-select" id="editItemProcSource">
+              <option value="NON PS-DBM" ${(item.procurement_source || 'NON PS-DBM') === 'NON PS-DBM' ? 'selected' : ''}>NON PS-DBM</option>
+              <option value="PS-DBM" ${item.procurement_source === 'PS-DBM' ? 'selected' : ''}>PS-DBM</option>
+            </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label>UACS Code</label>
+          <input type="text" id="editItemUACS" value="${item.uacs_code || ''}">
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -12441,7 +12789,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       uacs_code: document.getElementById('editItemUACS').value,
       quantity: parseInt(document.getElementById('editItemQty').value) || 0,
       reorder_point: parseInt(document.getElementById('editItemReorder').value) || 0,
-      is_active: document.getElementById('editItemActive').value === 'true'
+      is_active: document.getElementById('editItemActive').value === 'true',
+      procurement_source: document.getElementById('editItemProcSource')?.value || 'NON PS-DBM'
     };
     try {
       await apiRequest('/items/' + id, 'PUT', data);

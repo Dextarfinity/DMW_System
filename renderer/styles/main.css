@@ -1146,6 +1146,33 @@ body {
   color: var(--info-color);
 }
 
+/* ==================== PROCUREMENT SOURCE BADGES ==================== */
+.source-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.source-badge.psdbm {
+  background: #e6f4ea;
+  color: #1e7e34;
+  border: 1px solid #a3d9a5;
+}
+.source-badge.non-psdbm {
+  background: #e8f0fe;
+  color: #1a56db;
+  border: 1px solid #a4c2f4;
+}
+.source-badge.paps {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+}
+
 /* ==================== APPROVAL BADGES (PPMP dual approval) ==================== */
 .approval-status-row {
   display: flex;

@@ -539,6 +539,12 @@
                 <option value="">All Categories</option>
                 <!-- Populated dynamically -->
               </select>
+              <select class="form-select" id="ppmpSourceFilter">
+                <option value="">All Sources</option>
+                <option value="PS-DBM">PS-DBM</option>
+                <option value="NON PS-DBM">NON PS-DBM</option>
+                <option value="PAPs">PAPs</option>
+              </select>
               <select class="form-select dynamic-fy-select" id="ppmpYearFilter" data-prefix="FY">
               </select>
             </div>
@@ -1280,6 +1286,11 @@
               <option value="">All Categories</option>
               <!-- Populated dynamically from loaded items -->
             </select>
+            <select class="form-select" id="itemSourceFilter" onchange="filterItemsBySource(this.value)">
+              <option value="">All Sources</option>
+              <option value="PS-DBM">PS-DBM</option>
+              <option value="NON PS-DBM">NON PS-DBM</option>
+            </select>
             <select class="form-select" id="itemStockFilter" onchange="filterItemsByStock(this.value)">
               <option value="">All Stock Status</option>
               <option value="in-stock">In Stock</option>
@@ -1296,6 +1307,7 @@
                   <th>Stock No.</th>
                   <th>Description</th>
                   <th>Category</th>
+                  <th>Source</th>
                   <th>Unit</th>
                   <th>Unit Price</th>
                   <th>Qty on Hand</th>

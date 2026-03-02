@@ -1056,13 +1056,14 @@ app.delete('/api/suppliers/:id', authenticateToken, async (req, res) => {
 
 app.get('/api/items', authenticateToken, async (req, res) => {
   try {
-    const { category, active_only } = req.query;
+    const { category, active_only, procurement_source } = req.query;
     let query = `SELECT i.*, uc.name as uacs_name, uc.category as uacs_category
                  FROM items i LEFT JOIN uacs_codes uc ON i.uacs_code = uc.code`;
     const params = [];
     const conditions = [];
     if (category) { conditions.push(`i.category = $${params.length + 1}`); params.push(category); }
     if (active_only === 'true') { conditions.push('i.is_active = TRUE'); }
+    if (procurement_source) { conditions.push(`i.procurement_source = $${params.length + 1}`); params.push(procurement_source); }
     if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
     query += ' ORDER BY i.name';
     const result = await pool.query(query, params);
@@ -1083,11 +1084,11 @@ app.get('/api/items/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/items', authenticateToken, async (req, res) => {
   try {
-    const { code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, gam_classification, semi_expendable_classification } = req.body;
+    const { code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, gam_classification, semi_expendable_classification, procurement_source } = req.body;
     const result = await pool.query(
-      `INSERT INTO items (code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, gam_classification, semi_expendable_classification) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-      [code, stock_no, name, description, unit, unit_price || 0, category, uacs_code, quantity || 0, reorder_point || 0, gam_classification, semi_expendable_classification]
+      `INSERT INTO items (code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, gam_classification, semi_expendable_classification, procurement_source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [code, stock_no, name, description, unit, unit_price || 0, category, uacs_code, quantity || 0, reorder_point || 0, gam_classification, semi_expendable_classification, procurement_source || 'NON PS-DBM']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1095,12 +1096,12 @@ app.post('/api/items', authenticateToken, async (req, res) => {
 
 app.put('/api/items/:id', authenticateToken, async (req, res) => {
   try {
-    const { code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, is_active, gam_classification, semi_expendable_classification } = req.body;
+    const { code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, is_active, gam_classification, semi_expendable_classification, procurement_source } = req.body;
     const result = await pool.query(
       `UPDATE items SET code=$1, stock_no=$2, name=$3, description=$4, unit=$5, unit_price=$6, category=$7, uacs_code=$8, 
-       quantity=$9, reorder_point=$10, is_active=$11, gam_classification=$12, semi_expendable_classification=$13, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$14 RETURNING *`,
-      [code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, is_active !== false, gam_classification, semi_expendable_classification, req.params.id]
+       quantity=$9, reorder_point=$10, is_active=$11, gam_classification=$12, semi_expendable_classification=$13, procurement_source=$14, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$15 RETURNING *`,
+      [code, stock_no, name, description, unit, unit_price, category, uacs_code, quantity, reorder_point, is_active !== false, gam_classification, semi_expendable_classification, procurement_source || 'NON PS-DBM', req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1146,6 +1147,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               hu.username as hope_approver_name,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
+              it.procurement_source as item_procurement_source,
               pp.item_description, pp.section as section
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
@@ -1177,6 +1179,12 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
     if (req.query.procurement_mode) {
       params.push(req.query.procurement_mode);
       conditions.push(`pp.procurement_mode = $${params.length}`);
+    }
+
+    // Procurement source filter (PS-DBM, NON PS-DBM, PAPs)
+    if (req.query.procurement_source) {
+      params.push(req.query.procurement_source);
+      conditions.push(`pp.procurement_source = $${params.length}`);
     }
 
     // Only return PPMP line items (with ppmp_no) unless explicitly requesting all
@@ -1224,7 +1232,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description } = req.body;
+            category, item_id, section, item_description, procurement_source } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1247,12 +1255,12 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
         ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-        category, item_id, section, item_description) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
+        category, item_id, section, item_description, procurement_source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
        pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1285,7 +1293,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const { dept_id, fiscal_year, status, remarks, total_amount,
               ppmp_no, description, project_type, quantity_size, procurement_mode,
               pre_procurement, start_date, end_date, delivery_period, fund_source,
-              category, item_id, section, item_description } = entry;
+              category, item_id, section, item_description, procurement_source } = entry;
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
@@ -1308,12 +1316,12 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const planResult = await client.query(
         `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
           ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-          category, item_id, section, item_description) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id`,
+          category, item_id, section, item_description, procurement_source) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
         [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
          finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
          pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
+         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
       );
       createdIds.push(planResult.rows[0].id);
     }
@@ -1331,18 +1339,18 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description } = req.body;
+            category, item_id, section, item_description, procurement_source } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
-        category=$17, item_id=$18, section=$19, item_description=$20,
+        category=$17, item_id=$18, section=$19, item_description=$20, procurement_source=$21,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
        pre_procurement, start_date, end_date, delivery_period, fund_source,
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null]
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -1490,6 +1498,7 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
               1 as total_qty,
               pp.project_type as category,
               pp.procurement_mode,
+              pp.procurement_source,
               pp.fund_source,
               pp.fiscal_year,
               pp.status as plan_status,
@@ -2391,7 +2400,7 @@ app.get('/api/iars/:id', authenticateToken, async (req, res) => {
     );
     if (iar.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
     const items = await pool.query(
-      `SELECT ii.*, i.category as item_category, i.uacs_code, i.stock_no
+      `SELECT ii.*, i.category as item_category, i.uacs_code, i.stock_no, i.procurement_source as item_procurement_source
        FROM iar_items ii LEFT JOIN items i ON ii.item_id = i.id WHERE ii.iar_id = $1 ORDER BY ii.id`,
       [req.params.id]
     );
@@ -2416,10 +2425,10 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
     if (items && items.length > 0) {
       for (const item of items) {
         await client.query(
-          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [iar.id, item.item_id, item.item_code, item.item_name, item.quantity, item.unit_cost||0,
-           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks]
+           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null]
         );
       }
     }
@@ -2457,10 +2466,10 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);
       for (const item of items) {
         await client.query(
-          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [req.params.id, item.item_id, item.item_code, item.item_name, item.quantity, item.unit_cost||0,
-           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks]
+           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null]
         );
       }
     }

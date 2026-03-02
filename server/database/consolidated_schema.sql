@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS items (
     reorder_point INT DEFAULT 0,
     gam_classification VARCHAR(100),
     semi_expendable_classification VARCHAR(20),
+    procurement_source VARCHAR(20) DEFAULT 'NON PS-DBM',
     is_active   BOOLEAN DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -191,6 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_items_code ON items(code);
 CREATE INDEX IF NOT EXISTS idx_items_stock_no ON items(stock_no);
 CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
 CREATE INDEX IF NOT EXISTS idx_items_uacs ON items(uacs_code);
+CREATE INDEX IF NOT EXISTS idx_items_procurement_source ON items(procurement_source);
 
 -- ============================================================
 -- 12. SUPPLIERS
@@ -256,6 +258,11 @@ CREATE TABLE IF NOT EXISTS procurementplans (
     ppmp_no          VARCHAR(50),
     description      TEXT,
     project_type     VARCHAR(50),
+    procurement_source VARCHAR(20) DEFAULT 'NON PS-DBM',
+    category         VARCHAR(100),
+    item_id          INT REFERENCES items(id) ON DELETE SET NULL,
+    section          VARCHAR(100) DEFAULT 'GENERAL PROCUREMENT',
+    item_description TEXT,
     quantity_size    VARCHAR(100),
     procurement_mode VARCHAR(100),
     pre_procurement  VARCHAR(10),
@@ -280,6 +287,7 @@ CREATE TABLE IF NOT EXISTS procurementplans (
 CREATE INDEX IF NOT EXISTS idx_plans_dept   ON procurementplans(dept_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON procurementplans(status);
 CREATE INDEX IF NOT EXISTS idx_plans_year   ON procurementplans(fiscal_year);
+CREATE INDEX IF NOT EXISTS idx_plans_procurement_source ON procurementplans(procurement_source);
 
 -- ============================================================
 -- 16. PLAN ITEMS
