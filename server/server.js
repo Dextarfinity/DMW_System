@@ -1237,19 +1237,30 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
 
-    // Auto-generate PPMP number dynamically if not provided: PPMP-{DEPT}-{YEAR}-{SEQ}
+    // Auto-generate PPMP number or validate uniqueness of provided one
     let finalPpmpNo = ppmp_no;
-    if (!finalPpmpNo && deptId) {
-      const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
-      const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
-      const prefix = `PPMP-${deptCode}-${fy}-`;
+    const deptResult2 = deptId ? await client.query('SELECT code FROM departments WHERE id = $1', [deptId]) : { rows: [] };
+    const deptCode2 = deptResult2.rows.length > 0 ? deptResult2.rows[0].code : 'DMW';
+    const autoPrefix = `PPMP-${deptCode2}-${fy}-`;
+
+    if (finalPpmpNo) {
+      // Check if provided ppmp_no already exists — if so, regenerate
+      const dupCheck = await client.query('SELECT id FROM procurementplans WHERE ppmp_no = $1', [finalPpmpNo]);
+      if (dupCheck.rows.length > 0) {
+        const seqResult = await client.query(
+          `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+           FROM procurementplans WHERE ppmp_no LIKE $2`,
+          [autoPrefix, autoPrefix + '%']
+        );
+        finalPpmpNo = autoPrefix + String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
+      }
+    } else if (deptId) {
       const seqResult = await client.query(
         `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
          FROM procurementplans WHERE ppmp_no LIKE $2`,
-        [prefix, prefix + '%']
+        [autoPrefix, autoPrefix + '%']
       );
-      const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
-      finalPpmpNo = prefix + nextSeq;
+      finalPpmpNo = autoPrefix + String((seqResult.rows[0].max_seq || 0) + 1).padStart(3, '0');
     }
 
     const planResult = await client.query(
@@ -1298,19 +1309,30 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
 
-      // Auto-generate PPMP number if not provided
+      // Auto-generate PPMP number or validate uniqueness
       let finalPpmpNo = ppmp_no;
-      if (!finalPpmpNo && deptId) {
-        const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
-        const deptCode = deptResult.rows.length > 0 ? deptResult.rows[0].code : 'DMW';
-        const prefix = `PPMP-${deptCode}-${fy}-`;
+      const deptResultB = deptId ? await client.query('SELECT code FROM departments WHERE id = $1', [deptId]) : { rows: [] };
+      const deptCodeB = deptResultB.rows.length > 0 ? deptResultB.rows[0].code : 'DMW';
+      const batchPrefix = `PPMP-${deptCodeB}-${fy}-`;
+
+      if (finalPpmpNo) {
+        // Check if provided ppmp_no already exists — if so, regenerate
+        const dupCheck = await client.query('SELECT id FROM procurementplans WHERE ppmp_no = $1', [finalPpmpNo]);
+        if (dupCheck.rows.length > 0) {
+          const seqResult = await client.query(
+            `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
+             FROM procurementplans WHERE ppmp_no LIKE $2`,
+            [batchPrefix, batchPrefix + '%']
+          );
+          finalPpmpNo = batchPrefix + String((seqResult.rows[0].max_seq || 0) + 1 + createdIds.length).padStart(3, '0');
+        }
+      } else if (deptId) {
         const seqResult = await client.query(
           `SELECT COALESCE(MAX(CAST(SUBSTRING(ppmp_no FROM LENGTH($1)+1) AS INTEGER)), 0) as max_seq
            FROM procurementplans WHERE ppmp_no LIKE $2`,
-          [prefix, prefix + '%']
+          [batchPrefix, batchPrefix + '%']
         );
-        const nextSeq = String((seqResult.rows[0].max_seq || 0) + 1 + createdIds.length).padStart(3, '0');
-        finalPpmpNo = prefix + nextSeq;
+        finalPpmpNo = batchPrefix + String((seqResult.rows[0].max_seq || 0) + 1 + createdIds.length).padStart(3, '0');
       }
 
       const planResult = await client.query(
@@ -1787,21 +1809,49 @@ app.put('/api/paps/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'PAP not found' });
     }
 
-    // Replace items if provided
+    // Replace items if provided — UPSERT to preserve existing pap_items.id
     if (items && Array.isArray(items)) {
-      await client.query('DELETE FROM pap_items WHERE pap_id = $1', [req.params.id]);
+      // Get existing item IDs for this PAP
+      const existingRes = await client.query('SELECT id FROM pap_items WHERE pap_id = $1', [req.params.id]);
+      const existingIds = new Set(existingRes.rows.map(r => r.id));
+      const incomingIds = new Set();
+
       for (const item of items) {
-        await client.query(
-          `INSERT INTO pap_items (pap_id, item_id, item_code, product_category, account_code,
-            product_description, available_at, quantity, uom, unit_price, total_amount,
-            procurement_source, remarks)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [req.params.id, item.item_id || null, item.item_code || null, item.product_category || null,
-           item.account_code || null, item.product_description || null, item.available_at || null,
-           item.quantity || 0, item.uom || null, item.unit_price || 0,
-           item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
-           item.procurement_source || 'PAPs', item.remarks || null]
-        );
+        if (item.id && existingIds.has(item.id)) {
+          // UPDATE existing item
+          incomingIds.add(item.id);
+          await client.query(
+            `UPDATE pap_items SET item_id=$1, item_code=$2, product_category=$3, account_code=$4,
+              product_description=$5, available_at=$6, quantity=$7, uom=$8, unit_price=$9,
+              total_amount=$10, procurement_source=$11, remarks=$12
+             WHERE id=$13 AND pap_id=$14`,
+            [item.item_id || null, item.item_code || null, item.product_category || null,
+             item.account_code || null, item.product_description || null, item.available_at || null,
+             item.quantity || 0, item.uom || null, item.unit_price || 0,
+             item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
+             item.procurement_source || 'PAPs', item.remarks || null, item.id, req.params.id]
+          );
+        } else {
+          // INSERT new item
+          await client.query(
+            `INSERT INTO pap_items (pap_id, item_id, item_code, product_category, account_code,
+              product_description, available_at, quantity, uom, unit_price, total_amount,
+              procurement_source, remarks)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [req.params.id, item.item_id || null, item.item_code || null, item.product_category || null,
+             item.account_code || null, item.product_description || null, item.available_at || null,
+             item.quantity || 0, item.uom || null, item.unit_price || 0,
+             item.total_amount || (parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)),
+             item.procurement_source || 'PAPs', item.remarks || null]
+          );
+        }
+      }
+
+      // DELETE items that were removed (exist in DB but not in incoming)
+      for (const existId of existingIds) {
+        if (!incomingIds.has(existId)) {
+          await client.query('DELETE FROM pap_items WHERE id = $1 AND pap_id = $2', [existId, req.params.id]);
+        }
       }
     }
 
@@ -2272,15 +2322,41 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications } = req.body;
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications, quotations } = req.body;
+    const result = await client.query(
       `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_amount=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
        WHERE id=$9 RETURNING *`,
       [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications || null, req.params.id]
     );
+    // If quotations are provided, replace existing ones
+    if (quotations) {
+      // Delete existing quote items first (child), then quotations (parent)
+      const existingQuots = await client.query('SELECT id FROM abstract_quotations WHERE abstract_id = $1', [req.params.id]);
+      for (const eq of existingQuots.rows) {
+        await client.query('DELETE FROM abstract_quote_items WHERE abstract_quotation_id = $1', [eq.id]);
+      }
+      await client.query('DELETE FROM abstract_quotations WHERE abstract_id = $1', [req.params.id]);
+      // Insert new quotations
+      for (const q of quotations) {
+        const qResult = await client.query(
+          `INSERT INTO abstract_quotations (abstract_id, supplier_id, bid_amount, is_compliant, remarks, rank_no) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [req.params.id, q.supplier_id, q.bid_amount||0, q.is_compliant||false, q.remarks, q.rank_no]
+        );
+        if (q.items) for (const it of q.items) {
+          await client.query(
+            `INSERT INTO abstract_quote_items (abstract_quotation_id, item_description, quantity, unit, unit_price) VALUES ($1,$2,$3,$4,$5)`,
+            [qResult.rows[0].id, it.item_description, it.quantity||1, it.unit, it.unit_price||0]
+          );
+        }
+      }
+    }
+    await client.query('COMMIT');
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+  finally { client.release(); }
 });
 
 app.delete('/api/abstracts/:id', authenticateToken, async (req, res) => {
@@ -2306,7 +2382,26 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
 app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT pq.*, a.abstract_number FROM post_qualifications pq LEFT JOIN abstracts a ON pq.abstract_id = a.id ORDER BY pq.created_at DESC`
+      `SELECT pq.*, a.abstract_number,
+        eh.full_name as twg_head_name,
+        em1.full_name as twg_member1_name,
+        em2.full_name as twg_member2_name,
+        em3.full_name as twg_member3_name,
+        em4.full_name as twg_member4_name,
+        s1.supplier_name as bidder1_name,
+        s2.supplier_name as bidder2_name,
+        s3.supplier_name as bidder3_name
+       FROM post_qualifications pq
+       LEFT JOIN abstracts a ON pq.abstract_id = a.id
+       LEFT JOIN employees eh ON pq.twg_head_id = eh.id
+       LEFT JOIN employees em1 ON pq.twg_member1_id = em1.id
+       LEFT JOIN employees em2 ON pq.twg_member2_id = em2.id
+       LEFT JOIN employees em3 ON pq.twg_member3_id = em3.id
+       LEFT JOIN employees em4 ON pq.twg_member4_id = em4.id
+       LEFT JOIN suppliers s1 ON pq.bidder1_supplier_id = s1.id
+       LEFT JOIN suppliers s2 ON pq.bidder2_supplier_id = s2.id
+       LEFT JOIN suppliers s3 ON pq.bidder3_supplier_id = s3.id
+       ORDER BY pq.created_at DESC`
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2322,11 +2417,11 @@ app.get('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
-    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status } = req.body;
+    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id } = req.body;
     const result = await pool.query(
-      `INSERT INTO post_qualifications (postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id]
+      `INSERT INTO post_qualifications (postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, created_by, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2334,11 +2429,11 @@ app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
 
 app.put('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
   try {
-    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status } = req.body;
+    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id } = req.body;
     const result = await pool.query(
-      `UPDATE post_qualifications SET postqual_number=$1, abstract_id=$2, bidder_name=$3, documents_verified=$4, technical_compliance=$5, financial_validation=$6, twg_result=$7, findings=$8, status=$9, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$10 RETURNING *`,
-      [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, req.params.id]
+      `UPDATE post_qualifications SET postqual_number=$1, abstract_id=$2, bidder_name=$3, documents_verified=$4, technical_compliance=$5, financial_validation=$6, twg_result=$7, findings=$8, status=$9, twg_head_id=$10, twg_member1_id=$11, twg_member2_id=$12, twg_member3_id=$13, twg_member4_id=$14, bidder1_supplier_id=$15, bidder2_supplier_id=$16, bidder3_supplier_id=$17, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$18 RETURNING *`,
+      [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2368,21 +2463,53 @@ app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) =
 app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT br.*, a.abstract_number, s.name as supplier_name
+      `SELECT br.*, a.abstract_number, s.name as supplier_name,
+       ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
+       em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
+       eh.full_name as hope_name
        FROM bac_resolutions br LEFT JOIN abstracts a ON br.abstract_id = a.id
-       LEFT JOIN suppliers s ON br.recommended_supplier_id = s.id ORDER BY br.created_at DESC`
+       LEFT JOIN suppliers s ON br.recommended_supplier_id = s.id
+       LEFT JOIN employees ec ON br.bac_chairperson_id = ec.id
+       LEFT JOIN employees ev ON br.bac_vice_chairperson_id = ev.id
+       LEFT JOIN employees em1 ON br.bac_member1_id = em1.id
+       LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
+       LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
+       LEFT JOIN employees eh ON br.hope_id = eh.id
+       ORDER BY br.created_at DESC`
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT br.*, a.abstract_number, s.name as supplier_name,
+       ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
+       em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
+       eh.full_name as hope_name
+       FROM bac_resolutions br LEFT JOIN abstracts a ON br.abstract_id = a.id
+       LEFT JOIN suppliers s ON br.recommended_supplier_id = s.id
+       LEFT JOIN employees ec ON br.bac_chairperson_id = ec.id
+       LEFT JOIN employees ev ON br.bac_vice_chairperson_id = ev.id
+       LEFT JOIN employees em1 ON br.bac_member1_id = em1.id
+       LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
+       LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
+       LEFT JOIN employees eh ON br.hope_id = eh.id
+       WHERE br.id = $1`, [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
     const result = await pool.query(
-      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'on_going', req.user.id]
+      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2390,11 +2517,11 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
     const result = await pool.query(
-      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, status=$9, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$10 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, req.params.id]
+      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, status=$9, bac_chairperson_id=$10, bac_vice_chairperson_id=$11, bac_member1_id=$12, bac_member2_id=$13, bac_member3_id=$14, hope_id=$15, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$16 RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2433,21 +2560,41 @@ app.put('/api/bac-resolutions/:id/set-status', authenticateToken, async (req, re
 app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT n.*, br.resolution_number, s.name as supplier_name
+      `SELECT n.*, br.resolution_number, s.name as supplier_name, pq.postqual_number,
+              r.rfq_number
        FROM notices_of_award n LEFT JOIN bac_resolutions br ON n.bac_resolution_id = br.id
-       LEFT JOIN suppliers s ON n.supplier_id = s.id ORDER BY n.created_at DESC`
+       LEFT JOIN suppliers s ON n.supplier_id = s.id
+       LEFT JOIN rfqs r ON n.rfq_id = r.id
+       LEFT JOIN abstracts a ON br.abstract_id = a.id
+       LEFT JOIN post_qualifications pq ON pq.abstract_id = a.id
+       ORDER BY n.created_at DESC`
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT n.*, br.resolution_number, s.name as supplier_name, s.address as supplier_address,
+              r.rfq_number
+       FROM notices_of_award n LEFT JOIN bac_resolutions br ON n.bac_resolution_id = br.id
+       LEFT JOIN suppliers s ON n.supplier_id = s.id
+       LEFT JOIN rfqs r ON n.rfq_id = r.id
+       WHERE n.id = $1`, [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
-    const { noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, status } = req.body;
+    const { noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, company_name, address, status } = req.body;
     const result = await pool.query(
-      `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [noa_number, bac_resolution_id, supplier_id, contract_amount||0, date_issued, status||'issued', req.user.id]
+      `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount||0, date_issued, status||'issued', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2455,11 +2602,11 @@ app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
 
 app.put('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
   try {
-    const { noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, bidder_receipt_date, status } = req.body;
+    const { noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, bidder_receipt_date, status } = req.body;
     const result = await pool.query(
-      `UPDATE notices_of_award SET noa_number=$1, bac_resolution_id=$2, supplier_id=$3, contract_amount=$4, date_issued=$5, bidder_receipt_date=$6, status=$7, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$8 RETURNING *`,
-      [noa_number, bac_resolution_id, supplier_id, contract_amount, date_issued, bidder_receipt_date, status, req.params.id]
+      `UPDATE notices_of_award SET noa_number=$1, bac_resolution_id=$2, supplier_id=$3, rfq_id=$4, contract_amount=$5, date_issued=$6, bidder_receipt_date=$7, status=$8, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$9 RETURNING *`,
+      [noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, bidder_receipt_date, status, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2490,11 +2637,12 @@ app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT po.*, s.name as supplier_name, s.address as supplier_address, s.tin as supplier_tin,
-              u.username as created_by_name, pr.pr_number
+              u.username as created_by_name, pr.pr_number, noa.noa_number
        FROM purchaseorders po
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u ON po.created_by = u.id
        LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
+       LEFT JOIN notices_of_award noa ON po.noa_id = noa.id
        ORDER BY po.created_at DESC`
     );
     res.json(result.rows);

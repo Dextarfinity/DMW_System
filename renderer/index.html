@@ -505,21 +505,7 @@
             <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
-          <!-- PPMP Source Tabs -->
-          <div class="ppmp-source-tabs" style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid #e2e8f0;">
-            <button class="ppmp-tab active" data-tab="psdbm-items" onclick="switchPPMPTab('psdbm-items')">
-              <i class="fas fa-store"></i> PS-DBM Items
-            </button>
-            <button class="ppmp-tab" data-tab="non-psdbm-items" onclick="switchPPMPTab('non-psdbm-items')">
-              <i class="fas fa-box"></i> Non-PSDBM Items
-            </button>
-            <button class="ppmp-tab" data-tab="pap" onclick="switchPPMPTab('pap')">
-              <i class="fas fa-project-diagram"></i> PAP
-            </button>
-          </div>
-
-          <!-- ===== TAB 1 & 2: PS-DBM / Non-PSDBM Items (existing PPMP table) ===== -->
-          <div class="ppmp-tab-content active" id="ppmpTabPSDBM" data-tab="psdbm-items">
+          <!-- Unified PPMP content (all procurement sources) -->
           <div class="page-actions">
             <button class="btn btn-primary" data-action="create-ppmp" onclick="showNewPPMPModal()">
               <i class="fas fa-plus"></i> New PPMP Entry
@@ -590,97 +576,7 @@
               </tbody>
             </table>
           </div>
-          </div>
 
-          <!-- Non-PSDBM items tab (same table, filtered view) -->
-          <div class="ppmp-tab-content" id="ppmpTabNonPSDBM" data-tab="non-psdbm-items" style="display:none;">
-          <div class="page-actions">
-            <button class="btn btn-primary" onclick="showNewPPMPModal('NON PS-DBM')">
-              <i class="fas fa-plus"></i> New Non-PSDBM Entry
-            </button>
-            <button class="btn btn-outline" onclick="exportToExcel('PPMP')">
-              <i class="fas fa-file-excel"></i> Export
-            </button>
-            <div class="search-box">
-              <i class="fas fa-search"></i>
-              <input type="text" id="ppmpNonPSDBMSearch" placeholder="Search Non-PSDBM items..." oninput="filterNonPSDBMTable(this.value)">
-            </div>
-          </div>
-          <div class="data-card">
-            <table class="data-table full-width">
-              <thead>
-                <tr>
-                  <th>PPMP No.</th>
-                  <th>General Description</th>
-                  <th>Type of Project</th>
-                  <th>Quantity and Size</th>
-                  <th>Mode of Procurement</th>
-                  <th>Source of Funds</th>
-                  <th>Estimated Budget (₱)</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="ppmpNonPSDBMTableBody">
-                <tr><td colspan="9" class="text-center">Loading Non-PSDBM items...</td></tr>
-              </tbody>
-            </table>
-          </div>
-          </div>
-
-          <!-- ===== TAB 3: PAP (Programs, Activities & Projects) ===== -->
-          <div class="ppmp-tab-content" id="ppmpTabPAP" data-tab="pap" style="display:none;">
-            <div class="pap-header" style="text-align:center;padding:16px 0 8px;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">
-              <h3 style="font-variant:small-caps;letter-spacing:2px;color:#1a365d;margin:0;font-size:18px;font-weight:700;">PAP (Programs Activities Project)</h3>
-            </div>
-
-            <div class="page-actions">
-              <button class="btn btn-primary" onclick="showCreatePAPModal()">
-                <i class="fas fa-plus"></i> Create PAP
-              </button>
-              <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" id="papSearchInput" placeholder="Search PAP..." oninput="filterPAPTable(this.value)">
-              </div>
-              <button class="btn btn-outline" onclick="exportToExcel('PAP')">
-                <i class="fas fa-file-excel"></i> Export
-              </button>
-            </div>
-
-            <p style="color:#888;font-size:12px;margin:0 0 8px;">Drag a column header and drop it here to group by that column</p>
-
-            <div class="data-card">
-              <div id="papTotalBadge" style="text-align:right;padding:6px 12px;font-size:13px;font-weight:700;color:#28a745;display:none;"></div>
-              <table class="data-table full-width">
-                <thead>
-                  <tr>
-                    <th style="width:30px;"></th>
-                    <th>Command</th>
-                    <th>PAP Name</th>
-                    <th>Description</th>
-                    <th>Quart...</th>
-                    <th>PAP Estimated B...</th>
-                    <th>MOP</th>
-                    <th>Account Code</th>
-                  </tr>
-                </thead>
-                <tbody id="papTableBody">
-                  <tr><td colspan="8" class="text-center" style="padding:30px;color:#636e78;">Loading PAP data...</td></tr>
-                </tbody>
-              </table>
-              <div id="papPagination" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #e2e8f0;">
-                <span id="papItemRange" style="font-size:12px;color:#666;">0 items</span>
-                <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-                  <select id="papPageSize" onchange="loadPAPs()" style="padding:3px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;">
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
-                  <span style="font-size:12px;color:#666;">items per page</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
         </section>
 
@@ -976,9 +872,6 @@
             <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('BACRes')">
               <i class="fas fa-file-excel"></i> Export
             </button>
-            <button class="btn btn-outline" onclick="printCurrentPage()">
-              <i class="fas fa-print"></i> Print
-            </button>
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" placeholder="Search...">
@@ -998,6 +891,7 @@
               <thead>
                 <tr>
                   <th>Resolution No.</th>
+                  <th>Abstract No.</th>
                   <th>Series of</th>
                   <th>Date</th>
                   <th>Subject / Description</th>
@@ -1106,6 +1000,7 @@
               <thead>
                 <tr>
                   <th>NOA No.</th>
+                  <th>Post Qual No.</th>
                   <th>Date Issued</th>
                   <th>Winning Bidder</th>
                   <th>Address</th>
@@ -1160,6 +1055,7 @@
               <thead>
                 <tr>
                   <th>PO No.</th>
+                  <th>NOA No.</th>
                   <th>Date</th>
                   <th>Mode of Procurement</th>
                   <th>Supplier</th>
@@ -1295,6 +1191,7 @@
                   <th rowspan="2" class="pkt-th-fixed">Office/Section</th>
                   <th colspan="8" class="text-center pkt-th-docs-header">Supporting Documents</th>
                   <th rowspan="2" class="pkt-th-fixed">Status</th>
+                  <th rowspan="2" class="pkt-th-fixed">Actions</th>
                 </tr>
                 <tr>
                   <th class="pkt-doc-col-header">PR</th>
@@ -1308,7 +1205,7 @@
                 </tr>
               </thead>
               <tbody id="poPacketTableBody">
-                <tr><td colspan="10" class="text-center">Loading document monitoring data...</td></tr>
+                <tr><td colspan="12" class="text-center">Loading document monitoring data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1375,60 +1272,137 @@
             <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
-          <div class="page-actions">
-            <button class="btn btn-primary" data-action="create-item" onclick="showNewItemModal()">
-              <i class="fas fa-plus"></i> Add New Item
-            </button>
-            <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Items')">
-              <i class="fas fa-file-excel"></i> Export
-            </button>
-            <button class="btn btn-outline" onclick="printCurrentPage()">
-              <i class="fas fa-print"></i> Print
-            </button>
-            <div class="search-box">
-              <i class="fas fa-search"></i>
-              <input type="text" placeholder="Search items..." oninput="filterItemsTable(this.value)">
+          <!-- Summary Dashboard: Stats + Pie Charts -->
+          <div class="items-dashboard">
+            <!-- Left: Stat Cards -->
+            <div class="items-stats-col">
+              <div class="items-stat-card">
+                <div class="stat-icon bg-primary"><i class="fas fa-boxes"></i></div>
+                <div class="stat-info"><h3 id="icTotalItems">0</h3><p>Total Items</p></div>
+              </div>
+              <div class="items-stat-card">
+                <div class="stat-icon bg-success"><i class="fas fa-store"></i></div>
+                <div class="stat-info"><h3 id="icPsdbmItems">0</h3><p>PS-DBM</p></div>
+              </div>
+              <div class="items-stat-card">
+                <div class="stat-icon bg-info"><i class="fas fa-warehouse"></i></div>
+                <div class="stat-info"><h3 id="icNonPsdbmItems">0</h3><p>NON PS-DBM</p></div>
+              </div>
+              <div class="items-stat-card">
+                <div class="stat-icon bg-warning"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="stat-info"><h3 id="icLowStock">0</h3><p>Low Stock</p></div>
+              </div>
+              <div class="items-stat-card">
+                <div class="stat-icon bg-danger"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-info"><h3 id="icOutOfStock">0</h3><p>Out of Stock</p></div>
+              </div>
             </div>
-            <select class="form-select" id="itemCategoryFilter" onchange="filterItemsByCategory(this.value)">
-              <option value="">All Categories</option>
-              <!-- Populated dynamically from loaded items -->
-            </select>
-            <select class="form-select" id="itemSourceFilter" onchange="filterItemsBySource(this.value)">
-              <option value="">All Sources</option>
-              <option value="PS-DBM">PS-DBM</option>
-              <option value="NON PS-DBM">NON PS-DBM</option>
-              <option value="PAPs">PAPs</option>
-            </select>
-            <select class="form-select" id="itemStockFilter" onchange="filterItemsByStock(this.value)">
-              <option value="">All Stock Status</option>
-              <option value="in-stock">In Stock</option>
-              <option value="low-stock">Low Stock</option>
-              <option value="out-of-stock">Out of Stock</option>
-            </select>
+            <!-- Center: Source Pie Chart -->
+            <div class="items-chart-card">
+              <div class="chart-title"><i class="fas fa-chart-pie"></i> Procurement Source</div>
+              <div class="chart-container" id="itemsSourceChart"></div>
+              <div class="chart-legend" id="itemsSourceLegend"></div>
+            </div>
+            <!-- Right: Stock Status Pie Chart -->
+            <div class="items-chart-card">
+              <div class="chart-title"><i class="fas fa-chart-pie"></i> Stock Status</div>
+              <div class="chart-container" id="itemsStockChart"></div>
+              <div class="chart-legend" id="itemsStockLegend"></div>
+            </div>
+            <!-- Far Right: Top Categories -->
+            <div class="items-chart-card">
+              <div class="chart-title"><i class="fas fa-chart-bar"></i> Top Categories</div>
+              <div class="chart-container" id="itemsCategoryChart"></div>
+              <div class="chart-legend" id="itemsCategoryLegend"></div>
+            </div>
+          </div>
+
+          <!-- Toolbar: Actions + Filters -->
+          <div class="page-actions items-toolbar">
+            <div class="items-toolbar-left">
+              <button class="btn btn-primary" data-action="create-item" onclick="showNewItemModal()">
+                <i class="fas fa-plus"></i> Add New Item
+              </button>
+              <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('Items')">
+                <i class="fas fa-file-excel"></i> Export
+              </button>
+              <button class="btn btn-outline" onclick="printCurrentPage()">
+                <i class="fas fa-print"></i> Print
+              </button>
+            </div>
+            <div class="items-toolbar-right">
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="itemSearchInput" placeholder="Search items..." oninput="applyItemsFilters()">
+              </div>
+              <select class="form-select" id="itemCategoryFilter" onchange="applyItemsFilters()">
+                <option value="">All Categories</option>
+              </select>
+              <select class="form-select" id="itemSourceFilter" onchange="applyItemsFilters()">
+                <option value="">All Sources</option>
+                <option value="PS-DBM">PS-DBM</option>
+                <option value="NON PS-DBM">NON PS-DBM</option>
+                <option value="PAPs">PAPs</option>
+              </select>
+              <select class="form-select" id="itemStockFilter" onchange="applyItemsFilters()">
+                <option value="">All Stock Status</option>
+                <option value="in-stock">In Stock</option>
+                <option value="low-stock">Low Stock</option>
+                <option value="out-of-stock">Out of Stock</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="resetItemsFilters()" title="Clear all filters">
+                <i class="fas fa-undo"></i> Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- Items Count & Pagination Info -->
+          <div class="items-table-info">
+            <span id="itemsCountInfo">Showing 0 of 0 items</span>
+            <div class="items-pagination" id="itemsPagination">
+              <button class="btn-page" id="itemsPrevBtn" onclick="itemsChangePage(-1)" disabled><i class="fas fa-chevron-left"></i></button>
+              <span id="itemsPageInfo">Page 1 of 1</span>
+              <button class="btn-page" id="itemsNextBtn" onclick="itemsChangePage(1)" disabled><i class="fas fa-chevron-right"></i></button>
+              <select class="form-select page-size-select" id="itemsPageSize" onchange="itemsChangePageSize(this.value)">
+                <option value="25">25 / page</option>
+                <option value="50" selected>50 / page</option>
+                <option value="100">100 / page</option>
+                <option value="0">Show All</option>
+              </select>
+            </div>
           </div>
 
           <div class="data-card">
-            <table class="data-table full-width">
+            <table class="data-table full-width items-catalog-table">
               <thead>
                 <tr>
-                  <th>Item Code</th>
-                  <th>Stock No.</th>
-                  <th>Description</th>
-                  <th>Category</th>
-                  <th>Source</th>
-                  <th>Unit</th>
-                  <th>Unit Price</th>
-                  <th>Qty on Hand</th>
-                  <th>Reorder Pt</th>
-                  <th>Stock Status</th>
-                  <th>UACS Code</th>
-                  <th>Actions</th>
+                  <th class="col-stockno">Stock No.</th>
+                  <th class="col-desc">Description</th>
+                  <th class="col-category">Category</th>
+                  <th class="col-source">Source</th>
+                  <th class="col-unit">Unit</th>
+                  <th class="col-price">Unit Price</th>
+                  <th class="col-qty">Qty</th>
+                  <th class="col-reorder">Reorder</th>
+                  <th class="col-status">Status</th>
+                  <th class="col-uacs">UACS Code</th>
+                  <th class="col-actions">Actions</th>
                 </tr>
               </thead>
               <tbody id="itemsTableBody">
                 <!-- Populated by JS from API -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Bottom pagination -->
+          <div class="items-table-info items-table-footer">
+            <span id="itemsCountInfoBottom">Showing 0 of 0 items</span>
+            <div class="items-pagination">
+              <button class="btn-page" id="itemsPrevBtnBottom" onclick="itemsChangePage(-1)" disabled><i class="fas fa-chevron-left"></i></button>
+              <span id="itemsPageInfoBottom">Page 1 of 1</span>
+              <button class="btn-page" id="itemsNextBtnBottom" onclick="itemsChangePage(1)" disabled><i class="fas fa-chevron-right"></i></button>
+            </div>
           </div>
         </section>
 
