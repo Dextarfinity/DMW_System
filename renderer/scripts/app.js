@@ -5754,7 +5754,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div style="margin-bottom:12px;">
                 <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
                 <div style="display:flex;align-items:center;gap:4px;">
-                  <span style="color:#555;font-size:13px;">Php</span>
+                  <span style="color:#555;font-size:13px;">₱</span>
                   <input type="text" id="papEstimatedBudget" inputmode="decimal" placeholder="0.00" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
                 </div>
               </div>
@@ -5814,7 +5814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th style="padding:6px 8px;">Available At</th>
                 <th style="padding:6px 4px;text-align:center;">Qty</th>
                 <th style="padding:6px 8px;">UOM</th>
-                <th style="padding:6px 8px;">Unit Price (Php)</th>
+                <th style="padding:6px 8px;">Unit Price (₱)</th>
                 <th style="padding:6px 8px;text-align:right;">Total Amount</th>
               </tr></thead>
               <tbody id="papItemsListBody"></tbody>
@@ -8646,7 +8646,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </select>
             </div>
             <div class="form-group">
-              <label>Estimated Unit Price (Php)</label>
+              <label>Estimated Unit Price (₱)</label>
               <input type="number" id="itemPapPrice" step="0.01" min="0" placeholder="0.00" style="padding:6px 10px;border:1px solid #aaa;font-size:13px;">
             </div>
           </div>
@@ -8964,7 +8964,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       };
       
       const totalBudget = papData.estimated_budget || papItems.reduce((sum, it) => sum + (parseFloat(it.quantity || 0) * parseFloat(it.unit_price || 0)), 0);
-      if (!confirm('Create PAP "' + papName + '" with ' + papItems.length + ' items?\n\nEstimated Budget: Php ' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}))) return;
+      if (!confirm('Create PAP "' + papName + '" with ' + papItems.length + ' items?\n\nEstimated Budget: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}))) return;
       
       try {
         await apiRequest('/paps', 'POST', papData);
@@ -9485,7 +9485,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <td style="font-weight:600;">${escapeHtml(p.pap_name)}</td>
         <td>${escapeHtml(p.description || p.pap_name)}</td>
         <td style="text-align:center;">${p.quarter || 0}</td>
-        <td style="text-align:right;font-weight:600;">Php ${parseFloat(p.estimated_budget || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        <td style="text-align:right;font-weight:600;">₱${parseFloat(p.estimated_budget || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
         <td>${escapeHtml(p.mop || '')}</td>
         <td>${escapeHtml(p.account_code || '')}</td>
       </tr>`;
@@ -9495,7 +9495,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const totalBadge = document.getElementById('papTotalBadge');
     if (totalBadge) {
       totalBadge.style.display = 'block';
-      totalBadge.textContent = 'Php' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+      totalBadge.textContent = '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
     }
     const rangeEl = document.getElementById('papItemRange');
     if (rangeEl) rangeEl.textContent = `1 - ${paps.length} of ${paps.length} items`;
@@ -9551,7 +9551,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div style="margin-bottom:12px;">
               <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
               <div style="display:flex;align-items:center;gap:4px;">
-                <span style="color:#555;font-size:13px;">Php</span>
+                <span style="color:#555;font-size:13px;">₱</span>
                 <input type="text" id="papEstimatedBudget" inputmode="decimal" placeholder="0.00" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
               </div>
             </div>
@@ -9611,7 +9611,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <th style="padding:6px 8px;">Available At</th>
               <th style="padding:6px 4px;text-align:center;">Qty</th>
               <th style="padding:6px 8px;">UOM</th>
-              <th style="padding:6px 8px;">Unit Price (Php)</th>
+              <th style="padding:6px 8px;">Unit Price (₱)</th>
               <th style="padding:6px 8px;text-align:right;">Total Amount</th>
             </tr></thead>
             <tbody id="papItemsListBody"></tbody>
@@ -9662,7 +9662,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <div style="margin-bottom:12px;">
                 <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
                 <div style="display:flex;align-items:center;gap:4px;">
-                  <span style="color:#555;font-size:13px;">Php</span>
+                  <span style="color:#555;font-size:13px;">₱</span>
                   <input type="text" id="papEstimatedBudget" inputmode="decimal" value="${parseFloat(pap.estimated_budget || 0).toFixed(2)}" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
                 </div>
               </div>
@@ -9722,7 +9722,7 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <th style="padding:6px 8px;">Available At</th>
                 <th style="padding:6px 4px;text-align:center;">Qty</th>
                 <th style="padding:6px 8px;">UOM</th>
-                <th style="padding:6px 8px;">Unit Price (Php)</th>
+                <th style="padding:6px 8px;">Unit Price (₱)</th>
                 <th style="padding:6px 8px;text-align:right;">Total Amount</th>
               </tr></thead>
               <tbody id="papItemsListBody"></tbody>
@@ -10046,7 +10046,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const data = collectPAPFormData();
     if (!data.pap_name) { alert('Please enter the PAP Name.'); return; }
-    if (!confirm(`Create PAP "${data.pap_name}" with ${data.items.length} items and estimated budget of Php ${parseFloat(data.estimated_budget).toLocaleString('en-PH', {minimumFractionDigits:2})}?`)) return;
+    if (!confirm(`Create PAP "${data.pap_name}" with ${data.items.length} items and estimated budget of ₱${parseFloat(data.estimated_budget).toLocaleString('en-PH', {minimumFractionDigits:2})}?`)) return;
 
     try {
       await apiRequest('/paps', 'POST', data);
@@ -17557,7 +17557,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
 
           <ol style="margin: 6px 0 6px 72px; padding-left: 20px; font-size: 12pt; line-height: 1.5;">
-            <li>To declare the award of contract for the <strong>${subject}</strong> amounting to <strong>${winAmountWords} (Php ${winAmountFormatted})</strong> to <strong>${winningBidder.name}.</strong></li>
+            <li>To declare the award of contract for the <strong>${subject}</strong> amounting to <strong>${winAmountWords} (₱${winAmountFormatted})</strong> to <strong>${winningBidder.name}.</strong></li>
           </ol>
 
           <div class="section-body" style="margin-top: 10px;">
