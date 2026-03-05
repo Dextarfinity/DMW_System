@@ -2848,35 +2848,53 @@ window.pktLoadCellAttachments = async function(entityType, entityId, uniqueKey, 
   try {
     const atts = await getAttachments(entityType, entityId);
     const attachBtn = document.getElementById('pktBtn_' + uniqueKey);
+
+    // Track per-cell attachment IDs so reloads replace (no duplicates)
+    if (!window._pktCellAtts) window._pktCellAtts = {};
+    if (!window._pktCellAtts[rowId]) window._pktCellAtts[rowId] = {};
+    window._pktCellAtts[rowId][uniqueKey] = (atts || []).map(a => a.id);
+
+    // Recompute row-level aggregate from all cells
+    if (rowId) {
+      if (!window._pktAttCounts) window._pktAttCounts = {};
+      const cellMap = window._pktCellAtts[rowId] || {};
+      let total = 0;
+      let allIds = [];
+      Object.values(cellMap).forEach(ids => {
+        if (ids.length > 0) total++;
+        allIds = allIds.concat(ids);
+      });
+      window._pktAttCounts[rowId] = { total, attIds: allIds };
+      pktUpdateRowStatus(rowId);
+    }
+
     if (!atts || atts.length === 0) {
       container.innerHTML = '';
       if (attachBtn) attachBtn.style.display = '';
       return;
     }
-    // Hide attach button, show only the FIRST file (one document per cell)
+    // Hide attach button, show files in the cell
     if (attachBtn) attachBtn.style.display = 'none';
-    const att = atts[0];
-    const icon = att.mime_type === 'application/pdf' ? 'fa-file-pdf' 
-      : (att.mime_type && att.mime_type.startsWith('image/')) ? 'fa-file-image'
-      : (att.mime_type && att.mime_type.includes('word')) ? 'fa-file-word'
-      : (att.mime_type && (att.mime_type.includes('excel') || att.mime_type.includes('spreadsheet'))) ? 'fa-file-excel'
-      : 'fa-file';
-    const safeName = (att.original_name || 'file').replace(/'/g, "\\'");
-    const encodedName = encodeURIComponent(att.original_name || 'file');
-    container.innerHTML = `<div class="pkt-cell-file">
-      <i class="fas ${icon}"></i>
-      <span class="pkt-cell-filename pkt-clickable" title="Click to preview: ${att.original_name}" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')">${att.original_name}</span>
-      <button class="pkt-cell-dl" title="Preview" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')"><i class="fas fa-eye"></i></button>
-      <button class="pkt-cell-del" title="Delete" onclick="pktDeleteCellAttachment(${att.id},'${entityType}',${entityId},'${uniqueKey}','${rowId}')"><i class="fas fa-times"></i></button>
-    </div>`;
-    // Store attachment ID for download-all merging
-    if (rowId) {
-      if (!window._pktAttCounts) window._pktAttCounts = {};
-      if (!window._pktAttCounts[rowId]) window._pktAttCounts[rowId] = { total: 0, attIds: [] };
-      window._pktAttCounts[rowId].total++;
-      window._pktAttCounts[rowId].attIds.push(att.id);
-      pktUpdateRowStatus(rowId);
+
+    function getFileIcon(mimeType) {
+      return mimeType === 'application/pdf' ? 'fa-file-pdf'
+        : (mimeType && mimeType.startsWith('image/')) ? 'fa-file-image'
+        : (mimeType && mimeType.includes('word')) ? 'fa-file-word'
+        : (mimeType && (mimeType.includes('excel') || mimeType.includes('spreadsheet'))) ? 'fa-file-excel'
+        : 'fa-file';
     }
+
+    // Build HTML for ALL attachments in this cell (show each file)
+    container.innerHTML = atts.map(att => {
+      const icon = getFileIcon(att.mime_type);
+      const encodedName = encodeURIComponent(att.original_name || 'file');
+      return `<div class="pkt-cell-file">
+        <i class="fas ${icon}"></i>
+        <span class="pkt-cell-filename pkt-clickable" title="Click to preview: ${att.original_name}" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')">${att.original_name}</span>
+        <button class="pkt-cell-dl" title="Preview" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')"><i class="fas fa-eye"></i></button>
+        <button class="pkt-cell-del" title="Delete" onclick="pktDeleteCellAttachment(${att.id},'${entityType}',${entityId},'${uniqueKey}','${rowId}')"><i class="fas fa-times"></i></button>
+      </div>`;
+    }).join('');
   } catch (err) {
     container.innerHTML = '<span class="pkt-cell-nofile" style="color:var(--danger-color);">!</span>';
   }
@@ -2908,14 +2926,7 @@ function pktUpdateRowStatus(rowId) {
 window.pktDeleteCellAttachment = async function(attachmentId, entityType, entityId, uniqueKey, rowId) {
   const deleted = await deleteAttachment(attachmentId);
   if (deleted) {
-    // Decrement count before reloading
-    if (rowId && window._pktAttCounts && window._pktAttCounts[rowId]) {
-      window._pktAttCounts[rowId].total = Math.max(0, window._pktAttCounts[rowId].total - 1);
-      if (window._pktAttCounts[rowId].attIds) {
-        window._pktAttCounts[rowId].attIds = window._pktAttCounts[rowId].attIds.filter(id => id !== attachmentId);
-      }
-      pktUpdateRowStatus(rowId);
-    }
+    // Reload cell — pktLoadCellAttachments will recompute row counts automatically
     pktLoadCellAttachments(entityType, entityId, uniqueKey, rowId);
   }
 };
@@ -3220,27 +3231,33 @@ window.pktDownloadAllMerged = async function(rowId) {
 };
 
 function renderCOATable(coa) {
+  // Cache for view modal fallback
+  window._cachedCOA = coa;
   const tbody = document.getElementById('coaTableBody');
   if (!tbody) return;
   if (!coa.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">No COA Submissions found</td></tr>'; return; }
   
-  tbody.innerHTML = coa.map(c => `
+  tbody.innerHTML = coa.map(c => {
+    const amt = parseFloat(c.total_amount || 0);
+    const amtStr = amt ? '₱' + amt.toLocaleString('en-PH', {minimumFractionDigits:2}) : '-';
+    return `
     <tr>
       <td>${c.submission_number || ''}</td>
       <td>${c.po_number || ''}</td>
-      <td><span class="status-badge signed"><i class="fas fa-check"></i> Signed</span></td>
-      <td>-</td>
+      <td><span class="status-badge signed"><i class="fas fa-check"></i> Complete</span></td>
+      <td>${amtStr}</td>
       <td>${c.submission_date ? new Date(c.submission_date).toLocaleDateString() : ''}</td>
       <td>${c.coa_receipt_date ? new Date(c.coa_receipt_date).toLocaleDateString() : '-'}</td>
       <td><span class="status-badge ${c.status}">${c.status}</span></td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" title="View" onclick="showViewCOAModal(${c.id})"><i class="fas fa-folder-open"></i></button>
-          <button class="btn-icon" title="Print" onclick="printRecord('COA', '${c.submission_number}')"><i class="fas fa-print"></i></button>
+          <button class="btn-icon" title="View Documents" onclick="showViewCOAModal(${c.id})"><i class="fas fa-folder-open"></i></button>
+          <button class="btn-icon" title="Print Documents" onclick="showCOAPrintMenu(${c.id})" style="color:#1565c0;"><i class="fas fa-print"></i></button>
+          <button class="btn-icon" title="Delete" onclick="deleteCOASubmission(${c.id})" style="color:#c62828;"><i class="fas fa-trash"></i></button>
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 // ==================== INVENTORY MODULE RENDERERS ====================
@@ -13323,85 +13340,259 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
-  // COA Submission Modal
+  // =====================================================
+  // COA SUBMISSION – Document Hub with Standard Print Previews
+  // =====================================================
+  // State object for the COA wizard
+  window._coaWizard = { step: 1, poData: null, iarData: null, submissionNumber: '', dates: {} };
+
+  /**
+   * Main entry point: open the COA submission wizard
+   */
   window.showNewCOASubmissionModal = async function() {
-    // Load PO and IAR data dynamically
+    // Load PO and IAR data
     if (!cachedPO || cachedPO.length === 0) { try { cachedPO = await apiRequest('/po'); } catch(e) {} }
     if (!cachedIAR || cachedIAR.length === 0) { try { cachedIAR = await apiRequest('/iar'); } catch(e) {} }
-    const poOpts = (cachedPO || []).map(p => `<option value="${p.id}">${p.po_number || ''} - ${p.purpose || ''}</option>`).join('');
-    const iarOpts = (cachedIAR || []).map(i => `<option value="${i.id}">${i.iar_number || ''}</option>`).join('');
+
+    const poOpts = (cachedPO || []).map(p =>
+      `<option value="${p.id}" data-po='${JSON.stringify({ id:p.id, po_number:p.po_number||'', supplier_name:p.supplier_name||'', purpose:p.purpose||'', place_of_delivery:p.place_of_delivery||p.delivery_address||'', delivery_date:p.delivery_date||p.expected_delivery_date||'', total_amount:p.total_amount||0 }).replace(/'/g, '&#39;')}'>${p.po_number || ''} — ${(p.supplier_name || '').substring(0,30)} — ${(p.purpose || '').substring(0,40)}</option>`
+    ).join('');
+    const iarOpts = (cachedIAR || []).map(i =>
+      `<option value="${i.id}">${i.iar_number || ''}</option>`
+    ).join('');
+
     const html = `
-      <form id="coaForm">
-        <div class="info-banner warning-banner" style="margin-bottom: 15px;">
+      <div style="margin-bottom:16px;">
+        <div class="info-banner warning-banner" style="margin-bottom:12px;">
           <i class="fas fa-clock"></i>
           <strong>Deadline:</strong> Submit within 5 calendar days from PO approval date.
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Submission No.</label>
-            <input type="text" value="${generateDocNumber('COA')}" readonly>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Linked Purchase Order <span style="color:red;">*</span></label>
+            <select id="coaWizardPOSelect" class="form-select" style="font-size:12px;" onchange="coaWizardPOChanged()">
+              <option value="">-- Select PO --</option>
+              ${poOpts}
+            </select>
           </div>
-          <div class="form-group">
-            <label>Submission Date</label>
-            <input type="date" value="${new Date().toISOString().split('T')[0]}" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Linked Purchase Order</label>
-          <select class="form-select" required>
-            <option value="">-- Select PO --</option>
-            ${poOpts}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Linked IAR</label>
-          <select class="form-select" required>
-            <option value="">-- Select IAR --</option>
-            ${iarOpts}
-          </select>
-        </div>
-        <div class="form-group">
-          <label><strong>Required COA Submission Packet</strong> <span class="text-danger">*</span></label>
-          <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
-            <div style="margin-bottom: 12px;">
-              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-pdf"></i> Complete COA Packet (Single PDF)</label>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="coaPacket" accept=".pdf" required style="display: none;" onchange="updateFileLabel(this, 'coaPacketLabel')">
-                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('coaPacket').click()"><i class="fas fa-upload"></i> Upload PDF</button>
-                <span id="coaPacketLabel" style="font-size: 12px; color: #666;">No file selected</span>
-              </div>
-              <small style="color: #666; display: block; margin-top: 5px;">Combine all documents into a single PDF file</small>
-            </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Linked IAR (optional)</label>
+            <select id="coaWizardIARSelect" class="form-select" style="font-size:12px;">
+              <option value="">-- Select IAR --</option>
+              ${iarOpts}
+            </select>
           </div>
         </div>
-        <div class="form-group">
-          <label>Documents Included in Packet (Checklist)</label>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; background: var(--bg-color); border-radius: 8px; font-size: 13px;">
-            <label><input type="checkbox" required> Purchase Request (PR)</label>
-            <label><input type="checkbox" required> Route Slip / Annex 1</label>
-            <label><input type="checkbox" required> Request for Quotation (RFQ)</label>
-            <label><input type="checkbox" required> Abstract of Quotations</label>
-            <label><input type="checkbox" required> BAC Resolution</label>
-            <label><input type="checkbox" required> Notice of Award (NOA)</label>
-            <label><input type="checkbox" required> Purchase Order (PO)</label>
-            <label><input type="checkbox" required> Inspection & Acceptance Report</label>
-            <label><input type="checkbox" required> Delivery Receipt</label>
-            <label><input type="checkbox" required> Sales Invoice</label>
-            <label><input type="checkbox"> PhilGEPS Posting (if ABC ≥ ₱200K)</label>
-            <label><input type="checkbox"> Supplier Conforme</label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Received by COA (Name)</label>
-          <input type="text" placeholder="COA representative name" required>
-        </div>
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <div style="text-align:right;margin-top:10px;">
+          <button type="button" class="btn btn-primary" onclick="coaWizardStart()"><i class="fas fa-play"></i> Start COA Wizard</button>
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="return validateAttachment('coaPacket', 'COA Submission Packet')"><i class="fas fa-file-export"></i> Submit to COA</button>
         </div>
-      </form>
+      </div>
     `;
-    openModal('COA Submission Packet', html);
+    openModal('COA Submission – Select Transaction', html);
+  };
+
+  /**
+   * Called when PO dropdown changes – cache selected PO data
+   */
+  window.coaWizardPOChanged = function() {
+    const sel = document.getElementById('coaWizardPOSelect');
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.po) {
+      try { window._coaWizard.poData = JSON.parse(opt.dataset.po); } catch(e) {}
+    }
+  };
+
+  /**
+   * Start the wizard after PO is selected – show document hub
+   */
+  window.coaWizardStart = function() {
+    const sel = document.getElementById('coaWizardPOSelect');
+    if (!sel || !sel.value) {
+      showNotification('Please select a Purchase Order first.', 'warning');
+      return;
+    }
+    const iarSel = document.getElementById('coaWizardIARSelect');
+    window._coaWizard.iarId = iarSel ? iarSel.value : null;
+    window._coaWizard.poId = sel.value;
+    window._coaWizard.step = 1;
+    window._coaWizard.submissionNumber = generateDocNumber('COA');
+    window._coaWizard.dates = { step1: new Date().toISOString().split('T')[0], step2: new Date().toISOString().split('T')[0], step3: new Date().toISOString().split('T')[0] };
+    // Parse PO data from the selected option
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.po) {
+      try { window._coaWizard.poData = JSON.parse(opt.dataset.po); } catch(e) {}
+    }
+    // Show document hub in modal
+    coaRenderHub();
+  };
+
+  /**
+   * Render the COA document hub — shows 3 document preview buttons + submit
+   */
+  function coaRenderHub() {
+    const w = window._coaWizard;
+    const po = w.poData || {};
+    const poLabel = po.po_number || 'N/A';
+    const supplierLabel = (po.supplier_name || 'N/A').substring(0, 40);
+
+    const html = `
+      <div style="padding:4px 0;">
+        <div style="background:#f0f4ff;border:1px solid #c5d5f5;border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-file-contract" style="font-size:20px;color:#1565c0;"></i>
+          <div>
+            <div style="font-weight:700;color:#1565c0;">COA Submission – ${w.submissionNumber}</div>
+            <div style="color:#555;margin-top:2px;">PO: <strong>${poLabel}</strong> &nbsp;|&nbsp; Supplier: <strong>${supplierLabel}</strong></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Documents to Submit</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(1)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-file-export" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 1: Transmittal – Purchase Order</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Letter submitting PO documents (9 enclosures)</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(2)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-search" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 2: Notice of Inspection</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Invitation letter for COA to witness inspection</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(3)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-clipboard-check" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 3: Transmittal – IAR</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Letter submitting IAR documents (4 enclosures)</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewAll()">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-print" style="color:#388e3c;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Print All 3 Documents</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Open all documents in one print preview with page breaks</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #ddd;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" style="background:#388e3c;" onclick="coaWizardSubmit()"><i class="fas fa-file-export"></i> Submit to COA</button>
+        </div>
+      </div>`;
+
+    if (modalTitle) modalTitle.textContent = 'COA Submission Wizard';
+    if (modalBody) modalBody.innerHTML = html;
+  }
+
+  /**
+   * Build a static print-ready letter body for a given step (no input fields)
+   */
+  function coaBuildWizardLetter(step) {
+    const w = window._coaWizard;
+    const po = w.poData || {};
+    const today = new Date().toISOString().split('T')[0];
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+    const dateStr = fmtDate(w.dates['step' + step] || today);
+    const supplier = po.supplier_name || '';
+    const purpose = po.purpose || '';
+    const location = po.place_of_delivery || po.delivery_address || '';
+    const poNum = po.po_number || '';
+    const delivDate = fmtDate(po.delivery_date || po.expected_delivery_date || '');
+
+    const addr = `<div style="font-size:12px;line-height:1.5;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:14px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:24px;font-size:12px;">Thank you and best regards</div><div style="margin-top:40px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+
+    if (step === 1) {
+      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
+    } else if (step === 2) {
+      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${purpose}</strong> / PO No.: <strong>${poNum}</strong>, on <strong>${delivDate}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+    } else {
+      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
+    }
+  }
+
+  /**
+   * Open a single COA step letter in the standard editable print preview
+   */
+  window.coaPreviewStep = function(step) {
+    const stepNames = { 1: 'Transmittal_PO', 2: 'Notice_of_Inspection', 3: 'Transmittal_IAR' };
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const title = stepNames[step] + ' - ' + (window._coaWizard.poData?.po_number || '');
+    const letterBody = coaBuildWizardLetter(step);
+    const bodyContent = `<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[step-1]}</div>${letterBody}`;
+    const printHTML = buildPrintHTML(title, bodyContent);
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Open all 3 COA documents in one print preview with page breaks
+   */
+  window.coaPreviewAll = function() {
+    const poNum = window._coaWizard.poData?.po_number || '';
+    const title = 'COA_Documents_' + poNum;
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const body = [1,2,3].map((s,i) => {
+      const letterBody = coaBuildWizardLetter(s);
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[s-1]}</div>${letterBody}`;
+    }).join('');
+    const printHTML = buildPrintHTML(title, body);
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Final submit: create the COA submission record
+   */
+  window.coaWizardSubmit = async function() {
+    const w = window._coaWizard;
+    if (!w.poId) { showNotification('No Purchase Order selected.', 'warning'); return; }
+
+    if (!confirm('Submit all 3 documents to COA?\n\n\u2022 Transmittal \u2013 PO\n\u2022 Notice of Inspection\n\u2022 Transmittal \u2013 IAR\n\nThis will create the COA submission record.')) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const payload = {
+        submission_number: w.submissionNumber,
+        po_id: parseInt(w.poId) || null,
+        iar_id: parseInt(w.iarId) || null,
+        submission_date: w.dates.step1 || today,
+        status: 'submitted',
+        documents_included: JSON.stringify({
+          transmittal_po: { date: w.dates.step1 || today, supplier: w.poData?.supplier_name, purpose: w.poData?.purpose, location: w.poData?.place_of_delivery },
+          notice_inspection: { date: w.dates.step2 || today, purpose: w.poData?.purpose, po_number: w.poData?.po_number, delivery_date: w.poData?.delivery_date },
+          transmittal_iar: { date: w.dates.step3 || today, supplier: w.poData?.supplier_name, purpose: w.poData?.purpose, location: w.poData?.place_of_delivery }
+        })
+      };
+      await apiRequest('/coa-submissions', 'POST', payload);
+      showNotification('COA Submission created successfully!', 'success');
+      closeModal();
+      loadCOA();
+    } catch (err) {
+      showNotification('Failed to submit: ' + (err.message || err), 'error');
+    }
   };
 
   // PO Accept Modal (NEW - per spec v1.2)
@@ -14496,7 +14687,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-  // View COA Submission Details
+  // View COA Submission Details with 3 Document Templates
   window.showViewCOAModal = async function(coaId) {
     let coa = {};
     try { coa = await apiRequest('/coa/' + coaId); } catch(e) {
@@ -14504,22 +14695,188 @@ Failure to submit the above requirements within the prescribed period shall cons
       const allCoa = window._cachedCOA || [];
       coa = allCoa.find(c => c.id === coaId || c.submission_number === coaId) || {};
     }
+
+    // Parse documents_included JSON
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+
+    // Build read-only letter previews
+    function viewLetterHeader() {
+      return `<div style="text-align:center;margin-bottom:14px;">
+        ${dmwLogoBase64 ? `<img src="${dmwLogoBase64}" style="width:60px;height:60px;margin-bottom:4px;" alt="DMW">` : ''}
+        <div style="font-size:10px;"><em>Republic of the Philippines</em></div>
+        <div style="font-size:11px;font-weight:bold;">DEPARTMENT OF MIGRANT WORKERS</div>
+        <div style="font-size:10px;">Regional Office No. XIII</div>
+      </div>`;
+    }
+    function viewAddressee() {
+      return `<div style="font-size:10px;line-height:1.4;margin-bottom:10px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV / Audit Team Leader<br>Commission on Audit, Regional Office No. XIII, Butuan City</div>
+      <div style="font-size:10px;margin-bottom:8px;">Dear Auditor, Greetings!</div>`;
+    }
+    function viewSignatory() {
+      return `<div style="margin-top:16px;font-size:10px;">Thank you and best regards</div>
+      <div style="margin-top:24px;font-size:10px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+    }
+
+    const tp = docs.transmittal_po || {};
+    const ni = docs.notice_inspection || {};
+    const ti = docs.transmittal_iar || {};
+
+    const card = (title, icon, body) => `
+      <div style="border:1px solid #ddd;border-radius:6px;margin-bottom:12px;overflow:hidden;">
+        <div style="background:#e3f2fd;padding:8px 12px;font-size:11px;font-weight:700;color:#1565c0;"><i class="fas ${icon}"></i> ${title}</div>
+        <div style="padding:12px 16px;font-size:10px;line-height:1.5;">${body}</div>
+      </div>`;
+
+    const letter1 = card('Step 1: Transmittal – PO', 'fa-file-export',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(tp.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;margin-bottom:8px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${tp.supplier || coa.po_number || ''}</strong> for the <strong>${tp.purpose || ''}</strong> at <strong>${tp.location || ''}</strong>, to wit:</div>
+      <ol style="margin:0 0 8px 18px;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div>Hope you find the attached documents in order.</div>${viewSignatory()}`
+    );
+
+    const letter2 = card('Step 2: Notice of Inspection', 'fa-search',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ni.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ''}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(ni.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`
+    );
+
+    const letter3 = card('Step 3: Transmittal – IAR', 'fa-clipboard-check',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ti.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;margin-bottom:8px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${ti.supplier || ''}</strong> for the <strong>${ti.purpose || ''}</strong> at <strong>${ti.location || ''}</strong>, to wit:</div>
+      <ol style="margin:0 0 8px 18px;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div>Hope you find the attached documents in order.</div>${viewSignatory()}`
+    );
+
     const html = `
-      <div class="view-details">
-        <div class="detail-row"><label>Submission No.:</label><span>${coa.submission_number || coaId || ''}</span></div>
+      <div class="view-details" style="margin-bottom:14px;">
+        <div class="detail-row"><label>Submission No.:</label><span><strong>${coa.submission_number || coaId || ''}</strong></span></div>
         <div class="detail-row"><label>PO Reference:</label><span>${coa.po_number || 'N/A'}</span></div>
-        <div class="detail-row"><label>Packet Status:</label><span><span class="status-badge ${coa.packet_status || 'signed'}">${coa.packet_status || 'N/A'}</span></span></div>
-        <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(coa.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
         <div class="detail-row"><label>Submitted:</label><span>${coa.submission_date ? new Date(coa.submission_date).toLocaleDateString('en-PH') : 'N/A'}</span></div>
-        <div class="detail-row"><label>Received by COA:</label><span>${coa.received_by || 'N/A'}</span></div>
-        <div class="detail-row"><label>Status:</label><span><span class="status-badge submitted-to-coa">${coa.status || 'N/A'}</span></span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge ${coa.status}">${coa.status || 'N/A'}</span></span></div>
       </div>
-      <div class="form-group" style="text-align: right; margin-top: 20px;">
+      <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;"><i class="fas fa-file-alt"></i> Submitted Documents</div>
+      ${letter1}${letter2}${letter3}
+      <div class="form-group" style="text-align: right; margin-top: 16px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-        <button type="button" class="btn btn-outline" onclick="printRecord('COA', '${coa.submission_number || coaId}');"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-outline" onclick="showCOAPrintMenu(${coaId})"><i class="fas fa-print"></i> Print Documents</button>
       </div>
     `;
     openModal('View COA Submission', html);
+  };
+
+  /**
+   * Print menu for COA submissions – lets user choose which document to print
+   */
+  window.showCOAPrintMenu = function(coaId) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+
+    const html = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;">Select document to print for ${coa.submission_number || ''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 1)">
+          <i class="fas fa-file-export" style="color:#1565c0;margin-right:8px;"></i> Step 1: Transmittal – Purchase Order
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 2)">
+          <i class="fas fa-search" style="color:#1565c0;margin-right:8px;"></i> Step 2: Notice of Inspection
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 3)">
+          <i class="fas fa-clipboard-check" style="color:#1565c0;margin-right:8px;"></i> Step 3: Transmittal – IAR
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintAllDocs(${coaId})">
+          <i class="fas fa-print" style="color:#388e3c;margin-right:8px;"></i> Print All 3 Documents
+        </button>
+      </div>
+      <div style="text-align:right;margin-top:16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    `;
+    openModal('Print COA Documents', html);
+  };
+
+  /**
+   * Helper: build printable letter HTML from saved COA data
+   */
+  function coaBuildPrintLetter(coa, stepNum) {
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+    // No separate header needed — buildPrintHTML already provides the official DMW header with logos
+    const addr = `<div style="font-size:12px;line-height:1.5;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:14px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:24px;font-size:12px;">Thank you and best regards</div><div style="margin-top:40px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+
+    let body = '';
+    if (stepNum === 1) {
+      const d = docs.transmittal_po || {};
+      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
+    } else if (stepNum === 2) {
+      const d = docs.notice_inspection || {};
+      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ''}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+    } else if (stepNum === 3) {
+      const d = docs.transmittal_iar || {};
+      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
+    }
+    return body;
+  }
+
+  /**
+   * Print a single COA document step
+   */
+  window.coaPrintCOADoc = function(coaId, stepNum) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    const stepNames = { 1: 'Transmittal_PO', 2: 'Notice_of_Inspection', 3: 'Transmittal_IAR' };
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const title = stepNames[stepNum] + ' - ' + (coa.submission_number || '');
+    const body = coaBuildPrintLetter(coa, stepNum);
+    const bodyContent = `<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[stepNum-1]}</div>${body}`;
+    const printHTML = buildPrintHTML(title, bodyContent);
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Print all 3 COA documents in one print job
+   */
+  window.coaPrintAllDocs = function(coaId) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    const title = 'COA_Documents_' + (coa.submission_number || '');
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const body = [1,2,3].map((s,i) => {
+      const letterBody = coaBuildPrintLetter(coa, s);
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[s-1]}</div>${letterBody}`;
+    }).join('');
+    const printHTML = buildPrintHTML(title, body);
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Delete a COA submission
+   */
+  window.deleteCOASubmission = async function(coaId) {
+    if (!confirm('Are you sure you want to delete this COA submission?')) return;
+    try {
+      await apiRequest('/coa-submissions/' + coaId, 'DELETE');
+      showNotification('COA Submission deleted.', 'success');
+      loadCOA();
+    } catch(err) {
+      showNotification('Delete failed: ' + (err.message || err), 'error');
+    }
   };
 
   // View Supplier Details

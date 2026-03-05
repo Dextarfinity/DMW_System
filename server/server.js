@@ -4065,11 +4065,27 @@ app.delete('/api/po-packets/:id', authenticateToken, async (req, res) => {
 app.get('/api/coa-submissions', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT cs.*, po.po_number, iar.iar_number FROM coa_submissions cs
+      `SELECT cs.*, po.po_number, po.total_amount, iar.iar_number FROM coa_submissions cs
        LEFT JOIN purchaseorders po ON cs.po_id = po.id LEFT JOIN iars iar ON cs.iar_id = iar.id
        ORDER BY cs.created_at DESC`
     );
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/coa-submissions/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cs.*, po.po_number, po.total_amount, po.supplier_id, po.purpose, po.place_of_delivery,
+              s.name as supplier_name, iar.iar_number
+       FROM coa_submissions cs
+       LEFT JOIN purchaseorders po ON cs.po_id = po.id
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN iars iar ON cs.iar_id = iar.id
+       WHERE cs.id = $1`, [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'COA Submission not found' });
+    res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
