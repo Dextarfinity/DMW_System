@@ -53,6 +53,12 @@ app.use(cors({ origin: '*' }));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 
+// Ensure all JSON responses use UTF-8
+app.use((req, res, next) => {
+  res.charset = 'utf-8';
+  next();
+});
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -63,6 +69,7 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'dmw_db',
   password: process.env.DB_PASSWORD || 'dmw123',
   port: parseInt(process.env.DB_PORT) || 5432,
+  client_encoding: 'UTF8',
 });
 
 pool.connect((err, client, release) => {

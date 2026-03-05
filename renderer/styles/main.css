@@ -1068,6 +1068,7 @@ body {
   letter-spacing: 0.3px;
   color: var(--primary-color);
   white-space: nowrap;
+  padding: 12px 10px;
 }
 
 .data-table tbody tr:hover {
@@ -2714,10 +2715,56 @@ body {
 
 /* ==================== DATA CARD ==================== */
 
+.data-card-wrapper {
+  position: relative;
+}
+
+/* Sticky top scrollbar */
+.data-card-top-scroll {
+  z-index: 50;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #f0f2f5;
+  border: 1px solid var(--border-color);
+  border-bottom: 2px solid #a0aec0;
+  border-radius: 4px 4px 0 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.data-card-top-scroll-inner {
+  height: 1px;
+}
+.data-card-top-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.data-card-top-scroll::-webkit-scrollbar-track {
+  background: #f0f2f5;
+  border-radius: 5px;
+}
+.data-card-top-scroll::-webkit-scrollbar-thumb {
+  background: #a0aec0;
+  border-radius: 5px;
+  border: 2px solid #f0f2f5;
+}
+.data-card-top-scroll::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
 .data-card {
   background: #fff;
   border: 1px solid var(--border-color);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide native bottom scrollbar when top scrollbar is active */
+.data-card.has-top-scroll::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+.data-card.has-top-scroll {
+  scrollbar-width: none;
 }
 
 /* ==================== DIVISIONS GRID ==================== */
@@ -3918,6 +3965,7 @@ body:has(.login-overlay:not(.hidden)) {
   
   .main-content { margin-left: 0; }
   .page-content { padding: 0; }
+  .data-card-top-scroll { display: none !important; }
   
   .data-table th, .data-table td { padding: 3px 6px; font-size: 10px; }
   .data-table th { background: #eee !important; -webkit-print-color-adjust: exact; }

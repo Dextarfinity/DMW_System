@@ -49,6 +49,104 @@ function formatDateNice(date) {
   return new Date(date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// =====================================================
+// STICKY TOP SCROLLBAR for .data-card containers
+// =====================================================
+function initStickyTopScrollbar(dataCard) {
+  if (!dataCard || dataCard.classList.contains('has-top-scroll')) return;
+  // Wrap the data-card in a wrapper div if not already wrapped
+  let wrapper = dataCard.parentElement;
+  if (!wrapper || !wrapper.classList.contains('data-card-wrapper')) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'data-card-wrapper';
+    dataCard.parentNode.insertBefore(wrapper, dataCard);
+    wrapper.appendChild(dataCard);
+  }
+  // Create a floating scrollbar that is positioned fixed at viewport top when table is in view
+  const topScroll = document.createElement('div');
+  topScroll.className = 'data-card-top-scroll';
+  const inner = document.createElement('div');
+  inner.className = 'data-card-top-scroll-inner';
+  topScroll.appendChild(inner);
+  wrapper.insertBefore(topScroll, dataCard);
+  dataCard.classList.add('has-top-scroll');
+
+  // Sync widths and position
+  function syncWidth() {
+    const table = dataCard.querySelector('table');
+    if (table) inner.style.width = table.scrollWidth + 'px';
+    // Match the container's visible width
+    topScroll.style.width = dataCard.clientWidth + 'px';
+  }
+
+  function updatePosition() {
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const dataCardRect = dataCard.getBoundingClientRect();
+    const tableInView = dataCardRect.top < window.innerHeight && dataCardRect.bottom > 0;
+
+    if (tableInView) {
+      topScroll.style.display = '';
+      // If wrapper top is above viewport, fix to viewport top
+      if (wrapperRect.top < 0) {
+        topScroll.style.position = 'fixed';
+        topScroll.style.top = '0px';
+        topScroll.style.left = dataCardRect.left + 'px';
+      } else {
+        // Wrapper is visible, position scrollbar at top of wrapper
+        topScroll.style.position = 'absolute';
+        topScroll.style.top = '0px';
+        topScroll.style.left = '0px';
+      }
+      syncWidth();
+    } else {
+      topScroll.style.display = 'none';
+    }
+  }
+
+  syncWidth();
+
+  // Sync scroll positions (prevent infinite loop with flag)
+  let syncing = false;
+  topScroll.addEventListener('scroll', function() {
+    if (syncing) return;
+    syncing = true;
+    dataCard.scrollLeft = topScroll.scrollLeft;
+    syncing = false;
+  });
+  dataCard.addEventListener('scroll', function() {
+    if (syncing) return;
+    syncing = true;
+    topScroll.scrollLeft = dataCard.scrollLeft;
+    syncing = false;
+  });
+
+  // Update on scroll and resize
+  window.addEventListener('scroll', updatePosition, { passive: true });
+  window.addEventListener('resize', function() { syncWidth(); updatePosition(); });
+  // Also listen on .page-content scroll if it scrolls
+  const pageContent = dataCard.closest('.page-content');
+  if (pageContent) {
+    pageContent.addEventListener('scroll', updatePosition, { passive: true });
+  }
+
+  // Re-sync width when table content changes (e.g. after data load)
+  const observer = new MutationObserver(function() { syncWidth(); updatePosition(); });
+  observer.observe(dataCard, { childList: true, subtree: true });
+
+  // Initial position
+  setTimeout(updatePosition, 100);
+}
+
+// Initialize sticky scrollbars for PPMP, APP, and Document Monitoring tables
+function initAllStickyScrollbars() {
+  ['ppmpTableBody', 'appTableBody', 'poPacketTableBody'].forEach(tbodyId => {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const dataCard = tbody.closest('.data-card');
+    if (dataCard) initStickyTopScrollbar(dataCard);
+  });
+}
+
 // Wait for the DOM to load — populate ALL fiscal year spans & dynamic selects
 document.addEventListener('DOMContentLoaded', function() {
   const currentYear = getCurrentFiscalYear();
@@ -1149,6 +1247,10 @@ async function loadPOPacket() {
     window._poPacketData = data;
     renderPOPacketTable(data);
     updatePOPacketSummary(data);
+
+    // Initialize sticky top scrollbar for Document Monitoring table
+    const pktCard = document.getElementById('poPacketTableBody')?.closest('.data-card');
+    if (pktCard) initStickyTopScrollbar(pktCard);
     return data;
   } catch (err) {
     console.log('PO Packet monitoring load error:', err);
@@ -2087,6 +2189,10 @@ function renderPPMPTable(ppmp, allPPMPItems) {
     </tr>`;
 
   tbody.innerHTML = html;
+
+  // Initialize sticky top scrollbar for PPMP table
+  const ppmpCard = tbody.closest('.data-card');
+  if (ppmpCard) initStickyTopScrollbar(ppmpCard);
 }
 
 function renderAPPTable(items, appStatus) {
@@ -2237,6 +2343,10 @@ function renderAPPTable(items, appStatus) {
       <td colspan="4"></td>
     </tr>
   `;
+
+  // Initialize sticky top scrollbar for APP table
+  const appCard = tbody.closest('.data-card');
+  if (appCard) initStickyTopScrollbar(appCard);
 }
 
 function updateAPPSummary(items, budgetSummary) {
@@ -2771,30 +2881,29 @@ function renderPOPacketTable(rows) {
   const tbody = document.getElementById('poPacketTableBody');
   if (!tbody) return;
   if (!rows || !rows.length) { 
-    tbody.innerHTML = '<tr><td colspan="12" class="text-center">No transactions found for monitoring</td></tr>'; 
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No transactions found for monitoring</td></tr>'; 
     return; 
   }
 
   // Document column definitions — maps to the 8 document columns in the table
   // entityType must match what view/edit modals use for attachments (singular_underscore)
   const docCols = [
-    { key: 'pr', entityType: 'purchase_request', idField: 'pr_id', numField: 'pr_number' },
-    { key: 'rfq', entityType: 'rfq', idField: 'rfq_id', numField: 'rfq_number' },
-    { key: 'abstract', entityType: 'abstract', idField: 'abstract_id', numField: 'abstract_number' },
-    { key: 'bac', entityType: 'bac_resolution', idField: 'bac_res_id', numField: 'resolution_number' },
-    { key: 'pq', entityType: 'post_qualification', idField: 'postqual_id', numField: 'postqual_number' },
-    { key: 'noa', entityType: 'notice_of_award', idField: 'noa_id', numField: 'noa_number' },
     { key: 'po', entityType: 'purchase_order', idField: 'po_id', numField: 'po_number' },
-    { key: 'iar', entityType: 'iar', idField: 'iar_id', numField: 'iar_number' }
+    { key: 'noa', entityType: 'notice_of_award', idField: 'noa_id', numField: 'noa_number' },
+    { key: 'pq', entityType: 'post_qualification', idField: 'postqual_id', numField: 'postqual_number' },
+    { key: 'bac', entityType: 'bac_resolution', idField: 'bac_res_id', numField: 'resolution_number' },
+    { key: 'abstract', entityType: 'abstract', idField: 'abstract_id', numField: 'abstract_number' },
+    { key: 'rfq', entityType: 'rfq', idField: 'rfq_id', numField: 'rfq_number' },
+    { key: 'pr', entityType: 'purchase_request', idField: 'pr_id', numField: 'pr_number' }
   ];
 
   function overallStatus(r) {
     if (r.packet_status === 'submitted_to_coa') return '<span class="status-badge coa-submitted">Submitted to COA</span>';
     if (r.packet_status === 'signed') return '<span class="status-badge approved">Signed</span>';
     if (r.packet_status === 'for_signing') return '<span class="status-badge for-signing">For Signing</span>';
-    const has = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id, r.iar_id].filter(Boolean).length;
-    if (has >= 8) return '<span class="status-badge approved">Complete</span>';
-    return '<span class="status-badge pending">Incomplete (' + has + '/8)</span>';
+    const has = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id].filter(Boolean).length;
+    if (has >= 7) return '<span class="status-badge approved">Complete</span>';
+    return '<span class="status-badge pending">Incomplete (' + has + '/7)</span>';
   }
 
   tbody.innerHTML = rows.map((r, idx) => {
@@ -2819,9 +2928,9 @@ function renderPOPacketTable(rows) {
       <td class="pkt-td-ref"><strong>${r.pr_number || '-'}</strong></td>
       <td class="pkt-td-div">${officeDisplay}</td>
       ${docCells}
-      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 8</span></div></td>
+      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 7</span></div></td>
       <td class="pkt-td-actions" style="text-align:center;vertical-align:middle;">
-        <button class="btn btn-primary" onclick="pktConsolidateFiles('${rowId}')" title="Consolidate all attached files from PR to IAR" style="padding:5px 10px;font-size:10px;white-space:nowrap;"><i class="fas fa-folder-open" style="margin-right:4px;"></i> Consolidate Files</button>
+        <button class="btn btn-primary" onclick="pktConsolidateFiles('${rowId}')" title="Consolidate all attached files" style="padding:5px 10px;font-size:10px;white-space:nowrap;"><i class="fas fa-folder-open" style="margin-right:4px;"></i> Consolidate Files</button>
       </td>
     </tr>`;
   }).join('');
@@ -2906,15 +3015,15 @@ function pktUpdateRowStatus(rowId) {
   if (!statusCell) return;
   const count = (window._pktAttCounts[rowId] && window._pktAttCounts[rowId].total) || 0;
   let badgeClass, label;
-  if (count >= 8) {
+  if (count >= 7) {
     badgeClass = 'approved';
     label = 'Complete';
   } else if (count >= 4) {
     badgeClass = 'pending';
-    label = count + ' / 8';
+    label = count + ' / 7';
   } else {
     badgeClass = 'rejected';
-    label = count + ' / 8';
+    label = count + ' / 7';
   }
   const dlBtn = count > 0 ? `<button class="pkt-dl-all-btn" onclick="pktDownloadAllMerged('${rowId}')" title="Download all as merged PDF"><i class="fas fa-file-download"></i></button>` : '';
   statusCell.innerHTML = `<div class="pkt-status-wrapper"><span class="status-badge ${badgeClass}">${label}</span>${dlBtn}</div>`;
@@ -2937,8 +3046,8 @@ function updatePOPacketSummary(rows) {
   // For initial render, use entity ID presence as proxy
   let complete = 0, inProgress = 0, notStarted = 0;
   rows.forEach(r => {
-    const docs = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id, r.iar_id].filter(Boolean).length;
-    if (docs >= 8) complete++;
+    const docs = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id].filter(Boolean).length;
+    if (docs >= 7) complete++;
     else if (docs >= 1) inProgress++;
     else notStarted++;
   });
@@ -2957,7 +3066,7 @@ function updatePOPacketSummaryFromCounts() {
   let complete = 0, inProgress = 0, notStarted = 0;
   rowIds.forEach(id => {
     const c = counts[id].total || 0;
-    if (c >= 8) complete++;
+    if (c >= 7) complete++;
     else if (c >= 1) inProgress++;
     else notStarted++;
   });
@@ -2982,8 +3091,8 @@ window.filterPOPacketByStatus = function(val) {
     if (!val) { r.style.display = ''; return; }
     const rowId = r.getAttribute('data-pkt-row');
     const count = (window._pktAttCounts && window._pktAttCounts[rowId] && window._pktAttCounts[rowId].total) || 0;
-    if (val === 'complete') { r.style.display = count >= 8 ? '' : 'none'; return; }
-    if (val === 'in_progress') { r.style.display = (count >= 1 && count < 8) ? '' : 'none'; return; }
+    if (val === 'complete') { r.style.display = count >= 7 ? '' : 'none'; return; }
+    if (val === 'in_progress') { r.style.display = (count >= 1 && count < 7) ? '' : 'none'; return; }
     if (val === 'not_started') { r.style.display = count === 0 ? '' : 'none'; return; }
     r.style.display = '';
   });
