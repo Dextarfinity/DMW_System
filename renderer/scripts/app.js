@@ -2433,8 +2433,20 @@ function renderAPPTable(items, appStatus) {
   const isChief = !!chiefRole;
   const chiefDiv = chiefRole ? chiefDivMap[chiefRole] : '';
 
+  // Roles that can see ALL divisions' APP data
+  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+  const canSeeAll = userHasAnyRole(seeAllAPPRoles);
+
+  // Determine user's division code for filtering
+  let userDivCode = '';
+  if (isChief) {
+    userDivCode = chiefDiv;
+  } else if (!canSeeAll) {
+    userDivCode = currentUser.department_code || currentUser.division || '';
+  }
+  const shouldFilter = !canSeeAll && userDivCode;
+
   // Calculate total budget per division only (not overall PPMP total)
-  // Chiefs see only their division total; admin/hope see all
   let divisionTotals = {};
   items.forEach(item => {
     const dc = getDeptCode(item);
@@ -2446,16 +2458,16 @@ function renderAPPTable(items, appStatus) {
   let displayItems = items;
   let appTotalBudget = 0;
   let appTotalCount = 0;
-  if (isChief) {
-    displayItems = items.filter(item => getDeptCode(item) === chiefDiv);
-    appTotalBudget = (divisionTotals[chiefDiv] || {}).budget || 0;
-    appTotalCount = (divisionTotals[chiefDiv] || {}).count || 0;
+  if (shouldFilter) {
+    displayItems = items.filter(item => getDeptCode(item) === userDivCode);
+    appTotalBudget = (divisionTotals[userDivCode] || {}).budget || 0;
+    appTotalCount = (divisionTotals[userDivCode] || {}).count || 0;
   } else {
     Object.values(divisionTotals).forEach(d => { appTotalBudget += d.budget; appTotalCount += d.count; });
   }
 
   if (!displayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (isChief ? ' for ' + chiefDiv + ' division' : '') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
     return;
   }
 
@@ -2508,7 +2520,7 @@ function renderAPPTable(items, appStatus) {
   `;
   }).join('') + `
     <tr style="background:#f0f4f8;font-weight:bold;border-top:2px solid #1a365d;">
-      <td colspan="11" style="text-align:right;padding-right:15px;">${isChief ? chiefDiv + ' ' : ''}Total (${appTotalCount} items):</td>
+      <td colspan="11" style="text-align:right;padding-right:15px;">${shouldFilter ? userDivCode + ' ' : ''}Total (${appTotalCount} items):</td>
       <td>₱${appTotalBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td colspan="4"></td>
     </tr>
@@ -2520,12 +2532,25 @@ function renderAPPTable(items, appStatus) {
 }
 
 function updateAPPSummary(items, budgetSummary) {
-  // Determine if chief — filter all stats to their division only
+  // Determine division filtering — all users see only their own division except global roles
   const userRole = (currentUser && currentUser.role) || '';
   const chiefDivMap = { 'chief_fad': 'FAD', 'chief_wrsd': 'WRSD', 'chief_mwpsd': 'MWPSD', 'chief_mwptd': 'MWPTD' };
   const chiefRole2 = getUserChiefRole();
   const isChief = !!chiefRole2;
   const chiefDiv = chiefRole2 ? chiefDivMap[chiefRole2] : '';
+
+  // Roles that can see ALL divisions
+  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+  const canSeeAll = userHasAnyRole(seeAllAPPRoles);
+
+  // Determine user's division code
+  let userDivCode = '';
+  if (isChief) {
+    userDivCode = chiefDiv;
+  } else if (!canSeeAll) {
+    userDivCode = currentUser.department_code || currentUser.division || '';
+  }
+  const shouldFilter = !canSeeAll && userDivCode;
 
   // Helper to get dept code from item
   function getItemDeptCode(item) {
@@ -2539,16 +2564,16 @@ function updateAPPSummary(items, budgetSummary) {
     return '';
   }
 
-  // Filter items for chiefs
-  const displayItems = isChief ? items.filter(i => getItemDeptCode(i) === chiefDiv) : items;
+  // Filter items for division-restricted users
+  const displayItems = shouldFilter ? items.filter(i => getItemDeptCode(i) === userDivCode) : items;
 
   const activeBudget = displayItems.reduce((sum, i) => sum + parseFloat(i.total_price || i.unit_price || 0), 0);
   const totalProjects = displayItems.length;
 
-  // Budget summary — for chiefs use their division's data from by_department
+  // Budget summary — for division-restricted users, use their division's data
   let totalApproved, availableBudget, removedCount;
-  if (isChief && budgetSummary && budgetSummary.by_department) {
-    const deptData = budgetSummary.by_department.find(d => d.department_code === chiefDiv);
+  if (shouldFilter && budgetSummary && budgetSummary.by_department) {
+    const deptData = budgetSummary.by_department.find(d => d.department_code === userDivCode);
     totalApproved = deptData ? parseFloat(deptData.total || 0) : 0;
     availableBudget = deptData ? parseFloat(deptData.available || 0) : 0;
     removedCount = deptData ? parseInt(deptData.removed_count || 0) : 0;
@@ -2594,24 +2619,25 @@ function updateAPPSummary(items, budgetSummary) {
     'Direct Procurement for STI': '#a29bfe'
   };
 
-  // Render division budget breakdown (admin/hope see all, chiefs see own division only)
+  // Render division budget breakdown
   const divBudgetContainer = document.getElementById('appDivisionBudgets');
   if (divBudgetContainer && budgetSummary && budgetSummary.by_department) {
-    const allowedRoles = ['admin', 'hope', 'chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const allowedBudgetRoles = ['admin', 'hope', 'ord_manager', 'chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     
-    if (!userHasAnyRole(allowedRoles)) {
+    // Show division budget panel to users who have a division or global visibility
+    if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
       divBudgetContainer.innerHTML = '';
       divBudgetContainer.style.display = 'none';
     } else {
       divBudgetContainer.style.display = '';
       
-      // Filter departments: chiefs see only their own, admin/hope see all
+      // Filter departments: division-restricted users see only their own
       let departments = budgetSummary.by_department;
-      if (isChief) {
-        departments = departments.filter(d => d.department_code === chiefDiv);
+      if (shouldFilter) {
+        departments = departments.filter(d => d.department_code === userDivCode);
       }
       
-      const headerLabel = isChief ? `${chiefDiv} Division Budget` : 'Division Budget Allocation';
+      const headerLabel = shouldFilter ? `${userDivCode} Division Budget` : 'Division Budget Allocation';
       
       const tableRows = departments.map(dept => {
         const code = dept.department_code || 'N/A';
@@ -2626,9 +2652,9 @@ function updateAPPSummary(items, budgetSummary) {
         </tr>`;
       }).join('');
 
-      // Totals row (only for admin/hope viewing all)
+      // Totals row (only when viewing all divisions)
       let totalsRow = '';
-      if (!isChief && departments.length > 1) {
+      if (!shouldFilter && departments.length > 1) {
         const tTotal = departments.reduce((s, d) => s + parseFloat(d.total || 0), 0);
         const tActive = departments.reduce((s, d) => s + parseFloat(d.active || 0), 0);
         const tAvail = departments.reduce((s, d) => s + parseFloat(d.available || 0), 0);
