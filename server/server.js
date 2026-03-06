@@ -2388,16 +2388,16 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
 
 app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT pq.*, a.abstract_number,
-        eh.full_name as twg_head_name,
+    const rname as bidder1_name,
+        s2.name as bidder2_name,
+        s3. as twg_head_name,
         em1.full_name as twg_member1_name,
         em2.full_name as twg_member2_name,
         em3.full_name as twg_member3_name,
         em4.full_name as twg_member4_name,
-        s1.supplier_name as bidder1_name,
-        s2.supplier_name as bidder2_name,
-        s3.supplier_name as bidder3_name
+        s1.name as bidder1_name,
+        s2.name as bidder2_name,
+        s3.name as bidder3_name
        FROM post_qualifications pq
        LEFT JOIN abstracts a ON pq.abstract_id = a.id
        LEFT JOIN employees eh ON pq.twg_head_id = eh.id
