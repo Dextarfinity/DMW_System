@@ -1240,26 +1240,6 @@ async function loadAPPStatus(year) {
   }
 }
 
-async function loadPostQual() {
-  try {
-    const pq = await apiRequest('/postqual');
-    cachedPostQual = pq;
-    filterPostQualTable();
-    return pq;
-  } catch (err) {
-    console.error('Failed to load Post-Qualification data:', err);
-    cachedPostQual = [];
-    filterPostQualTable();
-    return [];
-  }
-}
-function filterPostQualTable() {
-  const statusVal = document.getElementById('postQualStatusFilter')?.value || '';
-  let data = cachedPostQual;
-  if (statusVal) data = data.filter(r => r.status === statusVal);
-  renderPostQualTable(data);
-}
-
 async function loadPR() {
   try {
     const pr = await apiRequest('/pr');
