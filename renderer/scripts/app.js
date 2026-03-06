@@ -1055,7 +1055,17 @@ async function loadPPMP() {
     }
 
     // Read selected division ("all" = all divisions, specific number = one division)
-    const selectedDept = divFilter ? divFilter.value : 'all';
+    let selectedDept = divFilter ? divFilter.value : 'all';
+
+    // Enforce division filtering for non-global users even if dropdown didn't set correctly
+    if (isLockedDivision && (!selectedDept || selectedDept === 'all')) {
+      if (isChief) {
+        const chiefDeptMapFallback = { chief_fad: '1', chief_wrsd: '4', chief_mwpsd: '3', chief_mwptd: '2' };
+        selectedDept = chiefDeptMapFallback[getUserChiefRole()] || '';
+      } else if (currentUser.dept_id) {
+        selectedDept = String(currentUser.dept_id);
+      }
+    }
 
     // Show loading indicator
     if (tbody) {
@@ -1163,22 +1173,23 @@ async function loadPPMP() {
 }
 
 // Initialize PPMP filter event listeners (called once after login)
-function initPPMPFilters() {
+async function initPPMPFilters() {
   const divFilter = document.getElementById('ppmpDivisionFilter');
   const modeFilter = document.getElementById('ppmpModeFilter');
   const yearFilter = document.getElementById('ppmpYearFilter');
   const searchInput = document.getElementById('ppmpSearchInput');
   
-  // Populate division filter from DB
+  // Populate division filter from DB (await so loadPPMP sees the options)
   if (divFilter && divFilter.options.length <= 1) {
-    apiRequest('/divisions').then(divisions => {
+    try {
+      const divisions = await apiRequest('/divisions');
       divisions.forEach(d => {
         const opt = document.createElement('option');
         opt.value = d.id;
         opt.textContent = d.code || d.name;
         divFilter.appendChild(opt);
       });
-    }).catch(() => {});
+    } catch(e) {}
   }
 
   // Populate mode filter from DB
@@ -4128,7 +4139,7 @@ async function loadPageData(pageId) {
     case 'items': await loadItems(); if (!cachedUOMs.length) await loadUOMs(); break;
     case 'suppliers': await loadSuppliers(); break;
     case 'users': await loadUsers(); break;
-    case 'ppmp': initPPMPFilters(); await loadPPMP(); break;
+    case 'ppmp': await initPPMPFilters(); await loadPPMP(); break;
     case 'app': await loadAPP(); break;
     case 'purchase-requests': await loadPR(); break;
     case 'rfq': await loadRFQ(); break;
