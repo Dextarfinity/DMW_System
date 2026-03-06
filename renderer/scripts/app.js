@@ -5262,12 +5262,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.togglePasswordVisibility = function(inputId, btn) {
     const input = document.getElementById(inputId);
     if (!input) return;
+    const icon = btn.querySelector('i');
     if (input.type === 'password') {
       input.type = 'text';
-      btn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+      if (icon) { icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+      btn.classList.add('active');
+      btn.title = 'Hide password';
     } else {
       input.type = 'password';
-      btn.innerHTML = '<i class="fas fa-eye"></i>';
+      if (icon) { icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+      btn.classList.remove('active');
+      btn.title = 'Show password';
     }
   };
 
