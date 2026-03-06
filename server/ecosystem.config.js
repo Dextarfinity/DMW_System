@@ -8,6 +8,7 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_memory_restart: '500M',
+    node_args: '--disable-warning=DEP0169',
     env: {
       NODE_ENV: 'production',
       PORT: 3000,

@@ -1,18 +1,21 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
-const bodyParser = require('body-parser');
+const compression = require('compression');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const os = require('os');
+const http = require('http');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { PDFDocument } = require('pdf-lib');
+const { Server: SocketIOServer } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
+const httpServer = http.createServer(app);
 
 // Ensure uploads directory exists
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -48,21 +51,178 @@ const upload = multer({
   }
 });
 
-// Middleware
-app.use(cors({ origin: '*' }));
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(express.json({ limit: '50mb' }));
+// ==============================================================================
+// MIDDLEWARE
+// ==============================================================================
 
-// Ensure all JSON responses use UTF-8
+// CORS — allow any origin so every client PC on the LAN can reach the server
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Disposition'],
+  credentials: false
+}));
+
+// Gzip compression — dramatically speeds up JSON data fetching for clients
+app.use(compression({ level: 6, threshold: 1024 }));
+
+// Body parsers
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// UTF-8 + no-cache headers for API responses so clients always get fresh data
 app.use((req, res, next) => {
   res.charset = 'utf-8';
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
+// Request logging — logs method, URL, status, and duration for every request
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (req.originalUrl !== '/api/health') {
+      const logLine = `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`;
+      if (res.statusCode >= 500) console.error(logLine);
+      else console.log(logLine);
+    }
+  });
+  next();
+});
+
+// Request timeout — abort if any request takes longer than 2 minutes
+const REQUEST_TIMEOUT = 120000;
+app.use((req, res, next) => {
+  req.setTimeout(REQUEST_TIMEOUT, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Request timed out. Please try again.' });
+    }
+  });
   next();
 });
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// PostgreSQL Connection Pool
+// ==============================================================================
+// REAL-TIME BROADCAST MIDDLEWARE
+// ==============================================================================
+// Intercepts every successful POST, PUT, PATCH, DELETE response and broadcasts
+// a "data_changed" event to ALL connected Electron clients via Socket.IO.
+// This way when Client A inserts/updates/deletes data, Clients B, C, D, etc.
+// instantly know which resource changed and can refresh their views.
+// ==============================================================================
+
+// Map API paths to resource names for clean event broadcasting
+const RESOURCE_MAP = {
+  '/api/departments': 'departments',
+  '/api/divisions': 'divisions',
+  '/api/offices': 'offices',
+  '/api/users': 'users',
+  '/api/designations': 'designations',
+  '/api/employees': 'employees',
+  '/api/fund-clusters': 'fund-clusters',
+  '/api/procurement-modes': 'procurement-modes',
+  '/api/uacs-codes': 'uacs-codes',
+  '/api/uoms': 'uoms',
+  '/api/suppliers': 'suppliers',
+  '/api/items': 'items',
+  '/api/plans': 'plans',
+  '/api/paps': 'paps',
+  '/api/plan-items': 'plan-items',
+  '/api/app-settings': 'app-settings',
+  '/api/app-budget-summary': 'app-budget-summary',
+  '/api/purchase-requests': 'purchase-requests',
+  '/api/rfqs': 'rfqs',
+  '/api/abstracts': 'abstracts',
+  '/api/post-qualifications': 'post-qualifications',
+  '/api/bac-resolutions': 'bac-resolutions',
+  '/api/notices-of-award': 'notices-of-award',
+  '/api/purchase-orders': 'purchase-orders',
+  '/api/iars': 'iars',
+  '/api/stock-cards': 'stock-cards',
+  '/api/supplies-ledger-cards': 'supplies-ledger-cards',
+  '/api/property-cards': 'property-cards',
+  '/api/property-ledger-cards': 'property-ledger-cards',
+  '/api/ics': 'ics',
+  '/api/pars': 'pars',
+  '/api/ptrs': 'ptrs',
+  '/api/ris': 'ris',
+  '/api/received-semi-expendable': 'received-semi-expendable',
+  '/api/received-capital-outlay': 'received-capital-outlay',
+  '/api/trip-tickets': 'trip-tickets',
+  '/api/po-packets': 'po-packets',
+  '/api/coa-submissions': 'coa-submissions',
+  '/api/settings': 'settings',
+  '/api/notifications': 'notifications',
+  '/api/attachments': 'attachments',
+};
+
+function getResourceFromPath(urlPath) {
+  // Strip query string
+  const cleanPath = urlPath.split('?')[0];
+  // Try exact match first, then match base path (e.g. /api/items/123 → items)
+  if (RESOURCE_MAP[cleanPath]) return RESOURCE_MAP[cleanPath];
+  for (const [prefix, resource] of Object.entries(RESOURCE_MAP)) {
+    if (cleanPath.startsWith(prefix + '/') || cleanPath === prefix) return resource;
+  }
+  // Fallback: extract from /api/<resource>/...
+  const match = cleanPath.match(/^\/api\/([a-z-]+)/);
+  return match ? match[1] : null;
+}
+
+function getActionFromMethod(method) {
+  switch (method) {
+    case 'POST': return 'created';
+    case 'PUT': case 'PATCH': return 'updated';
+    case 'DELETE': return 'deleted';
+    default: return 'changed';
+  }
+}
+
+// This middleware hooks into res.json() so that AFTER a successful mutation
+// response is sent, it broadcasts to all other Electron clients.
+app.use((req, res, next) => {
+  // Only intercept mutations (not GET/OPTIONS/HEAD)
+  if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
+
+  const originalJson = res.json.bind(res);
+  res.json = function (body) {
+    // Call original first so the requesting client gets its response
+    const result = originalJson(body);
+
+    // Only broadcast on success (2xx status codes)
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const resource = getResourceFromPath(req.originalUrl || req.url);
+      if (resource && global.io) {
+        const action = getActionFromMethod(req.method);
+        const event = {
+          resource,
+          action,
+          timestamp: new Date().toISOString(),
+          user: req.user ? { id: req.user.id, username: req.user.username } : null,
+          url: req.originalUrl,
+          // Include the record id if available (from URL param or response body)
+          recordId: req.params?.id || body?.id || null,
+        };
+        // Broadcast to ALL connected clients so every Electron app refreshes
+        global.io.emit('data_changed', event);
+      }
+    }
+    return result;
+  };
+  next();
+});
+
+// ==
+// POSTGRESQL CONNECTION POOL  (with auto-reconnect)
+// ==============================================================================
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || '192.168.100.235',
@@ -70,16 +230,51 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'dmw123',
   port: parseInt(process.env.DB_PORT) || 5432,
   client_encoding: 'UTF8',
+  max: 20,                        // Maximum connections in the pool
+  idleTimeoutMillis: 30000,       // Close idle connections after 30 s
+  connectionTimeoutMillis: 10000, // Fail fast if DB unreachable for 10 s
+  allowExitOnIdle: false,         // Keep pool alive for server lifetime
+  statement_timeout: 60000,       // Cancel any query running > 60 s
+  query_timeout: 60000,           // Same at libpq level
 });
 
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('ERROR connecting to PostgreSQL:', err.stack);
-  } else {
-    console.log('Connected to PostgreSQL database');
-    release();
-  }
+// Log pool errors globally so they never crash the process
+pool.on('error', (err) => {
+  console.error('[POOL] Unexpected error on idle client:', err.message);
 });
+
+// Initial connection + auto-reconnect heartbeat every 30 s
+let dbConnected = false;
+async function checkDatabaseConnection() {
+  try {
+    const client = await pool.connect();
+    client.release();
+    if (!dbConnected) {
+      dbConnected = true;
+      console.log('Connected to PostgreSQL database');
+    }
+  } catch (err) {
+    dbConnected = false;
+    console.error('[POOL] Database connection failed — retrying in 30 s:', err.message);
+  }
+}
+checkDatabaseConnection();                       // first attempt
+setInterval(checkDatabaseConnection, 30000);     // heartbeat every 30 s
+
+// Helper: safe query wrapper — returns empty result instead of crashing when a
+//         table does not exist yet (useful while upgrading / migrating schema)
+async function safeQuery(text, params) {
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    // Table-not-found or column-not-found errors — log and return empty
+    if (err.code === '42P01' || err.code === '42703') {
+      console.warn(`[SAFE-QUERY] Skipped — ${err.message.split('\n')[0]}`);
+      return { rows: [{ count: '0' }], rowCount: 0 };
+    }
+    throw err;   // re-throw everything else so normal error handling kicks in
+  }
+}
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
@@ -336,51 +531,51 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       rejectedPRs,
       pendingPOs
     ] = await Promise.all([
-      // Basic counts
-      pool.query('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
-      pool.query('SELECT COUNT(*) FROM procurementplans'),
-      pool.query("SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL"),
-      pool.query('SELECT COUNT(*) FROM purchaserequests'),
-      pool.query('SELECT COUNT(*) FROM purchaseorders'),
-      pool.query('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
-      pool.query('SELECT COUNT(*) FROM users WHERE is_active = TRUE'),
-      pool.query('SELECT COUNT(*) FROM departments'),
-      pool.query('SELECT COUNT(*) FROM stock_cards'),
-      pool.query('SELECT COUNT(*) FROM property_cards'),
-      pool.query('SELECT COUNT(*) FROM inventory_custodian_slips'),
-      pool.query("SELECT COUNT(*) FROM employees WHERE status = 'active'"),
-      pool.query("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity > 0 AND quantity <= reorder_point"),
-      pool.query("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity = 0"),
-      pool.query('SELECT COUNT(*) FROM received_semi_expendable_items'),
-      pool.query('SELECT COUNT(*) FROM received_capital_outlay_items'),
-      pool.query("SELECT COUNT(*) FROM iars WHERE acceptance != 'complete'"),
-      pool.query('SELECT COUNT(*) FROM iars'),
-      pool.query("SELECT COUNT(*) FROM requisition_issue_slips WHERE status = 'PENDING'"),
-      pool.query('SELECT COUNT(*) FROM trip_tickets'),
-      pool.query('SELECT COUNT(*) FROM rfqs'),
-      pool.query('SELECT COUNT(*) FROM abstracts'),
-      pool.query('SELECT COUNT(*) FROM post_qualifications'),
-      pool.query('SELECT COUNT(*) FROM bac_resolutions'),
-      pool.query('SELECT COUNT(*) FROM notices_of_award'),
-      pool.query('SELECT COUNT(*) FROM po_packets'),
-      pool.query('SELECT COUNT(*) FROM coa_submissions'),
+      // Basic counts — uses safeQuery so missing tables don't crash the dashboard
+      safeQuery('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
+      safeQuery('SELECT COUNT(*) FROM procurementplans'),
+      safeQuery("SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL"),
+      safeQuery('SELECT COUNT(*) FROM purchaserequests'),
+      safeQuery('SELECT COUNT(*) FROM purchaseorders'),
+      safeQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
+      safeQuery('SELECT COUNT(*) FROM users WHERE is_active = TRUE'),
+      safeQuery('SELECT COUNT(*) FROM departments'),
+      safeQuery('SELECT COUNT(*) FROM stock_cards'),
+      safeQuery('SELECT COUNT(*) FROM property_cards'),
+      safeQuery('SELECT COUNT(*) FROM inventory_custodian_slips'),
+      safeQuery("SELECT COUNT(*) FROM employees WHERE status = 'active'"),
+      safeQuery("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity > 0 AND quantity <= reorder_point"),
+      safeQuery("SELECT COUNT(*) FROM items WHERE is_active = TRUE AND quantity = 0"),
+      safeQuery('SELECT COUNT(*) FROM received_semi_expendable_items'),
+      safeQuery('SELECT COUNT(*) FROM received_capital_outlay_items'),
+      safeQuery("SELECT COUNT(*) FROM iars WHERE acceptance != 'complete'"),
+      safeQuery('SELECT COUNT(*) FROM iars'),
+      safeQuery("SELECT COUNT(*) FROM requisition_issue_slips WHERE status = 'PENDING'"),
+      safeQuery('SELECT COUNT(*) FROM trip_tickets'),
+      safeQuery('SELECT COUNT(*) FROM rfqs'),
+      safeQuery('SELECT COUNT(*) FROM abstracts'),
+      safeQuery('SELECT COUNT(*) FROM post_qualifications'),
+      safeQuery('SELECT COUNT(*) FROM bac_resolutions'),
+      safeQuery('SELECT COUNT(*) FROM notices_of_award'),
+      safeQuery('SELECT COUNT(*) FROM po_packets'),
+      safeQuery('SELECT COUNT(*) FROM coa_submissions'),
       // Status breakdowns
-      pool.query("SELECT status, COUNT(*)::int as count FROM purchaserequests GROUP BY status"),
-      pool.query("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
-      pool.query("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
+      safeQuery("SELECT status, COUNT(*)::int as count FROM purchaserequests GROUP BY status"),
+      safeQuery("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
+      safeQuery("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
       // PPMP by division
-      pool.query("SELECT d.code, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL GROUP BY d.code ORDER BY d.code"),
+      safeQuery("SELECT d.code, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL GROUP BY d.code ORDER BY d.code"),
       // Total PPMP budget
-      pool.query("SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL"),
+      safeQuery("SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL"),
       // Recent PRs with department + item descriptions
-      pool.query(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
+      safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
         COALESCE(
           (SELECT string_agg(pi.item_name, ', ' ORDER BY pi.id) FROM pr_items pi WHERE pi.pr_id = pr.id),
           'N/A'
         ) as item_descriptions
         FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id ORDER BY pr.created_at DESC LIMIT 50`),
       // Recent activity log (last 15 actions from various tables)
-      pool.query(`
+      safeQuery(`
         (SELECT 'PR' as type, pr_number as ref_no, purpose as description, status, created_at FROM purchaserequests ORDER BY created_at DESC LIMIT 5)
         UNION ALL
         (SELECT 'PO' as type, po_number as ref_no, '' as description, status, created_at FROM purchaseorders ORDER BY created_at DESC LIMIT 5)
@@ -389,7 +584,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         ORDER BY created_at DESC LIMIT 15
       `),
       // Procurement Tracker: each PR's current step in the process
-      pool.query(`SELECT
+      safeQuery(`SELECT
         pr.id, pr.pr_number, pr.purpose, pr.status as pr_status, pr.total_amount, d.code as dept_code, pr.created_at,
         COALESCE((SELECT string_agg(pi.item_name, ', ' ORDER BY pi.id) FROM pr_items pi WHERE pi.pr_id = pr.id), 'N/A') as item_descriptions,
         rfq.rfq_number, rfq.status as rfq_status,
@@ -410,10 +605,10 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       LEFT JOIN iars iar ON iar.po_id = po.id
       ORDER BY pr.created_at DESC LIMIT 50`),
       // Overdue / Alerts data
-      pool.query(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'pending_approval' AND created_at < NOW() - INTERVAL '5 days'`),
-      pool.query(`SELECT COUNT(*) FROM rfqs WHERE status = 'on_going' AND created_at < NOW() - INTERVAL '3 days'`),
-      pool.query(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'rejected'`),
-      pool.query(`SELECT COUNT(*) FROM purchaseorders WHERE status = 'for_signing'`)
+      safeQuery(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'pending_approval' AND created_at < NOW() - INTERVAL '5 days'`),
+      safeQuery(`SELECT COUNT(*) FROM rfqs WHERE status = 'on_going' AND created_at < NOW() - INTERVAL '3 days'`),
+      safeQuery(`SELECT COUNT(*) FROM purchaserequests WHERE status = 'rejected'`),
+      safeQuery(`SELECT COUNT(*) FROM purchaseorders WHERE status = 'for_signing'`)
     ]);
 
     // Build status maps
@@ -2388,9 +2583,10 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
 
 app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
-    const rname as bidder1_name,
-        s2.name as bidder2_name,
-        s3. as twg_head_name,
+    const result = await pool.query(
+      `SELECT pq.*,
+        a.abstract_number,
+        eh.full_name as twg_head_name,
         em1.full_name as twg_member1_name,
         em2.full_name as twg_member2_name,
         em3.full_name as twg_member3_name,
@@ -4293,8 +4489,35 @@ app.get('/api/audit-log', authenticateToken, authorizeRoles('admin', 'auditor'),
 // HEALTH CHECK
 // ==============================================================================
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), server_ip: getLocalIP() });
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbCheck = await pool.query('SELECT NOW() AS time');
+    dbConnected = true;
+    const mem = process.memoryUsage();
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      server_ip: getLocalIP(),
+      uptime_seconds: Math.floor(process.uptime()),
+      memory_mb: Math.round(mem.rss / 1024 / 1024),
+      heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+      db_connected: true,
+      db_time: dbCheck.rows[0].time,
+      pool_total: pool.totalCount,
+      pool_idle: pool.idleCount,
+      pool_waiting: pool.waitingCount
+    });
+  } catch (err) {
+    dbConnected = false;
+    res.status(503).json({
+      status: 'DEGRADED',
+      timestamp: new Date().toISOString(),
+      server_ip: getLocalIP(),
+      uptime_seconds: Math.floor(process.uptime()),
+      db_connected: false,
+      db_error: err.message
+    });
+  }
 });
 
 // ==============================================================================
@@ -4347,7 +4570,7 @@ app.post('/api/attachments/upload', upload.array('files', 10), async (req, res) 
 
 // Download a specific attachment (GET /api/attachments/download/:id)
 // MUST be defined BEFORE the :entity_type/:entity_id wildcard route
-app.get('/api/attachments/download/:id', async (req, res) => {
+app.get('/api/attachments/download/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
@@ -4364,7 +4587,7 @@ app.get('/api/attachments/download/:id', async (req, res) => {
 
 // View/preview a specific attachment inline (GET /api/attachments/view/:id or /api/attachments/view/:id/filename.ext)
 // MUST be defined BEFORE the :entity_type/:entity_id wildcard route
-app.get(/^\/api\/attachments\/view\/(\d+)(?:\/.*)?$/, async (req, res) => {
+app.get(/^\/api\/attachments\/view\/(\d+)(?:\/.*)?$/, authenticateToken, async (req, res) => {
   req.params = { id: req.params[0] };
   try {
     const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
@@ -4437,7 +4660,7 @@ app.post('/api/attachments/merge-download', async (req, res) => {
 });
 
 // Get all attachments for an entity (GET /api/attachments/:entity_type/:entity_id)
-app.get('/api/attachments/:entity_type/:entity_id', async (req, res) => {
+app.get('/api/attachments/:entity_type/:entity_id', authenticateToken, async (req, res) => {
   try {
     const { entity_type, entity_id } = req.params;
     const result = await pool.query(
@@ -4456,7 +4679,7 @@ app.get('/api/attachments/:entity_type/:entity_id', async (req, res) => {
 });
 
 // Delete attachment (DELETE /api/attachments/:id)
-app.delete('/api/attachments/:id', async (req, res) => {
+app.delete('/api/attachments/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM attachments WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
@@ -4599,18 +4822,119 @@ app.delete('/api/notifications', authenticateToken, async (req, res) => {
 // SERVER START
 // ==============================================================================
 
+// ==============================================================================
+// GLOBAL ERROR HANDLER — catches any unhandled route/middleware errors
+// ==============================================================================
+app.use((err, req, res, _next) => {
+  console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err.message);
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
+
+// ==============================================================================
+// SERVER START + GRACEFUL SHUTDOWN
+// ==============================================================================
+
 const PORT = parseInt(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, HOST, () => {
+// ==============================================================================
+// SOCKET.IO — Real-time communication with all Electron client apps
+// ==============================================================================
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  },
+  // Electron apps connect over the LAN — keep connections alive aggressively
+  pingInterval: 10000,   // ping every 10s
+  pingTimeout: 30000,    // disconnect if no pong in 30s
+  transports: ['websocket', 'polling'],  // prefer websocket for speed
+});
+
+// Make io globally accessible so the broadcast middleware can use it
+global.io = io;
+
+// Track connected Electron clients
+const connectedClients = new Map(); // socketId → { username, connectedAt, ip }
+
+io.on('connection', (socket) => {
+  const clientIP = socket.handshake.address;
+  const username = socket.handshake.query?.username || 'unknown';
+  connectedClients.set(socket.id, {
+    username,
+    connectedAt: new Date().toISOString(),
+    ip: clientIP
+  });
+  console.log(`[SOCKET] Client connected: ${username} (${clientIP}) — ${connectedClients.size} total`);
+
+  // Notify all clients about the updated connection count
+  io.emit('clients_count', { count: connectedClients.size });
+
+  // Client can authenticate with their JWT after connecting
+  socket.on('authenticate', (data) => {
+    try {
+      const decoded = jwt.verify(data.token, JWT_SECRET);
+      const info = connectedClients.get(socket.id);
+      if (info) {
+        info.username = decoded.username;
+        info.userId = decoded.id;
+        info.role = decoded.role;
+      }
+      socket.emit('authenticated', { success: true, username: decoded.username });
+      console.log(`[SOCKET] Authenticated: ${decoded.username} (${clientIP})`);
+    } catch (err) {
+      socket.emit('authenticated', { success: false, error: 'Invalid token' });
+    }
+  });
+
+  // Client can request a manual refresh broadcast (e.g. after reconnecting)
+  socket.on('request_refresh', (data) => {
+    // Just re-emit to THIS client so it knows to reload its data
+    socket.emit('data_changed', {
+      resource: data?.resource || 'all',
+      action: 'refresh',
+      timestamp: new Date().toISOString(),
+      user: null
+    });
+  });
+
+  socket.on('disconnect', (reason) => {
+    const info = connectedClients.get(socket.id);
+    const who = info?.username || 'unknown';
+    connectedClients.delete(socket.id);
+    console.log(`[SOCKET] Client disconnected: ${who} (${reason}) — ${connectedClients.size} total`);
+    io.emit('clients_count', { count: connectedClients.size });
+  });
+});
+
+// API: Get connected Electron clients (for admin monitoring)
+app.get('/api/connected-clients', authenticateToken, (req, res) => {
+  const clients = [];
+  for (const [socketId, info] of connectedClients) {
+    clients.push({ socketId, ...info });
+  }
+  res.json({ count: clients.length, clients });
+});
+
+// ==============================================================================
+// START HTTP + WEBSOCKET SERVER
+// ==============================================================================
+
+const server = httpServer.listen(PORT, HOST, () => {
   const localIP = getLocalIP();
   console.log('========================================');
   console.log('  DMW Procurement & Inventory System    ');
-  console.log('  Full API Server v3.0                  ');
+  console.log('  Full API Server v4.0 (Real-Time)      ');
   console.log('========================================');
   console.log(`Server running on:`);
   console.log(`  Local:   http://localhost:${PORT}`);
   console.log(`  Network: http://${localIP}:${PORT}`);
+  console.log(`  Socket:  ws://${localIP}:${PORT}`);
+  console.log('----------------------------------------');
+  console.log('Real-Time: Socket.IO enabled — all Electron clients sync instantly');
   console.log('----------------------------------------');
   console.log('API Endpoints:');
   console.log('  Auth:          POST /api/auth/login, /register');
@@ -4654,5 +4978,41 @@ app.listen(PORT, HOST, () => {
   console.log('  Audit Log:     GET /api/audit-log');
   console.log('  Notifications: CRUD /api/notifications');
   console.log('  Health:        GET /api/health');
+  console.log('  Clients:       GET /api/connected-clients');
   console.log('========================================');
+});
+
+// Graceful shutdown — lets pm2 restart cleanly
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  // Notify all Electron clients that the server is going down
+  if (io) {
+    io.emit('server_shutdown', { message: 'Server is restarting, please wait...', timestamp: new Date().toISOString() });
+    io.close();
+  }
+  server.close(() => {
+    console.log('HTTP + WebSocket server closed.');
+    pool.end(() => {
+      console.log('Database pool closed.');
+      process.exit(0);
+    });
+  });
+  // Force exit after 10 seconds if connections won't close
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch unhandled promise rejections so the server never crashes silently
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  gracefulShutdown('uncaughtException');
 });

@@ -2,6 +2,186 @@
 // Dynamic backend integration with PostgreSQL
 
 // =====================================================
+// REAL-TIME SOCKET.IO CLIENT — Auto-sync across all PCs
+// =====================================================
+const { io: ioConnect } = require('socket.io-client');
+
+// Derive the Socket.IO server URL from the API URL (same host, port 3000)
+const SOCKET_SERVER_URL = 'http://192.168.100.235:3000';
+
+// Socket instance (created once, reconnects automatically)
+let socket = null;
+let _socketReconnectTimer = null;
+
+/**
+ * Connect to the Socket.IO server. Called after login or session restore.
+ * Authenticates with JWT and listens for real-time data_changed events
+ * so when ANY other Electron client creates/updates/deletes data,
+ * this client automatically refreshes the active page.
+ */
+function connectSocket() {
+  // Prevent duplicate connections
+  if (socket && socket.connected) return;
+  if (socket) { socket.disconnect(); socket = null; }
+
+  const username = (currentUser && currentUser.username) || 'unknown';
+  socket = ioConnect(SOCKET_SERVER_URL, {
+    query: { username },
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000,
+    timeout: 20000
+  });
+
+  socket.on('connect', () => {
+    console.log('[SOCKET] Connected to server:', socket.id);
+    // Authenticate with JWT
+    const token = authToken || sessionStorage.getItem('dmw_token');
+    if (token) {
+      socket.emit('authenticate', { token });
+    }
+  });
+
+  socket.on('authenticated', (resp) => {
+    if (resp.success) {
+      console.log('[SOCKET] Authenticated as', resp.username);
+    } else {
+      console.warn('[SOCKET] Auth failed:', resp.error);
+    }
+  });
+
+  // ★ CORE: When another client changes data, auto-refresh the active page
+  socket.on('data_changed', (event) => {
+    console.log('[SOCKET] Data changed:', event.resource, event.action, 'by', event.user?.username || 'system');
+    handleRealtimeDataChange(event);
+  });
+
+  socket.on('clients_count', (data) => {
+    console.log('[SOCKET] Connected clients:', data.count);
+    // Optionally display connected client count in the UI
+    const el = document.getElementById('connectedClientsCount');
+    if (el) el.textContent = data.count;
+  });
+
+  socket.on('server_shutdown', () => {
+    console.warn('[SOCKET] Server is shutting down / restarting...');
+    // Show a non-blocking notification
+    showToast('Server is restarting. Data will sync automatically when it\'s back.', 'warning');
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.warn('[SOCKET] Disconnected:', reason);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.warn('[SOCKET] Connection error:', err.message);
+  });
+}
+
+/** Disconnect socket (on logout) */
+function disconnectSocket() {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+}
+
+/**
+ * Map Socket.IO resource names → loadPageData page IDs
+ * so we know which page to refresh when a resource changes.
+ */
+const RESOURCE_TO_PAGE = {
+  'departments': 'divisions',
+  'divisions': 'divisions',
+  'offices': 'offices',
+  'users': 'users',
+  'designations': 'designations',
+  'employees': 'employees',
+  'fund-clusters': 'fund-clusters',
+  'procurement-modes': 'procurement-modes',
+  'uacs-codes': 'uacs-codes',
+  'uoms': 'uoms',
+  'suppliers': 'suppliers',
+  'items': 'items',
+  'plans': 'ppmp',
+  'plan-items': 'ppmp',
+  'paps': 'ppmp',
+  'app-settings': 'app',
+  'app-budget-summary': 'app',
+  'purchase-requests': 'purchase-requests',
+  'rfqs': 'rfq',
+  'abstracts': 'abstract',
+  'post-qualifications': 'post-qual',
+  'bac-resolutions': 'bac-resolution',
+  'notices-of-award': 'noa',
+  'purchase-orders': 'purchase-orders',
+  'iars': 'iar',
+  'stock-cards': 'stock-cards',
+  'supplies-ledger-cards': 'supplies-ledger',
+  'property-cards': 'property-cards',
+  'property-ledger-cards': 'property-cards',
+  'ics': 'ics',
+  'pars': 'par',
+  'ptrs': 'ptr',
+  'ris': 'ris',
+  'received-semi-expendable': 'semi-expendable',
+  'received-capital-outlay': 'capital-outlay',
+  'trip-tickets': 'trip-tickets',
+  'po-packets': 'po-packet',
+  'coa-submissions': 'coa',
+  'settings': 'settings',
+  'notifications': null,  // handled separately
+  'attachments': null,    // no specific page
+};
+
+/** Handle a real-time data_changed event from the server */
+function handleRealtimeDataChange(event) {
+  const activePage = document.querySelector('.page.active');
+  const activePageId = activePage ? activePage.id : null;
+  const targetPageId = RESOURCE_TO_PAGE[event.resource];
+
+  // Always refresh dashboard stats (it aggregates all tables)
+  if (activePageId === 'dashboard') {
+    loadPageData('dashboard');
+    return;
+  }
+
+  // If the changed resource maps to the page the user is currently viewing, reload it
+  if (targetPageId && targetPageId === activePageId) {
+    console.log('[SOCKET] Refreshing active page:', activePageId);
+    loadPageData(activePageId);
+  }
+
+  // Always refresh notifications count when any data changes
+  if (typeof pollNotificationCount === 'function') {
+    pollNotificationCount();
+  }
+}
+
+/** Simple toast notification (non-blocking) for server events */
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  const bgColors = { info: '#3b82f6', warning: '#f59e0b', error: '#ef4444', success: '#10b981' };
+  toast.style.cssText = `background:${bgColors[type] || bgColors.info};color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transition:opacity 0.3s;max-width:360px;`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity = '1'; });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// =====================================================
 // DYNAMIC DATE UTILITIES — All dates are real-time
 // =====================================================
 const CURRENT_YEAR = new Date().getFullYear();
@@ -4217,6 +4397,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start real-time notification polling
     startNotificationPolling();
 
+    // Connect to Socket.IO for real-time sync across all Electron clients
+    connectSocket();
+
     // Navigate to dashboard
     navigateTo('dashboard');
   }
@@ -5173,6 +5356,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Stop notification polling
       stopNotificationPolling();
+
+      // Disconnect Socket.IO
+      disconnectSocket();
 
       // Show login overlay
       if (loginOverlay) {
