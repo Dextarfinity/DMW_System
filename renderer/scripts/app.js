@@ -4600,14 +4600,14 @@ document.addEventListener('DOMContentLoaded', () => {
       canManageDivisions: false
     },
     supply_officer: {
-      // Supply/Procurement Officer: Manages procurement process, creates PO, RFQ
-      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: false,
+      // Supply/Procurement Officer: Manages procurement process, creates PR through PO
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
-      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: false, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: false, canViewAbstract: true,
-      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
-      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
+      canCreatePostQual: true, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: true, canApproveBACRes: false, canViewBACRes: true,
       canCreateNOA: true, canApproveNOA: false, canViewNOA: true,
       canCreatePO: true, canApprovePO: false, canViewPO: true,
       canCreateIAR: true, canApproveIAR: false, canViewIAR: true,

@@ -110,6 +110,22 @@ app.use((req, res, next) => {
 // Serve uploaded files statically
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Serve renderer (frontend) files so Electron clients load UI from the server.
+// This makes ALL frontend changes on the server propagate to every client automatically.
+const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+app.use(express.static(RENDERER_DIR, {
+  etag: false,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    // No-cache for HTML/JS/CSS so clients always get the latest version
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
 // ==============================================================================
 // REAL-TIME BROADCAST MIDDLEWARE
 // ==============================================================================
