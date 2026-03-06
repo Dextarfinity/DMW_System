@@ -2054,7 +2054,7 @@ function renderItemsTable(items) {
       <td>${item.uacs_code || '-'}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" title="View" onclick="showViewItemModal(${item.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon view-btn" title="View Details" onclick="showViewItemModal(${item.id})"><i class="fas fa-eye"></i></button>
           <button class="btn-icon" data-action="edit-item" title="Edit" onclick="showEditItemModal(${item.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon danger" data-action="delete-item" title="Delete" onclick="showDeleteConfirmModal('Item', ${item.id})"><i class="fas fa-trash"></i></button>
         </div>
@@ -15758,39 +15758,46 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // View Item Modal
   window.showViewItemModal = async function(itemId) {
-    openModal('Item Details', '<div class="view-details"><p>Loading item...</p></div>');
+    openModal('Item Details', '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>');
     try {
       const item = await apiRequest('/items/' + itemId);
       const qty = parseInt(item.quantity) || 0;
       const reorder = parseInt(item.reorder_point) || 0;
       const isService = (item.category || '').toLowerCase() === 'services';
       let stockStatus = 'N/A';
+      let stockClass = 'na';
       if (!isService) {
-        if (qty === 0) stockStatus = 'Out of Stock';
-        else if (qty <= reorder) stockStatus = 'Low Stock';
-        else stockStatus = 'In Stock';
+        if (qty === 0) { stockStatus = 'Out of Stock'; stockClass = 'out-of-stock'; }
+        else if (qty <= reorder) { stockStatus = 'Low Stock'; stockClass = 'low-stock'; }
+        else { stockStatus = 'In Stock'; stockClass = 'in-stock'; }
       }
+      const source = item.procurement_source || 'NON PS-DBM';
+      const sourceBadgeClass = source === 'PS-DBM' ? 'source-badge psdbm' : source === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
       const content = `
         <div class="view-details">
-          <div class="info-banner"><i class="fas fa-box"></i> <strong>Item: ${item.name || 'N/A'}</strong></div>
-          <div class="detail-grid">
-            <div class="detail-item"><span class="label">Item Code</span><span class="value">${item.code || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Stock No.</span><span class="value">${item.stock_no || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Item Name</span><span class="value">${item.name || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Description</span><span class="value">${item.description || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Category</span><span class="value">${item.category || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Unit</span><span class="value">${item.unit || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Unit Price</span><span class="value">₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-            <div class="detail-item"><span class="label">Quantity</span><span class="value">${isService ? 'N/A' : qty}</span></div>
-            <div class="detail-item"><span class="label">Reorder Point</span><span class="value">${isService ? 'N/A' : reorder}</span></div>
-            <div class="detail-item"><span class="label">Stock Status</span><span class="value">${stockStatus}</span></div>
-            <div class="detail-item"><span class="label">UACS Code</span><span class="value">${item.uacs_code || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Supplier</span><span class="value">${item.supplier_name || 'N/A'}</span></div>
-          </div>
+          <div class="info-banner"><i class="fas fa-box"></i> <strong>${item.name || 'N/A'}</strong></div>
+          <div class="detail-row"><label>Item Code</label><span>${item.code || 'N/A'}</span></div>
+          <div class="detail-row"><label>Stock No.</label><span>${item.stock_no || 'N/A'}</span></div>
+          <div class="detail-row"><label>Item Name</label><span>${item.name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Description</label><span>${item.description || 'N/A'}</span></div>
+          <div class="detail-row"><label>Category</label><span>${item.category || 'N/A'}</span></div>
+          <div class="detail-row"><label>Unit</label><span>${item.unit || 'N/A'}</span></div>
+          <div class="detail-row"><label>Unit Price</label><span>₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          <div class="detail-row"><label>Quantity</label><span>${isService ? 'N/A' : qty}</span></div>
+          <div class="detail-row"><label>Reorder Point</label><span>${isService ? 'N/A' : reorder}</span></div>
+          <div class="detail-row"><label>Stock Status</label><span><span class="stock-badge ${stockClass}">${stockStatus}</span></span></div>
+          <div class="detail-row"><label>Procurement Source</label><span><span class="${sourceBadgeClass}">${source}</span></span></div>
+          <div class="detail-row"><label>UACS Code</label><span>${item.uacs_code || 'N/A'}</span></div>
+          <div class="detail-row"><label>GAM Classification</label><span>${item.gam_classification || 'N/A'}</span></div>
+          <div class="detail-row"><label>Status</label><span><span class="stock-badge ${item.is_active !== false ? 'in-stock' : 'out-of-stock'}">${item.is_active !== false ? 'Active' : 'Inactive'}</span></span></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button type="button" class="btn btn-primary" onclick="closeModal(); showEditItemModal(${item.id})"><i class="fas fa-edit"></i> Edit Item</button>
         </div>`;
       openModal('Item Details', content);
     } catch (err) {
-      openModal('Error', '<div class="view-details"><p>Error loading item: ' + err.message + '</p></div>');
+      openModal('Error', '<div class="view-details"><p style="padding:12px;color:var(--danger-color);">Error loading item: ' + err.message + '</p></div>');
     }
   };
 

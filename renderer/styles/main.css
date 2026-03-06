@@ -1990,18 +1990,22 @@ body {
 
 .btn-icon {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 3px 6px;
   font-size: 12px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
 }
 
-.btn-icon:hover { color: var(--primary-color); }
+.btn-icon:hover { color: var(--primary-color); background: rgba(26,54,93,0.08); border-color: rgba(26,54,93,0.15); }
+.btn-icon.view-btn { color: var(--primary-color); }
+.btn-icon.view-btn:hover { color: #fff; background: var(--primary-color); border-color: var(--primary-color); }
 .btn-icon.danger { color: var(--danger-color); }
-.btn-icon.danger:hover { color: #991b1b; }
+.btn-icon.danger:hover { color: #fff; background: var(--danger-color); border-color: var(--danger-color); }
 .btn-icon.success { color: var(--success-color); }
-.btn-icon.success:hover { color: #1e5631; }
+.btn-icon.success:hover { color: #fff; background: var(--success-color); border-color: var(--success-color); }
 
 .action-buttons {
   display: flex;
@@ -3314,7 +3318,7 @@ body {
 
 .view-details {
   border: 1px solid var(--border-color);
-  margin-bottom: 12px;
+  margin-bottom: 0;
   border-radius: 3px;
   overflow: hidden;
 }
