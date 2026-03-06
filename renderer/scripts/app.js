@@ -626,7 +626,7 @@ async function loadDashboardStats() {
     updateDashboardTracker(trackerData);
     updateDashboardDivisionPPMP(stats.divisionPPMP || {}, stats.totalPPMPBudget || 0, canSeeAll, userDiv);
     updateDashboardPRStatusSummary(stats.prByStatus || {});
-    updateDashboardRecentActivity(stats.recentActivity || []);
+    // Recent Activity section removed
   } catch (err) {
     console.error('Dashboard stats error:', err);
   }
@@ -1993,30 +1993,7 @@ function updateDashboardDivisionPPMP(divData, totalBudget, canSeeAll, userDiv) {
   `;
 }
 
-function updateDashboardRecentActivity(activities) {
-  const tbody = document.getElementById('dashRecentActivityBody');
-  if (!tbody) return;
-  if (!activities.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:20px;color:#636e78;">No recent activity</td></tr>';
-    return;
-  }
-  const typeIcons = { PR: 'fa-file-alt', PO: 'fa-shopping-cart', IAR: 'fa-truck' };
-  const typeColors = { PR: '#3182ce', PO: '#38a169', IAR: '#d69e2e' };
-  tbody.innerHTML = activities.map(a => {
-    const icon = typeIcons[a.type] || 'fa-circle';
-    const color = typeColors[a.type] || '#636e78';
-    const statusClass = a.status === 'approved' ? 'approved' : a.status === 'pending' ? 'submitted' : a.status === 'completed' ? 'approved' : a.status;
-    const desc = (a.description || '').length > 60 ? a.description.substring(0, 60) + '...' : (a.description || '-');
-    const date = a.created_at ? new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
-    return `<tr>
-      <td><i class="fas ${icon}" style="color:${color};margin-right:4px;"></i> ${a.type}</td>
-      <td><strong>${a.ref_no || '-'}</strong></td>
-      <td>${desc}</td>
-      <td><span class="status-badge ${statusClass}">${a.status || '-'}</span></td>
-      <td>${date}</td>
-    </tr>`;
-  }).join('');
-}
+// updateDashboardRecentActivity removed
 
 // Table rendering functions
 function renderItemsTable(items) {

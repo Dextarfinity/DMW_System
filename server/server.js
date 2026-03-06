@@ -521,8 +521,6 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       totalPPMPBudget,
       // Recent PRs
       recentPRs,
-      // Recent activity
-      recentActivity,
       // Procurement tracker
       procurementTracker,
       // Alerts
@@ -574,15 +572,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
           'N/A'
         ) as item_descriptions
         FROM purchaserequests pr LEFT JOIN departments d ON pr.dept_id = d.id ORDER BY pr.created_at DESC LIMIT 50`),
-      // Recent activity log (last 15 actions from various tables)
-      safeQuery(`
-        (SELECT 'PR' as type, pr_number as ref_no, purpose as description, status, created_at FROM purchaserequests ORDER BY created_at DESC LIMIT 5)
-        UNION ALL
-        (SELECT 'PO' as type, po_number as ref_no, '' as description, status, created_at FROM purchaseorders ORDER BY created_at DESC LIMIT 5)
-        UNION ALL
-        (SELECT 'IAR' as type, iar_number as ref_no, '' as description, acceptance as status, created_at FROM iars ORDER BY created_at DESC LIMIT 5)
-        ORDER BY created_at DESC LIMIT 15
-      `),
+      // Recent activity log removed,
       // Procurement Tracker: each PR's current step in the process
       safeQuery(`SELECT
         pr.id, pr.pr_number, pr.purpose, pr.status as pr_status, pr.total_amount, d.code as dept_code, pr.created_at,
@@ -661,8 +651,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       totalPPMPBudget: parseFloat(totalPPMPBudget.rows[0].total),
       // Recent PRs
       recentPRs: recentPRs.rows,
-      // Recent activity
-      recentActivity: recentActivity.rows,
+      // Recent activity removed
       // Procurement tracker
       procurementTracker: procurementTracker.rows,
       // Alerts
