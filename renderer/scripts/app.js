@@ -1023,6 +1023,8 @@ async function loadPPMP() {
   try {
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
+    const isPPMPEncoder = userHasRole('ppmp_encoder');
+    const isLockedDivision = isChief || isPPMPEncoder;
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
@@ -1030,11 +1032,15 @@ async function loadPPMP() {
     const yearFilter = document.getElementById('ppmpYearFilter');
     const searchInput = document.getElementById('ppmpSearchInput');
 
-    // For chiefs, auto-select their division and lock the dropdown
-    if (isChief && divFilter) {
-      const chiefDeptMap = { chief_fad: '1', chief_wrsd: '4', chief_mwpsd: '3', chief_mwptd: '2' };
-      const chiefRole = getUserChiefRole();
-      divFilter.value = chiefDeptMap[chiefRole] || '';
+    // For chiefs and PPMP encoders, auto-select their division and lock the dropdown
+    if (isLockedDivision && divFilter) {
+      if (isChief) {
+        const chiefDeptMap = { chief_fad: '1', chief_wrsd: '4', chief_mwpsd: '3', chief_mwptd: '2' };
+        const chiefRole = getUserChiefRole();
+        divFilter.value = chiefDeptMap[chiefRole] || '';
+      } else if (isPPMPEncoder) {
+        divFilter.value = currentUser.dept_id ? String(currentUser.dept_id) : '';
+      }
       divFilter.disabled = true;
       divFilter.style.opacity = '0.7';
     }
@@ -1119,7 +1125,7 @@ async function loadPPMP() {
 
     // Update division banner
     let banner = document.getElementById('ppmpDivisionBanner');
-    if (isChief) {
+    if (isLockedDivision) {
       const divName = currentUser.division || currentUser.department_code || '';
       if (!banner) {
         banner = document.createElement('div');
@@ -1285,6 +1291,10 @@ function filterPRTable() {
       data = data.filter(r => String(r.dept_id) === String(userDeptId) || (r.department_code || '').toUpperCase() === userDeptCode);
     }
   }
+
+  // Draft PRs: only visible to the creator (server already filters, but double-check on client)
+  const userId = currentUser.id;
+  data = data.filter(r => r.status !== 'draft' || String(r.requested_by) === String(userId));
 
   if (statusVal) data = data.filter(r => r.status === statusVal);
   if (divVal) data = data.filter(r => String(r.dept_id) === divVal || (r.department_code || '').toUpperCase() === divVal.toUpperCase() || (r.department_name || '').toLowerCase().includes(divVal.toLowerCase()));
@@ -1842,7 +1852,8 @@ function statusBadge(label, statusClass) {
     on_going: { bg: '#ebf8ff', color: '#2b6cb0', icon: 'fa-hourglass-half' },
     rejected: { bg: '#fff5f5', color: '#c53030', icon: 'fa-times-circle' },
     cancelled: { bg: '#e2e8f0', color: '#636e78', icon: 'fa-ban' },
-    pending: { bg: '#fffaf0', color: '#b7791f', icon: 'fa-hourglass-half' }
+    pending: { bg: '#fffaf0', color: '#b7791f', icon: 'fa-hourglass-half' },
+    draft: { bg: '#f7fafc', color: '#718096', icon: 'fa-file-alt' }
   };
   const c = colorMap[statusClass] || colorMap['on_going'];
   return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:${c.color};background:${c.bg};padding:3px 10px;border-radius:12px;white-space:nowrap;"><i class="fas ${c.icon}" style="font-size:10px;"></i> ${label}</span>`;
@@ -1852,14 +1863,14 @@ function stepBadge(status) {
   if (!status) return '<span style="color:#cbd5e0;">—</span>';
   // Map new DB status values to display labels
   const labelMap = {
-    pending_approval: 'PR PENDING APPROVAL', approved: 'APPROVED', rejected: 'REJECTED', cancelled: 'CANCELLED',
+    draft: 'DRAFT', pending_approval: 'PR PENDING APPROVAL', approved: 'APPROVED', rejected: 'REJECTED', cancelled: 'CANCELLED',
     on_going: 'ON-GOING', completed: 'COMPLETED',
     awaiting_noa: 'AWAITING NOA', with_noa: 'WITH NOA',
     for_signing: 'FOR SIGNING', signed: 'SIGNED',
     to_be_checked: 'TO BE CHECKED', inspection_ongoing: 'ON GOING', verified: 'VERIFIED', complete: 'COMPLETE', partial: 'PARTIAL'
   };
-  const colors = { pending_approval: '#d69e2e', approved: '#38a169', on_going: '#3182ce', completed: '#38a169', rejected: '#c53030', cancelled: '#a0aec0', awaiting_noa: '#5c6bc0', with_noa: '#38a169', for_signing: '#3182ce', signed: '#38a169', to_be_checked: '#636e78', inspection_ongoing: '#d69e2e', verified: '#38a169', complete: '#38a169', partial: '#d69e2e' };
-  const icons = { pending_approval: 'fa-hourglass-half', approved: 'fa-check', on_going: 'fa-spinner', completed: 'fa-check-double', rejected: 'fa-times', cancelled: 'fa-ban', awaiting_noa: 'fa-clock', with_noa: 'fa-award', for_signing: 'fa-pen', signed: 'fa-signature', to_be_checked: 'fa-hourglass-half', inspection_ongoing: 'fa-search', verified: 'fa-clipboard-check', complete: 'fa-check-double', partial: 'fa-exclamation-triangle' };
+  const colors = { draft: '#718096', pending_approval: '#d69e2e', approved: '#38a169', on_going: '#3182ce', completed: '#38a169', rejected: '#c53030', cancelled: '#a0aec0', awaiting_noa: '#5c6bc0', with_noa: '#38a169', for_signing: '#3182ce', signed: '#38a169', to_be_checked: '#636e78', inspection_ongoing: '#d69e2e', verified: '#38a169', complete: '#38a169', partial: '#d69e2e' };
+  const icons = { draft: 'fa-file-alt', pending_approval: 'fa-hourglass-half', approved: 'fa-check', on_going: 'fa-spinner', completed: 'fa-check-double', rejected: 'fa-times', cancelled: 'fa-ban', awaiting_noa: 'fa-clock', with_noa: 'fa-award', for_signing: 'fa-pen', signed: 'fa-signature', to_be_checked: 'fa-hourglass-half', inspection_ongoing: 'fa-search', verified: 'fa-clipboard-check', complete: 'fa-check-double', partial: 'fa-exclamation-triangle' };
   const c = colors[status] || '#636e78';
   const i = icons[status] || 'fa-circle';
   const lbl = labelMap[status] || status.toUpperCase().replace(/_/g, ' ');
@@ -2080,7 +2091,7 @@ function renderUsersTable(users) {
     twg_member: '#059669', division_head: '#d97706', end_user: '#6b7280', supply_officer: '#2563eb',
     inspector: '#be185d', ord_manager: '#dc2626', chief_fad: '#d97706', chief_wrsd: '#d97706',
     chief_mwpsd: '#d97706', chief_mwptd: '#d97706', manager: '#7c3aed', officer: '#2563eb',
-    viewer: '#6b7280', auditor: '#059669'
+    viewer: '#6b7280', auditor: '#059669', ppmp_encoder: '#0d9488'
   };
   
   const roleLabels = {
@@ -2088,7 +2099,7 @@ function renderUsersTable(users) {
     twg_member: 'TWG', division_head: 'Div Head', end_user: 'End User', supply_officer: 'Supply',
     inspector: 'Inspector', ord_manager: 'ORD Mgr', chief_fad: 'Chief FAD', chief_wrsd: 'Chief WRSD',
     chief_mwpsd: 'Chief MWPSD', chief_mwptd: 'Chief MWPTD', manager: 'Manager', officer: 'Officer',
-    viewer: 'Viewer', auditor: 'Auditor'
+    viewer: 'Viewer', auditor: 'Auditor', ppmp_encoder: 'PPMP Encoder'
   };
   
   const isAdmin = userHasRole('admin');
@@ -2743,8 +2754,8 @@ function renderPRTable(pr) {
   if (!pr.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No PRs found</td></tr>'; return; }
   
   tbody.innerHTML = pr.map(p => {
-    const statusLabel = p.status === 'approved' ? 'PR APPROVED' : p.status === 'pending_approval' ? 'PR PENDING APPROVAL' : p.status === 'rejected' ? 'PR REJECTED' : p.status === 'cancelled' ? 'PR CANCELLED' : p.status.toUpperCase();
-    const statusClass = p.status === 'approved' ? 'completed' : p.status === 'pending_approval' ? 'on_going' : p.status === 'rejected' ? 'rejected' : 'cancelled';
+    const statusLabel = p.status === 'approved' ? 'PR APPROVED' : p.status === 'pending_approval' ? 'PR PENDING APPROVAL' : p.status === 'rejected' ? 'PR REJECTED' : p.status === 'cancelled' ? 'PR CANCELLED' : p.status === 'draft' ? 'DRAFT' : p.status.toUpperCase();
+    const statusClass = p.status === 'approved' ? 'completed' : p.status === 'pending_approval' ? 'on_going' : p.status === 'rejected' ? 'rejected' : p.status === 'draft' ? 'draft' : 'cancelled';
     const itemCount = parseInt(p.item_count || 0);
     const itemDesc = p.first_item_description || p.first_item_name || p.purpose || '';
     let descDisplay = itemCount > 1 ? itemDesc + ` <span style="font-size:10px;color:#666;">(+${itemCount - 1} more)</span>` : itemDesc;
@@ -4381,7 +4392,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_fad: 'Chief - FAD',
       chief_wrsd: 'Chief - WRSD',
       chief_mwpsd: 'Chief - MWPSD',
-      chief_mwptd: 'Chief - MWPTD'
+      chief_mwptd: 'Chief - MWPTD',
+      ppmp_encoder: 'PPMP Entry Maker'
     };
     return roleLabels[role] || role;
   }
@@ -4731,6 +4743,25 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
       canManageDivisions: false
+    },
+    ppmp_encoder: {
+      // PPMP Entry Maker: Can create and edit PPMP entries for their assigned division
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: false,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: false,
+      canCreatePO: false, canApprovePO: false, canViewPO: false,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: false, canExportReports: false,
+      canManageDivisions: false
     }
   };
 
@@ -4796,7 +4827,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_fad: chiefPages,
       chief_wrsd: chiefPages,
       chief_mwpsd: chiefPages,
-      chief_mwptd: chiefPages
+      chief_mwptd: chiefPages,
+      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items']
     };
 
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -4986,7 +5018,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_fad: chiefNavPages,
       chief_wrsd: chiefNavPages,
       chief_mwpsd: chiefNavPages,
-      chief_mwptd: chiefNavPages
+      chief_mwptd: chiefNavPages,
+      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items']
     };
     
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -5890,10 +5923,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Modal Templates (As-Is PPMP per NGPA Form)
   window.showNewPPMPModal = async function(preSelectSource) {
-    // Only 4 chief accounts + admin can submit PPMPs
-    const allowedCreators = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd', 'admin'];
+    // Chiefs, admin, and PPMP encoders can submit PPMPs
+    const allowedCreators = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd', 'admin', 'ppmp_encoder'];
     if (!userHasAnyRole(allowedCreators)) {
-      alert('Only Division Chiefs (FAD, WRSD, MWPSD, MWPTD) can submit PPMP entries.');
+      alert('Only Division Chiefs, PPMP Entry Makers, or Admin can submit PPMP entries.');
       return;
     }
     // Ensure divisions, procurement modes, items, and UOMs are loaded
@@ -5907,6 +5940,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
+    const isPPMPEncoder = userHasRole('ppmp_encoder');
+    const isLockedDivision = isChief || isPPMPEncoder;
     const chiefDivision = currentUser.division || currentUser.department_code || '';
     
     const html = `
@@ -5930,10 +5965,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="form-group">
             <label>End-User / Division <span class="text-danger">*</span></label>
-            <select class="form-select" id="ppmpDivisionSelect" required ${isChief ? 'disabled' : ''} onchange="generatePPMPNumber()">
-              ${buildDivisionOptions(isChief ? chiefDivision : '')}
+            <select class="form-select" id="ppmpDivisionSelect" required ${isLockedDivision ? 'disabled' : ''} onchange="generatePPMPNumber()">
+              ${buildDivisionOptions(isLockedDivision ? chiefDivision : '')}
             </select>
-            ${isChief ? '<input type="hidden" name="division" value="' + chiefDivision + '">' : ''}
+            ${isLockedDivision ? '<input type="hidden" name="division" value="' + chiefDivision + '">' : ''}
           </div>
         </div>
 
@@ -6407,11 +6442,54 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   };
 
   window.submitPRForApproval = function() {
-    if(!validateAttachment('prRouteSlip', 'Route Slip / Annex 1')) return;
-    if(confirm('Submit this PR for Division Head approval? Timeline: 5 calendar days for approval.')) {
-      alert('PR submitted for Division Head approval. Status: PR For Approval');
-      closeModal();
-    }
+    // Collect all form data and save with pending_approval status
+    const prNumber = document.getElementById('prNumber')?.value || '';
+    const purpose = document.getElementById('prPurpose')?.value || '';
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    const selectedItems = window._docSelectedItems['pr'] || [];
+    if (selectedItems.length === 0) { alert('Please add at least one item.'); return; }
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Submit this PR for approval? It will be visible to approvers.')) return;
+
+    (async () => {
+      try {
+        const data = {
+          pr_number: prNumber,
+          purpose: purpose,
+          total_amount: totalAmount,
+          status: 'pending_approval',
+          item_specifications: document.getElementById('prItemSpecs')?.value.trim() || null,
+          items: items
+        };
+        const result = await apiRequest('/purchase-requests', 'POST', data);
+        const prId = result.id || result.pr_id;
+        if (prId) {
+          await uploadAttachments('purchase_request', prId, [
+            { inputId: 'prRouteSlip', description: 'Route Slip / Annex 1' },
+            { inputId: 'prTechSpecs', description: 'Technical Specifications / TOR' }
+          ]);
+        }
+        showToast('Purchase Request submitted for approval!', 'success');
+        closeModal();
+        if (typeof loadPurchaseRequests === 'function') loadPurchaseRequests();
+        else if (typeof loadPageData === 'function') loadPageData();
+        else loadPR();
+      } catch (err) {
+        alert('Error submitting PR: ' + err.message);
+      }
+    })();
   };
 
   window.showNewRFQModal = async function(preselectedPrNumber) {
@@ -7244,11 +7322,136 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // --- EDIT PR ---
   window.showEditPRModal = async function(id) {
-    // Fetch fresh data from server (same pattern as other edit modals)
+    // Fetch fresh data from server
     let pr = {};
     try { pr = await apiRequest('/purchase-requests/' + id); } catch (err) { alert('Could not load Purchase Request'); return; }
     const items = pr.items || [];
+    const isDraft = (pr.status === 'draft');
 
+    // ----- DRAFT: show create-style modal with catalog picker -----
+    if (isDraft) {
+      // Load APP items for validation
+      let appItems = [];
+      try { appItems = await apiRequest('/plan-items'); } catch(e) { console.warn('Could not load APP items:', e); }
+      const allItems = await ensureItemsCatalogLoaded();
+      const prCatOpts = buildCatalogCategoryOptions(allItems);
+      const prItemOpts = buildCatalogItemOptions(allItems);
+
+      const appOptions = appItems.map(item => {
+        const desc = (item.description || item.item_description || '').substring(0, 60);
+        const dept = item.department_code || '';
+        return `<option value="${item.id}" data-desc="${desc}" data-dept="${dept}">${desc} (${dept} - FY${item.fiscal_year || String(getCurrentFiscalYear())})</option>`;
+      }).join('');
+
+      const html = `
+        <form id="editPRForm" onsubmit="saveEditPRDraft(event, ${id})">
+          <div class="info-banner" style="margin-bottom: 0;">
+            <i class="fas fa-file-alt"></i>
+            <strong>PURCHASE REQUEST</strong> — ${pr.pr_number || 'Draft'} <span class="status-badge draft" style="margin-left:8px;">DRAFT</span>
+          </div>
+
+          <!-- APP/PPMP Validation Section -->
+          <div class="form-validation-section">
+            <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
+              <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
+            </label>
+            <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on.</p>
+            <select id="editPrAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this);">
+              <option value="">-- Select APP Item --</option>
+              ${appOptions}
+              <option value="not-in-app" style="color:#e53e3e;font-weight:600;">⚠ Item NOT in APP (Requires New PPMP)</option>
+            </select>
+            <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Office/Section</label>
+              <input type="text" id="editPrOffice" value="${(pr.office || 'DMW Caraga').replace(/"/g, '&quot;')}" required>
+            </div>
+            <div class="form-group">
+              <label>PR No.</label>
+              <input type="text" id="editPrNumber" value="${pr.pr_number || ''}" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="editPrDate" value="${pr.pr_date ? pr.pr_date.substring(0,10) : (pr.created_at ? pr.created_at.substring(0,10) : '')}">
+            </div>
+          </div>
+
+          <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Item Details</div>
+          <div class="form-items-section">
+            ${buildCatalogPickerHTML('editpr', prCatOpts, prItemOpts, true)}
+            <div style="text-align:right; margin-top:8px;">
+              <strong id="editPrTotalAmount">₱0.00</strong>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Purpose</label>
+            <textarea rows="2" id="editPrPurpose" placeholder="Purpose of the purchase request" required>${(pr.purpose || '').replace(/</g, '&lt;')}</textarea>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+          <div class="form-group">
+            <label>Specifications (one per line)</label>
+            <textarea rows="4" id="editPrItemSpecs" placeholder="Enter item specifications, one per line...">${(pr.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+          <div class="form-attachment-section">
+            <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
+              <div style="margin-bottom: 12px;">
+                <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Route Slip / Annex 1</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="file" id="editPrRouteSlip" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'editPrRouteSlipLabel')">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('editPrRouteSlip').click()"><i class="fas fa-upload"></i> Upload</button>
+                  <span id="editPrRouteSlipLabel" style="font-size: 12px; color: #666;">Optional</span>
+                </div>
+              </div>
+              <div>
+                <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="file" id="editPrTechSpecs" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'editPrTechSpecsLabel')">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('editPrTechSpecs').click()"><i class="fas fa-upload"></i> Upload</button>
+                  <span id="editPrTechSpecsLabel" style="font-size: 12px; color: #666;">Optional</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="text-align: right; margin-top: 20px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+            <button type="button" class="btn btn-primary" style="background:#2e7d32;" onclick="submitEditPRForApproval(${id})"><i class="fas fa-paper-plane"></i> Submit for Approval</button>
+          </div>
+        </form>
+      `;
+      openModal('Edit Purchase Request (Draft)', html);
+      // Initialize catalog picker with existing items
+      window._docSelectedItems['editpr'] = [];
+      if (items.length > 0) {
+        items.forEach(item => {
+          window._docSelectedItems['editpr'].push({
+            item_id: item.item_id || item.id,
+            item_code: item.item_code || '',
+            item_name: item.item_name || item.item_description || '',
+            description: item.item_description || item.item_name || '',
+            item_description: item.item_description || '',
+            item_unit: item.unit || 'Lot',
+            item_category: item.category || 'general',
+            quantity: item.quantity || 0,
+            unit_price: item.unit_price || 0,
+            total: (item.quantity || 0) * (item.unit_price || 0)
+          });
+        });
+        // Render existing items into the catalog picker table
+        if (typeof renderDocItemsList === 'function') renderDocItemsList('editpr');
+      }
+      return;
+    }
+
+    // ----- NON-DRAFT: existing table-based edit modal -----
     const unitOptions = ['Lot','Pax','Pcs','Unit','Sq.ft','Gal','Ltrs','Box','Ream','Set'];
     const buildUnitSelect = (selected) => {
       return `<select class="form-select" style="width:75px;">${unitOptions.map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
@@ -7270,7 +7473,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       ? items.map((item, idx) => buildItemRow(item, idx)).join('')
       : buildItemRow({ unit: 'Lot', item_description: '', quantity: 0, unit_price: 0 }, 0);
 
-    // Calculate initial total
     let initTotal = 0;
     items.forEach(item => { initTotal += (item.quantity || 0) * (item.unit_price || 0); });
 
@@ -7298,6 +7500,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Status</label>
             <select id="editPrStatus" class="form-select">
+              <option value="draft" ${pr.status==='draft'?'selected':''}>DRAFT</option>
               <option value="pending_approval" ${pr.status==='pending_approval'?'selected':''}>PENDING APPROVAL</option>
               <option value="approved" ${pr.status==='approved'?'selected':''}>APPROVED</option>
               <option value="rejected" ${pr.status==='rejected'?'selected':''}>REJECTED</option>
@@ -7450,6 +7653,88 @@ Failure to submit the above requirements within the prescribed period shall cons
       showToast('Purchase Request updated successfully!', 'success');
       closeModal(); loadPR();
     } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Save edited draft PR (uses catalog picker like create modal)
+  window.saveEditPRDraft = async function(e, id) {
+    e.preventDefault();
+    const purpose = document.getElementById('editPrPurpose')?.value || '';
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    const selectedItems = window._docSelectedItems['editpr'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Save this Purchase Request as Draft?')) return;
+
+    const cachedRecord = cachedPR.find(r => r.id === id);
+    try {
+      await apiRequest('/purchase-requests/' + id, 'PUT', {
+        pr_number: document.getElementById('editPrNumber').value,
+        purpose: purpose,
+        total_amount: totalAmount,
+        status: 'draft',
+        dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+        item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
+        items: items
+      });
+      await uploadAttachments('purchase_request', id, [
+        { inputId: 'editPrRouteSlip', description: 'Route Slip / Annex 1' },
+        { inputId: 'editPrTechSpecs', description: 'Technical Specifications / TOR' }
+      ]);
+      showToast('Draft saved!', 'success');
+      closeModal(); loadPR();
+    } catch (err) { alert('Error saving draft: ' + err.message); }
+  };
+
+  // Submit a draft PR for approval (from edit-draft modal)
+  window.submitEditPRForApproval = async function(id) {
+    const purpose = document.getElementById('editPrPurpose')?.value || '';
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    const selectedItems = window._docSelectedItems['editpr'] || [];
+    if (selectedItems.length === 0) { alert('Please add at least one item.'); return; }
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Submit this PR for approval? It will be visible to approvers.')) return;
+
+    const cachedRecord = cachedPR.find(r => r.id === id);
+    try {
+      await apiRequest('/purchase-requests/' + id, 'PUT', {
+        pr_number: document.getElementById('editPrNumber').value,
+        purpose: purpose,
+        total_amount: totalAmount,
+        status: 'pending_approval',
+        dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+        item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
+        items: items
+      });
+      await uploadAttachments('purchase_request', id, [
+        { inputId: 'editPrRouteSlip', description: 'Route Slip / Annex 1' },
+        { inputId: 'editPrTechSpecs', description: 'Technical Specifications / TOR' }
+      ]);
+      showToast('Purchase Request submitted for approval!', 'success');
+      closeModal(); loadPR();
+    } catch (err) { alert('Error submitting PR: ' + err.message); }
   };
 
   // --- EDIT RFQ ---
@@ -10814,14 +11099,14 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
 
-    if (!confirm('Are you sure you want to save this Purchase Request?')) return;
+    if (!confirm('Are you sure you want to save this Purchase Request as Draft?')) return;
 
     try {
       const data = {
         pr_number: prNumber,
         purpose: purpose,
         total_amount: totalAmount,
-        status: 'pending_approval',
+        status: 'draft',
         item_specifications: document.getElementById('prItemSpecs')?.value.trim() || null,
         items: items
       };
@@ -10833,10 +11118,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'prTechSpecs', description: 'Technical Specifications / TOR' }
         ]);
       }
-      alert('Purchase Request saved successfully!');
+      showToast('Purchase Request saved as Draft!', 'success');
       closeModal();
       if (typeof loadPurchaseRequests === 'function') loadPurchaseRequests();
       else if (typeof loadPageData === 'function') loadPageData();
+      else loadPR();
     } catch (err) {
       alert('Error saving PR: ' + err.message);
     }
@@ -11442,6 +11728,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     
     const allRoles = [
       { value: 'end_user', label: 'End User' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
       { value: 'bac_chair', label: 'BAC Chairperson' },
@@ -15904,6 +16191,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const allRoles = [
       { value: 'end_user', label: 'End User' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
       { value: 'bac_chair', label: 'BAC Chairperson' },
@@ -16037,6 +16325,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showPromoteUserModal = function(userId, username, currentRole, fullName) {
     const allRoles = [
       { value: 'end_user', label: 'End User', icon: 'fa-user', color: '#6b7280' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker', icon: 'fa-clipboard-list', color: '#0d9488' },
       { value: 'division_head', label: 'Division Head', icon: 'fa-user-tie', color: '#d97706' },
       { value: 'bac_secretariat', label: 'BAC Secretariat', icon: 'fa-file-alt', color: '#0891b2' },
       { value: 'bac_chair', label: 'BAC Chairperson', icon: 'fa-gavel', color: '#0891b2' },

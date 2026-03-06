@@ -2191,7 +2191,9 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       ORDER BY pr.created_at DESC`
+       WHERE (pr.status != 'draft' OR pr.requested_by = $1)
+       ORDER BY pr.created_at DESC`,
+      [req.user.id]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2266,17 +2268,19 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
     }
     await client.query('COMMIT');
     
-    // Notify approvers about new PR
-    broadcastNotification({
-      type: 'approval',
-      icon: 'fas fa-file-signature',
-      title: `${pr_number} Pending Approval`,
-      message: `${purpose || 'New purchase request'} requires your approval`,
-      reference_type: 'purchase_request',
-      reference_id: pr.id,
-      reference_code: pr_number,
-      roles: ['admin', 'manager', 'division_head', 'hope']
-    });
+    // Notify approvers about new PR (skip for drafts)
+    if (status !== 'draft') {
+      broadcastNotification({
+        type: 'approval',
+        icon: 'fas fa-file-signature',
+        title: `${finalPrNumber} Pending Approval`,
+        message: `${purpose || 'New purchase request'} requires your approval`,
+        reference_type: 'purchase_request',
+        reference_id: pr.id,
+        reference_code: finalPrNumber,
+        roles: ['admin', 'manager', 'division_head', 'hope']
+      });
+    }
     
     res.status(201).json(pr);
   } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
@@ -2314,7 +2318,21 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
       }
     }
     await client.query('COMMIT');
-    res.json(result.rows[0]);
+    const pr = result.rows[0];
+    // If status changed to pending_approval (e.g. draft submitted), notify approvers
+    if (status === 'pending_approval' && pr) {
+      broadcastNotification({
+        type: 'approval',
+        icon: 'fas fa-file-signature',
+        title: `${pr.pr_number} Pending Approval`,
+        message: `${purpose || 'Purchase request'} requires your approval`,
+        reference_type: 'purchase_request',
+        reference_id: pr.id,
+        reference_code: pr.pr_number,
+        roles: ['admin', 'manager', 'division_head', 'hope']
+      });
+    }
+    res.json(pr);
   } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
   finally { client.release(); }
 });
