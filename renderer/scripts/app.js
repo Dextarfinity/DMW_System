@@ -1024,7 +1024,13 @@ async function loadPPMP() {
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
     const isPPMPEncoder = userHasRole('ppmp_encoder');
-    const isLockedDivision = isChief || isPPMPEncoder;
+
+    // Roles that can see ALL divisions' PPMP data
+    const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+    const canSeeAll = userHasAnyRole(seeAllPPMPRoles);
+
+    // All non-global users should be locked to their division
+    const isLockedDivision = !canSeeAll;
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
@@ -1032,17 +1038,20 @@ async function loadPPMP() {
     const yearFilter = document.getElementById('ppmpYearFilter');
     const searchInput = document.getElementById('ppmpSearchInput');
 
-    // For chiefs and PPMP encoders, auto-select their division and lock the dropdown
+    // For all non-global users, auto-select their division and lock the dropdown
     if (isLockedDivision && divFilter) {
       if (isChief) {
         const chiefDeptMap = { chief_fad: '1', chief_wrsd: '4', chief_mwpsd: '3', chief_mwptd: '2' };
         const chiefRole = getUserChiefRole();
         divFilter.value = chiefDeptMap[chiefRole] || '';
-      } else if (isPPMPEncoder) {
+      } else {
         divFilter.value = currentUser.dept_id ? String(currentUser.dept_id) : '';
       }
       divFilter.disabled = true;
       divFilter.style.opacity = '0.7';
+    } else if (divFilter) {
+      divFilter.disabled = false;
+      divFilter.style.opacity = '1';
     }
 
     // Read selected division ("all" = all divisions, specific number = one division)

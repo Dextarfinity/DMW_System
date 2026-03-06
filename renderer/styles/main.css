@@ -2010,6 +2010,7 @@ body {
 .action-buttons {
   display: flex;
   gap: 2px;
+  justify-content: center;
 }
 
 /* ==================== INLINE ATTACHMENT CELL SYSTEM ==================== */
