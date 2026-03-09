@@ -20534,7 +20534,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.navigateTo = navigateTo;
   
   // Direct login function with API authentication
+  let _loginInProgress = false;
   window.doLogin = async function() {
+    if (_loginInProgress) return; // prevent double-submit
+    _loginInProgress = true;
     const username = document.getElementById('username')?.value?.trim();
     const password = document.getElementById('password')?.value;
     const loginBtn = document.getElementById('loginBtn');
@@ -20601,6 +20604,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         loginError.style.display = 'block';
       }
     } finally {
+      _loginInProgress = false;
       // Re-enable button
       if (loginBtn) {
         loginBtn.disabled = false;

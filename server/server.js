@@ -425,9 +425,9 @@ function getDescriptionFromAction(action, tableName, reference) {
 // Auto-logging middleware for all mutations
 app.use('/api', (req, res, next) => {
   if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
-  // Skip: activity-logs, audit-log, health, auth (auth routes log explicitly)
+  // Skip: activity-logs, audit-log, health (auth dedup handled by logActivity)
   const path = req.path || req.url;
-  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health' || path.startsWith('/auth/')) return next();
+  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
 
   let alreadyLogged = false;
   const originalJson = res.json;
