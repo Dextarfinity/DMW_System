@@ -3365,7 +3365,8 @@ app.delete('/api/iars/:id', authenticateToken, async (req, res) => {
 app.get('/api/stock-cards', authenticateToken, async (req, res) => {
   try {
     const { item_id } = req.query;
-    let query = `SELECT sc.*, i.name as item_name, i.unit, i.stock_no as item_stock_no
+    let query = `SELECT sc.*, i.name as item_name, i.unit, i.stock_no as item_stock_no,
+                        i.description as item_description, i.reorder_point, i.category as fund_cluster
                  FROM stock_cards sc LEFT JOIN items i ON sc.item_id = i.id`;
     const params = [];
     if (item_id) { query += ' WHERE sc.item_id = $1'; params.push(item_id); }
@@ -3419,7 +3420,8 @@ app.post('/api/stock-cards', authenticateToken, async (req, res) => {
 app.get('/api/supplies-ledger-cards', authenticateToken, async (req, res) => {
   try {
     const { item_id } = req.query;
-    let query = `SELECT slc.*, i.name as item_name, i.unit, i.stock_no
+    let query = `SELECT slc.*, i.name as item_name, i.unit, i.stock_no, i.code as item_code_catalog,
+                        i.description as item_description, i.reorder_point
                  FROM supplies_ledger_cards slc LEFT JOIN items i ON slc.item_id = i.id`;
     const params = [];
     if (item_id) { query += ' WHERE slc.item_id = $1'; params.push(item_id); }
@@ -3941,10 +3943,10 @@ app.put('/api/ris/:id/post', authenticateToken, async (req, res) => {
       const nextTxNo = await client.query('SELECT COALESCE(MAX(transaction_no), 0) + 1 as next FROM stock_cards WHERE item_id = $1', [item.item_id]);
 
       await client.query(
-        `INSERT INTO stock_cards (item_id, item_code, item_name, transaction_no, date, reference, issue_qty, issue_unit_cost, issue_total_cost, balance_qty, balance_unit_cost, balance_total_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO stock_cards (item_id, item_code, item_name, transaction_no, date, reference, issue_qty, issue_unit_cost, issue_total_cost, balance_qty, balance_unit_cost, balance_total_cost, issue_office)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [item.item_id, item.code, item.item_name, nextTxNo.rows[0].next, ris.ris_date || new Date(), 'RIS-' + ris.ris_no,
-         item.quantity, unitCost, issueCost, balQty, balQty > 0 ? balCost / balQty : 0, balCost]
+         item.quantity, unitCost, issueCost, balQty, balQty > 0 ? balCost / balQty : 0, balCost, ris.division]
       );
 
       // Create supplies ledger card issue entry
@@ -3956,10 +3958,10 @@ app.put('/api/ris/:id/post', authenticateToken, async (req, res) => {
       const nextLTxNo = await client.query('SELECT COALESCE(MAX(transaction_no), 0) + 1 as next FROM supplies_ledger_cards WHERE item_id = $1', [item.item_id]);
 
       await client.query(
-        `INSERT INTO supplies_ledger_cards (item_id, item_code, item_name, transaction_no, date, reference, issue_qty, issue_unit_cost, issue_total_cost, balance_qty, balance_unit_cost, balance_total_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO supplies_ledger_cards (item_id, item_code, item_name, transaction_no, date, reference, issue_qty, issue_unit_cost, issue_total_cost, balance_qty, balance_unit_cost, balance_total_cost, issue_office)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [item.item_id, item.code, item.item_name, nextLTxNo.rows[0].next, ris.ris_date || new Date(), 'RIS-' + ris.ris_no,
-         item.quantity, unitCost, issueCost, balLQty, balLQty > 0 ? balLCost / balLQty : 0, balLCost]
+         item.quantity, unitCost, issueCost, balLQty, balLQty > 0 ? balLCost / balLQty : 0, balLCost, ris.division]
       );
     }
 
@@ -4388,21 +4390,54 @@ app.put('/api/settings/:id', authenticateToken, async (req, res) => {
 // REPORTS QUERIES
 // ==============================================================================
 
-// RSMI - Report on Supplies and Materials Issued
+// RSMI - Report of Supplies and Materials Issued (Appendix 64)
 app.get('/api/reports/rsmi', authenticateToken, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
-    const result = await pool.query(
-      `SELECT sc.item_id, sc.item_code, sc.item_name, i.stock_no, i.unit, i.unit_price,
-              SUM(sc.receipt_qty) as total_received, SUM(sc.issue_qty) as total_issued,
-              SUM(sc.receipt_total_cost) as total_received_cost, SUM(sc.issue_total_cost) as total_issued_cost
-       FROM stock_cards sc LEFT JOIN items i ON sc.item_id = i.id
-       WHERE ($1::date IS NULL OR sc.date >= $1::date) AND ($2::date IS NULL OR sc.date <= $2::date)
-       GROUP BY sc.item_id, sc.item_code, sc.item_name, i.stock_no, i.unit, i.unit_price
-       ORDER BY sc.item_name`,
+
+    // Detail rows: individual RIS line items in the period
+    const details = await pool.query(
+      `SELECT ris.ris_no, ris.division as responsibility_center_code,
+              i.stock_no, ri.description as item, i.unit, ri.quantity as quantity_issued,
+              ri.unit_cost, (ri.quantity * ri.unit_cost) as amount,
+              i.uacs_code as uacs_object_code, ri.item_id
+       FROM requisition_issue_slips ris
+       JOIN ris_items ri ON ri.ris_id = ris.id
+       LEFT JOIN items i ON ri.item_id = i.id
+       WHERE ris.status = 'POSTED'
+         AND ($1::date IS NULL OR ris.ris_date >= $1::date)
+         AND ($2::date IS NULL OR ris.ris_date <= $2::date)
+       ORDER BY ris.ris_no, i.stock_no`,
       [start_date || null, end_date || null]
     );
-    res.json(result.rows);
+
+    // Recapitulation: grouped by stock_no with totals and UACS
+    const recapitulation = await pool.query(
+      `SELECT i.stock_no, SUM(ri.quantity) as total_quantity,
+              ri.unit_cost, SUM(ri.quantity * ri.unit_cost) as total_cost,
+              i.uacs_code as uacs_object_code
+       FROM requisition_issue_slips ris
+       JOIN ris_items ri ON ri.ris_id = ris.id
+       LEFT JOIN items i ON ri.item_id = i.id
+       WHERE ris.status = 'POSTED'
+         AND ($1::date IS NULL OR ris.ris_date >= $1::date)
+         AND ($2::date IS NULL OR ris.ris_date <= $2::date)
+       GROUP BY i.stock_no, ri.unit_cost, i.uacs_code
+       ORDER BY i.stock_no`,
+      [start_date || null, end_date || null]
+    );
+
+    // Grand total
+    const grandTotal = details.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+
+    res.json({
+      entity_name: 'DMW-CARAGA',
+      date_from: start_date || null,
+      date_to: end_date || null,
+      details: details.rows,
+      recapitulation: recapitulation.rows,
+      grand_total: grandTotal
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

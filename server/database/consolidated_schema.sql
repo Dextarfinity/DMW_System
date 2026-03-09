@@ -697,6 +697,8 @@ CREATE TABLE IF NOT EXISTS stock_cards (
     balance_qty        INT DEFAULT 0,
     balance_unit_cost  DECIMAL(15,2) DEFAULT 0,
     balance_total_cost DECIMAL(15,2) DEFAULT 0,
+    issue_office       VARCHAR(255),
+    no_of_days_to_consume INT,
     created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -723,6 +725,8 @@ CREATE TABLE IF NOT EXISTS supplies_ledger_cards (
     balance_qty        INT DEFAULT 0,
     balance_unit_cost  DECIMAL(15,2) DEFAULT 0,
     balance_total_cost DECIMAL(15,2) DEFAULT 0,
+    issue_office       VARCHAR(255),
+    no_of_days_to_consume INT,
     created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
