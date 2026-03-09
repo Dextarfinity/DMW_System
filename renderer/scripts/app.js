@@ -4459,7 +4459,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_wrsd: 'Chief - WRSD',
       chief_mwpsd: 'Chief - MWPSD',
       chief_mwptd: 'Chief - MWPTD',
-      ppmp_encoder: 'PPMP Entry Maker'
+      ppmp_encoder: 'PPMP Entry Maker',
+      requester: 'Requester'
     };
     return roleLabels[role] || role;
   }
@@ -4828,6 +4829,25 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: false, canExportReports: false,
       canManageDivisions: false
+    },
+    requester: {
+      // Requester: Can view/create PPMP, view APP, create/view PR, view IAR, view items (own division only)
+      canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: true, canEditPR: true, canApprovePR: false, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: false,
+      canCreatePO: false, canApprovePO: false, canViewPO: false,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: false, canExportReports: false,
+      canManageDivisions: false
     }
   };
 
@@ -4894,7 +4914,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_wrsd: chiefPages,
       chief_mwpsd: chiefPages,
       chief_mwptd: chiefPages,
-      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items']
+      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'iar', 'items']
     };
 
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -5085,7 +5106,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_wrsd: chiefNavPages,
       chief_mwpsd: chiefNavPages,
       chief_mwptd: chiefNavPages,
-      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items']
+      ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'iar', 'items']
     };
     
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -11799,6 +11821,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     
     const allRoles = [
       { value: 'end_user', label: 'End User' },
+      { value: 'requester', label: 'Requester' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
@@ -16275,6 +16298,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const allRoles = [
       { value: 'end_user', label: 'End User' },
+      { value: 'requester', label: 'Requester' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
