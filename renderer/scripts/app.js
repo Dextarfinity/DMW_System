@@ -21826,32 +21826,181 @@ Failure to submit the above requirements within the prescribed period shall cons
     showToast('Activity logs exported', 'success');
   };
 
+  // Human-friendly field label mapping for activity log details
+  const AL_FIELD_LABELS = {
+    id: 'Record ID', pr_number: 'PR Number', po_number: 'PO Number', iar_number: 'IAR Number',
+    rfq_no: 'RFQ Number', abstract_no: 'Abstract Number', resolution_no: 'Resolution Number',
+    noa_no: 'NOA Number', ris_no: 'RIS Number', ics_no: 'ICS Number', par_no: 'PAR Number',
+    trip_ticket_no: 'Trip Ticket No.', property_number: 'Property Number',
+    name: 'Name', code: 'Code', description: 'Description', username: 'Username',
+    full_name: 'Full Name', email: 'Email', role: 'Role', secondary_role: 'Secondary Role',
+    dept_id: 'Department ID', department: 'Department', department_name: 'Department',
+    department_code: 'Department Code', designation: 'Designation',
+    status: 'Status', purpose: 'Purpose', total_amount: 'Total Amount',
+    unit_price: 'Unit Price', quantity: 'Quantity', unit: 'Unit', category: 'Category',
+    item_name: 'Item Name', item_code: 'Item Code', item_description: 'Item Description',
+    item_specifications: 'Item Specifications', remarks: 'Remarks',
+    supplier_name: 'Supplier', supplier_id: 'Supplier',
+    fund_cluster: 'Fund Cluster', procurement_mode: 'Procurement Mode', uacs_code: 'UACS Code',
+    approved_by: 'Approved By', approved_at: 'Approved Date',
+    requested_by: 'Requested By', prepared_by: 'Prepared By',
+    date_needed: 'Date Needed', delivery_date: 'Delivery Date',
+    is_active: 'Active', active: 'Active',
+    plan_year: 'Plan Year', quarter: 'Quarter',
+    address: 'Address', contact_person: 'Contact Person', contact_number: 'Contact Number',
+    tin: 'TIN', philgeps_number: 'PhilGEPS Number',
+    last_login: 'Last Login'
+  };
+
+  // Fields to hide from the detail view (internal/sensitive)
+  const AL_HIDDEN_FIELDS = new Set([
+    'password', 'password_hash', 'token', 'refresh_token', 'secret',
+    'created_at', 'updated_at', 'deleted_at', 'user'
+  ]);
+
+  function alFormatFieldLabel(key) {
+    if (AL_FIELD_LABELS[key]) return AL_FIELD_LABELS[key];
+    // Convert snake_case to Title Case
+    return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function alFormatValue(val) {
+    if (val === null || val === undefined || val === '') return '<span style="color:#999;font-style:italic;">—</span>';
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    if (typeof val === 'object') {
+      try { return '<span style="font-size:11px;">' + JSON.stringify(val).replace(/</g,'&lt;').substring(0, 200) + '</span>'; } catch { return String(val); }
+    }
+    // Format amounts
+    if (typeof val === 'number' && !Number.isInteger(val)) return '₱ ' + val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return String(val).replace(/</g, '&lt;');
+  }
+
+  function alParseData(raw) {
+    if (!raw) return null;
+    try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return null; }
+  }
+
+  // Build a human-readable table for CREATE (new data only)
+  function alBuildCreateTable(data) {
+    const entries = Object.entries(data).filter(([k]) => !AL_HIDDEN_FIELDS.has(k));
+    if (!entries.length) return '<p style="color:#999;">No details recorded.</p>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f0fdf4;"><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #bbf7d0;width:35%;">Field</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #bbf7d0;">Value</th></tr></thead>
+      <tbody>${entries.map(([k, v]) => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151;">${alFormatFieldLabel(k)}</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">${alFormatValue(v)}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // Build a human-readable table for DELETE (old data only)
+  function alBuildDeleteTable(data) {
+    const entries = Object.entries(data).filter(([k]) => !AL_HIDDEN_FIELDS.has(k));
+    if (!entries.length) return '<p style="color:#999;">No details recorded.</p>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#fef2f2;"><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #fecaca;width:35%;">Field</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #fecaca;">Deleted Value</th></tr></thead>
+      <tbody>${entries.map(([k, v]) => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151;">${alFormatFieldLabel(k)}</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;color:#b91c1c;">${alFormatValue(v)}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // Build a diff table showing what changed (UPDATE)
+  function alBuildDiffTable(oldData, newData) {
+    const allKeys = new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})]);
+    const rows = [];
+    for (const key of allKeys) {
+      if (AL_HIDDEN_FIELDS.has(key)) continue;
+      const oldVal = oldData ? oldData[key] : undefined;
+      const newVal = newData ? newData[key] : undefined;
+      // Compare as strings to catch type differences
+      const oldStr = (oldVal === null || oldVal === undefined) ? '' : String(oldVal);
+      const newStr = (newVal === null || newVal === undefined) ? '' : String(newVal);
+      if (oldStr === newStr) continue; // skip unchanged fields
+      rows.push({ key, oldVal, newVal });
+    }
+    if (!rows.length) return '<p style="color:#999;font-style:italic;">No field changes detected.</p>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#eff6ff;">
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #bfdbfe;width:30%;">Field</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #bfdbfe;width:35%;">Previous Value</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #bfdbfe;width:35%;">New Value</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151;">${alFormatFieldLabel(r.key)}</td>
+        <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;background:#fef2f2;color:#991b1b;">${alFormatValue(r.oldVal)}</td>
+        <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;background:#f0fdf4;color:#166534;">${alFormatValue(r.newVal)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // Build a generic data table (for LOGIN, POST, UNPOST, etc.)
+  function alBuildGenericTable(data) {
+    const entries = Object.entries(data).filter(([k]) => !AL_HIDDEN_FIELDS.has(k));
+    if (!entries.length) return '<p style="color:#999;">No details recorded.</p>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f9fafb;"><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #d1d5db;width:35%;">Field</th><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #d1d5db;">Value</th></tr></thead>
+      <tbody>${entries.map(([k, v]) => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151;">${alFormatFieldLabel(k)}</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">${alFormatValue(v)}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+
   window.showALDetailModal = function(logId) {
     const log = alAllData.find(l => l.id === logId);
     if (!log) return;
     const dt = log.created_at ? new Date(log.created_at).toLocaleString('en-PH') : '';
-    const formatJson = (obj) => {
-      if (!obj) return '<em style="color:#999;">None</em>';
-      try {
-        const parsed = typeof obj === 'string' ? JSON.parse(obj) : obj;
-        return '<pre style="background:#f4f4f4;padding:8px;border-radius:4px;font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;word-break:break-word;">' + JSON.stringify(parsed, null, 2).replace(/</g,'&lt;') + '</pre>';
-      } catch { return '<pre style="background:#f4f4f4;padding:8px;border-radius:4px;font-size:11px;">' + String(obj).replace(/</g,'&lt;') + '</pre>'; }
-    };
+    const actionColors = { CREATE: '#276749', UPDATE: '#1e40af', DELETE: '#b91c1c', POST: '#6b21a8', UNPOST: '#92400e', LOGIN: '#b45309', LOGOUT: '#6b7280' };
+    const actionColor = actionColors[log.action] || '#333';
+
+    const oldData = alParseData(log.old_data);
+    const newData = alParseData(log.new_data);
+
+    // Build data section based on action type
+    let dataSection = '';
+    if (log.action === 'CREATE' && newData) {
+      dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#276749;"><i class="fas fa-plus-circle" style="margin-right:5px;"></i>Created Record</h4>${alBuildCreateTable(newData)}</div>`;
+    } else if (log.action === 'DELETE' && oldData) {
+      dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#b91c1c;"><i class="fas fa-trash" style="margin-right:5px;"></i>Deleted Record</h4>${alBuildDeleteTable(oldData)}</div>`;
+    } else if ((log.action === 'UPDATE' || log.action === 'POST' || log.action === 'UNPOST') && (oldData || newData)) {
+      if (oldData && newData) {
+        dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#1e40af;"><i class="fas fa-exchange-alt" style="margin-right:5px;"></i>Changes Made</h4>${alBuildDiffTable(oldData, newData)}</div>`;
+      } else if (newData) {
+        dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#1e40af;"><i class="fas fa-file-alt" style="margin-right:5px;"></i>Updated Values</h4>${alBuildGenericTable(newData)}</div>`;
+      }
+    } else if (log.action === 'LOGIN' && newData) {
+      // Show only relevant login info
+      const loginInfo = {};
+      if (newData.user) {
+        const u = newData.user;
+        if (u.full_name) loginInfo['Full Name'] = u.full_name;
+        if (u.username) loginInfo['Username'] = u.username;
+        if (u.role) loginInfo['Role'] = u.role;
+        if (u.department) loginInfo['Department'] = u.department;
+      } else {
+        if (newData.full_name || newData.username) loginInfo['User'] = newData.full_name || newData.username;
+      }
+      if (Object.keys(loginInfo).length) {
+        dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#b45309;"><i class="fas fa-sign-in-alt" style="margin-right:5px;"></i>Session Info</h4>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;"><tbody>
+          ${Object.entries(loginInfo).map(([k,v]) => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151;width:35%;">${k}</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">${String(v).replace(/</g,'&lt;')}</td></tr>`).join('')}
+          </tbody></table></div>`;
+      }
+    } else if (newData) {
+      dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#333;"><i class="fas fa-info-circle" style="margin-right:5px;"></i>Record Details</h4>${alBuildGenericTable(newData)}</div>`;
+    } else if (oldData) {
+      dataSection = `<div style="margin-top:14px;"><h4 style="margin:0 0 8px;font-size:13px;color:#333;"><i class="fas fa-info-circle" style="margin-right:5px;"></i>Record Details</h4>${alBuildGenericTable(oldData)}</div>`;
+    } else {
+      dataSection = '<p style="margin-top:14px;color:#999;font-style:italic;">No additional data recorded for this action.</p>';
+    }
+
     const html = `
-      <div style="display:grid;grid-template-columns:130px 1fr;gap:6px 12px;margin-bottom:12px;">
+      <div style="display:grid;grid-template-columns:130px 1fr;gap:6px 12px;margin-bottom:4px;font-size:13px;">
         <strong>Date & Time:</strong><span>${dt}</span>
         <strong>User:</strong><span>${log.full_name || log.username || ''}</span>
         <strong>Role:</strong><span>${(log.user_role || '').replace(/_/g,' ')}</span>
         <strong>Department:</strong><span>${log.department || ''}</span>
-        <strong>Action:</strong><span style="font-weight:700;">${log.action || ''}</span>
+        <strong>Action:</strong><span style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;color:#fff;background:${actionColor};">${log.action || ''}</span>
         <strong>Module:</strong><span>${(log.table_name || '').replace(/_/g,' ')}</span>
         <strong>Record ID:</strong><span>${log.record_id || ''}</span>
         <strong>Reference:</strong><span>${log.reference || ''}</span>
         <strong>Description:</strong><span>${log.description || ''}</span>
         <strong>IP Address:</strong><span>${log.ip_address || ''}</span>
       </div>
-      <div style="margin-bottom:8px;"><strong>Old Data:</strong>${formatJson(log.old_data)}</div>
-      <div><strong>New Data:</strong>${formatJson(log.new_data)}</div>
+      ${dataSection}
     `;
     showModal('Activity Log Detail', html, { size: 'large' });
   };

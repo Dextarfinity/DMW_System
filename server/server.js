@@ -422,12 +422,55 @@ function getDescriptionFromAction(action, tableName, reference) {
   }
 }
 
+// Fields to strip from activity log data (sensitive / internal / noisy)
+const SENSITIVE_FIELDS = new Set([
+  'password', 'password_hash', 'token', 'refresh_token', 'secret',
+  'created_at', 'updated_at', 'deleted_at'
+]);
+
+// Strip sensitive and internal fields from an object for activity logging
+function sanitizeLogData(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clean = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_FIELDS.has(key)) continue;
+    clean[key] = value;
+  }
+  return clean;
+}
+
+// Extract record ID from URL path (e.g. /api/departments/5 → 5)
+function getRecordIdFromUrl(url) {
+  const clean = (url || '').split('?')[0];
+  const match = clean.match(/\/api\/[a-z-]+\/([0-9]+)/);
+  return match ? parseInt(match[1]) : null;
+}
+
+// Fetch old record before UPDATE or DELETE (best-effort, non-blocking)
+async function fetchOldRecord(tableName, recordId) {
+  if (!tableName || !recordId) return null;
+  try {
+    const result = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [recordId]);
+    return result.rows[0] ? sanitizeLogData(result.rows[0]) : null;
+  } catch {
+    return null; // table may not have 'id' column — silently skip
+  }
+}
+
 // Auto-logging middleware for all mutations
-app.use('/api', (req, res, next) => {
+app.use('/api', async (req, res, next) => {
   if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
   // Skip: activity-logs, audit-log, health (auth dedup handled by logActivity)
   const path = req.path || req.url;
   if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
+
+  // For UPDATE/DELETE, fetch old record BEFORE the route handler mutates it
+  let oldRecord = null;
+  const tableName = getTableFromPath(req.originalUrl || req.url);
+  const urlRecordId = getRecordIdFromUrl(req.originalUrl || req.url);
+  if (tableName && urlRecordId && (req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE')) {
+    oldRecord = await fetchOldRecord(tableName, urlRecordId);
+  }
 
   let alreadyLogged = false;
   const originalJson = res.json;
@@ -435,10 +478,9 @@ app.use('/api', (req, res, next) => {
     // Only log on success (2xx), and only once per request
     if (!alreadyLogged && res.statusCode >= 200 && res.statusCode < 300) {
       alreadyLogged = true;
-      const tableName = getTableFromPath(req.originalUrl || req.url);
       if (tableName) {
         const action = getActionFromHttpMethod(req.method, req.originalUrl || req.url);
-        const recordId = body?.id || body?.user?.id || req.params?.id || null;
+        const recordId = body?.id || body?.user?.id || urlRecordId || null;
         const reference = body?.ris_no || body?.pr_number || body?.po_number || body?.iar_number ||
                           body?.rfq_no || body?.abstract_no || body?.resolution_no || body?.noa_no ||
                           body?.name || body?.username || body?.user?.username || body?.ics_no || body?.par_no ||
@@ -448,13 +490,20 @@ app.use('/api', (req, res, next) => {
         const user = req.user || {};
         const userId = user.id || body?.user?.id || null;
         const username = user.username || body?.user?.username || req.body?.username || null;
+
+        // Build sanitized new data
+        let newData = null;
+        if (req.method !== 'DELETE' && typeof body === 'object') {
+          newData = sanitizeLogData(body);
+        }
+
         logActivity(pool, {
           userId, username,
           action, tableName, recordId: parseInt(recordId) || null,
           reference: reference ? String(reference) : null,
           description: getDescriptionFromAction(action, tableName, reference),
-          oldData: null,
-          newData: req.method === 'DELETE' ? null : (typeof body === 'object' ? body : null),
+          oldData: oldRecord || null,
+          newData,
           ipAddress: ip
         });
       }
