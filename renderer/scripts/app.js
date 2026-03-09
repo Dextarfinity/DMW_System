@@ -4383,10 +4383,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup all event listeners
   function setupEventListeners() {
-    // Login form
-    if (loginForm) {
-      loginForm.addEventListener('submit', handleLogin);
-    }
+    // Login form — handled by inline onsubmit in HTML; do NOT add a second listener here
 
     // Sidebar toggle
     if (toggleSidebarBtn) {

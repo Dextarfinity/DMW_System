@@ -332,7 +332,27 @@ const authorizeRoles = (...roles) => {
 // ACTIVITY LOGGING HELPER
 // ==============================================================================
 
+// Dedup cache: prevent duplicate logs from clients that fire the same request twice
+const _recentLogs = new Map();
+const DEDUP_WINDOW_MS = 3000; // 3-second window
+
 function logActivity(pool, { userId, username, action, tableName, recordId, reference, description, oldData, newData, ipAddress }) {
+  // Build a dedup key from the core fields (ignore old/new data)
+  const dedupKey = `${userId || ''}|${username || ''}|${action}|${tableName}|${recordId || ''}|${reference || ''}|${ipAddress || ''}`;
+  const now = Date.now();
+  const lastTime = _recentLogs.get(dedupKey);
+  if (lastTime && (now - lastTime) < DEDUP_WINDOW_MS) {
+    // Duplicate within window — skip
+    return;
+  }
+  _recentLogs.set(dedupKey, now);
+  // Prune stale entries periodically (keep map small)
+  if (_recentLogs.size > 500) {
+    for (const [k, t] of _recentLogs) {
+      if (now - t > DEDUP_WINDOW_MS) _recentLogs.delete(k);
+    }
+  }
+
   pool.query(
     `INSERT INTO activity_logs (user_id, username, action, table_name, record_id, reference, description, old_data, new_data, ip_address)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
