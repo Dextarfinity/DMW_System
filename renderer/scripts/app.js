@@ -13609,6 +13609,19 @@ Failure to submit the above requirements within the prescribed period shall cons
   }
 
   /**
+   * DMW contact footer for COA letters (used as page footer in print)
+   */
+  function coaFooterHTML() {
+    return `<div style="border-top:2px solid #1565c0;padding-top:4px;font-size:7.5px;line-height:1.5;text-align:center;color:#333;">
+      <div>Website: www.dmw.gov.ph | Email: butuan@dmw.gov.ph | Landline: (085)815-1708</div>
+      <div>Finance &amp; Administrative Division: 0921-846 5934</div>
+      <div>Migrant Workers Processing Division: 0993-279 8082</div>
+      <div>Migrant Workers Protection Division: 0907-694 3525</div>
+      <div>Welfare &amp; Reintegration Services Division: 0948-475 6812 / 0950-305 7533</div>
+    </div>`;
+  }
+
+  /**
    * Build a static print-ready letter body for a given step (no input fields)
    */
   function coaBuildWizardLetter(step) {
@@ -13624,22 +13637,22 @@ Failure to submit the above requirements within the prescribed period shall cons
     const poNum = po.po_number || '';
     const delivDate = fmtDate(po.delivery_date || po.expected_delivery_date || '');
 
-    const addr = `<div style="font-size:12px;line-height:1.5;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
-    <div style="font-size:12px;margin-bottom:14px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
-    const sig = `<div style="margin-top:24px;font-size:12px;">Thank you and best regards</div><div style="margin-top:40px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+    const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:30px;font-size:12px;">Thank you and best regards</div><div style="margin-top:50px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
 
     if (step === 1) {
-      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
-      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
       <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
     } else if (step === 2) {
-      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${purpose}</strong> / PO No.: <strong>${poNum}</strong>, on <strong>${delivDate}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${purpose}</strong> / PO No.: <strong>${poNum}</strong>, on <strong>${delivDate}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
     } else {
-      return `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
-      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
       <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
     }
   }
@@ -13652,8 +13665,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
     const title = stepNames[step] + ' - ' + (window._coaWizard.poData?.po_number || '');
     const letterBody = coaBuildWizardLetter(step);
-    const bodyContent = `<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[step-1]}</div>${letterBody}`;
-    const printHTML = buildPrintHTML(title, bodyContent);
+    const printHTML = buildPrintHTML(title, letterBody, coaFooterHTML());
     openPrintPreview(printHTML, { title: toFilename(title), editable: true });
   };
 
@@ -13666,9 +13678,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
     const body = [1,2,3].map((s,i) => {
       const letterBody = coaBuildWizardLetter(s);
-      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[s-1]}</div>${letterBody}`;
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}${letterBody}`;
     }).join('');
-    const printHTML = buildPrintHTML(title, body);
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
     openPrintPreview(printHTML, { title: toFilename(title), editable: true });
   };
 
@@ -14825,8 +14837,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div style="font-size:10px;margin-bottom:8px;">Dear Auditor, Greetings!</div>`;
     }
     function viewSignatory() {
-      return `<div style="margin-top:16px;font-size:10px;">Thank you and best regards</div>
-      <div style="margin-top:24px;font-size:10px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+      return `<div style="margin-top:12px;font-size:10px;">Thank you and best regards</div>
+      <div style="margin-top:18px;font-size:10px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>
+      <div style="margin-top:14px;border-top:1.5px solid #1565c0;padding-top:4px;font-size:7px;line-height:1.4;text-align:center;color:#333;"><div>Website: www.dmw.gov.ph | Email: butuan@dmw.gov.ph | Landline: (085)815-1708</div><div>Finance &amp; Administrative Division: 0921-846 5934 | Migrant Workers Processing Division: 0993-279 8082</div><div>Migrant Workers Protection Division: 0907-694 3525 | Welfare &amp; Reintegration Services Division: 0948-475 6812 / 0950-305 7533</div></div>`;
     }
 
     const tp = docs.transmittal_po || {};
@@ -14918,26 +14931,26 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
     // No separate header needed — buildPrintHTML already provides the official DMW header with logos
-    const addr = `<div style="font-size:12px;line-height:1.5;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
-    <div style="font-size:12px;margin-bottom:14px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
-    const sig = `<div style="margin-top:24px;font-size:12px;">Thank you and best regards</div><div style="margin-top:40px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+    const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:30px;font-size:12px;">Thank you and best regards</div><div style="margin-top:50px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
 
     let body = '';
     if (stepNum === 1) {
       const d = docs.transmittal_po || {};
-      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
-      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
       <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
     } else if (stepNum === 2) {
       const d = docs.notice_inspection || {};
-      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ''}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ''}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
     } else if (stepNum === 3) {
       const d = docs.transmittal_iar || {};
-      body = `<div style="text-align:right;margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
-      <div style="font-size:12px;line-height:1.7;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
-      <ol style="font-size:12px;margin:0 0 14px 24px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
       <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
     }
     return body;
@@ -14953,8 +14966,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
     const title = stepNames[stepNum] + ' - ' + (coa.submission_number || '');
     const body = coaBuildPrintLetter(coa, stepNum);
-    const bodyContent = `<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[stepNum-1]}</div>${body}`;
-    const printHTML = buildPrintHTML(title, bodyContent);
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
     openPrintPreview(printHTML, { title: toFilename(title), editable: true });
   };
 
@@ -14968,9 +14980,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
     const body = [1,2,3].map((s,i) => {
       const letterBody = coaBuildPrintLetter(coa, s);
-      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}<div class="doc-title" style="font-size:13px;border:none;">${stepTitles[s-1]}</div>${letterBody}`;
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}${letterBody}`;
     }).join('');
-    const printHTML = buildPrintHTML(title, body);
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
     openPrintPreview(printHTML, { title: toFilename(title), editable: true });
   };
 
@@ -16815,7 +16827,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Build a complete print-ready HTML document
    */
-  function buildPrintHTML(title, bodyContent) {
+  function buildPrintHTML(title, bodyContent, footerHTML) {
+    const defaultFooter = `<p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>`;
+    const footerContent = footerHTML || defaultFooter;
     return `<!DOCTYPE html>
       <html>
         <head>
@@ -16833,7 +16847,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             td { font-size: 8px; }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
-            .footer { margin-top: 20px; text-align: center; font-size: 8px; color: #888; border-top: 1px solid #ddd; padding-top: 6px; }
+            .footer { margin-top: 10px; text-align: center; font-size: 8px; color: #888; padding-top: 4px; }
             .doc-title { font-size: 14px; font-weight: bold; margin: 12px 0; text-align: center; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 8px; }
             .doc-subtitle { text-align: center; font-style: italic; margin-bottom: 12px; font-size: 10px; }
             .info-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
@@ -16873,7 +16887,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <tfoot class="page-footer-group">
               <tr><td>
                 <div class="footer">
-                  <p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>
+                  ${footerContent}
                 </div>
               </td></tr>
             </tfoot>
