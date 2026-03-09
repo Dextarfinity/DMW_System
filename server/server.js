@@ -401,7 +401,7 @@ app.use('/api', (req, res, next) => {
   if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
   // Skip logging endpoints themselves, health, auth/login (logged separately)
   const path = req.path || req.url;
-  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
+  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health' || path.includes('/auth/')) return next();
 
   const originalJson = res.json;
   res.json = function(body) {
