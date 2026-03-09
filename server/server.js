@@ -2182,6 +2182,8 @@ app.put('/api/app-settings/:year', authenticateToken, async (req, res) => {
 
 app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT pr.*, d.name as department_name, d.code as department_code, u.username as requested_by_name,
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
@@ -2191,9 +2193,9 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (pr.status != 'draft' OR pr.requested_by = $1)
+       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)
        ORDER BY pr.created_at DESC`,
-      [req.user.id]
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2400,13 +2402,19 @@ app.put('/api/purchase-requests/:id/set-status', authenticateToken, async (req, 
 
 app.get('/api/rfqs', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT r.*, pr.pr_number, u.username as created_by_name,
-              pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name
+              pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name,
+              pr.dept_id as pr_dept_id, d.code as department_code
        FROM rfqs r LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
+       LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON r.created_by = u.id
        LEFT JOIN LATERAL (SELECT quantity, unit, item_name FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       ORDER BY r.created_at DESC`
+       WHERE (r.status != 'draft' OR r.created_by = $1 OR $2 = true)
+       ORDER BY r.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2506,11 +2514,19 @@ app.put('/api/rfqs/:id/set-status', authenticateToken, async (req, res) => {
 
 app.get('/api/abstracts', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
-      `SELECT a.*, r.rfq_number, s.name as recommended_supplier_name, u.username as created_by_name
+      `SELECT a.*, r.rfq_number, s.name as recommended_supplier_name, u.username as created_by_name,
+              pr.dept_id as pr_dept_id, dept.code as department_code
        FROM abstracts a LEFT JOIN rfqs r ON a.rfq_id = r.id
+       LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
+       LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN suppliers s ON a.recommended_supplier_id = s.id
-       LEFT JOIN users u ON a.created_by = u.id ORDER BY a.created_at DESC`
+       LEFT JOIN users u ON a.created_by = u.id
+       WHERE (a.status != 'draft' OR a.created_by = $1 OR $2 = true)
+       ORDER BY a.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2621,6 +2637,8 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
 
 app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT pq.*,
         a.abstract_number,
@@ -2631,9 +2649,13 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
         em4.full_name as twg_member4_name,
         s1.name as bidder1_name,
         s2.name as bidder2_name,
-        s3.name as bidder3_name
+        s3.name as bidder3_name,
+        pr.dept_id as pr_dept_id, dept.code as department_code
        FROM post_qualifications pq
        LEFT JOIN abstracts a ON pq.abstract_id = a.id
+       LEFT JOIN rfqs r ON a.rfq_id = r.id
+       LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
+       LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN employees eh ON pq.twg_head_id = eh.id
        LEFT JOIN employees em1 ON pq.twg_member1_id = em1.id
        LEFT JOIN employees em2 ON pq.twg_member2_id = em2.id
@@ -2642,7 +2664,9 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
        LEFT JOIN suppliers s1 ON pq.bidder1_supplier_id = s1.id
        LEFT JOIN suppliers s2 ON pq.bidder2_supplier_id = s2.id
        LEFT JOIN suppliers s3 ON pq.bidder3_supplier_id = s3.id
-       ORDER BY pq.created_at DESC`
+       WHERE (pq.status != 'draft' OR pq.created_by = $1 OR $2 = true)
+       ORDER BY pq.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2703,12 +2727,18 @@ app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) =
 
 app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT br.*, a.abstract_number, s.name as supplier_name,
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
        em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
-       eh.full_name as hope_name
+       eh.full_name as hope_name,
+       pr.dept_id as pr_dept_id, dept.code as department_code
        FROM bac_resolutions br LEFT JOIN abstracts a ON br.abstract_id = a.id
+       LEFT JOIN rfqs r ON a.rfq_id = r.id
+       LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
+       LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN suppliers s ON br.recommended_supplier_id = s.id
        LEFT JOIN employees ec ON br.bac_chairperson_id = ec.id
        LEFT JOIN employees ev ON br.bac_vice_chairperson_id = ev.id
@@ -2716,7 +2746,9 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
        LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
        LEFT JOIN employees eh ON br.hope_id = eh.id
-       ORDER BY br.created_at DESC`
+       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)
+       ORDER BY br.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2800,15 +2832,22 @@ app.put('/api/bac-resolutions/:id/set-status', authenticateToken, async (req, re
 
 app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT n.*, br.resolution_number, s.name as supplier_name, pq.postqual_number,
-              r.rfq_number
+              r.rfq_number,
+              pr.dept_id as pr_dept_id, dept.code as department_code
        FROM notices_of_award n LEFT JOIN bac_resolutions br ON n.bac_resolution_id = br.id
        LEFT JOIN suppliers s ON n.supplier_id = s.id
        LEFT JOIN rfqs r ON n.rfq_id = r.id
        LEFT JOIN abstracts a ON br.abstract_id = a.id
+       LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
+       LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN post_qualifications pq ON pq.abstract_id = a.id
-       ORDER BY n.created_at DESC`
+       WHERE (n.status != 'draft' OR n.created_by = $1 OR $2 = true)
+       ORDER BY n.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2876,15 +2915,21 @@ app.delete('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
 
 app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
     const result = await pool.query(
       `SELECT po.*, s.name as supplier_name, s.address as supplier_address, s.tin as supplier_tin,
-              u.username as created_by_name, pr.pr_number, noa.noa_number
+              u.username as created_by_name, pr.pr_number, noa.noa_number,
+              pr.dept_id as pr_dept_id, d.code as department_code
        FROM purchaseorders po
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u ON po.created_by = u.id
        LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
+       LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN notices_of_award noa ON po.noa_id = noa.id
-       ORDER BY po.created_at DESC`
+       WHERE (po.status != 'draft' OR po.created_by = $1 OR $2 = true)
+       ORDER BY po.created_at DESC`,
+      [req.user.id, canSeeAllDrafts]
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }

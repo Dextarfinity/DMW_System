@@ -949,6 +949,8 @@ function renderItemsPage() {
   }
 
   renderItemsTable(pageItems);
+  // Re-apply action permissions after table re-render so edit/delete buttons are hidden for restricted roles
+  if (typeof applyActionPermissions === 'function') applyActionPermissions();
 
   // Update info & pagination controls
   const showing = pageItems.length;
@@ -1332,9 +1334,11 @@ function filterPRTable() {
     }
   }
 
-  // Draft PRs: only visible to the creator (server already filters, but double-check on client)
-  const userId = currentUser.id;
-  data = data.filter(r => r.status !== 'draft' || String(r.requested_by) === String(userId));
+  // Draft PRs: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    const userId = currentUser.id;
+    data = data.filter(r => r.status !== 'draft' || String(r.requested_by) === String(userId));
+  }
 
   if (statusVal) data = data.filter(r => r.status === statusVal);
   if (divVal) data = data.filter(r => String(r.dept_id) === divVal || (r.department_code || '').toUpperCase() === divVal.toUpperCase() || (r.department_name || '').toLowerCase().includes(divVal.toLowerCase()));
@@ -1359,6 +1363,21 @@ async function loadRFQ() {
 function filterRFQTable() {
   const statusVal = document.getElementById('rfqStatusFilter')?.value || '';
   let data = cachedRFQ;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const rfqSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(rfqSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderRFQTable(data);
 }
@@ -1377,6 +1396,21 @@ async function loadAbstract() {
 function filterAbstractTable() {
   const statusVal = document.getElementById('abstractStatusFilter')?.value || '';
   let data = cachedAbstract;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const absSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(absSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderAbstractTable(data);
 }
@@ -1397,6 +1431,21 @@ async function loadPostQual() {
 function filterPostQualTable() {
   const statusVal = document.getElementById('postQualStatusFilter')?.value || '';
   let data = cachedPostQual;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const pqSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(pqSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderPostQualTable(data);
 }
@@ -1415,6 +1464,21 @@ async function loadBACResolution() {
 function filterBACResTable() {
   const statusVal = document.getElementById('bacResStatusFilter')?.value || '';
   let data = cachedBACRes;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const bacSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(bacSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderBACResolutionTable(data);
 }
@@ -1433,6 +1497,21 @@ async function loadNOA() {
 function filterNOATable() {
   const statusVal = document.getElementById('noaStatusFilter')?.value || '';
   let data = cachedNOA;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const noaSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(noaSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderNOATable(data);
 }
@@ -1451,6 +1530,21 @@ async function loadPO() {
 function filterPOTable() {
   const statusVal = document.getElementById('poStatusFilter')?.value || '';
   let data = cachedPO;
+  // Draft visibility: admin/hope see all drafts, others only see their own
+  if (!userHasAnyRole(['admin', 'hope'])) {
+    data = data.filter(r => r.status !== 'draft' || String(r.created_by) === String(currentUser.id));
+  }
+  // Division filtering: admin/hope see all, others see only their division
+  const poSeeAllRoles = ['admin', 'hope'];
+  if (!userHasAnyRole(poSeeAllRoles)) {
+    const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+    const chiefRole = getUserChiefRole();
+    const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+    const userDeptId = currentUser.dept_id;
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => (userDeptId && String(r.pr_dept_id) === String(userDeptId)) || (userDeptCode && (r.department_code || '').toUpperCase() === userDeptCode.toUpperCase()));
+    }
+  }
   if (statusVal) data = data.filter(r => r.status === statusVal);
   renderPOTable(data);
 }
@@ -2906,9 +3000,9 @@ function renderRFQTable(rfq) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewRFQModal(${r.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>` : ''}
           <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -2945,9 +3039,9 @@ function renderAbstractTable(abstract) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewAbstractModal(${a.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>` : ''}
           <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -2975,9 +3069,9 @@ function renderPostQualTable(postQual) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewPostQualModal(${p.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>` : ''}
           <button class="btn-icon" title="Print" onclick="printTWGReport(${p.id})"><i class="fas fa-print"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -3006,8 +3100,8 @@ function renderBACResolutionTable(bacRes) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewBACResolutionModal(${b.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ''}
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -3036,9 +3130,9 @@ function renderNOATable(noa) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewNOAModal(${n.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>` : ''}
           <button class="btn-icon" title="Print" onclick="printNoticeOfAward(${n.id})"><i class="fas fa-print"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -3067,9 +3161,9 @@ function renderPOTable(po) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewPOModal(${p.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>` : ''}
           <button class="btn-icon" title="Print" onclick="printPurchaseOrder(${p.id})"><i class="fas fa-print"></i></button>
-          <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>
+          ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -4519,7 +4613,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: true, canApprovePO: false, canViewPO: true,
       canCreateIAR: true, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: true, canSubmitCOA: true, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: true, canEditSupplier: true, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4614,7 +4708,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: true, canApprovePO: false, canViewPO: true,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: true, canSubmitCOA: true, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: true, canEditSupplier: true, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4653,7 +4747,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: false,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4748,7 +4842,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: true,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4767,7 +4861,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: true,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4786,7 +4880,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: true,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4805,7 +4899,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreatePO: false, canApprovePO: false, canViewPO: true,
       canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: true,
-      canCreateItem: true, canEditItem: true, canDeleteItem: false, canViewItem: true,
+      canCreateItem: true, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: true,
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: true, canExportReports: true,
@@ -4831,17 +4925,17 @@ document.addEventListener('DOMContentLoaded', () => {
       canManageDivisions: false
     },
     requester: {
-      // Requester: Can view/create PPMP, view APP, create/view PR, view IAR, view items (own division only)
+      // Requester: Can view/create PPMP, view APP, create/view PR, view all transactions through PO (own division only)
       canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: false, canViewPPMP: true,
       canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
       canCreatePR: true, canEditPR: true, canApprovePR: false, canViewPR: true,
-      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
-      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
-      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
-      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
-      canCreateNOA: false, canApproveNOA: false, canViewNOA: false,
-      canCreatePO: false, canApprovePO: false, canViewPO: false,
-      canCreateIAR: false, canApproveIAR: false, canViewIAR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: true,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: true,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: true,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
       canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
       canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
       canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
@@ -4915,7 +5009,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefPages,
       chief_mwptd: chiefPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
-      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'iar', 'items']
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
     };
 
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -5107,7 +5201,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefNavPages,
       chief_mwptd: chiefNavPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
-      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'iar', 'items']
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
     };
     
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -6326,6 +6420,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch APP items for validation
     let appItems = [];
     try { appItems = await apiRequest('/plan-items'); } catch(e) { console.warn('Could not load APP items:', e); }
+    // Filter APP items by user's division (admin/hope see all)
+    const prSeeAllRoles = ['admin', 'hope'];
+    if (!userHasAnyRole(prSeeAllRoles)) {
+      const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+      const chiefRole = getUserChiefRole();
+      const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+      const userDeptId = currentUser.dept_id;
+      if (userDeptCode || userDeptId) {
+        appItems = appItems.filter(item => {
+          return (userDeptId && String(item.dept_id) === String(userDeptId)) ||
+                 (userDeptCode && (item.department_code || '').toUpperCase() === userDeptCode.toUpperCase());
+        });
+      }
+    }
     // Load items catalog for picker
     const allItems = await ensureItemsCatalogLoaded();
     const prCatOpts = buildCatalogCategoryOptions(allItems);
@@ -6753,22 +6861,41 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  window.sendRFQ = function() {
+  window.sendRFQ = async function() {
     if(!validateAttachment('rfqDocument', 'RFQ Document')) return;
-    // Compute ABC from catalog selected items
-    const rfqItems = window._docSelectedItems['rfq'] || [];
-    let abc = rfqItems.reduce((sum, si) => sum + (si.total || 0), 0);
-    if (abc >= 200000) {
-      if(confirm('ABC ≥ ₱200,000. This RFQ will be posted to PhilGEPS for 3 calendar days. Continue?')) {
-        alert('RFQ sent to suppliers and posted to PhilGEPS. Status: RFQ Posted');
-        closeModal();
+    if (!confirm('Are you sure you want to send this RFQ?')) return;
+    const rfqNumber = document.getElementById('rfqNumber')?.value || '';
+    const rfqDate = document.getElementById('rfqDate')?.value || '';
+    const prId = document.getElementById('rfqLinkedPR')?.value || '';
+    const deadline = document.getElementById('rfqDeadline')?.value || '';
+    const supplierId = document.getElementById('rfqSupplierId')?.value || '';
+    const selectedItems = window._docSelectedItems['rfq'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id, item_code: si.item_code || 'RFQ-ITEM-' + (idx + 1),
+      item_name: si.item_name, item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit, quantity: si.quantity, abc_unit_cost: si.unit_price
+    }));
+    const abcAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+    try {
+      const data = {
+        rfq_number: rfqNumber, pr_id: prId ? parseInt(prId) : null,
+        date_prepared: rfqDate || null, submission_deadline: deadline || null,
+        abc_amount: abcAmount, status: 'on_going', items: items,
+        suppliers: supplierId ? [{ supplier_id: parseInt(supplierId) }] : []
+      };
+      const result = await apiRequest('/rfqs', 'POST', data);
+      const rfqId = result.id || result.rfq_id;
+      if (rfqId) {
+        await uploadAttachments('rfq', rfqId, [
+          { inputId: 'rfqDocument', description: 'RFQ Document (Signed)' },
+          { inputId: 'rfqTechSpecs', description: 'Technical Specifications / TOR' }
+        ]);
       }
-    } else {
-      if(confirm('Send this RFQ to invited suppliers?')) {
-        alert('RFQ sent to invited suppliers. Status: RFQ Prepared');
-        closeModal();
-      }
-    }
+      alert('RFQ sent successfully!');
+      closeModal();
+      if (typeof loadRFQs === 'function') loadRFQs();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) { alert('Error sending RFQ: ' + err.message); }
   };
 
   window.showNewAbstractModal = async function() {
@@ -6915,7 +7042,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-check-double"></i> Submit Abstract</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="submitAbstract()"><i class="fas fa-check-double"></i> Submit Abstract</button>
         </div>
       </form>
     `;
@@ -7155,7 +7283,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-award"></i> Issue NOA</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="issueNOA()"><i class="fas fa-award"></i> Issue NOA</button>
         </div>
       </form>
     `;
@@ -7403,12 +7532,47 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (totalEl) totalEl.value = grandTotal.toFixed(2);
   };
 
-  window.approvePO = function() {
+  window.approvePO = async function() {
     if(!validateAttachment('poDocument', 'Purchase Order Document')) return;
-    if(confirm('Approve this Purchase Order? This will start the COA submission timeline (5 calendar days).')) {
-      alert('PO Approved. Status: PO Approved. Sending to supplier for signature...');
+    if (!confirm('Approve this Purchase Order?')) return;
+    const poNumber = document.getElementById('poNumber')?.value || '';
+    const poDate = document.getElementById('poDate')?.value || '';
+    const supplierId = document.getElementById('poSupplierId')?.value || '';
+    const procMode = document.getElementById('poProcMode')?.value || '';
+    const placeDelivery = document.getElementById('poPlaceDelivery')?.value || '';
+    const deliveryDate = document.getElementById('poDeliveryDate')?.value || '';
+    const paymentTerm = document.getElementById('poPaymentTerm')?.value || 'Government Terms';
+    const noaId = document.getElementById('poLinkedNOA')?.value || '';
+    const purpose = document.getElementById('poPurpose')?.value || '';
+    const selectedItems = window._docSelectedItems['po'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id, item_code: si.item_code || 'PO-ITEM-' + (idx + 1),
+      item_name: si.item_name, item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit, quantity: si.quantity, unit_price: si.unit_price
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+    try {
+      const data = {
+        po_number: poNumber, supplier_id: supplierId ? parseInt(supplierId) : null,
+        noa_id: noaId ? parseInt(noaId) : null, total_amount: totalAmount,
+        payment_terms: paymentTerm, delivery_address: placeDelivery,
+        status: 'for_signing', workflow_status: 'pending',
+        expected_delivery_date: deliveryDate || null, po_date: poDate || null,
+        purpose: purpose, mode_of_procurement: procMode, place_of_delivery: placeDelivery, items: items
+      };
+      const result = await apiRequest('/purchase-orders', 'POST', data);
+      const poId = result.id || result.po_id;
+      if (poId) {
+        await uploadAttachments('purchase_order', poId, [
+          { inputId: 'poDocument', description: 'Purchase Order Document (Signed)' },
+          { inputId: 'poSupplierConforme', description: 'Supplier Conforme / Signed PO' }
+        ]);
+      }
+      alert('Purchase Order approved successfully!');
       closeModal();
-    }
+      if (typeof loadPurchaseOrders === 'function') loadPurchaseOrders();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) { alert('Error approving PO: ' + err.message); }
   };
 
   // ===== FULL EDIT MODALS FOR ALL TRANSACTION PAGES =====
@@ -7426,6 +7590,20 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Load APP items for validation
       let appItems = [];
       try { appItems = await apiRequest('/plan-items'); } catch(e) { console.warn('Could not load APP items:', e); }
+      // Filter APP items by user's division (admin/hope see all)
+      const editPrSeeAllRoles = ['admin', 'hope'];
+      if (!userHasAnyRole(editPrSeeAllRoles)) {
+        const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+        const chiefRole = getUserChiefRole();
+        const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+        const userDeptId = currentUser.dept_id;
+        if (userDeptCode || userDeptId) {
+          appItems = appItems.filter(item => {
+            return (userDeptId && String(item.dept_id) === String(userDeptId)) ||
+                   (userDeptCode && (item.department_code || '').toUpperCase() === userDeptCode.toUpperCase());
+          });
+        }
+      }
       const allItems = await ensureItemsCatalogLoaded();
       const prCatOpts = buildCatalogCategoryOptions(allItems);
       const prItemOpts = buildCatalogItemOptions(allItems);
@@ -11245,7 +11423,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }));
     const abcAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
 
-    if (!confirm('Are you sure you want to save this RFQ?')) return;
+    if (!confirm('Save this RFQ as draft?')) return;
 
     try {
       const data = {
@@ -11254,7 +11432,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
-        status: 'on_going',
+        status: 'draft',
         items: items,
         suppliers: supplierId ? [{ supplier_id: parseInt(supplierId) }] : []
       };
@@ -11266,7 +11444,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'rfqTechSpecs', description: 'Technical Specifications / TOR' }
         ]);
       }
-      alert('RFQ saved successfully!');
+      alert('RFQ saved as draft!');
       closeModal();
       if (typeof loadRFQs === 'function') loadRFQs();
       else if (typeof loadPageData === 'function') loadPageData();
@@ -11354,7 +11532,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const sortedQuotations = [...quotations].sort((a, b) => a.bid_amount - b.bid_amount);
     sortedQuotations.forEach((q, idx) => { q.rank_no = idx + 1; });
 
-    if (!confirm('Are you sure you want to submit this Abstract of Quotations?')) return;
+    if (!confirm('Save this Abstract of Quotations as draft?')) return;
 
     try {
       const data = {
@@ -11362,7 +11540,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         rfq_id: rfqId ? parseInt(rfqId) : null,
         date_prepared: abstractDate || null,
         purpose: purpose,
-        status: 'on_going',
+        status: 'draft',
         item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
         recommended_supplier_id: recommendedSupplier ? recommendedSupplier.id : null,
         recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
@@ -11376,7 +11554,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'supplierQuotations', description: 'Supplier Quotations (Scanned)' }
         ]);
       }
-      alert('Abstract of Quotations saved successfully!');
+      alert('Abstract of Quotations saved as draft!');
       closeModal();
       if (typeof loadAbstracts === 'function') loadAbstracts();
       else if (typeof loadPageData === 'function') loadPageData();
@@ -11397,7 +11575,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const supplierId = document.getElementById('noaSupplierId')?.value || '';
     const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
 
-    if (!confirm('Are you sure you want to issue this Notice of Award?')) return;
+    if (!confirm('Save this Notice of Award as draft?')) return;
 
     try {
       const data = {
@@ -11407,7 +11585,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         supplier_id: supplierId ? parseInt(supplierId) : null,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: 'issued'
+        status: 'draft'
       };
       const result = await apiRequest('/notices-of-award', 'POST', data);
       const noaId = result.id || result.noa_id;
@@ -11416,7 +11594,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'noaDocument', description: 'NOA Document (Signed by HoPE)' }
         ]);
       }
-      alert('Notice of Award issued successfully!');
+      alert('Notice of Award saved as draft!');
       closeModal();
       if (typeof loadNOAs === 'function') loadNOAs();
       else if (typeof loadPageData === 'function') loadPageData();
@@ -11454,7 +11632,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }));
     const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
 
-    if (!confirm('Are you sure you want to save this Purchase Order?')) return;
+    if (!confirm('Save this Purchase Order as draft?')) return;
 
     try {
       const data = {
@@ -11464,7 +11642,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         total_amount: totalAmount,
         payment_terms: paymentTerm,
         delivery_address: placeDelivery,
-        status: 'for_signing',
+        status: 'draft',
         workflow_status: 'pending',
         expected_delivery_date: deliveryDate || null,
         po_date: poDate || null,
@@ -11481,7 +11659,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'poSupplierConforme', description: 'Supplier Conforme / Signed PO' }
         ]);
       }
-      alert('Purchase Order saved successfully!');
+      alert('Purchase Order saved as draft!');
       closeModal();
       if (typeof loadPurchaseOrders === 'function') loadPurchaseOrders();
       else if (typeof loadPageData === 'function') loadPageData();
@@ -11567,7 +11745,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const hopeId = document.getElementById('bacHopeId')?.value || null;
 
     if (!subject) { alert('Please enter the resolution subject.'); return; }
-    if (!confirm('Are you sure you want to submit this BAC Resolution?')) return;
+    if (!confirm('Save this BAC Resolution as draft?')) return;
 
     try {
       const data = {
@@ -11577,7 +11755,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         procurement_mode: 'SVP',
         abc_amount: abcAmount,
         bid_amount: contractPrice,
-        status: 'on_going',
+        status: 'draft',
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
         bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
@@ -11593,7 +11771,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           { inputId: 'bacResPostQual', description: 'Post-Qualification Report' }
         ]);
       }
-      alert('BAC Resolution submitted successfully!');
+      alert('BAC Resolution saved as draft!');
       closeModal();
       if (typeof loadBACResolutions === 'function') loadBACResolutions();
       else if (typeof loadPageData === 'function') loadPageData();
@@ -11623,14 +11801,206 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidder3SupplierId = document.getElementById('twgBidder3')?.value || null;
 
     if (!subject) { alert('Please enter the subject.'); return; }
-    if (!confirm('Are you sure you want to submit this TWG Report?')) return;
+    if (!confirm('Save this TWG Report as draft?')) return;
 
     try {
       const data = {
         postqual_number: postQualNumber,
         abstract_id: abstractId ? parseInt(abstractId) : null,
         bidder_name: subject,
-        status: 'on_going',
+        status: 'draft',
+        twg_head_id: twgHeadId ? parseInt(twgHeadId) : null,
+        twg_member1_id: twgMember1Id ? parseInt(twgMember1Id) : null,
+        twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
+        twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
+        twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
+        bidder1_supplier_id: bidder1SupplierId ? parseInt(bidder1SupplierId) : null,
+        bidder2_supplier_id: bidder2SupplierId ? parseInt(bidder2SupplierId) : null,
+        bidder3_supplier_id: bidder3SupplierId ? parseInt(bidder3SupplierId) : null
+      };
+      const result = await apiRequest('/post-qualifications', 'POST', data);
+      const pqId = result.id || result.postqual_id;
+      if (pqId) {
+        await uploadAttachments('post_qualification', pqId, [
+          { inputId: 'postQualReport', description: 'TWG Report Document' },
+          { inputId: 'postQualBidderDocs', description: 'Bidder Documents' }
+        ]);
+      }
+      alert('TWG Report saved as draft!');
+      closeModal();
+      if (typeof loadPostQualifications === 'function') loadPostQualifications();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) {
+      alert('Error saving TWG Report: ' + err.message);
+    }
+  };
+
+  // ============================================================
+  // SUBMIT (NON-DRAFT) HANDLER FUNCTIONS
+  // ============================================================
+
+  window.submitAbstract = async function() {
+    const abstractNumber = document.getElementById('abstractNumber')?.value || '';
+    const abstractDate = document.getElementById('abstractDate')?.value || '';
+    const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
+    const purpose = document.getElementById('abstractPurpose')?.value || '';
+    const supplier1Id = document.getElementById('absSupplier1Id')?.value || '';
+    const supplier2Id = document.getElementById('absSupplier2Id')?.value || '';
+    const supplier3Id = document.getElementById('absSupplier3Id')?.value || '';
+    const supplier1Name = supplier1Id ? document.getElementById('absSupplier1Id')?.options[document.getElementById('absSupplier1Id').selectedIndex]?.text : '';
+    const supplier2Name = supplier2Id ? document.getElementById('absSupplier2Id')?.options[document.getElementById('absSupplier2Id').selectedIndex]?.text : '';
+    const supplier3Name = supplier3Id ? document.getElementById('absSupplier3Id')?.options[document.getElementById('absSupplier3Id').selectedIndex]?.text : '';
+    const itemRows = document.querySelectorAll('#abstractItemsBody tr');
+    const itemsData = [];
+    itemRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 10) return;
+      const qty = parseFloat(cells[0]?.querySelector('input')?.value) || 0;
+      const unit = cells[1]?.querySelector('select')?.value || '';
+      const desc = cells[2]?.querySelector('input')?.value || '';
+      const abc = parseFloat(cells[3]?.querySelector('input')?.value) || 0;
+      const s1UnitPrice = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
+      const s1Total = parseFloat(cells[5]?.querySelector('input')?.value) || 0;
+      const s2UnitPrice = parseFloat(cells[6]?.querySelector('input')?.value) || 0;
+      const s2Total = parseFloat(cells[7]?.querySelector('input')?.value) || 0;
+      const s3UnitPrice = parseFloat(cells[8]?.querySelector('input')?.value) || 0;
+      const s3Total = parseFloat(cells[9]?.querySelector('input')?.value) || 0;
+      if (desc.trim()) { itemsData.push({ qty, unit, desc, abc, s1UnitPrice, s1Total, s2UnitPrice, s2Total, s3UnitPrice, s3Total }); }
+    });
+    let s1Total = 0, s2Total = 0, s3Total = 0;
+    itemsData.forEach(it => { s1Total += it.s1Total; s2Total += it.s2Total; s3Total += it.s3Total; });
+    const quotations = [];
+    const supplierBids = [];
+    const supplierSlots = [
+      { id: supplier1Id, name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { id: supplier2Id, name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { id: supplier3Id, name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+    ];
+    supplierSlots.forEach((slot, idx) => {
+      if (slot.id) {
+        const qItems = slot.items.map(it => ({ item_description: it.desc, quantity: it.qty, unit: it.unit, unit_price: it[slot.priceKey] }));
+        quotations.push({ supplier_id: parseInt(slot.id), bid_amount: slot.total, is_compliant: true, remarks: null, rank_no: idx + 1, items: qItems });
+        supplierBids.push({ id: parseInt(slot.id), name: slot.name, total: slot.total });
+      }
+    });
+    supplierBids.sort((a, b) => a.total - b.total);
+    const recommendedSupplier = supplierBids.length > 0 ? supplierBids[0] : null;
+    const sortedQuotations = [...quotations].sort((a, b) => a.bid_amount - b.bid_amount);
+    sortedQuotations.forEach((q, idx) => { q.rank_no = idx + 1; });
+    if (!confirm('Are you sure you want to submit this Abstract of Quotations?')) return;
+    try {
+      const data = {
+        abstract_number: abstractNumber, rfq_id: rfqId ? parseInt(rfqId) : null,
+        date_prepared: abstractDate || null, purpose: purpose, status: 'on_going',
+        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
+        recommended_supplier_id: recommendedSupplier ? recommendedSupplier.id : null,
+        recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+        quotations: sortedQuotations
+      };
+      const result = await apiRequest('/abstracts', 'POST', data);
+      const absId = result.id || result.abstract_id;
+      if (absId) {
+        await uploadAttachments('abstract', absId, [
+          { inputId: 'abstractDocument', description: 'Abstract of Quotations (Signed)' },
+          { inputId: 'supplierQuotations', description: 'Supplier Quotations (Scanned)' }
+        ]);
+      }
+      alert('Abstract of Quotations submitted successfully!');
+      closeModal();
+      if (typeof loadAbstracts === 'function') loadAbstracts();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) { alert('Error submitting Abstract: ' + err.message); }
+  };
+
+  window.issueNOA = async function() {
+    const noaNumber = document.getElementById('noaNumber')?.value || '';
+    const noaDate = document.getElementById('noaDate')?.value || '';
+    const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
+    const rfqId = document.getElementById('noaRFQRef')?.value || '';
+    const supplierId = document.getElementById('noaSupplierId')?.value || '';
+    const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
+    if (!confirm('Are you sure you want to issue this Notice of Award?')) return;
+    try {
+      const data = {
+        noa_number: noaNumber, bac_resolution_id: bacResId ? parseInt(bacResId) : null,
+        rfq_id: rfqId ? parseInt(rfqId) : null, supplier_id: supplierId ? parseInt(supplierId) : null,
+        contract_amount: contractAmount, date_issued: noaDate || null, status: 'issued'
+      };
+      const result = await apiRequest('/notices-of-award', 'POST', data);
+      const noaId = result.id || result.noa_id;
+      if (noaId) {
+        await uploadAttachments('notice_of_award', noaId, [
+          { inputId: 'noaDocument', description: 'NOA Document (Signed by HoPE)' }
+        ]);
+      }
+      alert('Notice of Award issued successfully!');
+      closeModal();
+      if (typeof loadNOAs === 'function') loadNOAs();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) { alert('Error issuing NOA: ' + err.message); }
+  };
+
+  window.submitBACResolution = async function() {
+    const resNumber = document.getElementById('bacResNumber')?.value || '';
+    const series = document.getElementById('bacResSeries')?.value || String(getCurrentFiscalYear());
+    const subject = document.getElementById('bacResSubject')?.value || '';
+    const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
+    const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
+    const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
+    const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
+    const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
+    const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
+    const bacMember2Id = document.getElementById('bacMember2Id')?.value || null;
+    const bacMember3Id = document.getElementById('bacMember3Id')?.value || null;
+    const hopeId = document.getElementById('bacHopeId')?.value || null;
+    if (!subject) { alert('Please enter the resolution subject.'); return; }
+    if (!confirm('Are you sure you want to submit this BAC Resolution?')) return;
+    try {
+      const data = {
+        resolution_number: resNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
+        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: 'SVP',
+        abc_amount: abcAmount, bid_amount: contractPrice, status: 'on_going',
+        bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
+        bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
+        bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
+        bac_member2_id: bacMember2Id ? parseInt(bacMember2Id) : null,
+        bac_member3_id: bacMember3Id ? parseInt(bacMember3Id) : null,
+        hope_id: hopeId ? parseInt(hopeId) : null
+      };
+      const result = await apiRequest('/bac-resolutions', 'POST', data);
+      const bacId = result.id || result.bac_resolution_id;
+      if (bacId) {
+        await uploadAttachments('bac_resolution', bacId, [
+          { inputId: 'bacResDocument', description: 'BAC Resolution Document (Signed)' },
+          { inputId: 'bacResPostQual', description: 'Post-Qualification Report' }
+        ]);
+      }
+      alert('BAC Resolution submitted successfully!');
+      closeModal();
+      if (typeof loadBACResolutions === 'function') loadBACResolutions();
+      else if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) { alert('Error submitting BAC Resolution: ' + err.message); }
+  };
+
+  window.submitPostQual = async function() {
+    const postQualNumber = document.getElementById('postQualNumber')?.value || '';
+    const postQualDate = document.getElementById('postQualDate')?.value || '';
+    const subject = document.getElementById('postQualSubject')?.value || '';
+    const abstractId = document.getElementById('postQualLinkedAbstract')?.value || '';
+    const twgHeadId = document.getElementById('twgHeadId')?.value || null;
+    const twgMember1Id = document.getElementById('twgMember1Id')?.value || null;
+    const twgMember2Id = document.getElementById('twgMember2Id')?.value || null;
+    const twgMember3Id = document.getElementById('twgMember3Id')?.value || null;
+    const twgMember4Id = document.getElementById('twgMember4Id')?.value || null;
+    const bidder1SupplierId = document.getElementById('twgBidder1')?.value || null;
+    const bidder2SupplierId = document.getElementById('twgBidder2')?.value || null;
+    const bidder3SupplierId = document.getElementById('twgBidder3')?.value || null;
+    if (!subject) { alert('Please enter the subject.'); return; }
+    if (!confirm('Are you sure you want to submit this TWG Report?')) return;
+    try {
+      const data = {
+        postqual_number: postQualNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
+        bidder_name: subject, status: 'on_going',
         twg_head_id: twgHeadId ? parseInt(twgHeadId) : null,
         twg_member1_id: twgMember1Id ? parseInt(twgMember1Id) : null,
         twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
@@ -11652,9 +12022,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       closeModal();
       if (typeof loadPostQualifications === 'function') loadPostQualifications();
       else if (typeof loadPageData === 'function') loadPageData();
-    } catch (err) {
-      alert('Error saving TWG Report: ' + err.message);
-    }
+    } catch (err) { alert('Error submitting TWG Report: ' + err.message); }
   };
 
   // ============================================================
@@ -13746,7 +14114,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-gavel"></i> Submit Resolution</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="submitBACResolution()"><i class="fas fa-gavel"></i> Submit Resolution</button>
         </div>
       </form>
     `;
@@ -13975,7 +14344,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-user-check"></i> Submit TWG Report</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="submitPostQual()"><i class="fas fa-user-check"></i> Submit TWG Report</button>
         </div>
       </form>
     `;
@@ -16164,7 +16534,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="text-align: right; margin-top: 12px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-          <button type="button" class="btn btn-primary" onclick="closeModal(); showEditItemModal(${item.id})"><i class="fas fa-edit"></i> Edit Item</button>
+          ${hasPermission('canEditItem') ? `<button type="button" class="btn btn-primary" onclick="closeModal(); showEditItemModal(${item.id})"><i class="fas fa-edit"></i> Edit Item</button>` : ''}
         </div>`;
       openModal('Item Details', content);
     } catch (err) {
@@ -16368,7 +16738,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>Status</label>
             <select class="form-select" id="editIsActive">
-              ${buildDivisionOptionsById(user.dept_id || '', false, 'long')}
+              <option value="true" ${user.is_active !== false ? 'selected' : ''}>Active</option>
+              <option value="false" ${user.is_active === false ? 'selected' : ''}>Inactive</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Linked Employee</label>
             <select class="form-select" id="editEmployeeId">
               <option value="">-- No linked employee --</option>
