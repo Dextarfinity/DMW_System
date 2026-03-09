@@ -407,7 +407,7 @@ app.use('/api', (req, res, next) => {
   if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
   // Skip: activity-logs, audit-log, health
   const path = req.path || req.url;
-  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health' || path.includes('/auth/')) return next();
+  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
 
   let alreadyLogged = false;
   const originalJson = res.json;
