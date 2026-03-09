@@ -343,6 +343,7 @@ function logActivity(pool, { userId, username, action, tableName, recordId, refe
 
 // Map API paths to table names for auto-logging
 const apiToTableMap = {
+  'auth': 'users',
   'departments': 'departments', 'divisions': 'divisions', 'offices': 'offices',
   'users': 'users', 'designations': 'designations', 'employees': 'employees',
   'fund-clusters': 'fund_clusters', 'procurement-modes': 'procurement_modes',
@@ -371,6 +372,9 @@ function getTableFromPath(url) {
 }
 
 function getActionFromHttpMethod(method, url) {
+  if (url.includes('/auth/login')) return 'LOGIN';
+  if (url.includes('/auth/logout')) return 'LOGOUT';
+  if (url.includes('/auth/register')) return 'CREATE';
   if (url.includes('/accept') || url.includes('/post')) return 'POST';
   if (url.includes('/unpost')) return 'UNPOST';
   if (url.includes('/approve')) return 'UPDATE';
@@ -392,6 +396,8 @@ function getDescriptionFromAction(action, tableName, reference) {
     case 'DELETE': return `Deleted ${readable}${reference ? ': ' + reference : ''}`;
     case 'POST': return `Posted ${readable}${reference ? ': ' + reference : ''}`;
     case 'UNPOST': return `Unposted ${readable}${reference ? ': ' + reference : ''}`;
+    case 'LOGIN': return `User ${reference || 'unknown'} logged in`;
+    case 'LOGOUT': return `User ${reference || 'unknown'} logged out`;
     default: return `${action} on ${readable}${reference ? ': ' + reference : ''}`;
   }
 }
@@ -399,26 +405,31 @@ function getDescriptionFromAction(action, tableName, reference) {
 // Auto-logging middleware for all mutations
 app.use('/api', (req, res, next) => {
   if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
-  // Skip logging endpoints themselves, health, auth/login (logged separately)
+  // Skip: activity-logs, audit-log, health
   const path = req.path || req.url;
   if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
 
+  let alreadyLogged = false;
   const originalJson = res.json;
   res.json = function(body) {
-    // Only log on success (2xx)
-    if (res.statusCode >= 200 && res.statusCode < 300) {
+    // Only log on success (2xx), and only once per request
+    if (!alreadyLogged && res.statusCode >= 200 && res.statusCode < 300) {
+      alreadyLogged = true;
       const tableName = getTableFromPath(req.originalUrl || req.url);
       if (tableName) {
         const action = getActionFromHttpMethod(req.method, req.originalUrl || req.url);
-        const recordId = body?.id || req.params?.id || null;
+        const recordId = body?.id || body?.user?.id || req.params?.id || null;
         const reference = body?.ris_no || body?.pr_number || body?.po_number || body?.iar_number ||
                           body?.rfq_no || body?.abstract_no || body?.resolution_no || body?.noa_no ||
-                          body?.name || body?.username || body?.ics_no || body?.par_no ||
+                          body?.name || body?.username || body?.user?.username || body?.ics_no || body?.par_no ||
                           body?.trip_ticket_no || body?.property_number || null;
         const ip = req.ip || req.connection?.remoteAddress || null;
+        // For login/register, req.user is not set — extract from response body
         const user = req.user || {};
+        const userId = user.id || body?.user?.id || null;
+        const username = user.username || body?.user?.username || req.body?.username || null;
         logActivity(pool, {
-          userId: user.id, username: user.username,
+          userId, username,
           action, tableName, recordId: parseInt(recordId) || null,
           reference: reference ? String(reference) : null,
           description: getDescriptionFromAction(action, tableName, reference),
@@ -498,14 +509,6 @@ app.post('/api/auth/login', async (req, res) => {
     );
     const roles = [user.role, user.secondary_role].filter(Boolean);
 
-    // Log login activity
-    logActivity(pool, {
-      userId: user.id, username: user.username, action: 'LOGIN', tableName: 'users',
-      recordId: user.id, reference: user.username,
-      description: `User ${user.username} (${user.role}) logged in`,
-      ipAddress: req.ip || req.connection?.remoteAddress
-    });
-
     res.json({
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name }
@@ -513,6 +516,15 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    res.json({ message: 'Logged out', username: req.user?.username });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

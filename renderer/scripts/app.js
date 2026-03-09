@@ -5514,7 +5514,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Handle logout
-  function handleLogout() {
+  async function handleLogout() {
     const logoutBtn = document.getElementById('logoutBtn');
     
     // Show spinner on logout button
@@ -5523,39 +5523,39 @@ document.addEventListener('DOMContentLoaded', () => {
       logoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Logging out...</span>';
     }
 
-    // Brief delay so user sees the loading state
-    setTimeout(() => {
-      // Clear session data
-      currentUser = { name: '', role: '', division: '' };
-      authToken = null;
-      sessionStorage.removeItem('dmw_user');
-      sessionStorage.removeItem('dmw_token');
+    // Log logout on server BEFORE clearing token
+    try { await apiRequest('/auth/logout', 'POST'); } catch (e) { /* ignore */ }
 
-      // Stop notification polling
-      stopNotificationPolling();
+    // Clear session data
+    currentUser = { name: '', role: '', division: '' };
+    authToken = null;
+    sessionStorage.removeItem('dmw_user');
+    sessionStorage.removeItem('dmw_token');
 
-      // Disconnect Socket.IO
-      disconnectSocket();
+    // Stop notification polling
+    stopNotificationPolling();
 
-      // Show login overlay
-      if (loginOverlay) {
-        loginOverlay.style.display = 'flex';
-        loginOverlay.classList.remove('hidden');
-      }
-      // Reset form
-      if (loginForm) {
-        loginForm.reset();
-      }
-      // Clear any error messages
-      const loginError = document.getElementById('loginError');
-      if (loginError) loginError.style.display = 'none';
+    // Disconnect Socket.IO
+    disconnectSocket();
 
-      // Restore logout button
-      if (logoutBtn) {
-        logoutBtn.disabled = false;
-        logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>Logout</span>';
-      }
-    }, 800);
+    // Show login overlay
+    if (loginOverlay) {
+      loginOverlay.style.display = 'flex';
+      loginOverlay.classList.remove('hidden');
+    }
+    // Reset form
+    if (loginForm) {
+      loginForm.reset();
+    }
+    // Clear any error messages
+    const loginError = document.getElementById('loginError');
+    if (loginError) loginError.style.display = 'none';
+
+    // Restore logout button
+    if (logoutBtn) {
+      logoutBtn.disabled = false;
+      logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>Logout</span>';
+    }
   }
 
   // Open modal with content
@@ -21761,7 +21761,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:30px;color:#636e78;">No activity logs found.</td></tr>';
       return;
     }
-    const actionColors = { CREATE: '#276749', UPDATE: '#1e40af', DELETE: '#b91c1c', POST: '#6b21a8', UNPOST: '#92400e', LOGIN: '#b45309' };
+    const actionColors = { CREATE: '#276749', UPDATE: '#1e40af', DELETE: '#b91c1c', POST: '#6b21a8', UNPOST: '#92400e', LOGIN: '#b45309', LOGOUT: '#6b7280' };
     tbody.innerHTML = logs.map(log => {
       const dt = log.created_at ? new Date(log.created_at) : null;
       const dateStr = dt ? dt.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'2-digit' }) + ' ' + dt.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', hour12:true }) : '';
