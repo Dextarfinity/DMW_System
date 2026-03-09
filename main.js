@@ -1,7 +1,15 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
+const http = require('http');
 
 let mainWindow;
+
+// =====================================================
+// SERVER URL — Electron clients load the UI from here
+// so all frontend updates on the server auto-propagate.
+// Change this IP if the server moves to a different machine.
+// =====================================================
+const SERVER_URL = 'http://192.168.100.235:3000';
 
 function getAppIconPath() {
   if (process.platform === 'win32') {
@@ -10,7 +18,22 @@ function getAppIconPath() {
   return path.join(__dirname, 'renderer', 'assets', 'dmw-logo.png');
 }
 
-function createWindow() {
+/**
+ * Quick server reachability check (2-second timeout).
+ * Resolves true if the server responds, false otherwise.
+ */
+function isServerReachable() {
+  return new Promise((resolve) => {
+    const req = http.get(`${SERVER_URL}/api/health`, { timeout: 2000 }, (res) => {
+      resolve(res.statusCode >= 200 && res.statusCode < 400);
+      res.resume(); // consume response to free memory
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+async function createWindow() {
   const appIcon = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -30,7 +53,18 @@ function createWindow() {
   // Hide the menu bar visually but keep keyboard shortcuts (Ctrl+Shift+I for DevTools)
   mainWindow.setMenuBarVisibility(false);
 
-  mainWindow.loadFile('renderer/index.html');
+  // --- Dynamic UI loading ---
+  // Try loading the frontend from the server so that any HTML/JS/CSS changes
+  // made on the server are immediately reflected on every client PC.
+  // Falls back to the bundled local files if the server is unreachable.
+  const serverUp = await isServerReachable();
+  if (serverUp) {
+    console.log('[UI] Loading frontend from server:', SERVER_URL);
+    mainWindow.loadURL(SERVER_URL);
+  } else {
+    console.log('[UI] Server unreachable — loading bundled local files');
+    mainWindow.loadFile('renderer/index.html');
+  }
 
   // Start maximized while keeping Windows taskbar visible
   mainWindow.maximize();
