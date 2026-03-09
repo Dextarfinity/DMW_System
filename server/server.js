@@ -329,6 +329,111 @@ const authorizeRoles = (...roles) => {
 };
 
 // ==============================================================================
+// ACTIVITY LOGGING HELPER
+// ==============================================================================
+
+function logActivity(pool, { userId, username, action, tableName, recordId, reference, description, oldData, newData, ipAddress }) {
+  pool.query(
+    `INSERT INTO activity_logs (user_id, username, action, table_name, record_id, reference, description, old_data, new_data, ip_address)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [userId || null, username || null, action, tableName, recordId || null, reference || null, description || null,
+     oldData ? JSON.stringify(oldData) : null, newData ? JSON.stringify(newData) : null, ipAddress || null]
+  ).catch(err => console.error('[ACTIVITY LOG] Error:', err.message));
+}
+
+// Map API paths to table names for auto-logging
+const apiToTableMap = {
+  'departments': 'departments', 'divisions': 'divisions', 'offices': 'offices',
+  'users': 'users', 'designations': 'designations', 'employees': 'employees',
+  'fund-clusters': 'fund_clusters', 'procurement-modes': 'procurement_modes',
+  'uacs-codes': 'uacs_codes', 'uoms': 'uoms', 'suppliers': 'suppliers',
+  'items': 'items', 'plans': 'procurementplans', 'plan-items': 'plan_items',
+  'paps': 'paps', 'app-settings': 'app_settings',
+  'purchase-requests': 'purchaserequests', 'rfqs': 'rfqs',
+  'abstracts': 'abstracts', 'post-qualifications': 'post_qualifications',
+  'bac-resolutions': 'bac_resolutions', 'notices-of-award': 'notices_of_award',
+  'purchase-orders': 'purchaseorders', 'iars': 'iars',
+  'stock-cards': 'stock_cards', 'supplies-ledger-cards': 'supplies_ledger_cards',
+  'property-cards': 'property_cards', 'property-ledger-cards': 'property_ledger_cards',
+  'ics': 'inventory_custodian_slips', 'pars': 'property_acknowledgement_receipts',
+  'ris': 'requisition_issue_slips', 'trip-tickets': 'trip_tickets',
+  'coa-submissions': 'coa_submissions', 'po-packets': 'po_packets',
+  'received-semi-expendable': 'received_semi_expendable_items',
+  'received-capital-outlay': 'received_capital_outlay_items',
+  'notifications': 'notifications', 'attachments': 'attachments'
+};
+
+function getTableFromPath(url) {
+  const clean = url.split('?')[0];
+  const match = clean.match(/^\/api\/([a-z-]+)/);
+  if (!match) return null;
+  return apiToTableMap[match[1]] || match[1];
+}
+
+function getActionFromHttpMethod(method, url) {
+  if (url.includes('/accept') || url.includes('/post')) return 'POST';
+  if (url.includes('/unpost')) return 'UNPOST';
+  if (url.includes('/approve')) return 'UPDATE';
+  if (url.includes('/set-status')) return 'UPDATE';
+  if (url.includes('/restore')) return 'UPDATE';
+  switch (method) {
+    case 'POST': return 'CREATE';
+    case 'PUT': case 'PATCH': return 'UPDATE';
+    case 'DELETE': return 'DELETE';
+    default: return method;
+  }
+}
+
+function getDescriptionFromAction(action, tableName, reference) {
+  const readable = tableName.replace(/_/g, ' ');
+  switch (action) {
+    case 'CREATE': return `Created ${readable}${reference ? ': ' + reference : ''}`;
+    case 'UPDATE': return `Updated ${readable}${reference ? ': ' + reference : ''}`;
+    case 'DELETE': return `Deleted ${readable}${reference ? ': ' + reference : ''}`;
+    case 'POST': return `Posted ${readable}${reference ? ': ' + reference : ''}`;
+    case 'UNPOST': return `Unposted ${readable}${reference ? ': ' + reference : ''}`;
+    default: return `${action} on ${readable}${reference ? ': ' + reference : ''}`;
+  }
+}
+
+// Auto-logging middleware for all mutations
+app.use('/api', (req, res, next) => {
+  if (['GET', 'OPTIONS', 'HEAD'].includes(req.method)) return next();
+  // Skip logging endpoints themselves, health, auth/login (logged separately)
+  const path = req.path || req.url;
+  if (path.includes('activity-logs') || path.includes('audit-log') || path === '/health') return next();
+
+  const originalJson = res.json;
+  res.json = function(body) {
+    // Only log on success (2xx)
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const tableName = getTableFromPath(req.originalUrl || req.url);
+      if (tableName) {
+        const action = getActionFromHttpMethod(req.method, req.originalUrl || req.url);
+        const recordId = body?.id || req.params?.id || null;
+        const reference = body?.ris_no || body?.pr_number || body?.po_number || body?.iar_number ||
+                          body?.rfq_no || body?.abstract_no || body?.resolution_no || body?.noa_no ||
+                          body?.name || body?.username || body?.ics_no || body?.par_no ||
+                          body?.trip_ticket_no || body?.property_number || null;
+        const ip = req.ip || req.connection?.remoteAddress || null;
+        const user = req.user || {};
+        logActivity(pool, {
+          userId: user.id, username: user.username,
+          action, tableName, recordId: parseInt(recordId) || null,
+          reference: reference ? String(reference) : null,
+          description: getDescriptionFromAction(action, tableName, reference),
+          oldData: null,
+          newData: req.method === 'DELETE' ? null : (typeof body === 'object' ? body : null),
+          ipAddress: ip
+        });
+      }
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
+
+// ==============================================================================
 // ROUTE ALIASES - rewrite short frontend paths to actual server paths
 // Must be placed BEFORE all route definitions
 // ==============================================================================
@@ -392,6 +497,15 @@ app.post('/api/auth/login', async (req, res) => {
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
     const roles = [user.role, user.secondary_role].filter(Boolean);
+
+    // Log login activity
+    logActivity(pool, {
+      userId: user.id, username: user.username, action: 'LOGIN', tableName: 'users',
+      recordId: user.id, reference: user.username,
+      description: `User ${user.username} (${user.role}) logged in`,
+      ipAddress: req.ip || req.connection?.remoteAddress
+    });
+
     res.json({
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name }
@@ -4587,7 +4701,7 @@ app.get('/api/reports/monthly-travel-summary', authenticateToken, async (req, re
 });
 
 // ==============================================================================
-// AUDIT LOG
+// AUDIT LOG (legacy)
 // ==============================================================================
 
 app.get('/api/audit-log', authenticateToken, authorizeRoles('admin', 'auditor'), async (req, res) => {
@@ -4600,6 +4714,90 @@ app.get('/api/audit-log', authenticateToken, authorizeRoles('admin', 'auditor'),
     params.push(parseInt(lim) || 100);
     const result = await pool.query(query, params);
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==============================================================================
+// ACTIVITY LOGS (materialized view)
+// ==============================================================================
+
+// Get activity logs from materialized view (fast, includes user role & department)
+app.get('/api/activity-logs', authenticateToken, authorizeRoles('admin', 'hope'), async (req, res) => {
+  try {
+    const { table_name, action, user_id, username, date_from, date_to, limit: lim, offset: off } = req.query;
+    let query = 'SELECT * FROM activity_logs_view WHERE 1=1';
+    const params = [];
+
+    if (table_name) { params.push(table_name); query += ` AND table_name = $${params.length}`; }
+    if (action) { params.push(action); query += ` AND action = $${params.length}`; }
+    if (user_id) { params.push(parseInt(user_id)); query += ` AND user_id = $${params.length}`; }
+    if (username) { params.push(`%${username}%`); query += ` AND (username ILIKE $${params.length} OR full_name ILIKE $${params.length})`; }
+    if (date_from) { params.push(date_from); query += ` AND created_at >= $${params.length}::timestamp`; }
+    if (date_to) { params.push(date_to + ' 23:59:59'); query += ` AND created_at <= $${params.length}::timestamp`; }
+
+    // Count total for pagination
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    query += ' ORDER BY created_at DESC';
+    params.push(parseInt(lim) || 100);
+    query += ` LIMIT $${params.length}`;
+    params.push(parseInt(off) || 0);
+    query += ` OFFSET $${params.length}`;
+
+    const result = await pool.query(query, params);
+    res.json({ total, data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get activity logs directly from table (real-time, no refresh needed)
+app.get('/api/activity-logs/live', authenticateToken, authorizeRoles('admin', 'hope'), async (req, res) => {
+  try {
+    const { table_name, action, user_id, limit: lim } = req.query;
+    let query = `SELECT al.*, u.full_name, COALESCE(u.role,'unknown') as user_role, u.secondary_role as user_secondary_role, COALESCE(d.name,'') as department
+                 FROM activity_logs al LEFT JOIN users u ON al.user_id = u.id LEFT JOIN departments d ON u.dept_id = d.id WHERE 1=1`;
+    const params = [];
+    if (table_name) { params.push(table_name); query += ` AND al.table_name = $${params.length}`; }
+    if (action) { params.push(action); query += ` AND al.action = $${params.length}`; }
+    if (user_id) { params.push(parseInt(user_id)); query += ` AND al.user_id = $${params.length}`; }
+    query += ' ORDER BY al.created_at DESC';
+    params.push(parseInt(lim) || 100);
+    query += ` LIMIT $${params.length}`;
+    const result = await pool.query(query, params);
+    res.json({ logs: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Refresh the materialized view
+app.post('/api/activity-logs/refresh', authenticateToken, authorizeRoles('admin', 'hope'), async (req, res) => {
+  try {
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY activity_logs_view');
+    res.json({ message: 'Activity logs view refreshed successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get activity summary (counts by action, by user, by table)
+app.get('/api/activity-logs/summary', authenticateToken, authorizeRoles('admin', 'hope'), async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const dateFilter = [];
+    const params = [];
+    if (date_from) { params.push(date_from); dateFilter.push(`created_at >= $${params.length}::timestamp`); }
+    if (date_to) { params.push(date_to + ' 23:59:59'); dateFilter.push(`created_at <= $${params.length}::timestamp`); }
+    const where = dateFilter.length > 0 ? 'WHERE ' + dateFilter.join(' AND ') : '';
+
+    const byAction = await pool.query(`SELECT action, COUNT(*) as count FROM activity_logs ${where} GROUP BY action ORDER BY count DESC`, params);
+    const byUser = await pool.query(`SELECT user_id, username, COUNT(*) as count FROM activity_logs ${where} GROUP BY user_id, username ORDER BY count DESC LIMIT 20`, params);
+    const byTable = await pool.query(`SELECT table_name, COUNT(*) as count FROM activity_logs ${where} GROUP BY table_name ORDER BY count DESC`, params);
+    const total = await pool.query(`SELECT COUNT(*) FROM activity_logs ${where}`, params);
+
+    res.json({
+      total: parseInt(total.rows[0].count),
+      by_action: byAction.rows,
+      by_user: byUser.rows,
+      by_table: byTable.rows
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5094,6 +5292,7 @@ const server = httpServer.listen(PORT, HOST, () => {
   console.log('  Settings:      CRUD /api/settings');
   console.log('  Reports:       GET /api/reports/*');
   console.log('  Audit Log:     GET /api/audit-log');
+  console.log('  Activity Logs: GET /api/activity-logs, /live, /summary | POST /refresh');
   console.log('  Notifications: CRUD /api/notifications');
   console.log('  Health:        GET /api/health');
   console.log('  Clients:       GET /api/connected-clients');

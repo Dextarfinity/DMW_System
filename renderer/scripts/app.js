@@ -4279,6 +4279,7 @@ async function loadPageData(pageId) {
     case 'uacs-codes': await loadUACSCodes(); break;
     case 'uoms': await loadUOMs(); break;
     case 'settings': await loadSettings(); break;
+    case 'activity-logs': await loadActivityLogs(); break;
     case 'reports': /* Static page with report generators */ break;
   }
   // Apply action permissions AFTER data has fully loaded into the DOM
@@ -4346,6 +4347,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'uacs-codes': 'UACS Codes',
     uoms: 'Units of Measure',
     settings: 'System Settings',
+    'activity-logs': 'Activity Logs',
     reports: 'Reports'
   };
 
@@ -4990,12 +4992,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show/hide nav items based on role permissions (As-Is)
     const chiefPages = ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ris', 'reports'];
     const rolePermissions = {
-      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'reports'],
+      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'activity-logs', 'reports'],
       manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       officer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       viewer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       auditor: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
-      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'activity-logs', 'reports'],
       bac_chair: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'items', 'suppliers', 'stock-cards', 'property-cards', 'reports'],
       bac_secretariat: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'reports'],
       twg_member: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'items', 'suppliers', 'reports'],
@@ -5003,7 +5005,6 @@ document.addEventListener('DOMContentLoaded', () => {
       end_user: ['dashboard', 'ppmp', 'purchase-requests', 'items', 'ris'],
       supply_officer: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       inspector: ['dashboard', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
-      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'reports'],
       chief_fad: chiefPages,
       chief_wrsd: chiefPages,
       chief_mwpsd: chiefPages,
@@ -5182,12 +5183,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // RBAC: Check if user has access to this page
     const chiefNavPages = ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ris', 'reports'];
     const rolePermissions = {
-      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'reports'],
+      admin: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'offices', 'designations', 'fund-clusters', 'procurement-modes', 'uacs-codes', 'uoms', 'settings', 'activity-logs', 'reports'],
       manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'users', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       officer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       viewer: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       auditor: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
-      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
+      hope: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'activity-logs', 'reports'],
       bac_chair: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'items', 'suppliers', 'stock-cards', 'property-cards', 'reports'],
       bac_secretariat: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ics', 'reports'],
       twg_member: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'items', 'suppliers', 'reports'],
@@ -5195,7 +5196,6 @@ document.addEventListener('DOMContentLoaded', () => {
       end_user: ['dashboard', 'ppmp', 'purchase-requests', 'items', 'ris'],
       supply_officer: ['dashboard', 'app', 'purchase-requests', 'rfq', 'abstract', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'employees', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'semi-expendable', 'capital-outlay', 'trip-tickets', 'reports'],
       inspector: ['dashboard', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'reports'],
-      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'supplies-ledger', 'reports'],
       chief_fad: chiefNavPages,
       chief_wrsd: chiefNavPages,
       chief_mwpsd: chiefNavPages,
@@ -21662,6 +21662,197 @@ Failure to submit the above requirements within the prescribed period shall cons
         <tbody>${outOfStock.map(i => `<tr><td>${i.code}</td><td>${i.name}</td><td>${i.category}</td></tr>`).join('')}</tbody></table>
       `;
     } catch(err) { document.getElementById('lowStockReportContent').innerHTML = '<p>Error loading data.</p>'; }
+  };
+
+  // =============================================
+  // ACTIVITY LOGS PAGE
+  // =============================================
+  let alAllData = [];
+  let alFilteredData = [];
+  let alPage = 1;
+  let alPerPage = 50;
+
+  window.loadActivityLogs = async function() {
+    try {
+      const data = await apiRequest('/activity-logs/live?limit=5000');
+      alAllData = data.logs || [];
+      // Populate dynamic filter dropdowns
+      const tables = [...new Set(alAllData.map(l => l.table_name).filter(Boolean))].sort();
+      const users = [...new Set(alAllData.map(l => l.full_name || l.username).filter(Boolean))].sort();
+      const tableFilter = document.getElementById('alTableFilter');
+      const userFilter = document.getElementById('alUserFilter');
+      tableFilter.innerHTML = '<option value="">All Modules</option>' + tables.map(t => `<option value="${t}">${t.replace(/_/g,' ')}</option>`).join('');
+      userFilter.innerHTML = '<option value="">All Users</option>' + users.map(u => `<option value="${u}">${u}</option>`).join('');
+      // Summary cards
+      document.getElementById('alTotalCount').textContent = alAllData.length;
+      document.getElementById('alCreateCount').textContent = alAllData.filter(l => l.action === 'CREATE').length;
+      document.getElementById('alUpdateCount').textContent = alAllData.filter(l => l.action === 'UPDATE').length;
+      document.getElementById('alDeleteCount').textContent = alAllData.filter(l => l.action === 'DELETE').length;
+      document.getElementById('alLoginCount').textContent = alAllData.filter(l => l.action === 'LOGIN').length;
+      applyALFilters();
+    } catch (err) {
+      console.error('Failed to load activity logs:', err);
+      document.getElementById('alTableBody').innerHTML = '<tr><td colspan="10" class="text-center" style="padding:30px;color:#e53e3e;">Failed to load activity logs.</td></tr>';
+    }
+  };
+
+  window.applyALFilters = function() {
+    const search = (document.getElementById('alSearchInput').value || '').toLowerCase();
+    const action = document.getElementById('alActionFilter').value;
+    const table = document.getElementById('alTableFilter').value;
+    const user = document.getElementById('alUserFilter').value;
+    const dateFrom = document.getElementById('alDateFrom').value;
+    const dateTo = document.getElementById('alDateTo').value;
+
+    alFilteredData = alAllData.filter(log => {
+      if (action && log.action !== action) return false;
+      if (table && log.table_name !== table) return false;
+      const logUser = log.full_name || log.username || '';
+      if (user && logUser !== user) return false;
+      if (dateFrom) {
+        const logDate = log.created_at ? log.created_at.substring(0, 10) : '';
+        if (logDate < dateFrom) return false;
+      }
+      if (dateTo) {
+        const logDate = log.created_at ? log.created_at.substring(0, 10) : '';
+        if (logDate > dateTo) return false;
+      }
+      if (search) {
+        const haystack = [logUser, log.action, log.table_name, log.reference, log.description, log.ip_address, log.user_role, log.department].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      return true;
+    });
+    alPage = 1;
+    renderALPage();
+  };
+
+  window.resetALFilters = function() {
+    document.getElementById('alSearchInput').value = '';
+    document.getElementById('alActionFilter').value = '';
+    document.getElementById('alTableFilter').value = '';
+    document.getElementById('alUserFilter').value = '';
+    document.getElementById('alDateFrom').value = '';
+    document.getElementById('alDateTo').value = '';
+    applyALFilters();
+  };
+
+  function renderALPage() {
+    const total = alFilteredData.length;
+    const perPage = alPerPage === 0 ? total : alPerPage;
+    const totalPages = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1;
+    if (alPage > totalPages) alPage = totalPages;
+    const start = (alPage - 1) * perPage;
+    const pageData = perPage > 0 ? alFilteredData.slice(start, start + perPage) : alFilteredData;
+
+    renderALTable(pageData);
+
+    const showing = total === 0 ? 'Showing 0 of 0 records' : `Showing ${start + 1}-${Math.min(start + perPage, total)} of ${total} records`;
+    document.getElementById('alCountInfo').textContent = showing;
+    document.getElementById('alCountInfoBottom').textContent = showing;
+    document.getElementById('alPageInfo').textContent = `Page ${alPage} of ${totalPages}`;
+    document.getElementById('alPrevBtn').disabled = alPage <= 1;
+    document.getElementById('alNextBtn').disabled = alPage >= totalPages;
+  }
+
+  function renderALTable(logs) {
+    const tbody = document.getElementById('alTableBody');
+    if (!logs.length) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:30px;color:#636e78;">No activity logs found.</td></tr>';
+      return;
+    }
+    const actionColors = { CREATE: '#276749', UPDATE: '#1e40af', DELETE: '#b91c1c', POST: '#6b21a8', UNPOST: '#92400e', LOGIN: '#b45309' };
+    tbody.innerHTML = logs.map(log => {
+      const dt = log.created_at ? new Date(log.created_at) : null;
+      const dateStr = dt ? dt.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'2-digit' }) + ' ' + dt.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', hour12:true }) : '';
+      const color = actionColors[log.action] || '#333';
+      const actionBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;color:#fff;background:${color};">${log.action || ''}</span>`;
+      const moduleName = (log.table_name || '').replace(/_/g, ' ');
+      const hasDetails = log.old_data || log.new_data;
+      return `<tr>
+        <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
+        <td>${log.full_name || log.username || ''}</td>
+        <td style="font-size:11px;">${(log.user_role || '').replace(/_/g,' ')}</td>
+        <td style="font-size:11px;">${log.department || ''}</td>
+        <td>${actionBadge}</td>
+        <td style="font-size:12px;">${moduleName}</td>
+        <td style="font-size:12px;">${log.reference || ''}</td>
+        <td style="font-size:12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(log.description || '').replace(/"/g, '&quot;')}">${log.description || ''}</td>
+        <td style="font-size:11px;">${log.ip_address || ''}</td>
+        <td>${hasDetails ? `<button class="btn btn-outline btn-sm" onclick="showALDetailModal(${log.id})" title="View details"><i class="fas fa-eye"></i></button>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  window.alChangePage = function(delta) {
+    alPage += delta;
+    renderALPage();
+  };
+
+  window.alChangePageSize = function(val) {
+    alPerPage = parseInt(val) || 0;
+    alPage = 1;
+    renderALPage();
+  };
+
+  window.refreshActivityLogsView = async function() {
+    try {
+      await apiRequest('/activity-logs/refresh', 'POST');
+      showToast('Materialized view refreshed', 'success');
+      await loadActivityLogs();
+    } catch (err) {
+      showToast('Failed to refresh view: ' + err.message, 'error');
+    }
+  };
+
+  window.exportActivityLogs = function() {
+    const data = alFilteredData.length ? alFilteredData : alAllData;
+    if (!data.length) { showToast('No data to export', 'warning'); return; }
+    const headers = ['Date & Time','User','Role','Department','Action','Module','Reference','Description','IP Address'];
+    const rows = data.map(log => {
+      const dt = log.created_at ? new Date(log.created_at).toLocaleString('en-PH') : '';
+      return [dt, log.full_name || log.username || '', log.user_role || '', log.department || '', log.action || '', (log.table_name || '').replace(/_/g,' '), log.reference || '', log.description || '', log.ip_address || ''];
+    });
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    rows.forEach(r => { csv += r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n'; });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Activity_Logs_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Activity logs exported', 'success');
+  };
+
+  window.showALDetailModal = function(logId) {
+    const log = alAllData.find(l => l.id === logId);
+    if (!log) return;
+    const dt = log.created_at ? new Date(log.created_at).toLocaleString('en-PH') : '';
+    const formatJson = (obj) => {
+      if (!obj) return '<em style="color:#999;">None</em>';
+      try {
+        const parsed = typeof obj === 'string' ? JSON.parse(obj) : obj;
+        return '<pre style="background:#f4f4f4;padding:8px;border-radius:4px;font-size:11px;max-height:250px;overflow:auto;white-space:pre-wrap;word-break:break-word;">' + JSON.stringify(parsed, null, 2).replace(/</g,'&lt;') + '</pre>';
+      } catch { return '<pre style="background:#f4f4f4;padding:8px;border-radius:4px;font-size:11px;">' + String(obj).replace(/</g,'&lt;') + '</pre>'; }
+    };
+    const html = `
+      <div style="display:grid;grid-template-columns:130px 1fr;gap:6px 12px;margin-bottom:12px;">
+        <strong>Date & Time:</strong><span>${dt}</span>
+        <strong>User:</strong><span>${log.full_name || log.username || ''}</span>
+        <strong>Role:</strong><span>${(log.user_role || '').replace(/_/g,' ')}</span>
+        <strong>Department:</strong><span>${log.department || ''}</span>
+        <strong>Action:</strong><span style="font-weight:700;">${log.action || ''}</span>
+        <strong>Module:</strong><span>${(log.table_name || '').replace(/_/g,' ')}</span>
+        <strong>Record ID:</strong><span>${log.record_id || ''}</span>
+        <strong>Reference:</strong><span>${log.reference || ''}</span>
+        <strong>Description:</strong><span>${log.description || ''}</span>
+        <strong>IP Address:</strong><span>${log.ip_address || ''}</span>
+      </div>
+      <div style="margin-bottom:8px;"><strong>Old Data:</strong>${formatJson(log.old_data)}</div>
+      <div><strong>New Data:</strong>${formatJson(log.new_data)}</div>
+    `;
+    showModal('Activity Log Detail', html, { size: 'large' });
   };
 
   // Initialize the application

@@ -1047,6 +1047,46 @@ CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name);
 CREATE INDEX IF NOT EXISTS idx_audit_user  ON audit_log(user_id);
 
 -- ============================================================
+-- 47b. ACTIVITY LOGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id          SERIAL PRIMARY KEY,
+    user_id     INT REFERENCES users(id) ON DELETE SET NULL,
+    username    VARCHAR(50),
+    action      VARCHAR(20) NOT NULL CHECK (action IN ('CREATE','READ','UPDATE','DELETE','POST','UNPOST','LOGIN','LOGOUT')),
+    table_name  VARCHAR(100) NOT NULL,
+    record_id   INT,
+    reference   VARCHAR(255),
+    description TEXT,
+    old_data    JSONB,
+    new_data    JSONB,
+    ip_address  VARCHAR(50),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user    ON activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_action  ON activity_logs(action);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_table   ON activity_logs(table_name);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at);
+
+-- Materialized view: enriches activity logs with user role & department
+CREATE MATERIALIZED VIEW IF NOT EXISTS activity_logs_view AS
+SELECT
+    al.id, al.user_id, al.username,
+    COALESCE(u.full_name, al.username) AS full_name,
+    COALESCE(u.role, 'unknown')        AS user_role,
+    u.secondary_role                   AS user_secondary_role,
+    COALESCE(d.name, '')               AS department,
+    al.action, al.table_name, al.record_id, al.reference,
+    al.description, al.old_data, al.new_data, al.ip_address, al.created_at
+FROM activity_logs al
+LEFT JOIN users u       ON al.user_id = u.id
+LEFT JOIN departments d ON u.dept_id  = d.id
+ORDER BY al.created_at DESC;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_logs_view_id ON activity_logs_view(id);
+
+-- ============================================================
 -- 48. NOTIFICATIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS notifications (

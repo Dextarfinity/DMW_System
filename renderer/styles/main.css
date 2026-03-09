@@ -194,9 +194,15 @@ body {
   transform: rotate(-90deg);
 }
 
-.nav-section.collapsed ~ .nav-item[data-section-item] {
-  display: none;
-}
+.nav-section.collapsed[data-section="planning"] ~ .nav-item[data-section-item="planning"],
+.nav-section.collapsed[data-section="transactions"] ~ .nav-item[data-section-item="transactions"],
+.nav-section.collapsed[data-section="inspection"] ~ .nav-item[data-section-item="inspection"],
+.nav-section.collapsed[data-section="signing"] ~ .nav-item[data-section-item="signing"],
+.nav-section.collapsed[data-section="inventory"] ~ .nav-item[data-section-item="inventory"],
+.nav-section.collapsed[data-section="transport"] ~ .nav-item[data-section-item="transport"],
+.nav-section.collapsed[data-section="master"] ~ .nav-item[data-section-item="master"],
+.nav-section.collapsed[data-section="reports"] ~ .nav-item[data-section-item="reports"],
+.nav-section.collapsed[data-section="system"] ~ .nav-item[data-section-item="system"] { display: none; }
 
 .nav-item {
   display: flex;

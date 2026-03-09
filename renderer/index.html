@@ -162,8 +162,12 @@
             <span>Reports</span>
           </li>
 
-          <li class="nav-section" data-section="settings">System</li>
-          <li class="nav-item" data-page="settings" data-section-item="settings">
+          <li class="nav-section" data-section="system">System</li>
+          <li class="nav-item" data-page="activity-logs" data-section-item="system">
+            <i class="fas fa-history"></i>
+            <span>Activity Logs</span>
+          </li>
+          <li class="nav-item" data-page="settings" data-section-item="system">
             <i class="fas fa-cog"></i>
             <span>Settings</span>
           </li>
@@ -2102,6 +2106,115 @@
               </thead>
               <tbody id="uomsTableBody"></tbody>
             </table>
+          </div>
+        </section>
+
+        <!-- Activity Logs Page -->
+        <section class="page" id="activity-logs">
+          <div class="gov-form-header">
+            <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
+            <div class="form-title">Activity Logs</div>
+            <div class="form-subtitle">System Monitoring &bull; Fiscal Year <span class="fiscal-year-display"></span></div>
+          </div>
+
+          <!-- Summary Cards -->
+          <div class="stats-row" id="activityLogsSummary" style="display:flex; gap:12px; margin-bottom:8px; flex-wrap:wrap;">
+            <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
+              <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Total Actions</div>
+              <div id="alTotalCount" style="font-size:22px; font-weight:700; color:#1a365d;">0</div>
+            </div>
+            <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
+              <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Creates</div>
+              <div id="alCreateCount" style="font-size:22px; font-weight:700; color:#276749;">0</div>
+            </div>
+            <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
+              <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Updates</div>
+              <div id="alUpdateCount" style="font-size:22px; font-weight:700; color:#1e40af;">0</div>
+            </div>
+            <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
+              <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Deletes</div>
+              <div id="alDeleteCount" style="font-size:22px; font-weight:700; color:#b91c1c;">0</div>
+            </div>
+            <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
+              <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Logins</div>
+              <div id="alLoginCount" style="font-size:22px; font-weight:700; color:#b45309;">0</div>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="page-actions">
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-primary" onclick="refreshActivityLogsView()" title="Refresh materialized view"><i class="fas fa-sync-alt"></i> Refresh View</button>
+              <button class="btn btn-outline" onclick="exportActivityLogs()" title="Export to Excel"><i class="fas fa-file-excel"></i> Export</button>
+              <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-left:auto; align-items:center; flex-wrap:wrap;">
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="alSearchInput" placeholder="Search logs..." oninput="applyALFilters()">
+              </div>
+              <select class="form-select" id="alActionFilter" onchange="applyALFilters()">
+                <option value="">All Actions</option>
+                <option value="CREATE">Create</option>
+                <option value="UPDATE">Update</option>
+                <option value="DELETE">Delete</option>
+                <option value="POST">Post</option>
+                <option value="UNPOST">Unpost</option>
+                <option value="LOGIN">Login</option>
+              </select>
+              <select class="form-select" id="alTableFilter" onchange="applyALFilters()">
+                <option value="">All Modules</option>
+              </select>
+              <select class="form-select" id="alUserFilter" onchange="applyALFilters()">
+                <option value="">All Users</option>
+              </select>
+              <input type="date" class="form-select" id="alDateFrom" onchange="applyALFilters()" title="From date">
+              <input type="date" class="form-select" id="alDateTo" onchange="applyALFilters()" title="To date">
+              <button class="btn btn-outline btn-sm" onclick="resetALFilters()" title="Clear all filters"><i class="fas fa-undo"></i> Reset</button>
+            </div>
+          </div>
+
+          <!-- Table Info & Pagination -->
+          <div class="items-table-info">
+            <span id="alCountInfo">Showing 0 of 0 records</span>
+            <div class="items-pagination">
+              <button class="btn-page" id="alPrevBtn" onclick="alChangePage(-1)" disabled><i class="fas fa-chevron-left"></i></button>
+              <span id="alPageInfo">Page 1 of 1</span>
+              <button class="btn-page" id="alNextBtn" onclick="alChangePage(1)" disabled><i class="fas fa-chevron-right"></i></button>
+              <select class="form-select page-size-select" id="alPageSize" onchange="alChangePageSize(this.value)">
+                <option value="25">25 / page</option>
+                <option value="50" selected>50 / page</option>
+                <option value="100">100 / page</option>
+                <option value="0">Show All</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Data Table -->
+          <div class="data-card">
+            <table class="data-table full-width">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Action</th>
+                  <th>Module</th>
+                  <th>Reference</th>
+                  <th>Description</th>
+                  <th>IP Address</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="alTableBody">
+                <tr><td colspan="10" class="text-center" style="padding:30px;color:#636e78;">Loading activity logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="items-table-info items-table-footer">
+            <span id="alCountInfoBottom">Showing 0 of 0 records</span>
           </div>
         </section>
 
