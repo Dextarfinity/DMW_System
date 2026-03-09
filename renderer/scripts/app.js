@@ -13,12 +13,15 @@ const SOCKET_SERVER_URL = 'http://192.168.100.235:3000';
 let socket = null;
 let _socketReconnectTimer = null;
 
+
 /**
  * Connect to the Socket.IO server. Called after login or session restore.
  * Authenticates with JWT and listens for real-time data_changed events
  * so when ANY other Electron client creates/updates/deletes data,
  * this client automatically refreshes the active page.
  */
+
+
 function connectSocket() {
   // Prevent duplicate connections
   if (socket && socket.connected) return;
@@ -357,32 +360,49 @@ let bpLogoFilePath = '';
 try {
   const fs = require('fs');
   const nodePath = require('path');
-  const assetsDir = nodePath.join(__dirname, '..', 'assets');
-  if (!fs.existsSync(assetsDir)) {
-    // fallback: try renderer/assets from workspace root
-    const altDir = nodePath.join(__dirname, 'assets');
-    if (fs.existsSync(altDir)) {
-      const dmwFile = nodePath.join(altDir, 'image.png');
-      const bpFile = nodePath.join(altDir, 'bagong-pilipinas.png');
+  // Build candidate directories: __dirname-based (local file mode) + process.cwd()-based (remote server mode)
+  const candidates = [
+    nodePath.join(__dirname, '..', 'assets'),
+    nodePath.join(__dirname, 'assets'),
+    nodePath.join(process.cwd(), 'renderer', 'assets'),
+    nodePath.join(process.cwd(), 'renderer', 'assets'),
+    nodePath.join(process.resourcesPath || '', 'app', 'renderer', 'assets')
+  ];
+  for (const dir of candidates) {
+    if (dmwLogoBase64 && bagongPilipinasBase64) break;
+    if (!dir || !fs.existsSync(dir)) continue;
+    if (!dmwLogoBase64) {
+      const dmwFile = nodePath.join(dir, 'image.png');
       if (fs.existsSync(dmwFile)) { dmwLogoBase64 = 'data:image/png;base64,' + fs.readFileSync(dmwFile).toString('base64'); dmwLogoFilePath = dmwFile; }
+    }
+    if (!bagongPilipinasBase64) {
+      const bpFile = nodePath.join(dir, 'bagong-pilipinas.png');
       if (fs.existsSync(bpFile)) { bagongPilipinasBase64 = 'data:image/png;base64,' + fs.readFileSync(bpFile).toString('base64'); bpLogoFilePath = bpFile; }
     }
-  } else {
-    const dmwFile = nodePath.join(assetsDir, 'image.png');
-    const bpFile = nodePath.join(assetsDir, 'bagong-pilipinas.png');
-    if (fs.existsSync(dmwFile)) { dmwLogoBase64 = 'data:image/png;base64,' + fs.readFileSync(dmwFile).toString('base64'); dmwLogoFilePath = dmwFile; }
-    if (fs.existsSync(bpFile)) { bagongPilipinasBase64 = 'data:image/png;base64,' + fs.readFileSync(bpFile).toString('base64'); bpLogoFilePath = bpFile; }
   }
 } catch (e) {
   console.warn('Could not load print header logos:', e.message);
 }
+// Fallback: if fs-based loading failed (e.g. remote URL without Node access), use server URLs
+if (!dmwLogoBase64 || !bagongPilipinasBase64) {
+  try {
+    const proto = window.location.protocol;
+    if (proto === 'http:' || proto === 'https:') {
+      const serverBase = window.location.origin;
+      if (!dmwLogoBase64) dmwLogoBase64 = serverBase + '/assets/image.png';
+      if (!bagongPilipinasBase64) bagongPilipinasBase64 = serverBase + '/assets/bagong-pilipinas.png';
+    }
+  } catch(e2) { /* ignore */ }
+}
 
 // Reusable print header HTML generator
 function getPrintHeaderHTML() {
+  const dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
+  const bpLogo = bagongPilipinasBase64 || (typeof window !== 'undefined' && window.__bpLogo) || '';
   return `
     <div class="print-header">
       <div class="header-left">
-        ${dmwLogoBase64 ? `<img src="${dmwLogoBase64}" alt="DMW Logo">` : ''}
+        ${dmwLogo ? `<img src="${dmwLogo}" alt="DMW Logo">` : ''}
       </div>
       <div class="header-center">
         <div class="republic"><em>Republic of the Philippines</em></div>
@@ -391,7 +411,7 @@ function getPrintHeaderHTML() {
         <div class="address">3<sup>rd</sup> Floor Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City,<br>Agusan del Norte, 8600</div>
       </div>
       <div class="header-right">
-        ${bagongPilipinasBase64 ? `<img src="${bagongPilipinasBase64}" alt="Bagong Pilipinas">` : ''}
+        ${bpLogo ? `<img src="${bpLogo}" alt="Bagong Pilipinas">` : ''}
       </div>
     </div>
   `;
@@ -15316,8 +15336,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     // Build read-only letter previews
     function viewLetterHeader() {
+      const dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
       return `<div style="text-align:center;margin-bottom:14px;">
-        ${dmwLogoBase64 ? `<img src="${dmwLogoBase64}" style="width:60px;height:60px;margin-bottom:4px;" alt="DMW">` : ''}
+        ${dmwLogo ? `<img src="${dmwLogo}" style="width:60px;height:60px;margin-bottom:4px;" alt="DMW">` : ''}
         <div style="font-size:10px;"><em>Republic of the Philippines</em></div>
         <div style="font-size:11px;font-weight:bold;">DEPARTMENT OF MIGRANT WORKERS</div>
         <div style="font-size:10px;">Regional Office No. XIII</div>
@@ -17609,29 +17630,32 @@ Failure to submit the above requirements within the prescribed period shall cons
       const pr = await apiRequest('/purchase-requests/' + id);
       if (!pr) { showNotification('Purchase Request not found', 'error'); return; }
 
-      // Fetch chief and HOPE names + designations from users & employees
-      let chiefName = '', chiefDesignation = '', hopeName = '', hopeDesignation = 'Regional Director';
-      try {
-        const [allUsers, allEmployees] = await Promise.all([
-          apiRequest('/users'),
-          apiRequest('/employees')
-        ]);
-        // Find division chief for this PR's department
-        const chiefUser = allUsers.find(u => u.role && u.role.startsWith('chief_') && u.department_code === pr.department_code);
-        if (chiefUser) {
-          chiefName = chiefUser.full_name || '';
-          // Match employee by full_name (case-insensitive trim)
-          const chiefEmp = allEmployees.find(e => e.full_name && chiefUser.full_name && e.full_name.trim().toLowerCase() === chiefUser.full_name.trim().toLowerCase());
-          if (chiefEmp) chiefDesignation = chiefEmp.designation_name || '';
-        }
-        // Find HOPE / Regional Director
-        const hopeUser = allUsers.find(u => u.role === 'hope');
-        if (hopeUser) {
-          hopeName = hopeUser.full_name || '';
-          const hopeEmp = allEmployees.find(e => e.full_name && hopeUser.full_name && e.full_name.trim().toLowerCase() === hopeUser.full_name.trim().toLowerCase());
-          if (hopeEmp && hopeEmp.designation_name) hopeDesignation = hopeEmp.designation_name;
-        }
-      } catch (e) { console.warn('Could not fetch chief/HOPE data:', e); }
+      // Fetch "Requested by" and "Approved by" signatories
+      // Server already returns chief_name/chief_designation based on division rules:
+      //   WRSD → WRSD chief (MAKINANO), all others → FAD chief (ESPALDON)
+      let chiefName = pr.chief_name || '', chiefDesignation = pr.chief_designation || '';
+      let hopeName = pr.hope_name || '', hopeDesignation = pr.hope_designation || 'Regional Director';
+      // Fallback: if server didn't return names, fetch from employees
+      if (!chiefName) {
+        try {
+          const allEmployees = await apiRequest('/employees');
+          const deptCode = (pr.department_code || '').toUpperCase();
+          if (deptCode === 'WRSD') {
+            const wrsdEmp = allEmployees.find(e => e.full_name && e.full_name.toUpperCase().includes('MAKINANO'));
+            if (wrsdEmp) { chiefName = wrsdEmp.full_name || ''; chiefDesignation = wrsdEmp.designation_name || ''; }
+          } else {
+            const fadEmp = allEmployees.find(e => e.full_name && e.full_name.toUpperCase().includes('ESPALDON'));
+            if (fadEmp) { chiefName = fadEmp.full_name || ''; chiefDesignation = fadEmp.designation_name || ''; }
+          }
+        } catch (e) { console.warn('Could not fetch employee fallback:', e); }
+      }
+      if (!hopeName) {
+        try {
+          const allUsers = await apiRequest('/users');
+          const hopeUser = allUsers.find(u => u.role === 'hope');
+          if (hopeUser) hopeName = hopeUser.full_name || '';
+        } catch (e) {}
+      }
 
       const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
       const fmtCurrency = (v) => {
@@ -19812,8 +19836,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     const midSpan = Math.max(1, colCount - 2);
 
     // Use file:// URIs for local images (Excel supports these, not data: URIs)
-    const dmwImgTag = dmwLogoFilePath ? `<img src="file:///${dmwLogoFilePath.replace(/\\/g, '/')}" width="90" height="90">` : '';
-    const bpImgTag = bpLogoFilePath ? `<img src="file:///${bpLogoFilePath.replace(/\\/g, '/')}" width="70" height="70">` : '';
+    const _dmwPath = dmwLogoFilePath || (typeof window !== 'undefined' && window.__dmwLogoPath) || '';
+    const _bpPath = bpLogoFilePath || (typeof window !== 'undefined' && window.__bpLogoPath) || '';
+    const _dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
+    const _bpLogo = bagongPilipinasBase64 || (typeof window !== 'undefined' && window.__bpLogo) || '';
+    let dmwImgTag = _dmwPath ? `<img src="file:///${_dmwPath.replace(/\\/g, '/')}" width="90" height="90">` : '';
+    let bpImgTag = _bpPath ? `<img src="file:///${_bpPath.replace(/\\/g, '/')}" width="70" height="70">` : '';
+    // Fallback to base64/URL if file path not available
+    if (!dmwImgTag && _dmwLogo) dmwImgTag = `<img src="${_dmwLogo}" width="90" height="90">`;
+    if (!bpImgTag && _bpLogo) bpImgTag = `<img src="${_bpLogo}" width="70" height="70">`;
 
     return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head>

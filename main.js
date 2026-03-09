@@ -66,6 +66,70 @@ async function createWindow() {
     mainWindow.loadFile('renderer/index.html');
   }
 
+  // --- Inject local logo files into the renderer ---
+  // When loading from the server, the renderer's __dirname won't resolve to
+  // local assets. Read logos here (main process) and push them into the renderer.
+  mainWindow.webContents.on('did-finish-load', () => {
+    try {
+      const fs = require('fs');
+      const assetsDir = path.join(__dirname, 'renderer', 'assets');
+      const dmwFile = path.join(assetsDir, 'image.png');
+      const bpFile = path.join(assetsDir, 'bagong-pilipinas.png');
+      let dmwB64 = '', bpB64 = '';
+      if (fs.existsSync(dmwFile)) dmwB64 = 'data:image/png;base64,' + fs.readFileSync(dmwFile).toString('base64');
+      if (fs.existsSync(bpFile)) bpB64 = 'data:image/png;base64,' + fs.readFileSync(bpFile).toString('base64');
+
+      if (dmwB64 || bpB64) {
+        const dmwFileSafe = dmwFile.replace(/\\/g, '/');
+        const bpFileSafe = bpFile.replace(/\\/g, '/');
+        mainWindow.webContents.executeJavaScript(`
+          (function() {
+            try {
+              // Try to set let variables directly (works in Chromium global scope)
+              if (typeof dmwLogoBase64 !== 'undefined' && !dmwLogoBase64) dmwLogoBase64 = ${JSON.stringify(dmwB64)};
+              if (typeof bagongPilipinasBase64 !== 'undefined' && !bagongPilipinasBase64) bagongPilipinasBase64 = ${JSON.stringify(bpB64)};
+              if (typeof dmwLogoFilePath !== 'undefined' && !dmwLogoFilePath) dmwLogoFilePath = ${JSON.stringify(dmwFileSafe)};
+              if (typeof bpLogoFilePath !== 'undefined' && !bpLogoFilePath) bpLogoFilePath = ${JSON.stringify(bpFileSafe)};
+            } catch(e) {
+              // Fallback: store on window for patched functions
+              window.__dmwLogo = ${JSON.stringify(dmwB64)};
+              window.__bpLogo = ${JSON.stringify(bpB64)};
+            }
+            // Also store on window as reliable backup
+            window.__dmwLogo = window.__dmwLogo || ${JSON.stringify(dmwB64)};
+            window.__bpLogo = window.__bpLogo || ${JSON.stringify(bpB64)};
+            window.__dmwLogoPath = ${JSON.stringify(dmwFileSafe)};
+            window.__bpLogoPath = ${JSON.stringify(bpFileSafe)};
+
+            // Override getPrintHeaderHTML to guarantee logos appear
+            // (server's app.js may not have the window.__dmwLogo fallback)
+            if (typeof getPrintHeaderHTML === 'function') {
+              var _dmw = ${JSON.stringify(dmwB64)};
+              var _bp = ${JSON.stringify(bpB64)};
+              window.getPrintHeaderHTML = function() {
+                var d = (typeof dmwLogoBase64 !== 'undefined' && dmwLogoBase64) || window.__dmwLogo || _dmw || '';
+                var b = (typeof bagongPilipinasBase64 !== 'undefined' && bagongPilipinasBase64) || window.__bpLogo || _bp || '';
+                return '<div class="print-header">' +
+                  '<div class="header-left">' + (d ? '<img src="' + d + '" alt="DMW Logo">' : '') + '</div>' +
+                  '<div class="header-center">' +
+                    '<div class="republic"><em>Republic of the Philippines</em></div>' +
+                    '<div class="dept-name">Department of Migrant Workers</div>' +
+                    '<div class="regional">Regional Office \\u2013 XIII (Caraga)</div>' +
+                    '<div class="address">3<sup>rd</sup> Floor Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City,<br>Agusan del Norte, 8600</div>' +
+                  '</div>' +
+                  '<div class="header-right">' + (b ? '<img src="' + b + '" alt="Bagong Pilipinas">' : '') + '</div>' +
+                '</div>';
+              };
+              getPrintHeaderHTML = window.getPrintHeaderHTML;
+            }
+          })();
+        `).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Logos] Could not inject logos:', e.message);
+    }
+  });
+
   // Start maximized while keeping Windows taskbar visible
   mainWindow.maximize();
 

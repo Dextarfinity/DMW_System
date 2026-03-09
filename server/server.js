@@ -2205,17 +2205,32 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
       `SELECT pr.*, d.name as department_name, d.code as department_code,
               u1.full_name as requested_by_name,
               u2.full_name as approved_by_name,
-              chief.full_name as chief_name,
-              chief_desig.name as chief_designation,
+              -- "Requested by" signatory: WRSD uses their own chief, all others use FAD chief (ESPALDON)
+              CASE WHEN d.code = 'WRSD'
+                THEN wrsd_chief.full_name
+                ELSE fad_chief.full_name
+              END as chief_name,
+              CASE WHEN d.code = 'WRSD'
+                THEN wrsd_desig.name
+                ELSE fad_desig.name
+              END as chief_designation,
               hope_user.full_name as hope_name,
               hope_desig.name as hope_designation
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON pr.requested_by = u1.id
        LEFT JOIN users u2 ON pr.approved_by = u2.id
-       LEFT JOIN users chief ON chief.dept_id = pr.dept_id AND chief.role LIKE 'chief_%'
-       LEFT JOIN employees chief_emp ON chief.employee_id = chief_emp.id
-       LEFT JOIN designations chief_desig ON chief_emp.designation_id = chief_desig.id
+       -- FAD chief (ESPALDON) for FAD/MWPSD/MWPTD
+       LEFT JOIN departments fad_dept ON fad_dept.code = 'FAD'
+       LEFT JOIN users fad_chief ON fad_chief.dept_id = fad_dept.id AND fad_chief.role LIKE 'chief_%'
+       LEFT JOIN employees fad_emp ON fad_chief.employee_id = fad_emp.id
+       LEFT JOIN designations fad_desig ON fad_emp.designation_id = fad_desig.id
+       -- WRSD chief (MAKINANO) for WRSD only
+       LEFT JOIN departments wrsd_dept ON wrsd_dept.code = 'WRSD'
+       LEFT JOIN users wrsd_chief ON wrsd_chief.dept_id = wrsd_dept.id AND wrsd_chief.role LIKE 'chief_%'
+       LEFT JOIN employees wrsd_emp ON wrsd_chief.employee_id = wrsd_emp.id
+       LEFT JOIN designations wrsd_desig ON wrsd_emp.designation_id = wrsd_desig.id
+       -- HOPE (Approved by)
        LEFT JOIN users hope_user ON hope_user.role = 'hope'
        LEFT JOIN employees hope_emp ON hope_user.employee_id = hope_emp.id
        LEFT JOIN designations hope_desig ON hope_emp.designation_id = hope_desig.id
