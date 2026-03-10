@@ -498,7 +498,7 @@ let currentUser = { name: '', role: '', roles: [], division: '' };
 // --- Dual-role helper functions ---
 // Check if the current user has a specific role (primary or secondary)
 function userHasRole(r) {
-  return (currentUser.roles || [r === currentUser.role]).includes(r);
+  return (currentUser.roles || [currentUser.role]).includes(r);
 }
 // Check if the current user has ANY of the given roles
 function userHasAnyRole(arr) {
@@ -1062,7 +1062,7 @@ async function loadPPMP() {
     const hasMultiDivAccess = currentUser.managed_dept_ids && currentUser.managed_dept_ids.length > 1;
 
     // Roles that can see ALL divisions' PPMP data
-    const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+    const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
     const canSeeAll = userHasAnyRole(seeAllPPMPRoles);
 
     // Users with multi-division access can switch between their managed divisions (not locked)
@@ -2376,6 +2376,88 @@ function renderPPMPTable(ppmp, allPPMPItems) {
   if (gtVal) gtVal.textContent = '₱' + fixedGrandTotal.toLocaleString('en-PH', {minimumFractionDigits: 2});
   if (gtCount) gtCount.textContent = grandTotalSource.length + ' items';
 
+  // --- PPMP Budget Summary Cards ---
+  const budgetSummaryRoles = ['admin', 'hope', 'ord_manager', 'budget_consultant', 'chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd', 'bac_chair', 'bac_secretariat'];
+  const showBudgetSummary = userHasAnyRole(budgetSummaryRoles);
+  const ppmpBudgetSummaryEl = document.getElementById('ppmpBudgetSummary');
+  const ppmpDivBudgetsEl = document.getElementById('ppmpDivisionBudgets');
+  if (ppmpBudgetSummaryEl) {
+    if (showBudgetSummary && grandTotalSource.length > 0) {
+      ppmpBudgetSummaryEl.style.display = '';
+
+      // Division-scope filtering: chiefs only see their own division's budget summary
+      const chiefDivMapBudget = { 'chief_fad': 'FAD', 'chief_wrsd': 'WRSD', 'chief_mwpsd': 'MWPSD', 'chief_mwptd': 'MWPTD' };
+      const budgetChiefRole = getUserChiefRole();
+      const globalBudgetRoles = ['admin', 'hope', 'ord_manager', 'budget_consultant', 'bac_secretariat'];
+      const isGlobalBudgetViewer = userHasAnyRole(globalBudgetRoles);
+      const chiefBudgetDiv = budgetChiefRole ? chiefDivMapBudget[budgetChiefRole] : null;
+
+      // Filter data based on role:
+      // - chief_wrsd: sees only WRSD
+      // - chief_fad (+ bac_chair): sees all divisions EXCEPT WRSD
+      // - other chiefs: sees only their own division
+      // - global roles (admin, hope, budget_consultant, etc.): sees all
+      let budgetSource = grandTotalSource;
+      if (!isGlobalBudgetViewer && chiefBudgetDiv) {
+        if (budgetChiefRole === 'chief_wrsd') {
+          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') === 'WRSD');
+        } else if (budgetChiefRole === 'chief_fad') {
+          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') !== 'WRSD');
+        } else {
+          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') === chiefBudgetDiv);
+        }
+      }
+
+      let totalBud = 0, approvedBud = 0, pendingBud = 0, approvedCnt = 0, pendingCnt = 0;
+      const divMap = {};
+      budgetSource.forEach(p => {
+        const amt = parseFloat(p.total_amount || 0);
+        totalBud += amt;
+        if (p.status === 'approved') { approvedBud += amt; approvedCnt++; }
+        else { pendingBud += amt; pendingCnt++; }
+        const dc = p.department_code || 'DMW';
+        if (!divMap[dc]) divMap[dc] = { total: 0, approved: 0, pending: 0, count: 0 };
+        divMap[dc].total += amt;
+        divMap[dc].count++;
+        if (p.status === 'approved') divMap[dc].approved += amt;
+        else divMap[dc].pending += amt;
+      });
+      const fmt = v => '₱' + v.toLocaleString('en-PH', {minimumFractionDigits: 2});
+      const el = id => document.getElementById(id);
+      if (el('ppmpTotalBudget')) el('ppmpTotalBudget').textContent = fmt(totalBud);
+      if (el('ppmpPendingCount')) el('ppmpPendingCount').textContent = pendingCnt;
+      if (el('ppmpApprovedCount')) el('ppmpApprovedCount').textContent = approvedCnt;
+      if (el('ppmpApprovedBudget')) el('ppmpApprovedBudget').textContent = fmt(approvedBud);
+      if (el('ppmpPendingBudget')) el('ppmpPendingBudget').textContent = fmt(pendingBud);
+
+      // Division budget breakdown table
+      if (ppmpDivBudgetsEl) {
+        const divCodes = Object.keys(divMap).sort();
+        if (divCodes.length > 0) {
+          ppmpDivBudgetsEl.style.display = '';
+          const rows = divCodes.map(dc => {
+            const d = divMap[dc];
+            return `<tr><td style="font-weight:600;">${dc}</td><td>${d.count}</td><td style="text-align:right;">${fmt(d.total)}</td><td style="text-align:right;color:#28a745;">${fmt(d.approved)}</td><td style="text-align:right;color:#e67e22;">${fmt(d.pending)}</td></tr>`;
+          }).join('');
+          const headerLabel = (!isGlobalBudgetViewer && chiefBudgetDiv) ? (budgetChiefRole === 'chief_fad' ? 'FAD & Other Divisions Budget' : chiefBudgetDiv + ' Division Budget') : 'Division Budget Breakdown';
+          ppmpDivBudgetsEl.innerHTML = `
+            <div style="background:#fff;border-radius:8px;padding:12px 16px;border:1px solid #e2e8f0;margin-bottom:12px;width:100%;">
+              <h4 style="margin:0 0 8px;color:#1a365d;font-size:13px;"><i class="fas fa-building"></i> ${headerLabel}</h4>
+              <table class="data-table full-width" style="font-size:12px;"><thead><tr style="background:#f7fafc;">
+                <th>Division</th><th>Entries</th><th style="text-align:right;">Total Budget</th><th style="text-align:right;">Approved</th><th style="text-align:right;">Pending</th>
+              </tr></thead><tbody>${rows}</tbody></table>
+            </div>`;
+        } else {
+          ppmpDivBudgetsEl.style.display = 'none';
+          ppmpDivBudgetsEl.innerHTML = '';
+        }
+      }
+    } else {
+      ppmpBudgetSummaryEl.style.display = 'none';
+      if (ppmpDivBudgetsEl) { ppmpDivBudgetsEl.style.display = 'none'; ppmpDivBudgetsEl.innerHTML = ''; }
+    }
+  }
+
   const ppmpItems = ppmp;
   
   if (!ppmpItems.length) { 
@@ -2481,17 +2563,24 @@ function renderPPMPTable(ppmp, allPPMPItems) {
 
       let approvalInfo = '';
       if (p.status === 'pending') {
-        const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by Chief FAD: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> Chief FAD</span>` : `<span class="approval-badge chief-pending" title="Awaiting Chief FAD approval"><i class="fas fa-clock"></i> Chief FAD</span>`;
+        const isWRSD = (p.department_code || deptCode) === 'WRSD';
+        const chiefLabel = isWRSD ? 'Chief WRSD' : 'Chief FAD';
+        const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by ${chiefLabel}: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> ${chiefLabel}</span>` : `<span class="approval-badge chief-pending" title="Awaiting ${chiefLabel} approval"><i class="fas fa-clock"></i> ${chiefLabel}</span>`;
         const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
-        approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}</div>`;
+        const budgetDone = p.approved_by_budget ? `<span class="approval-badge chief-done" title="Approved by Budget Consultant: ${p.budget_approver_name || ''}"><i class="fas fa-check-circle"></i> Budget</span>` : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant approval"><i class="fas fa-clock"></i> Budget</span>`;
+        approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}${budgetDone}</div>`;
       }
 
       const userRole = window.currentUser?.role || '';
       const userRoles = currentUser.roles || [userRole];
-      const canApprove = p.status === 'pending' && userRoles.some(r => ['chief_fad', 'hope', 'admin'].includes(r));
+      const isWRSDEntry = (p.department_code || deptCode) === 'WRSD';
+      // chief_wrsd can only approve WRSD entries; chief_fad/bac_chair can only approve non-WRSD entries
+      const chiefCanApprove = isWRSDEntry ? userHasRole('chief_wrsd') : userHasAnyRole(['chief_fad', 'bac_chair']);
+      const canApprove = p.status === 'pending' && (chiefCanApprove || userRoles.some(r => ['hope', 'budget_consultant', 'admin'].includes(r)));
       const alreadyApprovedByChief = !!p.approved_by_chief;
       const alreadyApprovedByHope = !!p.approved_by_hope;
-      const userAlreadyApproved = (userHasRole('chief_fad') && alreadyApprovedByChief) || (userHasRole('hope') && alreadyApprovedByHope);
+      const alreadyApprovedByBudget = !!p.approved_by_budget;
+      const userAlreadyApproved = (chiefCanApprove && alreadyApprovedByChief) || (userHasRole('hope') && alreadyApprovedByHope) || (userHasRole('budget_consultant') && alreadyApprovedByBudget);
       const showApproveBtn = canApprove && !userAlreadyApproved;
 
       html += `
@@ -2609,7 +2698,7 @@ function renderAPPTable(items, appStatus) {
   const chiefDiv = chiefRole ? chiefDivMap[chiefRole] : '';
 
   // Roles that can see ALL divisions' APP data
-  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
   const canSeeAll = userHasAnyRole(seeAllAPPRoles);
 
   // Determine user's division code for filtering
@@ -2634,15 +2723,22 @@ function renderAPPTable(items, appStatus) {
   let appTotalBudget = 0;
   let appTotalCount = 0;
   if (shouldFilter) {
-    displayItems = items.filter(item => getDeptCode(item) === userDivCode);
-    appTotalBudget = (divisionTotals[userDivCode] || {}).budget || 0;
-    appTotalCount = (divisionTotals[userDivCode] || {}).count || 0;
+    // chief_wrsd sees only WRSD, chief_fad sees all except WRSD, others see own division
+    if (chiefRole === 'chief_wrsd') {
+      displayItems = items.filter(item => getDeptCode(item) === 'WRSD');
+    } else if (chiefRole === 'chief_fad') {
+      displayItems = items.filter(item => getDeptCode(item) !== 'WRSD');
+    } else {
+      displayItems = items.filter(item => getDeptCode(item) === userDivCode);
+    }
+    appTotalBudget = displayItems.reduce((s, item) => s + parseFloat(item.total_price || item.unit_price || 0), 0);
+    appTotalCount = displayItems.length;
   } else {
     Object.values(divisionTotals).forEach(d => { appTotalBudget += d.budget; appTotalCount += d.count; });
   }
 
   if (!displayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + (chiefRole === 'chief_fad' ? 'FAD & other divisions' : (chiefRole === 'chief_wrsd' ? 'WRSD division' : userDivCode + ' division')) : '') + '</td></tr>';
     return;
   }
 
@@ -2695,7 +2791,7 @@ function renderAPPTable(items, appStatus) {
   `;
   }).join('') + `
     <tr style="background:#f0f4f8;font-weight:bold;border-top:2px solid #1a365d;">
-      <td colspan="11" style="text-align:right;padding-right:15px;">${shouldFilter ? userDivCode + ' ' : ''}Total (${appTotalCount} items):</td>
+      <td colspan="11" style="text-align:right;padding-right:15px;">${shouldFilter ? (chiefRole === 'chief_fad' ? 'FAD & Others ' : (chiefRole === 'chief_wrsd' ? 'WRSD ' : userDivCode + ' ')) : ''}Total (${appTotalCount} items):</td>
       <td>₱${appTotalBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td colspan="4"></td>
     </tr>
@@ -2715,7 +2811,7 @@ function updateAPPSummary(items, budgetSummary) {
   const chiefDiv = chiefRole2 ? chiefDivMap[chiefRole2] : '';
 
   // Roles that can see ALL divisions
-  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
+  const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
   const canSeeAll = userHasAnyRole(seeAllAPPRoles);
 
   // Determine user's division code
@@ -2740,7 +2836,19 @@ function updateAPPSummary(items, budgetSummary) {
   }
 
   // Filter items for division-restricted users
-  const displayItems = shouldFilter ? items.filter(i => getItemDeptCode(i) === userDivCode) : items;
+  let displayItems;
+  if (shouldFilter) {
+    // chief_wrsd sees only WRSD, chief_fad sees all except WRSD, others see own division
+    if (chiefRole2 === 'chief_wrsd') {
+      displayItems = items.filter(i => getItemDeptCode(i) === 'WRSD');
+    } else if (chiefRole2 === 'chief_fad') {
+      displayItems = items.filter(i => getItemDeptCode(i) !== 'WRSD');
+    } else {
+      displayItems = items.filter(i => getItemDeptCode(i) === userDivCode);
+    }
+  } else {
+    displayItems = items;
+  }
 
   const activeBudget = displayItems.reduce((sum, i) => sum + parseFloat(i.total_price || i.unit_price || 0), 0);
   const totalProjects = displayItems.length;
@@ -2748,10 +2856,18 @@ function updateAPPSummary(items, budgetSummary) {
   // Budget summary — for division-restricted users, use their division's data
   let totalApproved, availableBudget, removedCount;
   if (shouldFilter && budgetSummary && budgetSummary.by_department) {
-    const deptData = budgetSummary.by_department.find(d => d.department_code === userDivCode);
-    totalApproved = deptData ? parseFloat(deptData.total || 0) : 0;
-    availableBudget = deptData ? parseFloat(deptData.available || 0) : 0;
-    removedCount = deptData ? parseInt(deptData.removed_count || 0) : 0;
+    // chief_wrsd: only WRSD, chief_fad: all except WRSD, others: own division
+    let filteredDepts;
+    if (chiefRole2 === 'chief_wrsd') {
+      filteredDepts = budgetSummary.by_department.filter(d => d.department_code === 'WRSD');
+    } else if (chiefRole2 === 'chief_fad') {
+      filteredDepts = budgetSummary.by_department.filter(d => d.department_code !== 'WRSD');
+    } else {
+      filteredDepts = budgetSummary.by_department.filter(d => d.department_code === userDivCode);
+    }
+    totalApproved = filteredDepts.reduce((s, d) => s + parseFloat(d.total || 0), 0);
+    availableBudget = filteredDepts.reduce((s, d) => s + parseFloat(d.available || 0), 0);
+    removedCount = filteredDepts.reduce((s, d) => s + parseInt(d.removed_count || 0), 0);
   } else {
     totalApproved = budgetSummary ? parseFloat(budgetSummary.total_budget || 0) : activeBudget;
     availableBudget = budgetSummary ? parseFloat(budgetSummary.available_budget || 0) : 0;
@@ -2797,7 +2913,7 @@ function updateAPPSummary(items, budgetSummary) {
   // Render division budget breakdown
   const divBudgetContainer = document.getElementById('appDivisionBudgets');
   if (divBudgetContainer && budgetSummary && budgetSummary.by_department) {
-    const allowedBudgetRoles = ['admin', 'hope', 'ord_manager', 'chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const allowedBudgetRoles = ['admin', 'hope', 'ord_manager', 'budget_consultant', 'chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     
     // Show division budget panel to users who have a division or global visibility
     if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
@@ -2806,13 +2922,19 @@ function updateAPPSummary(items, budgetSummary) {
     } else {
       divBudgetContainer.style.display = '';
       
-      // Filter departments: division-restricted users see only their own
+      // Filter departments: chief_wrsd sees only WRSD, chief_fad sees all except WRSD, others see own division
       let departments = budgetSummary.by_department;
       if (shouldFilter) {
-        departments = departments.filter(d => d.department_code === userDivCode);
+        if (chiefRole2 === 'chief_wrsd') {
+          departments = departments.filter(d => d.department_code === 'WRSD');
+        } else if (chiefRole2 === 'chief_fad') {
+          departments = departments.filter(d => d.department_code !== 'WRSD');
+        } else {
+          departments = departments.filter(d => d.department_code === userDivCode);
+        }
       }
       
-      const headerLabel = shouldFilter ? `${userDivCode} Division Budget` : 'Division Budget Allocation';
+      const headerLabel = shouldFilter ? (chiefRole2 === 'chief_fad' ? 'FAD & Other Divisions Budget' : (chiefRole2 === 'chief_wrsd' ? 'WRSD Division Budget' : `${userDivCode} Division Budget`)) : 'Division Budget Allocation';
       
       const tableRows = departments.map(dept => {
         const code = dept.department_code || 'N/A';
@@ -2827,9 +2949,9 @@ function updateAPPSummary(items, budgetSummary) {
         </tr>`;
       }).join('');
 
-      // Totals row (only when viewing all divisions)
+      // Totals row (when viewing multiple divisions)
       let totalsRow = '';
-      if (!shouldFilter && departments.length > 1) {
+      if (departments.length > 1) {
         const tTotal = departments.reduce((s, d) => s + parseFloat(d.total || 0), 0);
         const tActive = departments.reduce((s, d) => s + parseFloat(d.active || 0), 0);
         const tAvail = departments.reduce((s, d) => s + parseFloat(d.available || 0), 0);
@@ -4533,6 +4655,13 @@ document.addEventListener('DOMContentLoaded', () => {
       loginOverlay.classList.add('hidden');
     }
 
+    // Ensure no stale modal overlay is blocking the UI
+    if (modalOverlay) {
+      modalOverlay.classList.remove('show');
+    }
+    // Remove any leftover sub-modal overlays from previous session
+    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay').forEach(el => el.remove());
+
     // Update user info in sidebar
     if (userNameEl) {
       userNameEl.textContent = currentUser.name;
@@ -4589,6 +4718,7 @@ document.addEventListener('DOMContentLoaded', () => {
       supply_officer: 'Supply/Procurement Officer',
       inspector: 'Inspection/Property Custodian',
       ord_manager: 'ORD Manager',
+      budget_consultant: 'Budget Consultant',
       chief_fad: 'Chief - FAD',
       chief_wrsd: 'Chief - WRSD',
       chief_mwpsd: 'Chief - MWPSD',
@@ -4964,6 +5094,25 @@ document.addEventListener('DOMContentLoaded', () => {
       canViewReports: false, canExportReports: false,
       canManageDivisions: false
     },
+    budget_consultant: {
+      // Budget Consultant: Can view/approve PPMP across all divisions, view APP, view reports
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: true, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: false,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: false,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: false,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: false,
+      canCreatePO: false, canApprovePO: false, canViewPO: false,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: true,
+      canManageDivisions: false
+    },
     requester: {
       // Requester: Can view/create PPMP, view APP, create/view PR, view all transactions through PO (own division only)
       canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: false, canViewPPMP: true,
@@ -5048,6 +5197,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefPages,
       chief_mwptd: chiefPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
+      budget_consultant: ['dashboard', 'ppmp', 'app', 'items', 'reports'],
+      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'reports'],
       requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
     };
 
@@ -5239,6 +5390,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefNavPages,
       chief_mwptd: chiefNavPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
+      budget_consultant: ['dashboard', 'ppmp', 'app', 'items', 'reports'],
+      ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'reports'],
       requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
     };
     
@@ -5575,6 +5728,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Disconnect Socket.IO
     disconnectSocket();
+
+    // Close any open modals/overlays before showing login
+    if (modalOverlay) modalOverlay.classList.remove('show');
+    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay').forEach(el => el.remove());
 
     // Show login overlay
     if (loginOverlay) {
@@ -6224,6 +6381,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <option value="NON PS-DBM" selected>NON PS-DBM (Items Catalog)</option>
               <option value="PS-DBM">PS-DBM (Items Catalog)</option>
               <option value="PAPs">PAPs (Programs, Activities & Projects)</option>
+              <option value="MANUAL-NON-PSDBM">Create NON-PS-DBM (Manually)</option>
             </select>
           </div>
         </div>
@@ -6243,25 +6401,19 @@ document.addEventListener('DOMContentLoaded', () => {
               </select>
             </div>
             <div class="form-group">
-              <label>Filter by Category <small style="color:#999;">(narrows item list)</small></label>
-              <select class="form-select" id="ppmpCategoryFilterModal" onchange="filterPPMPItemsByCategory(this.value)">
+              <label>Filter by Category <small style="color:#999;">(optional)</small></label>
+              <select class="form-select" id="ppmpCategoryFilterModal">
                 <option value="">-- All Categories --</option>
                 ${categoryOptions}
               </select>
             </div>
-            <div class="form-group">
-              <label>Select Item to Add</label>
-              <select class="form-select" id="ppmpItemSelect">
-                <option value="">-- Select Item --</option>
-                ${allItems.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('')}
-              </select>
+            <div class="form-group" style="display:flex;flex:1;min-width:0;">
+              <button type="button" class="btn btn-primary" onclick="showPPMPCatalogItemModal()" style="font-size:13px;width:100%;height:100%;box-sizing:border-box;">
+                <i class="fas fa-search"></i> Select Item from Catalog
+              </button>
             </div>
           </div>
-          <div style="margin-bottom:12px;">
-            <button type="button" class="btn btn-sm btn-primary" onclick="addPPMPItemToList()" style="padding:6px 16px;">
-              <i class="fas fa-plus"></i> Add Item to List
-            </button>
-            <span id="ppmpItemCount" style="margin-left:12px; font-size:12px; color:#4a5568;"></span>
+          <span id="ppmpItemCount" style="font-size:12px; color:#4a5568; margin-bottom:8px; display:block;"></span>
           </div>
           <div id="ppmpItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
             <table class="data-table full-width" style="font-size:11.5px; margin:0;">
@@ -6280,6 +6432,69 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <input type="hidden" id="ppmpCategory" value="">
+
+        <!-- ===== MANUAL ITEMS SECTION (Create NON-PS-DBM / PAPs Manually) ===== -->
+        <div id="ppmpManualItemsSection" style="display:none;">
+          <div class="form-section-header"><i class="fas fa-pen"></i> <span id="ppmpManualSectionTitle">Manual Item Entry</span></div>
+          <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+            <i class="fas fa-info-circle"></i> Items entered here will be <strong>added directly to the Items Catalog</strong> and linked to this PPMP.
+          </div>
+          <div class="form-row-3" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>Item Name <span class="text-danger">*</span></label>
+              <input type="text" id="manualItemName" placeholder="e.g., Ballpen, Black" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="manualItemDesc" placeholder="Specs, size, color..." style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select class="form-select" id="manualItemCategory" style="font-size:12px;">
+                <option value="">-- Select Category --</option>
+                ${categoryOptions}
+                <option value="OTHER">Other (type below)</option>
+              </select>
+              <input type="text" id="manualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
+            </div>
+          </div>
+          <div class="form-row-3" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>Unit <span class="text-danger">*</span></label>
+              <input type="text" id="manualItemUnit" placeholder="pc, lot, box, ream..." value="" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Unit Price (₱) <span class="text-danger">*</span></label>
+              <input type="number" id="manualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Quantity <span class="text-danger">*</span></label>
+              <input type="number" id="manualItemQty" value="1" min="1" step="1" style="font-size:12px;">
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <button type="button" class="btn btn-sm btn-primary" onclick="addManualCatalogItemToList()" style="padding:8px 20px;font-size:13px;">
+              <i class="fas fa-plus"></i> Add Manual Item
+            </button>
+          </div>
+          <span id="ppmpManualItemCount" style="font-size:12px; color:#4a5568;"></span>
+          <div id="ppmpManualItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
+            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+              <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Item Name</th>
+                <th>Description</th>
+                <th style="width:80px;">Category</th>
+                <th style="width:60px;">Unit</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:60px;">Qty</th>
+                <th style="width:90px;">Budget</th>
+                <th style="width:40px;"></th>
+              </tr></thead>
+              <tbody id="ppmpManualItemsListBody"></tbody>
+            </table>
+          </div>
+        </div>
 
         <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
         <div id="ppmpPAPsSection" style="display:none;">
@@ -6408,7 +6623,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline (MM/YYYY)</div>
+        <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline</div>
         <div class="form-row-3">
           <div class="form-group">
             <label>Start of Procurement <span class="text-danger">*</span></label>
@@ -6454,6 +6669,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the items list
     window._ppmpSelectedItems = [];
     window._papSelectedItems = [];
+    window._ppmpManualItems = [];
+    window._ppmpCatalogSourceFilter = 'NON PS-DBM';
     // Always auto-generate PPMP number
     generatePPMPNumber();
     // Pre-select procurement source if provided
@@ -9855,14 +10072,24 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     
-    // --- PS-DBM / NON PS-DBM Mode: Save as procurement plan entries ---
-    const catalogItems = window._ppmpSelectedItems || [];
-    const items = catalogItems;
-    
-    if (items.length === 0) {
-      alert('Please add at least one item from the catalog.');
-      return;
+    // --- PS-DBM / NON PS-DBM / Manual Mode: Save as procurement plan entries ---
+    const isManualMode = procSource === 'MANUAL-NON-PSDBM';
+    let catalogItems = window._ppmpSelectedItems || [];
+    let manualItems = window._ppmpManualItems || [];
+
+    if (isManualMode) {
+      if (manualItems.length === 0) {
+        alert('Please add at least one manual item.');
+        return;
+      }
+    } else {
+      if (catalogItems.length === 0) {
+        alert('Please add at least one item from the catalog.');
+        return;
+      }
     }
+
+    const items = isManualMode ? manualItems : catalogItems;
 
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
@@ -9870,9 +10097,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
-    const startDate = document.getElementById('ppmpStartDate')?.value || '';
-    const endDate = document.getElementById('ppmpEndDate')?.value || '';
-    const deliveryPeriod = document.getElementById('ppmpDeliveryPeriod')?.value || '';
+    const startDate = formatMonthYear(document.getElementById('ppmpStartDate')?.value || '');
+    const endDate = formatMonthYear(document.getElementById('ppmpEndDate')?.value || '');
+    const deliveryPeriod = formatMonthYear(document.getElementById('ppmpDeliveryPeriod')?.value || '');
     const fundSource = document.getElementById('ppmpFundSource')?.value || 'GAA';
     const remarks = document.getElementById('ppmpRemarks')?.value || '';
     const isIndicative = document.getElementById('ppmpIndicative')?.checked || false;
@@ -9885,6 +10112,41 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
 
     try {
+      // If manual mode, first create items in the Items Catalog
+      if (isManualMode) {
+        const actualSource = 'NON PS-DBM';
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          const codePrefix = actualSource === 'PAPs' ? 'PAP-M-' : 'NPD-M-';
+          const itemData = {
+            code: codePrefix + Date.now() + '-' + i,
+            name: it.item_name,
+            description: it.description || it.item_name,
+            unit: it.unit || 'pc',
+            unit_price: it.unit_price || 0,
+            category: it.category || '',
+            procurement_source: actualSource,
+            quantity: 0,
+            reorder_point: 0
+          };
+          try {
+            const created = await apiRequest('/items', 'POST', itemData);
+            // Update the manual item with the newly created catalog item ID
+            items[i].item_id = created.id;
+            items[i].item_code = created.code;
+            items[i].item_category = created.category || it.category;
+            items[i].item_name = created.name || it.item_name;
+            items[i].procurement_source = actualSource;
+          } catch(catErr) {
+            console.error('Failed to create catalog item:', it.item_name, catErr);
+            alert('Failed to add item "' + it.item_name + '" to catalog: ' + catErr.message);
+            return;
+          }
+        }
+        // Refresh items cache
+        try { window._ppmpItemsCache = await apiRequest('/items'); } catch(e) {}
+      }
+
       // Generate PPMP numbers for the batch (use full year to match server format)
       const year = String(fiscalYear);
       const prefix = 'PPMP-' + division + '-' + year + '-';
@@ -9917,10 +10179,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           dept_id: deptIdMap[division] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: it.item_category || '',
+          category: it.item_category || it.category || '',
           item_id: it.item_id || null,
-          description: it.description,
-          item_description: it.description,
+          description: it.description || it.item_name,
+          item_description: it.description || it.item_name,
           project_type: projectType,
           quantity_size: String(it.quantity),
           procurement_mode: procurementMode,
@@ -9931,7 +10193,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fund_source: fundSource,
           total_amount: it.budget,
           status: 'pending',
-          procurement_source: it.procurement_source || procSource,
+          procurement_source: it.procurement_source || (procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource),
           remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim()
         };
       });
@@ -9972,19 +10234,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-  /** Filter the items catalog dropdown by selected PPMP category */
+  /** Filter the items catalog dropdown by selected PPMP category (no-op, modal handles filtering) */
   window.filterPPMPItemsByCategory = function(category) {
-    const itemSelect = document.getElementById('ppmpItemSelect');
-    if (!itemSelect) return;
-    const allItems = window._ppmpItemsCache || [];
-    // Filter items matching category (exact match on item catalog category)
-    const filtered = category ? allItems.filter(i => {
-      return (i.category || '').toUpperCase() === category.toUpperCase();
-    }) : allItems;
-    const items = filtered.length > 0 ? filtered : allItems;
-    itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
-      items.map(i => `<option value="${i.id}" data-unit="${i.unit || ''}" data-price="${i.unit_price || 0}" data-desc="${(i.description || '').replace(/"/g, '&quot;')}" data-name="${(i.name || '').replace(/"/g, '&quot;')}" data-category="${(i.category || '').replace(/"/g, '&quot;')}">${i.code} - ${i.name} (${i.unit || ''} @ ₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</option>`
-      ).join('');
+    // Category filter is now applied when opening the catalog modal
   };
 
   // Category → Section mapping (matches migrate_ppmp_section.js)
@@ -10075,10 +10327,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     const catalogSection = document.getElementById('ppmpCatalogSection');
     const papsSection = document.getElementById('ppmpPAPsSection');
     const nonPAPDetails = document.getElementById('ppmpNonPAPDetails');
+    const manualSection = document.getElementById('ppmpManualItemsSection');
+    const manualTitle = document.getElementById('ppmpManualSectionTitle');
     
+    // Hide all optional sections first
+    if (catalogSection) catalogSection.style.display = 'none';
+    if (papsSection) papsSection.style.display = 'none';
+    if (manualSection) manualSection.style.display = 'none';
+
     if (source === 'PAPs') {
-      // Hide catalog items section
-      if (catalogSection) catalogSection.style.display = 'none';
       // Show PAP-style form
       if (papsSection) papsSection.style.display = 'block';
       // Hide common procurement details + timeline (PAPs have their own period/budget)
@@ -10091,11 +10348,23 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Initialize PAP items list if not already done
       if (!window._papSelectedItems) window._papSelectedItems = [];
       renderPAPModalItemsList();
+    } else if (source === 'MANUAL-NON-PSDBM') {
+      // Show manual items section
+      if (manualSection) manualSection.style.display = 'block';
+      if (manualTitle) manualTitle.textContent = 'Manual NON-PS-DBM Item Entry';
+      // Show common procurement details + timeline
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+      // Initialize manual items list
+      if (!window._ppmpManualItems) window._ppmpManualItems = [];
+      renderManualCatalogItemsList();
     } else {
       // Show catalog section for PS-DBM / NON PS-DBM
       if (catalogSection) catalogSection.style.display = 'block';
-      // Hide PAP-style form
-      if (papsSection) papsSection.style.display = 'none';
       // Show common procurement details + timeline
       if (nonPAPDetails) nonPAPDetails.style.display = 'block';
       // Re-add required on common fields
@@ -10104,13 +10373,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (el) el.setAttribute('required', '');
       });
       // Filter the catalog item dropdown by procurement source
-      const itemSelect = document.getElementById('ppmpItemSelect');
-      if (itemSelect) {
-        const allItems = window._ppmpItemsCache || [];
-        const filtered = source ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === source) : allItems;
-        itemSelect.innerHTML = '<option value="">-- Select Item --</option>' +
-          filtered.map(i => '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) + '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') + '" data-name="' + (i.name || '').replace(/"/g, '&quot;') + '" data-category="' + (i.category || '').replace(/"/g, '&quot;') + '" data-source="' + (i.procurement_source || 'NON PS-DBM') + '">' + i.code + ' - ' + i.name + ' (' + (i.unit || '') + ')</option>').join('');
-      }
+      window._ppmpCatalogSourceFilter = source || 'NON PS-DBM';
       // Update section label based on source
       const sectionHeader = catalogSection ? catalogSection.querySelector('.form-section-header') : null;
       if (sectionHeader) {
@@ -11009,41 +11272,274 @@ Failure to submit the above requirements within the prescribed period shall cons
   // END PAP MANAGEMENT
   // =====================================================
 
-  window.addPPMPItemToList = function() {
-    const itemSelect = document.getElementById('ppmpItemSelect');
-    if (!itemSelect || !itemSelect.value) {
-      alert('Please select an item from the catalog first.');
+  // =====================================================
+  // DATE FORMAT UTILITIES — "Month YYYY" format
+  // =====================================================
+  /** Convert YYYY-MM, MM/YYYY, or text to "Month YYYY" (e.g., "June 2026"). Returns '-' for display, empty for save. */
+  window.formatMonthYear = function(val, forDisplay) {
+    if (!val) return forDisplay ? '-' : '';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    // YYYY-MM
+    if (/^\d{4}-\d{2}$/.test(val)) {
+      const [y, m] = val.split('-');
+      return months[parseInt(m) - 1] + ' ' + y;
+    }
+    // MM/YYYY
+    if (/^\d{2}\/\d{4}$/.test(val)) {
+      const [m, y] = val.split('/');
+      return months[parseInt(m) - 1] + ' ' + y;
+    }
+    return val;
+  };
+
+  /** Convert any date format to YYYY-MM for <input type="month"> */
+  window.parseMonthYearToInput = function(val) {
+    if (!val) return '';
+    if (/^\d{4}-\d{2}$/.test(val)) return val;
+    if (/^\d{2}\/\d{4}$/.test(val)) {
+      const [m, y] = val.split('/');
+      return y + '-' + m;
+    }
+    const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const short = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const parts = val.trim().split(/\s+/);
+    if (parts.length === 2) {
+      const mStr = parts[0].toLowerCase();
+      const y = parts[1];
+      let idx = months.indexOf(mStr);
+      if (idx === -1) idx = short.indexOf(mStr);
+      if (idx !== -1) return y + '-' + String(idx + 1).padStart(2, '0');
+    }
+    return '';
+  };
+
+  // =====================================================
+  // MANUAL CATALOG ITEM FUNCTIONS
+  // =====================================================
+
+  /** Toggle custom category input visibility */
+  window.toggleManualCategoryCustom = function() {
+    const sel = document.getElementById('manualItemCategory');
+    const custom = document.getElementById('manualItemCategoryCustom');
+    if (sel && custom) {
+      custom.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+    }
+  };
+  // Attach onchange after DOM ready
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'manualItemCategory') toggleManualCategoryCustom();
+  });
+
+  /** Add a manual item to the list (not from catalog) */
+  window.addManualCatalogItemToList = function() {
+    const name = document.getElementById('manualItemName')?.value?.trim();
+    if (!name) { alert('Please enter the item name.'); return; }
+    const unit = document.getElementById('manualItemUnit')?.value?.trim() || '';
+    if (!unit) { alert('Please enter the unit (e.g., pc, lot, box, ream).'); return; }
+    const unitPrice = parseFloat(document.getElementById('manualItemPrice')?.value);
+    if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
+    const qty = Math.max(1, parseInt(document.getElementById('manualItemQty')?.value) || 1);
+    const desc = document.getElementById('manualItemDesc')?.value?.trim() || '';
+    const catSel = document.getElementById('manualItemCategory')?.value || '';
+    const catCustom = document.getElementById('manualItemCategoryCustom')?.value?.trim() || '';
+    const category = catSel === 'OTHER' ? catCustom : catSel;
+    const procSource = document.getElementById('ppmpProcurementSource')?.value || 'MANUAL-NON-PSDBM';
+    const actualSource = 'NON PS-DBM';
+
+    if (!window._ppmpManualItems) window._ppmpManualItems = [];
+    window._ppmpManualItems.push({
+      item_name: name,
+      description: desc,
+      category: category,
+      unit: unit,
+      unit_price: unitPrice,
+      quantity: qty,
+      budget: unitPrice * qty,
+      procurement_source: actualSource,
+      is_manual: true
+    });
+    renderManualCatalogItemsList();
+
+    // Clear inputs for next entry
+    document.getElementById('manualItemName').value = '';
+    document.getElementById('manualItemDesc').value = '';
+    document.getElementById('manualItemUnit').value = '';
+    document.getElementById('manualItemPrice').value = '';
+    document.getElementById('manualItemQty').value = '1';
+    document.getElementById('manualItemName').focus();
+  };
+
+  /** Remove a manual item */
+  window.removeManualCatalogItem = function(index) {
+    if (!window._ppmpManualItems) return;
+    window._ppmpManualItems.splice(index, 1);
+    renderManualCatalogItemsList();
+  };
+
+  /** Update manual item quantity */
+  window.updateManualItemQty = function(index, qty) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._ppmpManualItems[index].quantity = q;
+    window._ppmpManualItems[index].budget = q * window._ppmpManualItems[index].unit_price;
+    renderManualCatalogItemsList();
+  };
+
+  /** Update manual item unit */
+  window.updateManualItemUnit = function(index, val) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    window._ppmpManualItems[index].unit = val;
+  };
+
+  /** Update manual item price */
+  window.updateManualItemPrice = function(index, price) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    const p = Math.max(0, parseFloat(price) || 0);
+    window._ppmpManualItems[index].unit_price = p;
+    window._ppmpManualItems[index].budget = window._ppmpManualItems[index].quantity * p;
+    renderManualCatalogItemsList();
+  };
+
+  /** Render the manual items list */
+  window.renderManualCatalogItemsList = function() {
+    const tbody = document.getElementById('ppmpManualItemsListBody');
+    const container = document.getElementById('ppmpManualItemsListContainer');
+    const countEl = document.getElementById('ppmpManualItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+    const items = window._ppmpManualItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      if (totalEl) totalEl.textContent = '';
       return;
     }
-    const itemId = itemSelect.value;
+    if (container) container.style.display = 'block';
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name) + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description) + '</td>' +
+        '<td style="font-size:10px;">' + escapeHtml(it.category) + '</td>' +
+        '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit) + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updateManualItemUnit(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + it.unit_price.toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updateManualItemPrice(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + it.quantity + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updateManualItemQty(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:right;font-weight:600;font-size:11px;">₱' + it.budget.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;"><button type="button" class="btn btn-sm" onclick="removeManualCatalogItem(' + idx + ')" style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove"><i class="fas fa-times"></i></button></td>' +
+        '</tr>';
+    }).join('');
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH',{minimumFractionDigits:2});
+  };
+
+  // =====================================================
+  // CATALOG ITEM PICKER MODAL FOR PPMP (PS-DBM / NON PS-DBM)
+  // =====================================================
+
+  /** Open a modal to select catalog items for PPMP (similar to PAP item picker) */
+  window.showPPMPCatalogItemModal = function() {
     const allItems = window._ppmpItemsCache || [];
-    const item = allItems.find(i => String(i.id) === String(itemId));
-    if (!item) { alert('Item not found in cache.'); return; }
+    const sourceFilter = window._ppmpCatalogSourceFilter || 'NON PS-DBM';
+    const catFilter = document.getElementById('ppmpCategoryFilterModal')?.value || '';
+
+    // Filter items by procurement source and optionally category
+    let filteredItems = allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === sourceFilter);
+    if (catFilter) {
+      filteredItems = filteredItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+
+    const itemRows = filteredItems.map(item => {
+      const alreadyAdded = (window._ppmpSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? ' already-added' : '') + '" onclick="' + (alreadyAdded ? '' : 'selectPPMPCatalogItem(' + item.id + ', this)') + '" style="cursor:' + (alreadyAdded ? 'default' : 'pointer') + ';' + (alreadyAdded ? 'opacity:0.5;' : '') + '">' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + parseInt(item.quantity || 0).toLocaleString() + '</td>' +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : '') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const modalTitle = sourceFilter === 'PS-DBM' ? 'Select PS-DBM Item' : 'Select NON PS-DBM Item';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ppmpCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> ${modalTitle}</h4>
+          <button onclick="document.getElementById('ppmpCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="ppmpCatalogModalSearch" placeholder="Search by item code, name, category, description..."
+            oninput="filterPPMPCatalogModalItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Unit</th>
+              <th>Unit Price</th>
+              <th>Qty Available</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="ppmpCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items in the PPMP catalog modal */
+  window.filterPPMPCatalogModalItems = function(text) {
+    const tbody = document.getElementById('ppmpCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into PPMP items list */
+  window.selectPPMPCatalogItem = function(itemId, rowEl) {
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
 
     // Prevent duplicates
-    if (window._ppmpSelectedItems.some(si => String(si.item_id) === String(itemId))) {
+    if ((window._ppmpSelectedItems || []).some(si => String(si.item_id) === String(itemId))) {
       alert('This item is already in the list.');
       return;
     }
 
-    const description = buildItemDescription(item);
+    const description = typeof buildItemDescription === 'function' ? buildItemDescription(item) : (item.description || item.name || '');
     const unitPrice = parseFloat(item.unit_price || 0);
 
-    // Auto-set section and category from the first item added
+    // Auto-set section and category
     const catField = document.getElementById('ppmpCategory');
     const sectionField = document.getElementById('ppmpSection');
-    const catFilterField = document.getElementById('ppmpCategoryFilterModal');
     if (catField && item.category) catField.value = item.category;
     if (sectionField && item.category) {
-      const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+      const autoSection = (typeof CATEGORY_TO_SECTION !== 'undefined' && CATEGORY_TO_SECTION[item.category]) || 'GENERAL PROCUREMENT';
       sectionField.value = autoSection;
     }
 
-    // Determine procurement source from the source dropdown or the item's inherent source
     const sourceSelect = document.getElementById('ppmpProcurementSource');
     const procSource = sourceSelect ? sourceSelect.value : (item.procurement_source || 'NON PS-DBM');
 
-    // Add to the selected items array
     const entry = {
       item_id: parseInt(itemId),
       item_name: item.name || '',
@@ -11057,13 +11553,20 @@ Failure to submit the above requirements within the prescribed period shall cons
       budget: unitPrice,
       procurement_source: procSource
     };
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
     window._ppmpSelectedItems.push(entry);
 
-    // Render the list
     renderPPMPItemsList();
 
-    // Reset the dropdown selection
-    itemSelect.value = '';
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
   };
 
   /**
@@ -12238,6 +12741,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       { value: 'end_user', label: 'End User' },
       { value: 'requester', label: 'Requester' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
       { value: 'bac_chair', label: 'BAC Chairperson' },
@@ -15027,9 +15531,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="detail-row"><label>Quantity/Size:</label><span>${plan.quantity_size || '-'}</span></div>
           <div class="detail-row"><label>Mode of Procurement:</label><span>${plan.procurement_mode || 'Small Value Procurement'}</span></div>
           <div class="detail-row"><label>Pre-Procurement:</label><span>${plan.pre_procurement || 'NO'}</span></div>
-          <div class="detail-row"><label>Start Date:</label><span>${plan.start_date || '-'}</span></div>
-          <div class="detail-row"><label>End Date:</label><span>${plan.end_date || '-'}</span></div>
-          <div class="detail-row"><label>Delivery Period:</label><span>${plan.delivery_period || '-'}</span></div>
+          <div class="detail-row"><label>Start Date:</label><span>${formatMonthYear(plan.start_date, true)}</span></div>
+          <div class="detail-row"><label>End Date:</label><span>${formatMonthYear(plan.end_date, true)}</span></div>
+          <div class="detail-row"><label>Delivery Period:</label><span>${formatMonthYear(plan.delivery_period, true)}</span></div>
           <div class="detail-row"><label>Source of Funds:</label><span>${plan.fund_source || 'GAA'}</span></div>
           <div class="detail-row"><label>Total ABC:</label><span>₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
           <div class="detail-row"><label>Status:</label><span><span class="status-badge ${statusClass}">${plan.status}</span></span></div>
@@ -15073,18 +15577,30 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Determine what this user can approve
       const chiefApproved = !!plan.approved_by_chief;
       const hopeApproved = !!plan.approved_by_hope;
+      const budgetApproved = !!plan.approved_by_budget;
+      const isWRSD = deptCode === 'WRSD';
+      const chiefLabel = isWRSD ? 'Chief WRSD' : 'Chief FAD';
       let canUserApprove = false;
       let approveLabel = '';
-      if (userHasRole('chief_fad') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as Chief FAD'; }
+      if (isWRSD) {
+        if (userHasRole('chief_wrsd') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as Chief WRSD'; }
+      } else {
+        if (userHasRole('chief_fad') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as Chief FAD'; }
+        if (userHasRole('bac_chair') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as BAC Chair'; }
+      }
       if (userHasRole('hope') && !hopeApproved) { canUserApprove = true; approveLabel = 'Approve as HOPE'; }
+      if (userHasRole('budget_consultant') && !budgetApproved) { canUserApprove = true; approveLabel = 'Approve as Budget Consultant'; }
       if (userHasRole('admin')) { canUserApprove = true; approveLabel = 'Approve (Admin)'; }
 
       const chiefStatus = chiefApproved 
-        ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Chief FAD${plan.chief_approver_name ? ' (' + plan.chief_approver_name + ')' : ''}</span>` 
-        : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Chief FAD</span>`;
+        ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by ${chiefLabel}${plan.chief_approver_name ? ' (' + plan.chief_approver_name + ')' : ''}</span>` 
+        : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting ${chiefLabel}</span>`;
       const hopeStatus = hopeApproved 
         ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${plan.hope_approver_name ? ' (' + plan.hope_approver_name + ')' : ''}</span>` 
         : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
+      const budgetStatus = budgetApproved 
+        ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Budget Consultant${plan.budget_approver_name ? ' (' + plan.budget_approver_name + ')' : ''}</span>` 
+        : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
 
       const html = `
         <div class="view-details">
@@ -15100,8 +15616,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div style="display:flex;gap:15px;flex-wrap:wrap;">
             ${chiefStatus}
             ${hopeStatus}
+            ${budgetStatus}
           </div>
-          ${chiefApproved && hopeApproved ? '<p style="margin-top:12px;color:#2196f3;font-weight:bold;"><i class="fas fa-check-double"></i> Fully approved — will appear in APP</p>' : ''}
+          ${chiefApproved && hopeApproved && budgetApproved ? '<p style="margin-top:12px;color:#2196f3;font-weight:bold;"><i class="fas fa-check-double"></i> Fully approved — will appear in APP</p>' : ''}
         </div>
         <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
@@ -16076,6 +16593,7 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM</option>
                 <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM</option>
                 <option value="PAPs" ${(plan.procurement_source||plan.item_procurement_source||'')==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
+                <option value="MANUAL-NON-PSDBM" ${(plan.procurement_source||'')==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
               </select>
             </div>
           </div>
@@ -16103,21 +16621,13 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Filter / Search Items</label>
-              <input type="text" id="ppmpEditItemSearch" placeholder="Type to filter items..." oninput="filterEditPPMPItems()" style="font-size:12px;">
+            <div class="form-group" style="display:flex;flex:1;min-width:0;align-items:flex-end;">
+              <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="width:100%;height:36px;"><i class="fas fa-layer-group"></i> Select Items from Catalog</button>
             </div>
           </div>
-          <div class="form-group">
-            <label>Filter by Category</label>
-            <select class="form-select" id="ppmpEditCatFilter" onchange="filterEditPPMPItems()" style="font-size:12px;">
-              <option value="">-- All Categories --</option>
-              ${catFilterOptions}
-            </select>
-          </div>
 
-          <div id="ppmpEditItemsList" class="ppmp-checkbox-list" style="max-height:280px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; background:#fff;">
-            <!-- Items rendered by JS -->
+          <div id="ppmpEditItemsList" style="margin-bottom:16px;">
+            <!-- Selected items rendered by JS -->
           </div>
           <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
 
@@ -16158,15 +16668,15 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-row-3">
             <div class="form-group">
               <label>Start of Procurement</label>
-              <input type="text" name="start_date" value="${plan.start_date || ''}" placeholder="MM/YYYY or text">
+              <input type="month" name="start_date" value="${parseMonthYearToInput(plan.start_date || '')}">
             </div>
             <div class="form-group">
               <label>End of Procurement</label>
-              <input type="text" name="end_date" value="${plan.end_date || ''}" placeholder="MM/YYYY or text">
+              <input type="month" name="end_date" value="${parseMonthYearToInput(plan.end_date || '')}">
             </div>
             <div class="form-group">
               <label>Expected Delivery</label>
-              <input type="text" name="delivery_period" value="${plan.delivery_period || ''}" placeholder="MM/YYYY or text">
+              <input type="month" name="delivery_period" value="${parseMonthYearToInput(plan.delivery_period || '')}">
             </div>
           </div>
           <div class="form-row">
@@ -16226,77 +16736,47 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
-   * Render the checkbox items list in the edit modal.
-   * Shows all items with checkboxes; checked items show a description textarea.
+   * Render compact summary table of selected items in the edit modal.
    */
   window.renderEditPPMPItemsList = function() {
     const container = document.getElementById('ppmpEditItemsList');
     const summaryEl = document.getElementById('ppmpEditCheckedSummary');
     if (!container) return;
 
-    const allItems = window._ppmpItemsCache || [];
     const checked = window._ppmpEditCheckedItems || {};
-    const searchText = (document.getElementById('ppmpEditItemSearch')?.value || '').trim().toUpperCase();
-    const catFilter = document.getElementById('ppmpEditCatFilter')?.value || '';
-
-    // Always show checked items regardless of filter
     const checkedIds = Object.keys(checked);
-    const checkedItems = allItems.filter(i => checkedIds.includes(String(i.id)));
 
-    // Filter UNCHECKED items only
-    let filteredUnchecked = allItems.filter(i => !checkedIds.includes(String(i.id)));
-    if (catFilter) {
-      filteredUnchecked = filteredUnchecked.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
-    }
-    if (searchText) {
-      filteredUnchecked = filteredUnchecked.filter(i => {
-        const searchable = ((i.code || '') + ' ' + (i.name || '') + ' ' + (i.category || '')).toUpperCase();
-        return searchable.includes(searchText);
-      });
-    }
-
-    // Checked items always on top, then filtered unchecked
-    const sortedItems = [...checkedItems, ...filteredUnchecked];
-
-    if (sortedItems.length === 0) {
-      container.innerHTML = '<div style="padding:20px; text-align:center; color:#999; font-size:12px;">No items match your filter.</div>';
+    if (checkedIds.length === 0) {
+      container.innerHTML = '<div style="padding:16px; text-align:center; color:#999; font-size:12px; border:1px solid #e2e8f0; border-radius:6px; background:#f9fafb;">No items selected. Click <strong>Select Items from Catalog</strong> to add items.</div>';
+      if (summaryEl) summaryEl.textContent = '';
       return;
     }
 
-    container.innerHTML = sortedItems.map(item => {
-      const id = String(item.id);
-      const isChecked = !!checked[id];
-      const desc = isChecked ? (checked[id].description || '') : '';
-      const isOrig = isChecked && checked[id].isOriginal;
+    const rows = checkedIds.map(id => {
+      const c = checked[id];
+      const item = c.item || {};
       const price = parseFloat(item.unit_price || 0);
-      return `
-        <div class="ppmp-item-checkbox-row ${isChecked ? 'checked' : ''} ${isOrig ? 'original' : ''}" data-item-id="${id}">
-          <label class="ppmp-item-check-label">
-            <input type="checkbox" ${isChecked ? 'checked' : ''} 
-              onchange="toggleEditPPMPItem('${id}', this.checked)">
-            <span class="ppmp-item-check-info">
-              <strong>${escapeHtml(item.code)}</strong> — ${escapeHtml(item.name)}
-              <span class="ppmp-item-check-meta">${item.unit || ''} @ ₱${price.toLocaleString('en-PH', {minimumFractionDigits:2})}${item.category ? ' · ' + item.category : ''}</span>
-            </span>
-            ${isOrig ? '<span class="ppmp-item-orig-badge">current</span>' : ''}
-          </label>
-          ${isChecked ? `
-          <div class="ppmp-item-desc-input">
-            <textarea rows="2" placeholder="Item description (specs, size, color, etc.)"
-              oninput="updateEditPPMPItemDesc('${id}', this.value)">${escapeHtml(desc)}</textarea>
-          </div>` : ''}
-        </div>`;
+      return '<tr>' +
+        '<td style="font-weight:600;white-space:nowrap;">' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + (c.isOriginal ? ' <span style="background:#38a169;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;">current</span>' : '') + '</td>' +
+        '<td>' + (item.unit || '') + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">\u20b1' + price.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td><textarea rows="1" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;resize:vertical;" placeholder="Item description..." oninput="updateEditPPMPItemDesc(\'' + id + '\', this.value)">' + escapeHtml(c.description || '') + '</textarea></td>' +
+        '<td style="text-align:center;"><button type="button" onclick="toggleEditPPMPItem(\'' + id + '\', false)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:14px;" title="Remove"><i class="fas fa-times-circle"></i></button></td>' +
+      '</tr>';
     }).join('');
 
-    // Update summary
+    container.innerHTML = '<table class="data-table full-width" style="font-size:12px;">' +
+      '<thead><tr style="background:#f7fafc;"><th>Code</th><th>Name</th><th>Unit</th><th>Price</th><th>Description</th><th style="width:30px;"></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+
     if (summaryEl) {
-      const count = checkedIds.length;
-      summaryEl.textContent = count > 0 ? count + ' item' + (count > 1 ? 's' : '') + ' selected' : '';
+      summaryEl.textContent = checkedIds.length + ' item' + (checkedIds.length > 1 ? 's' : '') + ' selected';
     }
   };
 
   /**
-   * Toggle an item checkbox in the edit modal.
+   * Toggle an item in the edit modal (called from summary remove or catalog modal).
    */
   window.toggleEditPPMPItem = function(itemId, isChecked) {
     const allItems = window._ppmpItemsCache || [];
@@ -16309,7 +16789,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         description: buildItemDescription(item),
         isOriginal: false
       };
-      // Auto-set section from first checked item's category
       const sectionField = document.getElementById('ppmpSection');
       if (sectionField && item.category) {
         const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
@@ -16332,6 +16811,152 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // syncDescToCheckedItem removed — general description and item_description are independent fields
 
+  // =====================================================
+  // CATALOG ITEM PICKER MODAL FOR EDIT PPMP
+  // =====================================================
+
+  /** Open a sub-modal to select catalog items for Edit PPMP (table-based, like create flow) */
+  window.showEditPPMPCatalogItemModal = function() {
+    const allItems = window._ppmpItemsCache || [];
+    const checked = window._ppmpEditCheckedItems || {};
+    const sourceSelect = document.querySelector('#editPPMPForm select[name="procurement_source"]');
+    let sourceFilter = sourceSelect ? sourceSelect.value : 'NON PS-DBM';
+    if (sourceFilter === 'MANUAL-NON-PSDBM') sourceFilter = 'NON PS-DBM';
+
+    let filteredItems = allItems;
+    if (sourceFilter !== 'PAPs') {
+      filteredItems = allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === sourceFilter);
+    }
+
+    // Pin checked items to top
+    const checkedIds = Object.keys(checked);
+    const checkedItemsList = filteredItems.filter(i => checkedIds.includes(String(i.id)));
+    const uncheckedItemsList = filteredItems.filter(i => !checkedIds.includes(String(i.id)));
+    const sortedItems = [...checkedItemsList, ...uncheckedItemsList];
+
+    const itemRows = sortedItems.map(item => {
+      const id = String(item.id);
+      const isChecked = !!checked[id];
+      const isOrig = isChecked && checked[id].isOriginal;
+      const price = parseFloat(item.unit_price || 0);
+      return '<tr data-item-id="' + id + '" style="cursor:pointer;' + (isChecked ? 'background:#f0fff4;' : '') + '" onclick="toggleEditPPMPCatalogRow(\'' + id + '\')">' +
+        '<td style="text-align:center;"><input type="checkbox" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleEditPPMPCatalogRow(\'' + id + '\')"></td>' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + price.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + (isOrig ? '<span style="background:#38a169;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;">current</span>' : (isChecked ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i></span>' : '')) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ppmpEditCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:8px;width:820px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
+          '<h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Items from Catalog</h4>' +
+          '<button onclick="closeEditPPMPCatalogModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>' +
+        '</div>' +
+        '<div style="padding:8px 16px;">' +
+          '<input type="text" id="ppmpEditCatalogModalSearch" placeholder="Search by item code, name, category..." oninput="filterEditPPMPCatalogModalItems()" style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">' +
+        '</div>' +
+        '<div style="padding:0 16px 4px;font-size:11px;color:#718096;">' +
+          'Check items to link them. Click a row or use the checkbox.' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto;padding:0 16px;">' +
+          '<table class="data-table full-width" style="font-size:12px;">' +
+            '<thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">' +
+              '<th style="width:30px;"></th>' +
+              '<th>Code</th>' +
+              '<th>Category</th>' +
+              '<th>Name</th>' +
+              '<th>Unit</th>' +
+              '<th>Price</th>' +
+              '<th style="width:60px;">Status</th>' +
+            '</tr></thead>' +
+            '<tbody id="ppmpEditCatalogModalBody">' + itemRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #e2e8f0;">' +
+          '<span id="ppmpEditCatalogCount" style="font-size:12px;color:#2b6cb0;font-weight:600;">' + Object.keys(checked).length + ' item(s) selected</span>' +
+          '<button type="button" onclick="closeEditPPMPCatalogModal()" class="btn btn-primary" style="padding:8px 24px;"><i class="fas fa-check"></i> Done</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  };
+
+  /** Close the edit PPMP catalog modal and refresh the summary */
+  window.closeEditPPMPCatalogModal = function() {
+    const overlay = document.getElementById('ppmpEditCatalogItemOverlay');
+    if (overlay) overlay.remove();
+    renderEditPPMPItemsList();
+  };
+
+  /** Toggle a row in the edit PPMP catalog modal */
+  window.toggleEditPPMPCatalogRow = function(itemId) {
+    const isCurrentlyChecked = !!window._ppmpEditCheckedItems[itemId];
+    const allItems = window._ppmpItemsCache || [];
+
+    if (!isCurrentlyChecked) {
+      const item = allItems.find(i => String(i.id) === itemId);
+      if (!item) return;
+      window._ppmpEditCheckedItems[itemId] = {
+        item_id: parseInt(itemId),
+        item: item,
+        description: buildItemDescription(item),
+        isOriginal: false
+      };
+      const sectionField = document.getElementById('ppmpSection');
+      if (sectionField && item.category) {
+        const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+        sectionField.value = autoSection;
+      }
+    } else {
+      delete window._ppmpEditCheckedItems[itemId];
+    }
+
+    // Re-sort rows: pinned checked items on top
+    const tbody = document.getElementById('ppmpEditCatalogModalBody');
+    if (tbody) {
+      const allRows = Array.from(tbody.querySelectorAll('tr'));
+      // Update toggled row appearance
+      const row = allRows.find(r => r.getAttribute('data-item-id') === itemId);
+      if (row) {
+        const cb = row.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = !isCurrentlyChecked;
+        row.style.background = !isCurrentlyChecked ? '#f0fff4' : '';
+        const statusCell = row.querySelector('td:last-child');
+        if (statusCell) statusCell.innerHTML = !isCurrentlyChecked ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i></span>' : '';
+      }
+      // Sort: checked rows first, then unchecked
+      const checkedNow = window._ppmpEditCheckedItems || {};
+      allRows.sort((a, b) => {
+        const aChecked = !!checkedNow[a.getAttribute('data-item-id')];
+        const bChecked = !!checkedNow[b.getAttribute('data-item-id')];
+        if (aChecked === bChecked) return 0;
+        return aChecked ? -1 : 1;
+      });
+      allRows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Update count
+    const countEl = document.getElementById('ppmpEditCatalogCount');
+    if (countEl) countEl.textContent = Object.keys(window._ppmpEditCheckedItems).length + ' item(s) selected';
+  };
+
+  /** Filter items in the edit PPMP catalog modal */
+  window.filterEditPPMPCatalogModalItems = function() {
+    const tbody = document.getElementById('ppmpEditCatalogModalBody');
+    if (!tbody) return;
+    const search = (document.getElementById('ppmpEditCatalogModalSearch')?.value || '').toLowerCase();
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(r => {
+      r.style.display = (!search || r.textContent.toLowerCase().includes(search)) ? '' : 'none';
+    });
+  };
+
   // Submit Edit PPMP — handles multiple checked items or no items
   window.submitEditPPMP = async function(e, planId) {
     e.preventDefault();
@@ -16350,13 +16975,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       quantity_size: form.quantity_size?.value || null,
       procurement_mode: form.procurement_mode?.value || null,
       pre_procurement: form.pre_procurement?.value || 'NO',
-      start_date: form.start_date?.value || null,
-      end_date: form.end_date?.value || null,
-      delivery_period: form.delivery_period?.value || null,
+      start_date: formatMonthYear(form.start_date?.value || '') || null,
+      end_date: formatMonthYear(form.end_date?.value || '') || null,
+      delivery_period: formatMonthYear(form.delivery_period?.value || '') || null,
       total_amount: parseFloat(form.total_amount.value),
       fund_source: form.fund_source?.value || 'GAA',
       remarks: form.remarks.value,
-      procurement_source: form.procurement_source?.value || 'NON PS-DBM'
+      procurement_source: (() => { const ps = form.procurement_source?.value || 'NON PS-DBM'; return ps === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : ps; })()
     };
 
     // Separate: the original item (update existing plan) vs new items (batch create)
@@ -16717,6 +17342,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       { value: 'end_user', label: 'End User' },
       { value: 'requester', label: 'Requester' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
       { value: 'bac_chair', label: 'BAC Chairperson' },
@@ -20599,6 +21225,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         loginError.textContent = 'Please enter username and password';
         loginError.style.display = 'block';
       }
+      _loginInProgress = false;
       return;
     }
     

@@ -1554,6 +1554,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               au.username as approved_by_name,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
+              bu.username as budget_approver_name,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
               it.procurement_source as item_procurement_source,
@@ -1564,6 +1565,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
        LEFT JOIN users au ON pp.approved_by = au.id
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
+       LEFT JOIN users bu ON pp.approved_by_budget = bu.id
        LEFT JOIN items it ON pp.item_id = it.id`;
     const params = [];
     const conditions = [];
@@ -1625,10 +1627,16 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
     const plan = await pool.query(
       `SELECT pp.*, d.name as department_name, d.code as department_code,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
-              it.category as item_category, it.description as item_description_detail
+              it.category as item_category, it.description as item_description_detail,
+              cu.username as chief_approver_name,
+              hu.username as hope_approver_name,
+              bu.username as budget_approver_name
        FROM procurementplans pp 
        LEFT JOIN departments d ON pp.dept_id = d.id 
        LEFT JOIN items it ON pp.item_id = it.id
+       LEFT JOIN users cu ON pp.approved_by_chief = cu.id
+       LEFT JOIN users hu ON pp.approved_by_hope = hu.id
+       LEFT JOIN users bu ON pp.approved_by_budget = bu.id
        WHERE pp.id = $1`,
       [req.params.id]
     );
@@ -1838,12 +1846,12 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const userId = req.user.id;
     
-    // Only chief_fad and hope can approve
-    if (!userRoles.some(r => ['chief_fad', 'hope', 'admin'].includes(r))) {
-      return res.status(403).json({ error: 'Only HOPE and Chief FAD can approve PPMPs' });
+    // Only chief_fad, chief_wrsd, bac_chair, hope, budget_consultant, and admin can approve
+    if (!userRoles.some(r => ['chief_fad', 'chief_wrsd', 'bac_chair', 'hope', 'budget_consultant', 'admin'].includes(r))) {
+      return res.status(403).json({ error: 'Only Chief FAD, Chief WRSD, BAC Chair, HOPE, or Budget Consultant can approve PPMPs' });
     }
-    // Determine effective role for approval (prefer chief_fad or hope over admin)
-    const userRole = userRoles.find(r => ['chief_fad', 'hope'].includes(r)) || userRoles.find(r => r === 'admin') || userRoles[0];
+    // Determine effective role for approval
+    const userRole = userRoles.find(r => ['chief_fad', 'chief_wrsd', 'bac_chair', 'hope', 'budget_consultant'].includes(r)) || userRoles.find(r => r === 'admin') || userRoles[0];
 
     // Get current plan
     const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
@@ -1856,9 +1864,14 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
     let updateValues = [];
     let paramIdx = 1;
 
-    if (userRole === 'chief_fad' || (userRole === 'admin')) {
+    // For WRSD plans, chief_wrsd approves; for all others, chief_fad/bac_chair approves
+    const deptRow = await pool.query('SELECT code FROM departments WHERE id = $1', [p.dept_id]);
+    const isWRSDPlan = deptRow.rows[0]?.code === 'WRSD';
+    const chiefApprovalRoles = isWRSDPlan ? ['chief_wrsd'] : ['chief_fad', 'bac_chair'];
+
+    if (chiefApprovalRoles.includes(userRole) || (userRole === 'admin')) {
       if (p.approved_by_chief && userRole !== 'admin') {
-        return res.status(400).json({ error: 'Already approved by Chief FAD' });
+        return res.status(400).json({ error: isWRSDPlan ? 'Already approved by Chief WRSD' : 'Already approved by Chief FAD / BAC Chair' });
       }
       updateFields.push(`approved_by_chief = $${paramIdx++}`);
       updateValues.push(userId);
@@ -1876,6 +1889,16 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
       updateValues.push(new Date());
     }
 
+    if (userRole === 'budget_consultant' || (userRole === 'admin')) {
+      if (p.approved_by_budget && userRole !== 'admin') {
+        return res.status(400).json({ error: 'Already approved by Budget Consultant' });
+      }
+      updateFields.push(`approved_by_budget = $${paramIdx++}`);
+      updateValues.push(userId);
+      updateFields.push(`budget_approved_at = $${paramIdx++}`);
+      updateValues.push(new Date());
+    }
+
     updateFields.push(`updated_at = NOW()`);
     updateValues.push(req.params.id);
 
@@ -1888,33 +1911,38 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
     const updated = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
     const up = updated.rows[0];
     
-    if (up.approved_by_chief && up.approved_by_hope) {
-      // Both approved — set status to approved
+    if (up.approved_by_chief && up.approved_by_hope && up.approved_by_budget) {
+      // All three approved — set status to approved
       await pool.query(
         `UPDATE procurementplans SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW() WHERE id = $2`,
         [userId, req.params.id]
       );
       const final = await pool.query(
-        `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name
+        `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name, u3.username as budget_approver_name
          FROM procurementplans pp
          LEFT JOIN users u1 ON pp.approved_by_chief = u1.id
          LEFT JOIN users u2 ON pp.approved_by_hope = u2.id
+         LEFT JOIN users u3 ON pp.approved_by_budget = u3.id
          WHERE pp.id = $1`, [req.params.id]
       );
-      return res.json({ message: 'PPMP fully approved! Both HOPE and Chief FAD have approved.', status: 'approved', plan: final.rows[0] });
+      return res.json({ message: 'PPMP fully approved! Chief FAD, HOPE, and Budget Consultant have all approved.', status: 'approved', plan: final.rows[0] });
     }
 
-    // Only one approval so far
+    // Not all approvals complete yet
     const partial = await pool.query(
-      `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name
+      `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name, u3.username as budget_approver_name
        FROM procurementplans pp
        LEFT JOIN users u1 ON pp.approved_by_chief = u1.id
        LEFT JOIN users u2 ON pp.approved_by_hope = u2.id
+       LEFT JOIN users u3 ON pp.approved_by_budget = u3.id
        WHERE pp.id = $1`, [req.params.id]
     );
-    const whoApproved = userRole === 'chief_fad' ? 'Chief FAD' : userRole === 'hope' ? 'HOPE' : 'Admin';
-    const whoRemains = up.approved_by_chief ? 'HOPE' : 'Chief FAD';
-    res.json({ message: `Approved by ${whoApproved}. Awaiting approval from ${whoRemains}.`, status: 'pending', plan: partial.rows[0] });
+    const whoApproved = userRole === 'chief_wrsd' ? 'Chief WRSD' : ['chief_fad', 'bac_chair'].includes(userRole) ? 'Chief FAD / BAC Chair' : userRole === 'hope' ? 'HOPE' : userRole === 'budget_consultant' ? 'Budget Consultant' : 'Admin';
+    const remaining = [];
+    if (!up.approved_by_chief) remaining.push(isWRSDPlan ? 'Chief WRSD' : 'Chief FAD');
+    if (!up.approved_by_hope) remaining.push('HOPE');
+    if (!up.approved_by_budget) remaining.push('Budget Consultant');
+    res.json({ message: `Approved by ${whoApproved}. Awaiting: ${remaining.join(', ')}.`, status: 'pending', plan: partial.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
