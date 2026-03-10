@@ -572,15 +572,22 @@ app.post('/api/auth/login', async (req, res) => {
 
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
+    // Fetch multi-division access (if any)
+    const accessResult = await pool.query(
+      'SELECT dept_id FROM user_department_access WHERE user_id = $1 AND access_type = $2 ORDER BY dept_id',
+      [user.id, 'ppmp_manage']
+    );
+    const managed_dept_ids = accessResult.rows.map(r => r.dept_id);
+
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, secondary_role: user.secondary_role || null, dept_id: user.dept_id },
+      { id: user.id, username: user.username, role: user.role, secondary_role: user.secondary_role || null, dept_id: user.dept_id, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined },
       JWT_SECRET, { expiresIn: JWT_EXPIRES_IN }
     );
     const roles = [user.role, user.secondary_role].filter(Boolean);
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name }
+      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -1565,6 +1572,10 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
     if (req.query.dept_id) {
       params.push(req.query.dept_id);
       conditions.push(`pp.dept_id = $${params.length}`);
+    } else if (req.user.managed_dept_ids && req.user.managed_dept_ids.length > 0) {
+      // User has multi-division PPMP access — show all managed divisions
+      const placeholders = req.user.managed_dept_ids.map((id, i) => { params.push(id); return `$${params.length}`; });
+      conditions.push(`pp.dept_id IN (${placeholders.join(',')})`);
     } else if (isChief && req.user.dept_id) {
       // Chiefs only see their own division
       params.push(req.user.dept_id);

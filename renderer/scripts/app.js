@@ -555,6 +555,17 @@ function buildDivisionOptions(selectedCode, includeEmpty = true) {
   return html;
 }
 
+// Build <option> HTML for only the user's managed divisions (multi-division access)
+function buildManagedDivisionOptions(managedDeptIds) {
+  let html = '<option value="">-- Select Division --</option>';
+  const ids = (managedDeptIds || []).map(String);
+  cachedDivisions.filter(d => ids.includes(String(d.id))).forEach(d => {
+    const code = d.code || d.abbreviation || d.name;
+    html += `<option value="${code}" data-deptid="${d.id}">${code}</option>`;
+  });
+  return html;
+}
+
 // Build <option> HTML for divisions using ID as value (for user/employee/office forms)
 function buildDivisionOptionsById(selectedId, includeEmpty = true, labelStyle = 'short') {
   let html = includeEmpty ? '<option value="">-- Select --</option>' : '';
@@ -1047,12 +1058,15 @@ async function loadPPMP() {
     const isChief = userHasAnyRole(chiefRoles);
     const isPPMPEncoder = userHasRole('ppmp_encoder');
 
+    // Check if user has multi-division PPMP access
+    const hasMultiDivAccess = currentUser.managed_dept_ids && currentUser.managed_dept_ids.length > 1;
+
     // Roles that can see ALL divisions' PPMP data
     const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat'];
     const canSeeAll = userHasAnyRole(seeAllPPMPRoles);
 
-    // All non-global users should be locked to their division
-    const isLockedDivision = !canSeeAll;
+    // Users with multi-division access can switch between their managed divisions (not locked)
+    const isLockedDivision = !canSeeAll && !hasMultiDivAccess;
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
@@ -1060,8 +1074,20 @@ async function loadPPMP() {
     const yearFilter = document.getElementById('ppmpYearFilter');
     const searchInput = document.getElementById('ppmpSearchInput');
 
-    // For all non-global users, auto-select their division and lock the dropdown
-    if (isLockedDivision && divFilter) {
+    // For multi-division users: enable dropdown but restrict options to managed divisions
+    if (hasMultiDivAccess && divFilter) {
+      divFilter.disabled = false;
+      divFilter.style.opacity = '1';
+      // Filter dropdown options to only show managed divisions + "All" option
+      const managedIds = currentUser.managed_dept_ids.map(String);
+      Array.from(divFilter.options).forEach(opt => {
+        if (opt.value === '' || opt.value === 'all') {
+          opt.style.display = ''; // keep the "All" option visible
+        } else {
+          opt.style.display = managedIds.includes(opt.value) ? '' : 'none';
+        }
+      });
+    } else if (isLockedDivision && divFilter) {
       if (isChief) {
         const chiefDeptMap = { chief_fad: '1', chief_wrsd: '4', chief_mwpsd: '3', chief_mwptd: '2' };
         const chiefRole = getUserChiefRole();
@@ -1166,7 +1192,22 @@ async function loadPPMP() {
 
     // Update division banner
     let banner = document.getElementById('ppmpDivisionBanner');
-    if (isLockedDivision) {
+    if (hasMultiDivAccess) {
+      // Multi-division user — show banner listing managed divisions
+      const managedCodes = cachedDivisions.filter(d => currentUser.managed_dept_ids.map(String).includes(String(d.id))).map(d => d.code || d.name);
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ppmpDivisionBanner';
+        banner.className = 'ppmp-division-banner';
+        const ppmpSection = document.getElementById('ppmp');
+        const pageActions = ppmpSection?.querySelector('.page-actions');
+        if (pageActions) {
+          pageActions.parentNode.insertBefore(banner, pageActions);
+        }
+      }
+      banner.innerHTML = `<i class="fas fa-building"></i> Managing PPMP for: <strong>${managedCodes.join(', ')}</strong>`;
+      banner.style.display = '';
+    } else if (isLockedDivision) {
       const divName = currentUser.division || currentUser.department_code || '';
       if (!banner) {
         banner = document.createElement('div');
@@ -6125,7 +6166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
     const isPPMPEncoder = userHasRole('ppmp_encoder');
-    const isLockedDivision = isChief || isPPMPEncoder;
+    const hasMultiDivAccess = currentUser.managed_dept_ids && currentUser.managed_dept_ids.length > 1;
+    const isLockedDivision = (isChief || isPPMPEncoder) && !hasMultiDivAccess;
     const chiefDivision = currentUser.division || currentUser.department_code || '';
     
     const html = `
@@ -6150,7 +6192,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="form-group">
             <label>End-User / Division <span class="text-danger">*</span></label>
             <select class="form-select" id="ppmpDivisionSelect" required ${isLockedDivision ? 'disabled' : ''} onchange="generatePPMPNumber()">
-              ${buildDivisionOptions(isLockedDivision ? chiefDivision : '')}
+              ${hasMultiDivAccess ? buildManagedDivisionOptions(currentUser.managed_dept_ids) : buildDivisionOptions(isLockedDivision ? chiefDivision : '')}
             </select>
             ${isLockedDivision ? '<input type="hidden" name="division" value="' + chiefDivision + '">' : ''}
           </div>
@@ -20585,7 +20627,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         department: data.user.department || '',
         department_code: data.user.department_code || '',
         dept_id: data.user.dept_id || null,
-        designation: data.user.designation || ''
+        designation: data.user.designation || '',
+        managed_dept_ids: data.user.managed_dept_ids || null
       };
       
       // Persist session to sessionStorage
@@ -20773,7 +20816,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         department: data.user.department || '',
         department_code: data.user.department_code || '',
         dept_id: data.user.dept_id || null,
-        designation: data.user.designation || ''
+        designation: data.user.designation || '',
+        managed_dept_ids: data.user.managed_dept_ids || null
       };
       
       // Wait a moment then proceed to app
