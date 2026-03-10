@@ -3329,8 +3329,8 @@ window.pktLoadCellAttachments = async function(entityType, entityId, uniqueKey, 
       const encodedName = encodeURIComponent(att.original_name || 'file');
       return `<div class="pkt-cell-file">
         <i class="fas ${icon}"></i>
-        <span class="pkt-cell-filename pkt-clickable" title="Click to preview: ${att.original_name}" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')">${att.original_name}</span>
-        <button class="pkt-cell-dl" title="Preview" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')"><i class="fas fa-eye"></i></button>
+        <span class="pkt-cell-filename pkt-clickable" title="Click to preview: ${att.original_name}" onclick="window.open(authAttUrl('${API_URL}/attachments/view/${att.id}/${encodedName}'),'_blank')">${att.original_name}</span>
+        <button class="pkt-cell-dl" title="Preview" onclick="window.open(authAttUrl('${API_URL}/attachments/view/${att.id}/${encodedName}'),'_blank')"><i class="fas fa-eye"></i></button>
         <button class="pkt-cell-del" title="Delete" onclick="pktDeleteCellAttachment(${att.id},'${entityType}',${entityId},'${uniqueKey}','${rowId}')"><i class="fas fa-times"></i></button>
       </div>`;
     }).join('');
@@ -3542,8 +3542,8 @@ window.pktConsolidateFiles = async function(rowId) {
           <i class="fas ${fi.icon}" style="color:${fi.color};font-size:14px;min-width:16px;"></i>
           <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${att.original_name}">${att.original_name}</span>
           <span style="font-size:10px;color:#999;min-width:50px;text-align:right;">${fmtSize(att.file_size_bytes)}</span>
-          <button class="btn-icon" title="Preview" onclick="window.open('${API_URL}/attachments/view/${att.id}/${encodedName}','_blank')" style="padding:2px 5px;"><i class="fas fa-eye" style="font-size:11px;"></i></button>
-          <button class="btn-icon" title="Download" onclick="window.open('${API_URL}/attachments/download/${att.id}','_blank')" style="padding:2px 5px;"><i class="fas fa-download" style="font-size:11px;"></i></button>
+          <button class="btn-icon" title="Preview" onclick="window.open(authAttUrl('${API_URL}/attachments/view/${att.id}/${encodedName}'),'_blank')" style="padding:2px 5px;"><i class="fas fa-eye" style="font-size:11px;"></i></button>
+          <button class="btn-icon" title="Download" onclick="window.open(authAttUrl('${API_URL}/attachments/download/${att.id}'),'_blank')" style="padding:2px 5px;"><i class="fas fa-download" style="font-size:11px;"></i></button>
         </div>`;
       }).join('') + `</div>`;
     } else if (docExists) {
@@ -5738,6 +5738,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return (bytes / 1048576).toFixed(1) + ' MB';
   }
 
+  // Helper: append JWT token as query parameter for attachment view/download URLs
+  // so that window.open() and BrowserWindow.loadURL() can authenticate
+  window.authAttUrl = function(url) {
+    const t = localStorage.getItem('token');
+    if (!t) return url;
+    return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+  };
+
   /**
    * Preview an attachment in a native viewer window (same as Document Monitoring page).
    * PDFs open in Chromium's built-in PDF viewer with page thumbnails, zoom, print, download.
@@ -5746,8 +5754,8 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   window.previewAttachment = function(attId, originalName, mimeType) {
     // Build URL with filename appended so the window title / tab shows the real name
-    const viewUrl = API_URL + '/attachments/view/' + attId + '/' + encodeURIComponent(originalName);
-    const downloadUrl = API_URL + '/attachments/download/' + attId;
+    const viewUrl = authAttUrl(API_URL + '/attachments/view/' + attId + '/' + encodeURIComponent(originalName));
+    const downloadUrl = authAttUrl(API_URL + '/attachments/download/' + attId);
 
     if (mimeType === 'application/pdf' || (mimeType && mimeType.startsWith('image/'))) {
       // Open directly in a native BrowserWindow — Chromium renders PDF with built-in viewer
@@ -5791,7 +5799,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <button class="btn-icon" title="Preview / View" onclick="previewAttachment(${att.id}, '${(att.original_name || '').replace(/'/g, "\\'")}', '${att.mime_type}')" style="padding:4px 6px;color:#3182ce;">
             <i class="fas fa-eye" style="font-size:12px;"></i>
           </button>
-          <button class="btn-icon" title="Download" onclick="window.open('${API_URL}/attachments/download/${att.id}', '_blank')" style="padding:4px 6px;color:#38a169;">
+          <button class="btn-icon" title="Download" onclick="window.open(authAttUrl('${API_URL}/attachments/download/${att.id}'), '_blank')" style="padding:4px 6px;color:#38a169;">
             <i class="fas fa-download" style="font-size:12px;"></i>
           </button>
           ${allowDelete ? `<button class="btn-icon" title="Delete" onclick="deleteAttachmentAndRefresh(${att.id}, '${containerId}', '${att.entity_type || ''}', ${att.entity_id || 0})" style="padding:4px 6px;color:#e53e3e;">
@@ -5994,8 +6002,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="att-popover-item-meta">${formatSize(att.file_size_bytes)}</div>
           </div>
           <div class="att-popover-item-actions">
-            <button title="Download" onclick="window.open('${API_URL}/attachments/download/${att.id}','_blank')"><i class="fas fa-download"></i></button>
-            <button title="View" onclick="window.open('${API_URL}/attachments/view/${att.id}','_blank')"><i class="fas fa-eye"></i></button>
+            <button title="Download" onclick="window.open(authAttUrl('${API_URL}/attachments/download/${att.id}'),'_blank')"><i class="fas fa-download"></i></button>
+            <button title="View" onclick="window.open(authAttUrl('${API_URL}/attachments/view/${att.id}'),'_blank')"><i class="fas fa-eye"></i></button>
             <button title="Delete" class="danger" onclick="deletePopoverAttachment(${att.id},'${entityType}',${entityId},'${uid}')"><i class="fas fa-trash"></i></button>
           </div>
         </div>`;
@@ -15632,7 +15640,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <i class="fas ${icon}" style="color:${color}; font-size:13px;"></i>
             <span class="pkt-att-name" title="${att.original_name}">${att.original_name}</span>
             <span class="pkt-att-size">${sizeStr}</span>
-            <button class="btn-icon" title="Download" onclick="window.open('${API_URL}/attachments/download/${att.id}','_blank')" style="padding:2px 4px;"><i class="fas fa-download" style="font-size:10px;"></i></button>
+            <button class="btn-icon" title="Download" onclick="window.open(authAttUrl('${API_URL}/attachments/download/${att.id}'),'_blank')" style="padding:2px 4px;"><i class="fas fa-download" style="font-size:10px;"></i></button>
             <button class="btn-icon" title="View" onclick="previewAttachment(${att.id}, '${(att.original_name || '').replace(/'/g, "\\'")}', '${att.mime_type}')" style="padding:2px 4px;"><i class="fas fa-eye" style="font-size:10px;"></i></button>
             <button class="btn-icon danger" title="Delete" onclick="pktDeleteAttachment(${att.id},'${entityType}',${entityId},'${key}')" style="padding:2px 4px;"><i class="fas fa-trash" style="font-size:10px;"></i></button>
           </div>`;
