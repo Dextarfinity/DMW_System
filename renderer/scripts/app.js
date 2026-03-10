@@ -4594,7 +4594,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: 'Chief - MWPSD',
       chief_mwptd: 'Chief - MWPTD',
       ppmp_encoder: 'PPMP Entry Maker',
-      requester: 'Requester'
+      requester: 'Requester',
+      budget_consultant: 'Budget Consultant'
     };
     return roleLabels[role] || role;
   }
@@ -4982,6 +4983,25 @@ document.addEventListener('DOMContentLoaded', () => {
       canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
       canViewReports: false, canExportReports: false,
       canManageDivisions: false
+    },
+    budget_consultant: {
+      // Budget Consultant: Can view PPMP, APP, PR, and budget-related data (read-only)
+      canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: false, canViewAPP: true,
+      canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
+      canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
+      canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
+      canCreatePostQual: false, canApprovePostQual: false, canViewPostQual: false,
+      canCreateBACRes: false, canApproveBACRes: false, canViewBACRes: false,
+      canCreateNOA: false, canApproveNOA: false, canViewNOA: false,
+      canCreatePO: false, canApprovePO: false, canViewPO: true,
+      canCreateIAR: false, canApproveIAR: false, canViewIAR: false,
+      canCreateCOA: false, canSubmitCOA: false, canViewCOA: false,
+      canCreateItem: false, canEditItem: false, canDeleteItem: false, canViewItem: true,
+      canCreateSupplier: false, canEditSupplier: false, canDeleteSupplier: false, canViewSupplier: false,
+      canCreateUser: false, canEditUser: false, canDeleteUser: false, canViewUser: false,
+      canViewReports: true, canExportReports: false,
+      canManageDivisions: false
     }
   };
 
@@ -5048,7 +5068,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefPages,
       chief_mwptd: chiefPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
-      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items'],
+      budget_consultant: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'purchase-orders', 'items', 'reports']
     };
 
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -5239,7 +5260,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chief_mwpsd: chiefNavPages,
       chief_mwptd: chiefNavPages,
       ppmp_encoder: ['dashboard', 'ppmp', 'app', 'items'],
-      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items']
+      requester: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'items'],
+      budget_consultant: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'purchase-orders', 'items', 'reports']
     };
     
     const allowedPages = getMergedPermissions(rolePermissions);
@@ -12237,6 +12259,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const allRoles = [
       { value: 'end_user', label: 'End User' },
       { value: 'requester', label: 'Requester' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
@@ -16716,6 +16739,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const allRoles = [
       { value: 'end_user', label: 'End User' },
       { value: 'requester', label: 'Requester' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
       { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
       { value: 'division_head', label: 'Division Head' },
       { value: 'bac_secretariat', label: 'BAC Secretariat' },
