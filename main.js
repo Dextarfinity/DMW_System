@@ -41,6 +41,8 @@ async function createWindow() {
     minWidth: 1200,
     minHeight: 700,
     fullscreen: false,
+    show: false,
+    backgroundColor: '#0c1929',
     title: 'Procurement Plan System',
     icon: appIcon,
     autoHideMenuBar: true,
@@ -69,6 +71,12 @@ async function createWindow() {
   // --- Inject local logo files into the renderer ---
   // When loading from the server, the renderer's __dirname won't resolve to
   // local assets. Read logos here (main process) and push them into the renderer.
+  // Show window once the page content is ready (prevents white flash)
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.maximize();
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
     try {
       const fs = require('fs');
@@ -129,9 +137,6 @@ async function createWindow() {
       console.warn('[Logos] Could not inject logos:', e.message);
     }
   });
-
-  // Start maximized while keeping Windows taskbar visible
-  mainWindow.maximize();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
