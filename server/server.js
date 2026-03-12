@@ -1813,30 +1813,14 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
 
 app.delete('/api/plans/:id', authenticateToken, async (req, res) => {
   try {
-    const reason = req.body?.reason || 'Removed by user';
-    // Soft-delete: mark as deleted but keep the record for budget tracking
+    // Delete related plan_items first, then permanently delete the plan
+    await pool.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
     const result = await pool.query(
-      `UPDATE procurementplans SET is_deleted = true, deleted_at = NOW(), deleted_reason = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [req.params.id, reason]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
-    const plan = result.rows[0];
-    res.json({ 
-      message: 'Plan removed — budget of ₱' + parseFloat(plan.total_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' is now available for reallocation.',
-      freed_budget: parseFloat(plan.total_amount)
-    });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Restore a soft-deleted plan
-app.put('/api/plans/:id/restore', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE procurementplans SET is_deleted = false, deleted_at = NULL, deleted_reason = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      'DELETE FROM procurementplans WHERE id = $1 RETURNING id',
       [req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
-    res.json({ message: 'Plan restored successfully', plan: result.rows[0] });
+    res.json({ message: 'PPMP deleted successfully.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1979,30 +1963,7 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET removed/deleted plan items (for Available Budget tracking)
-app.get('/api/plan-items/removed', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT pp.id, pp.ppmp_no,
-              REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
-              pp.description as item_name,
-              pp.description as item_description,
-              pp.total_amount,
-              pp.project_type as category,
-              pp.procurement_mode,
-              pp.fiscal_year,
-              pp.deleted_at, pp.deleted_reason,
-              pp.dept_id,
-              d.name as department_name,
-              d.code as department_code
-       FROM procurementplans pp
-       LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.is_deleted = true
-       ORDER BY pp.deleted_at DESC`
-    );
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+
 
 // GET APP budget summary (total allocated, active, available)
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {

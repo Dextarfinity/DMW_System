@@ -18049,31 +18049,21 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Delete Confirmation Modal
   window.showDeleteConfirmModal = function(recordType, recordId) {
-    const isPPMP = (recordType === 'PPMP');
     const html = `
       <div class="info-banner warning-banner" style="margin-bottom: 15px;">
         <i class="fas fa-exclamation-triangle"></i>
-        Are you sure you want to ${isPPMP ? 'remove' : 'delete'} this ${recordType}?
+        Are you sure you want to delete this ${recordType}?
       </div>
       <div class="view-details">
         <div class="detail-row"><label>${recordType} ID:</label><span>${recordId}</span></div>
       </div>
-      ${isPPMP ? `
-      <div class="info-banner" style="margin-top:12px; background:#e8f5e9; border-left:4px solid #28a745; padding:10px 14px;">
-        <i class="fas fa-info-circle" style="color: #28a745;"></i>
-        <strong>Budget will be preserved.</strong> The allocated budget for this item will become <strong>Available Budget</strong> in the APP — it can be reallocated to other projects.
-      </div>
-      <div class="form-group" style="margin-top: 12px;">
-        <label>Reason for Removal <small style="color:#999;">(optional)</small></label>
-        <input type="text" id="deleteReasonInput" placeholder="E.g., Project cancelled, scope changed, consolidated with another item">
-      </div>
-      ` : `<p style="margin-top: 15px; font-size: 13px; color: #666;">This action cannot be undone.</p>`}
+      <p style="margin-top: 15px; font-size: 13px; color: #666;">This action cannot be undone.</p>
       <div class="form-group" style="text-align: right; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="button" class="btn btn-danger" onclick="${isPPMP ? `deletePPMPWithReason('${recordId}')` : `deleteRecord('${recordType}', '${recordId}')`}; closeModal();"><i class="fas fa-trash"></i> ${isPPMP ? 'Remove' : 'Delete'}</button>
+        <button type="button" class="btn btn-danger" onclick="deleteRecord('${recordType}', '${recordId}'); closeModal();"><i class="fas fa-trash"></i> Delete</button>
       </div>
     `;
-    openModal(isPPMP ? 'Remove PPMP Entry' : 'Confirm Delete', html);
+    openModal('Confirm Delete', html);
   };
 
   // Export to Excel Modal
@@ -20748,95 +20738,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         'UOM': loadUOMs
       };
       if (refreshMap[recordType]) refreshMap[recordType]();
+      // Also refresh APP budget summary when PPMP is deleted
+      if (recordType === 'PPMP' && typeof loadAPP === 'function') loadAPP();
     } catch (err) {
-      alert(`Error deleting ${recordType}: ${err.message}`);
-    }
-  };
-
-  // Delete PPMP with reason (soft-delete — budget becomes available)
-  window.deletePPMPWithReason = async function(planId) {
-    const reason = document.getElementById('deleteReasonInput')?.value || 'Removed by user';
-    try {
-      const result = await apiRequest('/plans/' + planId, 'DELETE', { reason });
-      alert(result.message || 'PPMP removed — budget is now available for reallocation.');
-      loadPPMP();
-      loadAPP(); // Refresh APP to update budget summary
-    } catch (err) {
-      alert('Error removing PPMP: ' + err.message);
-    }
-  };
-
-  // Show removed/deleted PPMP items modal (Available Budget breakdown)
-  window.showRemovedItemsModal = async function() {
-    try {
-      const removed = await apiRequest('/plan-items/removed');
-      const fy = getCurrentFiscalYear();
-      const budgetSummary = await apiRequest('/app-budget-summary?fiscal_year=' + fy);
-      const totalAvailable = parseFloat(budgetSummary.available_budget || 0);
-
-      let tableRows = '';
-      if (removed.length === 0) {
-        tableRows = '<tr><td colspan="6" class="text-center">No removed items. All PPMP entries are active.</td></tr>';
-      } else {
-        tableRows = removed.map(item => {
-          const amt = parseFloat(item.total_amount || 0);
-          const deletedDate = item.deleted_at ? new Date(item.deleted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
-          return `<tr>
-            <td>${item.item_code || item.ppmp_no || '-'}</td>
-            <td>${item.item_name || '-'}</td>
-            <td>${item.department_code || '-'}</td>
-            <td style="text-align:right; font-weight:600;">₱${amt.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-            <td>${item.deleted_reason || '-'}</td>
-            <td style="text-align:center;">
-              <span style="font-size:11px; color:#888;">${deletedDate}</span><br>
-              <button class="btn btn-sm btn-primary" onclick="restorePPMP(${item.id})" title="Restore this item back to active"><i class="fas fa-undo"></i> Restore</button>
-            </td>
-          </tr>`;
-        }).join('');
-      }
-
-      const html = `
-        <div class="info-banner" style="margin-bottom:16px; background:#e8f5e9; border-left:4px solid #28a745; padding:12px 14px;">
-          <i class="fas fa-coins" style="color:#28a745;"></i>
-          <strong>Available Budget: ₱${totalAvailable.toLocaleString('en-PH', {minimumFractionDigits:2})}</strong><br>
-          <small style="color:#555;">This is the total budget freed from ${removed.length} removed item(s). These funds can be reallocated to new or existing projects.</small>
-        </div>
-        <table class="data-table full-width" style="font-size:12px;">
-          <thead>
-            <tr>
-              <th>APP/PPMP Code</th>
-              <th>Description</th>
-              <th>Division</th>
-              <th>Freed Budget</th>
-              <th>Reason</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <div style="margin-top:16px; padding:10px; background:#f8f9fa; border-radius:4px; font-size:12px; color:#666;">
-          <i class="fas fa-info-circle"></i> Restoring an item will move its budget back from "Available" to "Active" and reappear in the APP table.
-        </div>
-      `;
-      openModal('Removed Items — Available Budget', html);
-    } catch (err) {
-      alert('Error loading removed items: ' + err.message);
-    }
-  };
-
-  // Restore a soft-deleted PPMP back to active
-  window.restorePPMP = async function(planId) {
-    try {
-      const result = await apiRequest('/plans/' + planId + '/restore', 'PUT');
-      alert(result.message || 'PPMP restored successfully.');
-      closeModal();
-      loadPPMP();
-      loadAPP();
-    } catch (err) {
-      alert('Error restoring item: ' + err.message);
-    }
-  };
-
   // =====================================================
   // EXPORT TO EXCEL/CSV FUNCTIONS
   // =====================================================
