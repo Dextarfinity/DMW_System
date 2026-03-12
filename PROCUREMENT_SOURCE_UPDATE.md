@@ -194,3 +194,38 @@ Inventory
 psql -U your_user -d your_database -f server/database/migration_pap_management.sql
 
 cd "c:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System"; $env:PGPASSWORD='dmw123'; psql -U postgres -d dmw_db -f server/database/migration_pap_management.sql 2>&1
+
+
+
+Instructions for Updating the Create and Edit PPMP Modal
+Please implement the following updates to the Create and Edit PPMP modal, specifically within the PAPs Procurement Source section.
+1. Section Title Update
+Rename the section “Manual PAP Item Entry” to “PAP Details (Programs, Activities & Projects)”.
+2. Remove Duplicate Section
+Remove the existing “PAP Details (Programs, Activities & Projects)” section to prevent duplication and maintain a single unified section.
+3. Enhancements to the PAP Details Section
+Within the updated PAP Details (Programs, Activities & Projects) section, implement the following changes:
+a. Unit Selection
+Add a Unit dropdown field.
+The dropdown options must be dynamically retrieved from the Units of Measure table.
+b. Estimated Budget Calculation
+Add an Estimated Budget field.
+This field should be automatically calculated using the formula:
+Estimated Budget = Unit Price × Quantity
+The value should update in real time whenever the Unit Price or Quantity changes.
+c. Field Adjustments
+Rename Item Name to PAP Name.
+Convert the Description field into a textarea to support longer and more detailed input.
+4. Item Handling Logic
+When users add manual items or select items from the Item Catalog, both types must be combined and treated as a single unified list of items within the system.
+Additional Changes for Non-PSDBM Manual Entry (Procurement Source)
+Please apply the following changes when creating Non-PSDBM items manually in the Procurement Source:
+1. Unit Selection
+Add a Unit dropdown field.
+The dropdown options must be dynamically retrieved from the Units of Measure table.
+2. Estimated Budget Calculation
+Add an Estimated Budget field.
+This value must be automatically calculated using the formula:
+Estimated Budget = Unit Price × Quantity
+3. Handling Logic
+Items manually added and items selected from the Item Catalog should be treated as part of the same unified item list within the system.
