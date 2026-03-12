@@ -6526,62 +6526,66 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 18px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
-              Create PAP to Centralize?
-              <input type="checkbox" id="papCentralize" style="width:16px;height:16px;">
-            </label>
+          <!-- Manual PAP Item Entry (like Manual NON-PS-DBM) -->
+          <div class="form-section-header"><i class="fas fa-pen"></i> Manual PAP Item Entry</div>
+          <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+            <i class="fas fa-info-circle"></i> Manually enter PAP items below. These will be linked to this PPMP entry.
+          </div>
+          <div class="form-row-3" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>Item Name <span class="text-danger">*</span></label>
+              <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="papManualItemDesc" placeholder="Specs, details..." style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select class="form-select" id="papManualItemCategory" style="font-size:12px;">
+                <option value="">-- Select Category --</option>
+                ${categoryOptions}
+                <option value="OTHER">Other (type below)</option>
+              </select>
+              <input type="text" id="papManualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
+            </div>
+          </div>
+          <div class="form-row-3" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>Unit <span class="text-danger">*</span></label>
+              <input type="text" id="papManualItemUnit" placeholder="pc, lot, box, ream..." value="" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Unit Price (₱) <span class="text-danger">*</span></label>
+              <input type="number" id="papManualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label>Quantity <span class="text-danger">*</span></label>
+              <input type="number" id="papManualItemQty" value="1" min="1" step="1" style="font-size:12px;">
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <button type="button" class="btn btn-sm btn-primary" onclick="addManualPAPItem()" style="padding:8px 20px;font-size:13px;">
+              <i class="fas fa-plus"></i> Add Manual PAP Item
+            </button>
           </div>
 
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 18px;flex-wrap:wrap;">
-            <span style="font-weight:600;font-size:13px;">Period:</span>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan"> Jan</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb"> Feb</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar"> Mar</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr"> Apr</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay"> May</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun"> Jun</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul"> Jul</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug"> Aug</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep"> Sep</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct"> Oct</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov"> Nov</label>
-            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec"> Dec</label>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:10px;margin:14px 16px 10px 16px;">
-            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
-              <i class="fas fa-plus"></i> Select on PSDBM
-            </button>
-            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('NON PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
-              <i class="fas fa-plus"></i> Select on Non-PSDBM
-            </button>
-            <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#2b6cb0;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
-              <i class="fas fa-pen"></i> Add Manual Item
-            </button>
-          </div>
-
-          <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin-bottom:8px;">
-            <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
-              <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
-                <th style="padding:6px 8px;">Command</th>
-                <th style="padding:6px 8px;">Item Code</th>
-                <th style="padding:6px 8px;">Product Category</th>
-                <th style="padding:6px 8px;">UACS</th>
-                <th style="padding:6px 8px;">Product Description</th>
-                <th style="padding:6px 8px;">Available At</th>
-                <th style="padding:6px 4px;text-align:center;">Qty</th>
-                <th style="padding:6px 8px;">UOM</th>
-                <th style="padding:6px 8px;">Unit Price (₱)</th>
-                <th style="padding:6px 8px;text-align:right;">Total Amount</th>
+          <span id="papItemCount" style="font-size:12px; color:#4a5568;"></span>
+          <div id="papItemsListContainer" style="max-height:250px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;display:none;">
+            <table class="data-table full-width" style="font-size:11.5px;margin:0;">
+              <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Item Name</th>
+                <th>Description</th>
+                <th style="width:80px;">Category</th>
+                <th style="width:60px;">Unit</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:60px;">Qty</th>
+                <th style="width:90px;">Budget</th>
+                <th style="width:40px;"></th>
               </tr></thead>
               <tbody id="papItemsListBody"></tbody>
             </table>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:10px;margin:0 16px 14px 16px;border-top:1px solid #ddd;padding-top:6px;">
-            <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
-            <span style="font-size:12px;color:#888;">items</span>
           </div>
         </div>
 
@@ -10336,17 +10340,20 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (manualSection) manualSection.style.display = 'none';
 
     if (source === 'PAPs') {
-      // Show PAP-style form
+      // Show PAP-style form AND catalog section + common procurement details + timeline
       if (papsSection) papsSection.style.display = 'block';
-      // Hide common procurement details + timeline (PAPs have their own period/budget)
-      if (nonPAPDetails) nonPAPDetails.style.display = 'none';
-      // Remove required from hidden fields to prevent form validation errors
+      if (catalogSection) catalogSection.style.display = 'block';
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields (they stay visible)
       ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.removeAttribute('required');
+        if (el) el.setAttribute('required', '');
       });
+      // Set catalog source filter to show all items
+      window._ppmpCatalogSourceFilter = 'NON PS-DBM';
       // Initialize PAP items list if not already done
       if (!window._papSelectedItems) window._papSelectedItems = [];
+      if (!window._ppmpManualItems) window._ppmpManualItems = [];
       renderPAPModalItemsList();
     } else if (source === 'MANUAL-NON-PSDBM') {
       // Show manual items section
@@ -11015,89 +11022,103 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-  /** Render PAP items list in Create/Edit modal — catalog items read-only, manual items editable */
-  window.renderPAPModalItemsList = function() {
+  /** Render PAP items list - manual entry style (like Manual NON-PS-DBM) */
+  window.renderPAPManualItemsList = function() {
     const tbody = document.getElementById('papItemsListBody');
+    const container = document.getElementById('papItemsListContainer');
     const countEl = document.getElementById('papItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    const budgetField = document.getElementById('papEstimatedBudget');
     if (!tbody) return;
 
     const items = window._papSelectedItems || [];
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="color:#888;padding:20px;">No items added yet. Click "Select on PSDBM", "Select on Non-PSDBM" or "Add Manual Item" to add items.</td></tr>';
-      if (countEl) countEl.textContent = '0';
-      // Reset budget to 0 when no items
-      const budgetField = document.getElementById('papEstimatedBudget');
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
       if (budgetField) budgetField.value = '0.00';
       return;
     }
 
-    let totalAmount = 0;
+    if (container) container.style.display = 'block';
+    let totalBudget = 0;
     tbody.innerHTML = items.map((it, idx) => {
-      const lineTotal = parseFloat(it.quantity || 0) * parseFloat(it.unit_price || 0);
-      totalAmount += lineTotal;
-      it.total_amount = lineTotal;
-      const isManual = !it.item_id;
-      return `<tr>
-        <td style="padding:4px 6px;">
-          <button type="button" onclick="removePAPItem(${idx})" style="color:#dc3545;background:none;border:none;cursor:pointer;font-size:12px;" title="Remove">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.item_code || '') + '" onchange="updatePAPItemField(' + idx + ',\'item_code\',this.value)" style="width:70px;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.item_code || '')}</td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.product_category || '') + '" onchange="updatePAPItemField(' + idx + ',\'product_category\',this.value)" style="width:90px;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.product_category || '')}</td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.account_code || '') + '" onchange="updatePAPItemField(' + idx + ',\'account_code\',this.value)" style="width:80px;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.account_code || '')}</td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.product_description || '') + '" onchange="updatePAPItemField(' + idx + ',\'product_description\',this.value)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.product_description || '')}</td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.available_at || '') + '" onchange="updatePAPItemField(' + idx + ',\'available_at\',this.value)" style="width:70px;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.available_at || '')}</td>
-        <td style="padding:2px 4px;text-align:center;"><input type="number" value="${it.quantity}" min="1" step="1" onchange="updatePAPItemQty(${idx}, this.value)" style="width:45px;font-size:11px;text-align:center;padding:3px 2px;border:1px solid #ccc;"></td>
-        <td style="padding:2px 4px;font-size:11px;">${isManual ? '<input type="text" value="' + escapeHtml(it.uom || '') + '" onchange="updatePAPItemField(' + idx + ',\'uom\',this.value)" style="width:50px;font-size:11px;padding:2px 4px;border:1px solid #ccc;">' : escapeHtml(it.uom || '')}</td>
-        <td style="padding:2px 4px;font-size:11px;text-align:right;">${isManual ? '<input type="number" value="' + it.unit_price + '" min="0" step="0.01" onchange="updatePAPItemPrice(' + idx + ', this.value)" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;border:1px solid #ccc;">' : '₱' + parseFloat(it.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-        <td style="padding:2px 4px;font-size:11px;text-align:right;font-weight:600;">₱${lineTotal.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-      </tr>`;
+      const lineBudget = (parseFloat(it.unit_price) || 0) * (parseInt(it.quantity) || 1);
+      it.budget = lineBudget;
+      it.total_amount = lineBudget;
+      totalBudget += lineBudget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name || it.product_description || '') + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description || '') + '</td>' +
+        '<td style="font-size:10px;">' + escapeHtml(it.category || it.product_category || '') + '</td>' +
+        '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit || it.uom || '') + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updatePAPManualItemUnit(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + (parseFloat(it.unit_price) || 0).toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updatePAPItemPrice(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + (parseInt(it.quantity) || 1) + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updatePAPItemQty(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:right;font-weight:600;font-size:11px;">\u20b1' + lineBudget.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;"><button type="button" class="btn btn-sm" onclick="removePAPItem(' + idx + ')" style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove"><i class="fas fa-times"></i></button></td>' +
+        '</tr>';
     }).join('');
 
-    // Append grand total row
-    tbody.innerHTML += `<tr style="background:#edf2f7;border-top:2px solid #1a365d;">
-      <td colspan="9" style="padding:6px 8px;font-size:12px;font-weight:700;text-align:right;color:#1a365d;">Grand Total:</td>
-      <td style="padding:6px 8px;font-size:12px;font-weight:700;text-align:right;color:#1a365d;">₱${totalAmount.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-    </tr>`;
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (budgetField) budgetField.value = totalBudget.toFixed(2);
+    if (totalEl) totalEl.textContent = 'Total: \u20b1' + totalBudget.toLocaleString('en-PH',{minimumFractionDigits:2});
+  };
 
-    if (countEl) countEl.textContent = String(items.length);
+  /** Alias - keep renderPAPModalItemsList working for backward compatibility */
+  window.renderPAPModalItemsList = window.renderPAPManualItemsList;
 
-    // Always sync estimated budget from items total
-    const budgetField = document.getElementById('papEstimatedBudget');
-    if (budgetField) budgetField.value = totalAmount.toFixed(2);
+  /** Update PAP manual item unit */
+  window.updatePAPManualItemUnit = function(index, val) {
+    if (!window._papSelectedItems || !window._papSelectedItems[index]) return;
+    window._papSelectedItems[index].unit = val;
+    window._papSelectedItems[index].uom = val;
   };
 
   /** Add a blank manual PAP item row (not from catalog) */
   window.addManualPAPItem = function() {
+    const name = document.getElementById('papManualItemName')?.value?.trim();
+    if (!name) { alert('Please enter the item name.'); return; }
+    const unit = document.getElementById('papManualItemUnit')?.value?.trim() || '';
+    if (!unit) { alert('Please enter the unit (e.g., pc, lot, box, ream).'); return; }
+    const unitPrice = parseFloat(document.getElementById('papManualItemPrice')?.value);
+    if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
+    const qty = Math.max(1, parseInt(document.getElementById('papManualItemQty')?.value) || 1);
+    const desc = document.getElementById('papManualItemDesc')?.value?.trim() || '';
+    const catSel = document.getElementById('papManualItemCategory')?.value || '';
+    const catCustom = document.getElementById('papManualItemCategoryCustom')?.value?.trim() || '';
+    const category = catSel === 'OTHER' ? catCustom : catSel;
+
     if (!window._papSelectedItems) window._papSelectedItems = [];
     window._papSelectedItems.push({
       id: null,
       item_id: null,
       item_code: '',
-      product_category: '',
+      product_category: category,
       account_code: '',
-      product_description: '',
-      available_at: '',
-      quantity: 1,
-      uom: 'lot',
-      unit_price: 0,
-      total_amount: 0,
-      procurement_source: 'PAPs'
+      product_description: name + (desc ? ' - ' + desc : ''),
+      item_name: name,
+      description: desc,
+      category: category,
+      available_at: 'PAPs',
+      quantity: qty,
+      uom: unit,
+      unit: unit,
+      unit_price: unitPrice,
+      total_amount: unitPrice * qty,
+      budget: unitPrice * qty,
+      procurement_source: 'PAPs',
+      is_manual: true
     });
-    renderPAPModalItemsList();
-    // Focus the last description input for quick entry (manual items only)
-    setTimeout(() => {
-      const tbody = document.getElementById('papItemsListBody');
-      if (tbody) {
-        const rows = tbody.querySelectorAll('tr');
-        const lastRow = rows[rows.length - 2]; // -2 because last row is grand total
-        if (lastRow) {
-          const descInput = lastRow.querySelector('input[type="text"]');
-          if (descInput) descInput.focus();
-        }
-      }
-    }, 50);
+    renderPAPManualItemsList();
+
+    // Clear inputs for next entry
+    document.getElementById('papManualItemName').value = '';
+    document.getElementById('papManualItemDesc').value = '';
+    document.getElementById('papManualItemUnit').value = '';
+    document.getElementById('papManualItemPrice').value = '';
+    document.getElementById('papManualItemQty').value = '1';
+    document.getElementById('papManualItemName').focus();
   };
 
   /** Remove a PAP item */
@@ -11325,9 +11346,18 @@ Failure to submit the above requirements within the prescribed period shall cons
       custom.style.display = sel.value === 'OTHER' ? 'block' : 'none';
     }
   };
+  /** Toggle custom category input visibility for PAP manual items */
+  window.togglePAPManualCategoryCustom = function() {
+    const sel = document.getElementById('papManualItemCategory');
+    const custom = document.getElementById('papManualItemCategoryCustom');
+    if (sel && custom) {
+      custom.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+    }
+  };
   // Attach onchange after DOM ready
   document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'manualItemCategory') toggleManualCategoryCustom();
+    if (e.target && e.target.id === 'papManualItemCategory') togglePAPManualCategoryCustom();
   });
 
   /** Add a manual item to the list (not from catalog) */
