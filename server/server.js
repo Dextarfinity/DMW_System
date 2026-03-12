@@ -241,7 +241,7 @@ app.use((req, res, next) => {
 // ==============================================================================
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || '192.168.100.235',
+  host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'dmw_db',
   password: process.env.DB_PASSWORD || 'dmw123',
   port: parseInt(process.env.DB_PORT) || 5432,
@@ -300,6 +300,18 @@ function getLocalIP() {
     }
   }
   return 'localhost';
+}
+
+/** Return ALL non-internal IPv4 addresses (for dual-network logging) */
+function getAllLocalIPs() {
+  const ips = [];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) ips.push({ name, address: iface.address });
+    }
+  }
+  return ips;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dmw_procurement_secret_key_2026_change_in_production';
@@ -628,7 +640,7 @@ app.post('/api/auth/register', async (req, res) => {
     console.error('Register error:', err);
     res.status(500).json({ error: err.message });
   }
-});F
+});
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
@@ -737,6 +749,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       ppmpByDiv,
       // Budget utilization
       totalPPMPBudget,
+      // PPMP status breakdown
+      ppmpStatusBreakdown,
       // Recent PRs
       recentPRs,
       // Procurement tracker
@@ -749,8 +763,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     ] = await Promise.all([
       // Basic counts — uses safeQuery so missing tables don't crash the dashboard
       safeQuery('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
-      safeQuery('SELECT COUNT(*) FROM procurementplans'),
-      safeQuery("SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL"),
+      safeQuery('SELECT COUNT(*) FROM procurementplans WHERE (is_deleted = false OR is_deleted IS NULL)'),
+      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
       safeQuery('SELECT COUNT(*) FROM purchaserequests'),
       safeQuery('SELECT COUNT(*) FROM purchaseorders'),
       safeQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
@@ -779,10 +793,12 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       safeQuery("SELECT status, COUNT(*)::int as count FROM purchaserequests GROUP BY status"),
       safeQuery("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
       safeQuery("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
-      // PPMP by division
-      safeQuery("SELECT d.code, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL GROUP BY d.code ORDER BY d.code"),
-      // Total PPMP budget
-      safeQuery("SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL"),
+      // PPMP by division (with status breakdown) — current fiscal year only
+      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
+      // Total PPMP budget — current fiscal year only
+      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
+      // PPMP status breakdown — current fiscal year only
+      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
       // Recent PRs with department + item descriptions
       safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
         COALESCE(
@@ -827,9 +843,20 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     const iarStatusMap = {};
     iarByStatus.rows.forEach(r => { iarStatusMap[r.acceptance] = r.count; });
 
-    // Build division PPMP map
+    // Build division PPMP map (with approved/pending breakdown)
     const divisionPPMP = {};
-    ppmpByDiv.rows.forEach(r => { divisionPPMP[r.code] = { count: r.count, budget: parseFloat(r.budget) }; });
+    ppmpByDiv.rows.forEach(r => {
+      if (!divisionPPMP[r.code]) divisionPPMP[r.code] = { count: 0, budget: 0, approved: 0, approvedBudget: 0, pending: 0, pendingBudget: 0 };
+      const d = divisionPPMP[r.code];
+      d.count += r.count;
+      d.budget += parseFloat(r.budget);
+      if (r.status === 'approved') { d.approved += r.count; d.approvedBudget += parseFloat(r.budget); }
+      else { d.pending += r.count; d.pendingBudget += parseFloat(r.budget); }
+    });
+
+    // Build PPMP status summary
+    const ppmpStatusMap = {};
+    ppmpStatusBreakdown.rows.forEach(r => { ppmpStatusMap[r.status] = { count: r.count, budget: parseFloat(r.budget) }; });
 
     res.json({
       // Summary counts
@@ -867,6 +894,11 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       // Division PPMP
       divisionPPMP: divisionPPMP,
       totalPPMPBudget: parseFloat(totalPPMPBudget.rows[0].total),
+      ppmpStatusBreakdown: ppmpStatusMap,
+      ppmpApprovedCount: (ppmpStatusMap['approved'] || {}).count || 0,
+      ppmpApprovedBudget: (ppmpStatusMap['approved'] || {}).budget || 0,
+      ppmpPendingCount: (ppmpStatusMap['pending'] || {}).count || 0,
+      ppmpPendingBudget: (ppmpStatusMap['pending'] || {}).budget || 0,
       // Recent PRs
       recentPRs: recentPRs.rows,
       // Recent activity removed
@@ -1555,6 +1587,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
               bu.username as budget_approver_name,
+              du.username as declined_by_name,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
               it.procurement_source as item_procurement_source,
@@ -1566,6 +1599,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id
+       LEFT JOIN users du ON pp.declined_by = du.id
        LEFT JOIN items it ON pp.item_id = it.id`;
     const params = [];
     const conditions = [];
@@ -1630,13 +1664,15 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
               it.category as item_category, it.description as item_description_detail,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
-              bu.username as budget_approver_name
+              bu.username as budget_approver_name,
+              du.username as declined_by_name
        FROM procurementplans pp 
        LEFT JOIN departments d ON pp.dept_id = d.id 
        LEFT JOIN items it ON pp.item_id = it.id
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id
+       LEFT JOIN users du ON pp.declined_by = du.id
        WHERE pp.id = $1`,
       [req.params.id]
     );
@@ -1901,6 +1937,28 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
         `UPDATE procurementplans SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW() WHERE id = $2`,
         [userId, req.params.id]
       );
+
+      // Auto-add manual items to Items Catalog if item_id is NULL
+      if (!up.item_id) {
+        try {
+          const procSource = up.procurement_source || 'NON PS-DBM';
+          const codePrefix = procSource === 'PAPs' ? 'PAP-A-' : 'NPD-A-';
+          const itemCode = codePrefix + Date.now();
+          const itemName = (up.description || '').split('\n')[0].trim() || 'Approved Item';
+          const newItem = await pool.query(
+            `INSERT INTO items (code, name, description, unit, unit_price, category, procurement_source, quantity, reorder_point, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, true) RETURNING id, code`,
+            [itemCode, itemName, up.item_description || up.description || '', up.quantity_size ? 'pc' : 'lot', up.total_amount || 0, up.category || '', procSource]
+          );
+          // Link the PPMP entry to the new catalog item
+          await pool.query('UPDATE procurementplans SET item_id = $1 WHERE id = $2', [newItem.rows[0].id, req.params.id]);
+          console.log(`Auto-created catalog item ${newItem.rows[0].code} (id: ${newItem.rows[0].id}) for approved PPMP ${up.ppmp_no}`);
+        } catch (catErr) {
+          console.error('Failed to auto-create catalog item for PPMP', up.ppmp_no, catErr.message);
+          // Don't block the approval — just log the error
+        }
+      }
+
       const final = await pool.query(
         `SELECT pp.*, u1.username as chief_approver_name, u2.username as hope_approver_name, u3.username as budget_approver_name
          FROM procurementplans pp
@@ -1928,6 +1986,119 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
     if (!up.approved_by_budget) remaining.push('Budget Consultant');
     res.json({ message: `Approved by ${whoApproved}. Awaiting: ${remaining.join(', ')}.`, status: 'pending', plan: partial.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/plans/:id/decline — Decline a PPMP entry (send back for revision)
+// Available to Chief FAD/WRSD, BAC Chair, HOPE, Budget Consultant, Admin
+app.put('/api/plans/:id/decline', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const userId = req.user.id;
+    const { reason } = req.body;
+
+    if (!userRoles.some(r => ['chief_fad', 'chief_wrsd', 'bac_chair', 'hope', 'budget_consultant', 'admin'].includes(r))) {
+      return res.status(403).json({ error: 'Only Chief FAD, Chief WRSD, BAC Chair, HOPE, Budget Consultant, or Admin can decline PPMPs' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A reason for declining is required' });
+    }
+
+    const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
+    if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    const p = plan.rows[0];
+
+    if (p.status === 'approved') return res.status(400).json({ error: 'Cannot decline an already approved PPMP' });
+    if (p.status === 'rejected') return res.status(400).json({ error: 'PPMP is already declined' });
+
+    // Set status to rejected, clear all approvals so it can go through the full cycle again after revision
+    await pool.query(
+      `UPDATE procurementplans
+       SET status = 'rejected',
+           declined_by = $1, declined_at = NOW(), decline_reason = $2,
+           approved_by_chief = NULL, chief_approved_at = NULL,
+           approved_by_hope = NULL, hope_approved_at = NULL,
+           approved_by_budget = NULL, budget_approved_at = NULL,
+           approved_by = NULL, approved_at = NULL,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [userId, reason.trim(), req.params.id]
+    );
+
+    // Determine who declined
+    const effectiveRole = userRoles.find(r => ['chief_fad', 'chief_wrsd', 'bac_chair', 'hope', 'budget_consultant'].includes(r)) || 'admin';
+    const roleLabel = effectiveRole === 'chief_wrsd' ? 'Chief WRSD' : effectiveRole === 'chief_fad' ? 'Chief FAD' : effectiveRole === 'bac_chair' ? 'BAC Chair' : effectiveRole === 'hope' ? 'HOPE' : effectiveRole === 'budget_consultant' ? 'Budget Consultant' : 'Admin';
+
+    // Notify the PPMP encoder (created_by user)
+    if (p.created_by) {
+      const ppmpNo = p.ppmp_no || `PPMP-${req.params.id}`;
+      await createNotification(p.created_by, {
+        type: 'warning',
+        icon: 'fas fa-exclamation-triangle',
+        title: 'PPMP Declined — Needs Revision',
+        message: `Your PPMP entry ${ppmpNo} was declined by ${roleLabel}. Reason: "${reason.trim()}". Please revise and resubmit.`,
+        reference_type: 'ppmp',
+        reference_id: p.id,
+        reference_code: ppmpNo
+      });
+    }
+
+    // Emit real-time event so other clients refresh
+    if (global.io) {
+      global.io.emit('data_changed', { resource: 'plans', action: 'update', id: p.id });
+      global.io.emit('data_changed', { resource: 'notifications', action: 'create' });
+    }
+
+    console.log(`PPMP ${p.ppmp_no} declined by user ${userId} (${roleLabel}): ${reason.trim()}`);
+    res.json({ message: `PPMP declined by ${roleLabel}. The encoder has been notified to revise and resubmit.`, status: 'rejected' });
+  } catch (err) {
+    console.error('Decline PPMP error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/plans/:id/resubmit — Resubmit a declined PPMP after revision
+app.put('/api/plans/:id/resubmit', authenticateToken, async (req, res) => {
+  try {
+    const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
+    if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    const p = plan.rows[0];
+
+    if (p.status !== 'rejected') return res.status(400).json({ error: 'Only declined PPMPs can be resubmitted' });
+
+    // Reset to pending for fresh approval cycle
+    await pool.query(
+      `UPDATE procurementplans
+       SET status = 'pending',
+           declined_by = NULL, declined_at = NULL, decline_reason = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [req.params.id]
+    );
+
+    // Notify approval roles about the resubmission
+    const ppmpNo = p.ppmp_no || `PPMP-${req.params.id}`;
+    await broadcastNotification({
+      type: 'info',
+      icon: 'fas fa-redo',
+      title: 'PPMP Resubmitted for Approval',
+      message: `PPMP entry ${ppmpNo} has been revised and resubmitted for approval.`,
+      reference_type: 'ppmp',
+      reference_id: p.id,
+      reference_code: ppmpNo,
+      roles: ['chief_fad', 'chief_wrsd', 'bac_chair', 'hope', 'budget_consultant', 'admin']
+    });
+
+    if (global.io) {
+      global.io.emit('data_changed', { resource: 'plans', action: 'update', id: p.id });
+      global.io.emit('data_changed', { resource: 'notifications', action: 'create' });
+    }
+
+    console.log(`PPMP ${ppmpNo} resubmitted for approval`);
+    res.json({ message: `PPMP ${ppmpNo} resubmitted for approval. All approvers have been notified.`, status: 'pending' });
+  } catch (err) {
+    console.error('Resubmit PPMP error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET all plan items across all plans (for the APP page)
@@ -1963,38 +2134,104 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
+// PUT adjust APP item budget (total_amount on procurementplans)
+app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const allowedRoles = ['admin', 'hope', 'budget_consultant', 'bac_secretariat', 'encoder'];
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    if (!userRoles.some(r => allowedRoles.includes(r) || chiefRoles.includes(r))) {
+      return res.status(403).json({ error: 'Not authorized to adjust APP budget' });
+    }
+    const { total_amount, reason } = req.body;
+    if (total_amount === undefined || total_amount === null || isNaN(parseFloat(total_amount)) || parseFloat(total_amount) < 0) {
+      return res.status(400).json({ error: 'Valid total_amount is required' });
+    }
+    // Get current plan info
+    const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
+    if (!plan.rows.length) return res.status(404).json({ error: 'APP item not found' });
+    const oldAmount = parseFloat(plan.rows[0].total_amount || 0);
+    const newAmount = parseFloat(total_amount);
+    // Update the budget
+    const result = await pool.query(
+      `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [newAmount, req.params.id]
+    );
+    // Log the adjustment
+    console.log(`APP budget adjusted: Plan #${req.params.id} from ₱${oldAmount} to ₱${newAmount} by user ${req.user.username} (${reason || 'no reason'})`);
+    // Emit real-time update
+    io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id) });
+    res.json({ message: 'Budget adjusted successfully', old_amount: oldAmount, new_amount: newAmount, plan: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // GET APP budget summary (total allocated, active, available)
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
   try {
     const fy = req.query.fiscal_year || new Date().getFullYear();
+    // Only count non-deleted approved PPMPs for budget figures
     const result = await pool.query(
       `SELECT 
         COALESCE(SUM(total_amount), 0) as total_budget,
-        COALESCE(SUM(CASE WHEN is_deleted = false OR is_deleted IS NULL THEN total_amount ELSE 0 END), 0) as active_budget,
-        COALESCE(SUM(CASE WHEN is_deleted = true THEN total_amount ELSE 0 END), 0) as available_budget,
-        COUNT(*) FILTER (WHERE is_deleted = false OR is_deleted IS NULL) as active_count,
-        COUNT(*) FILTER (WHERE is_deleted = true) as removed_count
+        COALESCE(SUM(total_amount), 0) as active_budget,
+        COUNT(*)::int as active_count
        FROM procurementplans
-       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
+         AND (is_deleted = false OR is_deleted IS NULL)`,
       [fy]
     );
-    // Department breakdown
+    // Count removed (soft-deleted) approved PPMPs for this fiscal year
+    const removedResult = await pool.query(
+      `SELECT COUNT(*)::int as removed_count,
+              COALESCE(SUM(total_amount), 0) as removed_budget
+       FROM procurementplans
+       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
+         AND is_deleted = true`,
+      [fy]
+    );
+    const row = result.rows[0];
+    const removed = removedResult.rows[0];
+    // Department breakdown (non-deleted approved only)
     const deptResult = await pool.query(
       `SELECT d.code as department_code, d.name as department_name,
-              COALESCE(SUM(pp.total_amount), 0) as total,
-              COALESCE(SUM(CASE WHEN pp.is_deleted = false OR pp.is_deleted IS NULL THEN pp.total_amount ELSE 0 END), 0) as active,
-              COALESCE(SUM(CASE WHEN pp.is_deleted = true THEN pp.total_amount ELSE 0 END), 0) as available,
-              COUNT(*) FILTER (WHERE pp.is_deleted = false OR pp.is_deleted IS NULL) as active_count,
-              COUNT(*) FILTER (WHERE pp.is_deleted = true) as removed_count
+              COALESCE(SUM(pp.total_amount), 0) as active,
+              COUNT(*)::int as active_count
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
        WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+         AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
        GROUP BY d.code, d.name ORDER BY d.code`,
       [fy]
     );
-    res.json({ ...result.rows[0], by_department: deptResult.rows });
+    // Department removed breakdown
+    const deptRemovedResult = await pool.query(
+      `SELECT d.code as department_code,
+              COALESCE(SUM(pp.total_amount), 0) as removed_budget,
+              COUNT(*)::int as removed_count
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+         AND pp.is_deleted = true
+       GROUP BY d.code`,
+      [fy]
+    );
+    // Merge removed data into department breakdown
+    const removedMap = {};
+    deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
+    const departments = deptResult.rows.map(d => ({
+      ...d,
+      removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
+      removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
+    }));
+    res.json({
+      total_budget: row.total_budget,
+      active_budget: row.active_budget,
+      available_budget: '0',
+      active_count: row.active_count,
+      removed_count: removed.removed_count,
+      removed_budget: removed.removed_budget,
+      by_department: departments
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2013,11 +2250,11 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       [fiscalYear]
     );
 
-    // Get total including deleted (original approved budget)
+    // Get total approved (non-deleted only)
     const totalResult = await pool.query(
-      `SELECT COALESCE(SUM(total_amount), 0) as total_approved,
-              COALESCE(SUM(CASE WHEN is_deleted = true THEN total_amount ELSE 0 END), 0) as available_budget
-       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+      `SELECT COALESCE(SUM(total_amount), 0) as total_approved
+       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
+         AND (is_deleted = false OR is_deleted IS NULL)`,
       [fiscalYear]
     );
 
@@ -2028,6 +2265,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
        WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+         AND pp.status = 'approved'
        GROUP BY d.name ORDER BY d.name`,
       [fiscalYear]
     );
@@ -2038,7 +2276,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       total_items: parseInt(result.rows[0].item_count),
       total_abc: parseFloat(result.rows[0].total_abc),
       total_approved: parseFloat(totalResult.rows[0].total_approved),
-      available_budget: parseFloat(totalResult.rows[0].available_budget),
+      available_budget: 0,
       by_department: deptBreakdown.rows
     });
   } catch (err) {
@@ -5321,15 +5559,20 @@ app.get('/api/connected-clients', authenticateToken, (req, res) => {
 // ==============================================================================
 
 const server = httpServer.listen(PORT, HOST, () => {
-  const localIP = getLocalIP();
+  const allIPs = getAllLocalIPs();
   console.log('========================================');
   console.log('  DMW Procurement & Inventory System    ');
   console.log('  Full API Server v4.0 (Real-Time)      ');
   console.log('========================================');
-  console.log(`Server running on:`);
+  console.log(`Server listening on ${HOST}:${PORT}`);
   console.log(`  Local:   http://localhost:${PORT}`);
-  console.log(`  Network: http://${localIP}:${PORT}`);
-  console.log(`  Socket:  ws://${localIP}:${PORT}`);
+  if (allIPs.length) {
+    allIPs.forEach(ip => {
+      console.log(`  Network: http://${ip.address}:${PORT}  (${ip.name})`);
+    });
+  } else {
+    console.log(`  Network: no external interfaces found`);
+  }
   console.log('----------------------------------------');
   console.log('Real-Time: Socket.IO enabled — all Electron clients sync instantly');
   console.log('----------------------------------------');

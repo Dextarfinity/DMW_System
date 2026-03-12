@@ -6,8 +6,68 @@
 // =====================================================
 const { io: ioConnect } = require('socket.io-client');
 
-// Derive the Socket.IO server URL from the API URL (same host, port 3000)
-const SOCKET_SERVER_URL = 'http://192.168.100.235:3000';
+// =====================================================
+// DUAL-NETWORK SERVER DISCOVERY
+// The server PC has two WiFi adapters. Clients on either
+// network can reach it via whichever IP is on their subnet.
+// =====================================================
+const SERVER_PORT = 3000;
+const SERVER_IPS = [
+  '192.168.100.235',   // WiFi Network 1 (original)
+  '192.168.1.117'      // WiFi Network 2
+];
+  
+// Resolved at startup — set by discoverServer()
+let RESOLVED_SERVER_IP = null;
+let SOCKET_SERVER_URL = null;
+let _serverDiscoveryPromise = null;
+
+/**
+ * Race all candidate IPs — the first one to respond on /api/health wins.
+ * Returns the IP string. Falls back to the first IP if none respond.
+ */
+function discoverServer() {
+  if (_serverDiscoveryPromise) return _serverDiscoveryPromise;
+
+  _serverDiscoveryPromise = new Promise((resolve) => {
+    let settled = false;
+
+    // Also try localhost for the server PC itself
+    const candidates = [...SERVER_IPS, 'localhost'];
+
+    candidates.forEach(ip => {
+      const url = `http://${ip}:${SERVER_PORT}/api/health`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+
+      fetch(url, { signal: controller.signal })
+        .then(r => {
+          clearTimeout(timer);
+          if (r.ok && !settled) {
+            settled = true;
+            RESOLVED_SERVER_IP = ip;
+            SOCKET_SERVER_URL = `http://${ip}:${SERVER_PORT}`;
+            console.log(`[DISCOVERY] Server found at ${ip}:${SERVER_PORT}`);
+            resolve(ip);
+          }
+        })
+        .catch(() => { clearTimeout(timer); });
+    });
+
+    // Fallback after 4 seconds — use first IP
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        RESOLVED_SERVER_IP = SERVER_IPS[0];
+        SOCKET_SERVER_URL = `http://${SERVER_IPS[0]}:${SERVER_PORT}`;
+        console.warn('[DISCOVERY] No server responded; falling back to', SERVER_IPS[0]);
+        resolve(SERVER_IPS[0]);
+      }
+    }, 4000);
+  });
+
+  return _serverDiscoveryPromise;
+}
 
 // Socket instance (created once, reconnects automatically)
 let socket = null;
@@ -23,6 +83,12 @@ let _socketReconnectTimer = null;
 
 
 function connectSocket() {
+  // Ensure we have a resolved URL
+  if (!SOCKET_SERVER_URL) {
+    console.warn('[SOCKET] Server not yet discovered, deferring connect');
+    discoverServer().then(() => connectSocket());
+    return;
+  }
   // Prevent duplicate connections
   if (socket && socket.connected) return;
   if (socket) { socket.disconnect(); socket = null; }
@@ -487,10 +553,15 @@ function getPrintHeaderCSS() {
 }
 
 
-// API Configuration - Use the server's network IP so other machines on the LAN can connect
-const API_URL = (window.location.hostname === 'localhost' || window.location.protocol === 'file:')
-  ? 'http://192.168.100.235:3000/api'
-  : `http://${window.location.hostname}:3000/api`;
+// API Configuration - Resolved dynamically via discoverServer()
+// Before discovery completes, API_URL is null; getApiUrl() returns the resolved value.
+let API_URL = null;
+
+function getApiUrl() {
+  if (API_URL) return API_URL;
+  // Fallback if called before discovery (shouldn't happen in normal flow)
+  return `http://${SERVER_IPS[0]}:${SERVER_PORT}/api`;
+}
 
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
@@ -1837,6 +1908,7 @@ async function loadSettings() {
 // Dashboard stats update — all data from single API call
 function updateDashboardStats(s) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const fmt = v => '₱' + (v || 0).toLocaleString('en-PH', {minimumFractionDigits:2});
   
   // Row 1 - Procurement
   set('statTotalPPMP', s.totalPPMPItems || 0);
@@ -1851,11 +1923,17 @@ function updateDashboardStats(s) {
   set('statTotalEmployees', s.totalEmployees || 0);
   
   // Budget banner
-  set('dashTotalBudget', '₱' + (s.totalPPMPBudget || 0).toLocaleString('en-PH', {minimumFractionDigits:2}));
+  set('dashTotalBudget', fmt(s.totalPPMPBudget));
   set('statTotalPlans', s.totalPPMPItems || 0);
   set('dashStockCards', s.totalStockCards || 0);
   set('statPropertyCards', s.totalPropertyCards || 0);
   set('statICS', s.totalICS || 0);
+
+  // PPMP Approved / Pending breakdown
+  set('dashApprovedPPMP', s.ppmpApprovedCount || 0);
+  set('dashApprovedBudget', fmt(s.ppmpApprovedBudget));
+  set('dashPendingPPMP', s.ppmpPendingCount || 0);
+  set('dashPendingBudget', fmt(s.ppmpPendingBudget));
 }
 
 function updateDashboardPipeline(s) {
@@ -2156,11 +2234,12 @@ function updateDashboardDivisionPPMP(divData, totalBudget, canSeeAll, userDiv) {
   
   const maxBudget = Math.max(...divisions.map(d => (divData[d.code] || {}).budget || 0), 1);
   const shownBudget = canSeeAll ? totalBudget : (divData[userDiv] || {}).budget || 0;
+  const fmt = v => '₱' + (v || 0).toLocaleString('en-PH', {minimumFractionDigits:2});
   
   container.innerHTML = divisions.map(div => {
-    const data = divData[div.code] || { count: 0, budget: 0 };
+    const data = divData[div.code] || { count: 0, budget: 0, approved: 0, approvedBudget: 0, pending: 0, pendingBudget: 0 };
     const pct = Math.round((data.budget / maxBudget) * 100);
-    const budgetStr = '₱' + data.budget.toLocaleString('en-PH', {minimumFractionDigits:2});
+    const budgetStr = fmt(data.budget);
     return `
       <div class="division-item" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
@@ -2170,11 +2249,15 @@ function updateDashboardDivisionPPMP(divData, totalBudget, canSeeAll, userDiv) {
         <div class="progress-bar" style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
           <div class="progress-fill" style="width:${pct}%;background:${div.color};height:100%;border-radius:4px;transition:width 0.6s ease;"></div>
         </div>
+        <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:11px;">
+          <span style="color:#38a169;"><i class="fas fa-check-circle" style="font-size:9px;"></i> Approved: ${data.approved || 0} (${fmt(data.approvedBudget)})</span>
+          <span style="color:#e67e22;"><i class="fas fa-clock" style="font-size:9px;"></i> Pending: ${data.pending || 0} (${fmt(data.pendingBudget)})</span>
+        </div>
       </div>
     `;
   }).join('') + `
     <div style="text-align:right;padding-top:8px;border-top:1px solid #e2e8f0;font-size:13px;color:#4a5568;">
-      <strong>${canSeeAll ? 'Grand Total' : userDiv + ' Total'}:</strong> ₱${shownBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}
+      <strong>${canSeeAll ? 'Grand Total' : userDiv + ' Total'}:</strong> ${fmt(shownBudget)}
     </div>
   `;
 }
@@ -2553,7 +2636,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
     items.forEach(p => {
       const deptCode = getDeptCode(p);
       const ppmpNo = p.ppmp_no || `PPMP-${deptCode}-${p.fiscal_year}-${String(p.id).padStart(3, '0')}`;
-      const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'pending' ? 'pending' : p.status === 'draft' ? 'draft' : p.status;
+      const statusClass = p.status === 'approved' ? 'approved' : p.status === 'submitted' ? 'submitted' : p.status === 'pending' ? 'pending' : p.status === 'draft' ? 'draft' : p.status === 'rejected' ? 'rejected' : p.status;
       const mode = getModeBadge(p.procurement_mode);
       
       // Procurement source badge
@@ -2569,6 +2652,13 @@ function renderPPMPTable(ppmp, allPPMPItems) {
         const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
         const budgetDone = p.approved_by_budget ? `<span class="approval-badge chief-done" title="Approved by Budget Consultant: ${p.budget_approver_name || ''}"><i class="fas fa-check-circle"></i> Budget</span>` : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant approval"><i class="fas fa-clock"></i> Budget</span>`;
         approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}${budgetDone}</div>`;
+      } else if (p.status === 'rejected') {
+        const declinedBy = p.declined_by_name || 'Unknown';
+        const declineReason = p.decline_reason || 'No reason provided';
+        approvalInfo = `<div style="margin-top:4px;padding:6px 8px;background:#fff5f5;border:1px solid #fed7d7;border-radius:6px;font-size:10px;">
+          <div style="color:#c53030;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Declined by ${escapeHtml(declinedBy)}</div>
+          <div style="color:#742a2a;margin-top:2px;">${escapeHtml(declineReason)}</div>
+        </div>`;
       }
 
       const userRole = window.currentUser?.role || '';
@@ -2582,6 +2672,16 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       const alreadyApprovedByBudget = !!p.approved_by_budget;
       const userAlreadyApproved = (chiefCanApprove && alreadyApprovedByChief) || (userHasRole('hope') && alreadyApprovedByHope) || (userHasRole('budget_consultant') && alreadyApprovedByBudget);
       const showApproveBtn = canApprove && !userAlreadyApproved;
+
+      // Decline button — same roles as approve, on pending entries
+      const canDecline = p.status === 'pending' && (chiefCanApprove || userRoles.some(r => ['hope', 'budget_consultant', 'admin'].includes(r)));
+
+      // Resubmit button — the encoder (created_by) or admin can resubmit rejected entries
+      const isEncoder = p.created_by === (currentUser.id || currentUser.userId);
+      const canResubmit = p.status === 'rejected' && (isEncoder || userHasRole('admin'));
+
+      // Status display text — show "Needs Revision" instead of "rejected"
+      const statusDisplayText = p.status === 'rejected' ? 'Needs Revision' : p.status;
 
       html += `
       <tr class="ppmp-item-row" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
@@ -2598,7 +2698,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
         <td class="text-right">₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
         <td>${deptCode} - FY ${p.fiscal_year}</td>
         <td>
-          <span class="status-badge ${statusClass}">${p.status}</span>
+          <span class="status-badge ${statusClass}">${statusDisplayText}</span>
           ${approvalInfo}
         </td>
         <td>
@@ -2606,6 +2706,8 @@ function renderPPMPTable(ppmp, allPPMPItems) {
             <button class="btn-icon" data-action="view-ppmp" title="View" onclick="showViewPPMPModal(${p.id})"><i class="fas fa-eye"></i></button>
             <button class="btn-icon" data-action="edit-ppmp" title="Edit" onclick="showEditPPMPModal(${p.id})"><i class="fas fa-edit"></i></button>
             ${showApproveBtn ? `<button class="btn-icon success" data-action="approve-ppmp" title="Approve PPMP" onclick="showApprovePPMPModal(${p.id})"><i class="fas fa-check"></i></button>` : ''}
+            ${canDecline ? `<button class="btn-icon danger" data-action="decline-ppmp" title="Decline PPMP" onclick="showDeclinePPMPModal(${p.id})" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ''}
+            ${canResubmit ? `<button class="btn-icon" data-action="resubmit-ppmp" title="Resubmit for Approval" onclick="resubmitPPMP(${p.id})" style="color:#dd6b20;"><i class="fas fa-redo"></i></button>` : ''}
             <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PPMP', ${p.id})"><i class="fas fa-trash"></i></button>
           </div>
         </td>
@@ -2784,6 +2886,7 @@ function renderAPPTable(items, appStatus) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewAPPModal(${item.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Adjust Budget" onclick="showAdjustAPPBudgetModal(${item.id})" style="color:#d69e2e;"><i class="fas fa-coins"></i></button>
           <button class="btn-icon" title="Create PR" onclick="showCreatePRFromAPPModal(${item.id})"><i class="fas fa-file-signature"></i></button>
         </div>
       </td>
@@ -2801,6 +2904,25 @@ function renderAPPTable(items, appStatus) {
   const appCard = tbody.closest('.data-card');
   if (appCard) initStickyTopScrollbar(appCard);
 }
+
+// APP table search filter — filters visible rows by search text
+window.filterAPPTable = function(searchText) {
+  const tbody = document.getElementById('appTableBody');
+  if (!tbody) return;
+  const query = (searchText || '').toLowerCase().trim();
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    // Skip total/summary rows (they use colspan)
+    const cells = row.querySelectorAll('td');
+    if (cells.length > 0 && cells[0].hasAttribute('colspan')) {
+      row.style.display = '';
+      return;
+    }
+    if (!query) { row.style.display = ''; return; }
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(query) ? '' : 'none';
+  });
+};
 
 function updateAPPSummary(items, budgetSummary) {
   // Determine division filtering — all users see only their own division except global roles
@@ -2865,12 +2987,14 @@ function updateAPPSummary(items, budgetSummary) {
     } else {
       filteredDepts = budgetSummary.by_department.filter(d => d.department_code === userDivCode);
     }
-    totalApproved = filteredDepts.reduce((s, d) => s + parseFloat(d.total || 0), 0);
-    availableBudget = filteredDepts.reduce((s, d) => s + parseFloat(d.available || 0), 0);
+    totalApproved = filteredDepts.reduce((s, d) => s + parseFloat(d.active || 0), 0);
+    availableBudget = totalApproved - activeBudget;
+    if (availableBudget < 0) availableBudget = 0;
     removedCount = filteredDepts.reduce((s, d) => s + parseInt(d.removed_count || 0), 0);
   } else {
-    totalApproved = budgetSummary ? parseFloat(budgetSummary.total_budget || 0) : activeBudget;
-    availableBudget = budgetSummary ? parseFloat(budgetSummary.available_budget || 0) : 0;
+    totalApproved = budgetSummary ? parseFloat(budgetSummary.active_budget || 0) : activeBudget;
+    availableBudget = totalApproved - activeBudget;
+    if (availableBudget < 0) availableBudget = 0;
     removedCount = budgetSummary ? parseInt(budgetSummary.removed_count || 0) : 0;
   }
 
@@ -4528,7 +4652,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Initialize the app
-  function init() {
+  async function init() {
+    // Discover which server IP is reachable BEFORE any API calls
+    await discoverServer();
+    API_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api`;
+    console.log('[INIT] API_URL resolved to', API_URL);
+
     setCurrentDate();
     setupEventListeners();
     populateSignupDivision(); // Populate signup division dropdown (API is public)
@@ -5796,6 +5925,65 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ==================== Government-Styled Dialog Utilities ====================
+
+  /**
+   * Show a government-themed confirmation dialog (replaces native confirm())
+   * @param {Object} opts - { title, bodyHtml, confirmText, cancelText }
+   * @returns {Promise<boolean>}
+   */
+  function govConfirm(opts) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'gov-dialog-overlay';
+      overlay.innerHTML = `
+        <div class="gov-dialog">
+          <div class="gov-dialog-header confirm">
+            <i class="fas fa-clipboard-check"></i>
+            <h4>${opts.title || 'Confirm Action'}</h4>
+          </div>
+          <div class="gov-dialog-body">${opts.bodyHtml || ''}</div>
+          <div class="gov-dialog-footer">
+            <button class="btn btn-cancel" id="govDialogCancel">${opts.cancelText || 'Cancel'}</button>
+            <button class="btn btn-confirm" id="govDialogConfirm"><i class="fas fa-check"></i> ${opts.confirmText || 'Confirm'}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#govDialogConfirm').onclick = () => { overlay.remove(); resolve(true); };
+      overlay.querySelector('#govDialogCancel').onclick = () => { overlay.remove(); resolve(false); };
+    });
+  }
+  window.govConfirm = govConfirm;
+
+  /**
+   * Show a government-themed alert/success dialog (replaces native alert())
+   * @param {Object} opts - { title, bodyHtml, type: 'success'|'error'|'confirm', buttonText }
+   * @returns {Promise<void>}
+   */
+  function govAlert(opts) {
+    return new Promise(resolve => {
+      const type = opts.type || 'success';
+      const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+      const btnClass = type === 'success' ? 'btn-success' : type === 'error' ? 'btn-confirm' : 'btn-confirm';
+      const overlay = document.createElement('div');
+      overlay.className = 'gov-dialog-overlay';
+      overlay.innerHTML = `
+        <div class="gov-dialog">
+          <div class="gov-dialog-header ${type}">
+            <i class="fas ${icon}"></i>
+            <h4>${opts.title || 'Notice'}</h4>
+          </div>
+          <div class="gov-dialog-body">${opts.bodyHtml || ''}</div>
+          <div class="gov-dialog-footer">
+            <button class="btn ${btnClass}" id="govAlertOk">${opts.buttonText || 'OK'}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#govAlertOk').onclick = () => { overlay.remove(); resolve(); };
+    });
+  }
+  window.govAlert = govAlert;
+
   // File attachment validation function
   window.validateAttachment = function(inputId, fieldName) {
     const fileInput = document.getElementById(inputId);
@@ -6459,45 +6647,36 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="ppmpManualItemsSection" style="display:none;">
           <div class="form-section-header"><i class="fas fa-pen"></i> <span id="ppmpManualSectionTitle">Manual Item Entry</span></div>
           <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-            <i class="fas fa-info-circle"></i> Items entered here will be <strong>added directly to the Items Catalog</strong> and linked to this PPMP.
+            <i class="fas fa-info-circle"></i> Items entered here will be <strong>automatically added to the Items Catalog</strong> once this PPMP is fully approved.
           </div>
-          <div class="form-row-3" style="margin-bottom:8px;">
+          <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>Item Name <span class="text-danger">*</span></label>
-              <input type="text" id="manualItemName" placeholder="e.g., Ballpen, Black" style="font-size:12px;">
+              <input type="text" id="manualItemName" placeholder="e.g., Ballpen, Black" style="font-size:13px;">
             </div>
             <div class="form-group">
               <label>Description</label>
-              <input type="text" id="manualItemDesc" placeholder="Specs, size, color..." style="font-size:12px;">
-            </div>
-            <div class="form-group">
-              <label>Category</label>
-              <select class="form-select" id="manualItemCategory" style="font-size:12px;">
-                <option value="">-- Select Category --</option>
-                ${categoryOptions}
-                <option value="OTHER">Other (type below)</option>
-              </select>
-              <input type="text" id="manualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
+              <input type="text" id="manualItemDesc" placeholder="Specs, size, color..." style="font-size:13px;">
             </div>
           </div>
           <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>Unit <span class="text-danger">*</span></label>
-              <select class="form-select" id="manualItemUnit" style="font-size:12px;">
+              <select class="form-select" id="manualItemUnit" style="font-size:13px;">
                 ${uomOptions}
               </select>
             </div>
             <div class="form-group">
               <label>Unit Price (₱) <span class="text-danger">*</span></label>
-              <input type="number" id="manualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;" oninput="calcManualEstBudget()">
+              <input type="number" id="manualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:13px;" oninput="calcManualEstBudget()">
             </div>
             <div class="form-group">
               <label>Quantity <span class="text-danger">*</span></label>
-              <input type="number" id="manualItemQty" value="1" min="1" step="1" style="font-size:12px;" oninput="calcManualEstBudget()">
+              <input type="number" id="manualItemQty" value="1" min="1" step="1" style="font-size:13px;" oninput="calcManualEstBudget()">
             </div>
             <div class="form-group">
-              <label>Estimated Budget</label>
-              <input type="text" id="manualEstBudget" readonly style="font-size:12px;background:#f0f0f0;" value="₱0.00">
+              <label>Est. Budget</label>
+              <input type="number" id="manualEstBudget" step="0.01" min="0" style="font-size:13px;" value="0" oninput="syncManualBudgetFromEdit()">
             </div>
           </div>
           <div style="margin-bottom:12px;">
@@ -6512,11 +6691,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th style="width:30px;">#</th>
                 <th>Item Name</th>
                 <th>Description</th>
-                <th style="width:80px;">Category</th>
                 <th style="width:60px;">Unit</th>
                 <th style="width:90px;">Unit Price</th>
                 <th style="width:60px;">Qty</th>
-                <th style="width:90px;">Budget</th>
+                <th style="width:100px;">Budget</th>
                 <th style="width:40px;"></th>
               </tr></thead>
               <tbody id="ppmpManualItemsListBody"></tbody>
@@ -6530,43 +6708,34 @@ document.addEventListener('DOMContentLoaded', () => {
           <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
             <i class="fas fa-info-circle"></i> Manually enter PAP items below or select from the Item Catalog. All items will be part of a unified list.
           </div>
-          <div class="form-row-3" style="margin-bottom:8px;">
+          <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>PAP Name <span class="text-danger">*</span></label>
-              <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:12px;">
+              <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:13px;">
             </div>
             <div class="form-group">
               <label>Description</label>
-              <textarea id="papManualItemDesc" rows="2" placeholder="Specs, details..." style="font-size:12px;resize:vertical;"></textarea>
-            </div>
-            <div class="form-group">
-              <label>Category</label>
-              <select class="form-select" id="papManualItemCategory" style="font-size:12px;">
-                <option value="">-- Select Category --</option>
-                ${categoryOptions}
-                <option value="OTHER">Other (type below)</option>
-              </select>
-              <input type="text" id="papManualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
+              <textarea id="papManualItemDesc" rows="2" placeholder="Specs, details..." style="font-size:13px;resize:vertical;"></textarea>
             </div>
           </div>
           <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>Unit <span class="text-danger">*</span></label>
-              <select class="form-select" id="papManualItemUnit" style="font-size:12px;">
+              <select class="form-select" id="papManualItemUnit" style="font-size:13px;">
                 ${uomOptions}
               </select>
             </div>
             <div class="form-group">
               <label>Unit Price (₱) <span class="text-danger">*</span></label>
-              <input type="number" id="papManualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;" oninput="calcPAPEstBudget()">
+              <input type="number" id="papManualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:13px;" oninput="calcPAPEstBudget()">
             </div>
             <div class="form-group">
               <label>Quantity <span class="text-danger">*</span></label>
-              <input type="number" id="papManualItemQty" value="1" min="1" step="1" style="font-size:12px;" oninput="calcPAPEstBudget()">
+              <input type="number" id="papManualItemQty" value="1" min="1" step="1" style="font-size:13px;" oninput="calcPAPEstBudget()">
             </div>
             <div class="form-group">
-              <label>Estimated Budget</label>
-              <input type="text" id="papManualEstBudget" readonly style="font-size:12px;background:#f0f0f0;" value="₱0.00">
+              <label>Est. Budget</label>
+              <input type="number" id="papManualEstBudget" step="0.01" min="0" style="font-size:13px;" value="0" oninput="syncPAPBudgetFromEdit()">
             </div>
           </div>
           <div style="margin-bottom:12px;">
@@ -6582,11 +6751,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th style="width:30px;">#</th>
                 <th>PAP Name</th>
                 <th>Description</th>
-                <th style="width:80px;">Category</th>
                 <th style="width:60px;">Unit</th>
                 <th style="width:90px;">Unit Price</th>
                 <th style="width:60px;">Qty</th>
-                <th style="width:90px;">Budget</th>
+                <th style="width:100px;">Budget</th>
                 <th style="width:40px;"></th>
               </tr></thead>
               <tbody id="papItemsListBody"></tbody>
@@ -10058,43 +10226,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!division) { alert('Please select a division.'); return; }
 
     const totalBudget = items.reduce((sum, it) => sum + it.budget, 0);
-    const itemSummary = items.map((it, i) => `  ${i+1}. ${it.item_name || it.description} (x${it.quantity}) = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}`).join('\n');
-    if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
+    const itemLines = items.map((it, i) =>
+      `<div class="item-line">${i+1}. ${it.item_name || it.description} <span style="float:right;">x${it.quantity} = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>`
+    ).join('');
+
+    const confirmed = await govConfirm({
+      title: 'Save PPMP Entries',
+      bodyHtml: `
+        <p>You are about to save <strong>${items.length} PPMP entr${items.length > 1 ? 'ies' : 'y'}</strong> for <strong>${division}</strong> — FY ${fiscalYear}.</p>
+        <div class="item-summary">${itemLines}</div>
+        <div class="total-line">Total Estimated Budget: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>`,
+      confirmText: 'Save Entries',
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
 
     try {
-      // Create manual items in the Items Catalog first (for any procurement source)
+      // Manual items will be auto-added to the Items Catalog when PPMP is fully approved
+      // (by Chief, Budget Consultant, and HOPE). For now, just save with item_id = null.
       const manualItemsInList = items.filter(it => it.is_manual);
       if (manualItemsInList.length > 0) {
         const catalogSource = isPAPs ? 'PAPs' : 'NON PS-DBM';
-        const codePrefix = isPAPs ? 'PAP-M-' : 'NPD-M-';
-        for (let i = 0; i < manualItemsInList.length; i++) {
-          const it = manualItemsInList[i];
-          const itemData = {
-            code: codePrefix + Date.now() + '-' + i,
-            name: it.item_name,
-            description: it.item_description || it.description || it.item_name,
-            unit: it.unit || it.item_unit || 'pc',
-            unit_price: it.unit_price || 0,
-            category: it.item_category || it.category || '',
-            procurement_source: catalogSource,
-            quantity: 0,
-            reorder_point: 0
-          };
-          try {
-            const created = await apiRequest('/items', 'POST', itemData);
-            it.item_id = created.id;
-            it.item_code = created.code;
-            it.item_category = created.category || it.item_category || it.category;
-            it.item_name = created.name || it.item_name;
-            it.procurement_source = catalogSource;
-          } catch(catErr) {
-            console.error('Failed to create catalog item:', it.item_name, catErr);
-            alert('Failed to add item "' + it.item_name + '" to catalog: ' + catErr.message);
-            return;
-          }
-        }
-        // Refresh items cache
-        try { window._ppmpItemsCache = await apiRequest('/items'); } catch(e) {}
+        manualItemsInList.forEach(it => {
+          it.item_id = null;
+          it.procurement_source = catalogSource;
+        });
       }
 
       // Generate PPMP numbers for the batch (use full year to match server format)
@@ -10175,12 +10331,24 @@ Failure to submit the above requirements within the prescribed period shall cons
         ]);
       }
 
-      alert(`Successfully saved ${savedCount} of ${entries.length} PPMP entries!`);
+      await govAlert({
+        title: 'PPMP Entries Saved',
+        type: 'success',
+        bodyHtml: `<p style="text-align:center;"><i class="fas fa-check-circle" style="font-size:36px;color:#28a745;display:block;margin-bottom:10px;"></i>
+          Successfully saved <strong>${savedCount}</strong> of <strong>${entries.length}</strong> PPMP entr${entries.length > 1 ? 'ies' : 'y'}.</p>
+          <p style="text-align:center;font-size:12px;color:#718096;">Entries are now pending approval by Chief, HOPE, and Budget Consultant.</p>`,
+        buttonText: 'Done'
+      });
       closeModal();
       if (typeof loadPlans === 'function') loadPlans();
       else if (typeof loadPageData === 'function') loadPageData();
     } catch (err) {
-      alert('Error saving PPMP entries: ' + err.message);
+      govAlert({
+        title: 'Error Saving PPMP',
+        type: 'error',
+        bodyHtml: `<p>Failed to save PPMP entries:</p><p style="color:#dc3545;font-weight:600;">${err.message}</p>`,
+        buttonText: 'OK'
+      });
     }
   };
 
@@ -11006,7 +11174,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
         '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name || it.product_description || '') + '</td>' +
         '<td style="font-size:11px;">' + escapeHtml(it.description || '') + '</td>' +
-        '<td style="font-size:10px;">' + escapeHtml(it.category || it.product_category || '') + '</td>' +
         '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit || it.uom || '') + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updatePAPManualItemUnit(' + idx + ', this.value)"></td>' +
         '<td><input type="number" value="' + (parseFloat(it.unit_price) || 0).toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updatePAPItemPrice(' + idx + ', this.value)"></td>' +
         '<td><input type="number" value="' + (parseInt(it.quantity) || 1) + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updatePAPItemQty(' + idx + ', this.value)"></td>' +
@@ -11039,28 +11206,27 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
     const qty = Math.max(1, parseInt(document.getElementById('papManualItemQty')?.value) || 1);
     const desc = document.getElementById('papManualItemDesc')?.value?.trim() || '';
-    const catSel = document.getElementById('papManualItemCategory')?.value || '';
-    const catCustom = document.getElementById('papManualItemCategoryCustom')?.value?.trim() || '';
-    const category = catSel === 'OTHER' ? catCustom : catSel;
+    const budgetOverride = parseFloat(document.getElementById('papManualEstBudget')?.value);
+    const budget = (!isNaN(budgetOverride) && budgetOverride > 0) ? budgetOverride : unitPrice * qty;
 
     if (!window._papSelectedItems) window._papSelectedItems = [];
     window._papSelectedItems.push({
       id: null,
       item_id: null,
       item_code: '',
-      product_category: category,
+      product_category: '',
       account_code: '',
       product_description: name + (desc ? ' - ' + desc : ''),
       item_name: name,
       description: desc,
-      category: category,
+      category: '',
       available_at: 'PAPs',
       quantity: qty,
       uom: unit,
       unit: unit,
       unit_price: unitPrice,
-      total_amount: unitPrice * qty,
-      budget: unitPrice * qty,
+      total_amount: budget,
+      budget: budget,
       procurement_source: 'PAPs',
       is_manual: true
     });
@@ -11073,7 +11239,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('papManualItemPrice').value = '';
     document.getElementById('papManualItemQty').value = '1';
     const estBudget = document.getElementById('papManualEstBudget');
-    if (estBudget) estBudget.value = '\u20b10.00';
+    if (estBudget) estBudget.value = '0';
     document.getElementById('papManualItemName').focus();
   };
 
@@ -11082,7 +11248,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     const price = parseFloat(document.getElementById('papManualItemPrice')?.value) || 0;
     const qty = parseInt(document.getElementById('papManualItemQty')?.value) || 1;
     const el = document.getElementById('papManualEstBudget');
-    if (el) el.value = '\u20b1' + (price * qty).toLocaleString('en-PH', {minimumFractionDigits:2});
+    if (el) el.value = (price * qty).toFixed(2);
+  };
+
+  /** Sync PAP price/qty when user manually edits budget */
+  window.syncPAPBudgetFromEdit = function() {
+    // User edited the budget directly — no auto-recalc needed, just let them type
   };
 
   /** Calculate estimated budget for Non-PSDBM manual entry form */
@@ -11090,7 +11261,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     const price = parseFloat(document.getElementById('manualItemPrice')?.value) || 0;
     const qty = parseInt(document.getElementById('manualItemQty')?.value) || 1;
     const el = document.getElementById('manualEstBudget');
-    if (el) el.value = '\u20b1' + (price * qty).toLocaleString('en-PH', {minimumFractionDigits:2});
+    if (el) el.value = (price * qty).toFixed(2);
+  };
+
+  /** Sync manual budget when user manually edits budget */
+  window.syncManualBudgetFromEdit = function() {
+    // User edited the budget directly — no auto-recalc needed, just let them type
   };
 
   /** Remove a PAP item */
@@ -11342,9 +11518,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
     const qty = Math.max(1, parseInt(document.getElementById('manualItemQty')?.value) || 1);
     const desc = document.getElementById('manualItemDesc')?.value?.trim() || '';
-    const catSel = document.getElementById('manualItemCategory')?.value || '';
-    const catCustom = document.getElementById('manualItemCategoryCustom')?.value?.trim() || '';
-    const category = catSel === 'OTHER' ? catCustom : catSel;
+    const budgetOverride = parseFloat(document.getElementById('manualEstBudget')?.value);
+    const budget = (!isNaN(budgetOverride) && budgetOverride > 0) ? budgetOverride : unitPrice * qty;
     const actualSource = 'NON PS-DBM';
 
     const entry = {
@@ -11352,13 +11527,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_name: name,
       item_code: '',
       item_unit: unit,
-      item_category: category,
+      item_category: '',
       item_description: desc,
       description: name + (desc ? ' - ' + desc : ''),
       unit: unit,
       unit_price: unitPrice,
       quantity: qty,
-      budget: unitPrice * qty,
+      budget: budget,
       procurement_source: actualSource,
       is_manual: true
     };
@@ -11375,7 +11550,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('manualItemPrice').value = '';
     document.getElementById('manualItemQty').value = '1';
     const estBudget = document.getElementById('manualEstBudget');
-    if (estBudget) estBudget.value = '\u20b10.00';
+    if (estBudget) estBudget.value = '0';
     document.getElementById('manualItemName').focus();
   };
 
@@ -11433,7 +11608,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
         '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name) + '</td>' +
         '<td style="font-size:11px;">' + escapeHtml(it.description) + '</td>' +
-        '<td style="font-size:10px;">' + escapeHtml(it.category) + '</td>' +
         '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit) + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updateManualItemUnit(' + idx + ', this.value)"></td>' +
         '<td><input type="number" value="' + it.unit_price.toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updateManualItemPrice(' + idx + ', this.value)"></td>' +
         '<td><input type="number" value="' + it.quantity + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updateManualItemQty(' + idx + ', this.value)"></td>' +
@@ -15633,6 +15807,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button type="button" class="btn" onclick="closeModal();showDeclinePPMPModal(${planId})" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Decline</button>
           ${canUserApprove ? `<button type="button" class="btn btn-primary" onclick="approvePPMP(${planId})" style=""><i class="fas fa-check"></i> ${approveLabel}</button>` : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PPMP with your current role.</p>`}
         </div>
       `;
@@ -15653,6 +15828,93 @@ Failure to submit the above requirements within the prescribed period shall cons
       else if (typeof loadPageData === 'function') loadPageData();
     } catch (err) {
       alert('Approval failed: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // DECLINE PPMP — Send back for revision
+  // =====================================================
+
+  // Show Decline PPMP modal with reason input
+  window.showDeclinePPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(p) {
+        if (p.department_code) return p.department_code;
+        const name = p.department_name;
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan);
+      const ppmpNo = plan.ppmp_no || ('PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0'));
+      const totalAmt = parseFloat(plan.total_amount || 0);
+
+      const html = `
+        <div style="padding:5px 0;">
+          <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
+            <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;"><i class="fas fa-exclamation-triangle"></i> Decline PPMP Entry</div>
+            <p style="color:#742a2a;font-size:12px;margin:0;">This will send the PPMP back to the encoder for revision. All existing approvals will be cleared and the entry will require a full re-approval cycle after revision.</p>
+          </div>
+          <div class="view-details" style="margin-bottom:16px;">
+            <div class="detail-row"><label>PPMP No.:</label><span style="font-weight:bold;">${ppmpNo}</span></div>
+            <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
+            <div class="detail-row"><label>Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
+            <div class="detail-row"><label>Total ABC:</label><span style="font-weight:bold;color:#1a365d;">₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;"><i class="fas fa-comment-alt"></i> Reason for Declining <span style="color:#e53e3e;">*</span></label>
+            <textarea id="declineReasonInput" rows="4" placeholder="Please provide a detailed reason for declining this PPMP entry (e.g., budget needs adjustment, incorrect items, missing information)..." style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+          </div>
+          <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="button" class="btn" onclick="declinePPMP(${planId})" style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Decline PPMP</button>
+          </div>
+        </div>
+      `;
+      openModal('Decline PPMP — Needs Revision', html);
+      // Focus the textarea
+      setTimeout(() => { const ta = document.getElementById('declineReasonInput'); if (ta) ta.focus(); }, 200);
+    } catch (err) {
+      alert('Failed to load PPMP: ' + err.message);
+    }
+  };
+
+  // Execute PPMP decline
+  window.declinePPMP = async function(planId) {
+    const reasonEl = document.getElementById('declineReasonInput');
+    const reason = (reasonEl?.value || '').trim();
+    if (!reason) {
+      reasonEl.style.border = '2px solid #e53e3e';
+      reasonEl.focus();
+      showNotification('Please provide a reason for declining this PPMP.', 'error');
+      return;
+    }
+    if (!confirm('Are you sure you want to decline this PPMP entry? The encoder will be notified to revise and resubmit.')) return;
+    try {
+      const result = await apiRequest('/plans/' + planId + '/decline', 'PUT', { reason });
+      showNotification(result.message, 'success');
+      closeModal();
+      if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) {
+      alert('Decline failed: ' + err.message);
+    }
+  };
+
+  // Resubmit a declined PPMP for fresh approval
+  window.resubmitPPMP = async function(planId) {
+    if (!confirm('Resubmit this PPMP entry for approval? All approvers will be notified.')) return;
+    try {
+      const result = await apiRequest('/plans/' + planId + '/resubmit', 'PUT');
+      showNotification(result.message, 'success');
+      if (typeof loadPageData === 'function') loadPageData();
+    } catch (err) {
+      alert('Resubmit failed: ' + err.message);
     }
   };
 
@@ -15713,6 +15975,76 @@ Failure to submit the above requirements within the prescribed period shall cons
       </div>
     `;
     openModal('View APP Project', html);
+  };
+
+  // Adjust APP Budget Modal
+  window.showAdjustAPPBudgetModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    const currentBudget = parseFloat(item.total_price || item.unit_price || 0);
+    const html = `
+      <div style="margin-bottom:18px;">
+        <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i class="fas fa-coins" style="color:#d69e2e;font-size:18px;"></i>
+            <strong style="color:#744210;">Adjust APP Budget</strong>
+          </div>
+          <div style="font-size:13px;color:#744210;">Modify the estimated budget for this APP entry. This will update the total amount in the procurement plan.</div>
+        </div>
+        <div class="view-details" style="margin-bottom:16px;">
+          <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
+          <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
+          <div class="detail-row"><label>Department:</label><span>${item.department_name || '-'}</span></div>
+          <div class="detail-row"><label>Current Budget:</label><span style="font-weight:bold;color:#2b6cb0;">₱${currentBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        </div>
+        <div class="form-group">
+          <label for="adjustBudgetAmount" style="font-weight:600;">New Budget Amount (₱)</label>
+          <input type="number" id="adjustBudgetAmount" class="form-control" value="${currentBudget.toFixed(2)}" min="0" step="0.01" style="font-size:16px;font-weight:bold;padding:10px;" />
+        </div>
+        <div class="form-group">
+          <label for="adjustBudgetReason" style="font-weight:600;">Reason for Adjustment</label>
+          <textarea id="adjustBudgetReason" class="form-control" rows="3" placeholder="Enter reason for budget adjustment..." style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="adjustAPPBudget(${item.id})" style="background:#d69e2e;border-color:#d69e2e;">
+          <i class="fas fa-save"></i> Save Budget
+        </button>
+      </div>
+    `;
+    openModal('Adjust APP Budget', html);
+  };
+
+  // Adjust APP Budget API call
+  window.adjustAPPBudget = async function(itemId) {
+    const amountInput = document.getElementById('adjustBudgetAmount');
+    const reasonInput = document.getElementById('adjustBudgetReason');
+    if (!amountInput) return;
+    const newAmount = parseFloat(amountInput.value);
+    if (isNaN(newAmount) || newAmount < 0) {
+      alert('Please enter a valid budget amount.');
+      return;
+    }
+    const reason = reasonInput ? reasonInput.value.trim() : '';
+    try {
+      const res = await fetch(getApiUrl() + '/api/plan-items/' + itemId + '/adjust-budget', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+        body: JSON.stringify({ total_amount: newAmount, reason: reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to adjust budget');
+      closeModal();
+      showNotification('Budget adjusted successfully — ₱' + data.old_amount.toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + data.new_amount.toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
+      // Refresh APP table
+      if (typeof loadAPP === 'function') loadAPP();
+      else if (typeof navigateTo === 'function') navigateTo('app');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
   };
 
   // =====================================================
@@ -20598,12 +20930,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       || currentPage.querySelector('h2, .page-title')?.textContent 
       || 'Report';
 
-    // --- APP page detection ---
+    // --- APP / PPMP page detection ---
     const isAPPPage = currentPage.id === 'app' || pageTitle.toLowerCase().includes('annual procurement');
+    const isPPMPPage = currentPage.id === 'ppmp' || pageTitle.toLowerCase().includes('project procurement management');
 
-    // For APP page, target the data-table specifically (skip division budget table)
-    const table = isAPPPage
-      ? (currentPage.querySelector('table.data-table') || currentPage.querySelector('table'))
+    // For APP and PPMP pages, target the data-table specifically (skip division budget summary table)
+    const table = (isAPPPage || isPPMPPage)
+      ? (currentPage.querySelector('.data-card table.data-table') || currentPage.querySelector('table.data-table') || currentPage.querySelector('table'))
       : currentPage.querySelector('table');
     if (!table) {
       alert('No table data to print');
@@ -20634,6 +20967,23 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Remove action column (last column)
     tableClone.querySelectorAll('th:last-child').forEach(el => el.remove());
     tableClone.querySelectorAll('td:last-child').forEach(el => el.remove());
+
+    // For PPMP page: also remove Status column (interactive badges don't print well)
+    if (isPPMPPage) {
+      const ppmpHeaders = tableClone.querySelectorAll('thead th');
+      let statusColIdx = -1;
+      ppmpHeaders.forEach((th, idx) => {
+        if (th.textContent.trim().toLowerCase() === 'status') { statusColIdx = idx; th.remove(); }
+      });
+      if (statusColIdx >= 0) {
+        tableClone.querySelectorAll('tbody tr').forEach(row => {
+          const cells = row.querySelectorAll('td');
+          // Skip rows with colspan (section headers, totals)
+          if (cells.length > 0 && cells[0].hasAttribute('colspan')) return;
+          if (cells[statusColIdx]) cells[statusColIdx].remove();
+        });
+      }
+    }
 
     // Remove Docs / Attached Supporting Documents column
     const allHeaders = tableClone.querySelectorAll('thead th');
@@ -20738,9 +21088,17 @@ Failure to submit the above requirements within the prescribed period shall cons
         'UOM': loadUOMs
       };
       if (refreshMap[recordType]) refreshMap[recordType]();
-      // Also refresh APP budget summary when PPMP is deleted
-      if (recordType === 'PPMP' && typeof loadAPP === 'function') loadAPP();
+      // Also refresh APP budget summary and dashboard stats when PPMP is deleted
+      if (recordType === 'PPMP') {
+        if (typeof loadAPP === 'function') loadAPP();
+        if (typeof loadDashboardStats === 'function') loadDashboardStats();
+      }
     } catch (err) {
+      console.error(`Delete ${recordType} error:`, err);
+      alert(`Failed to delete ${recordType}: ${err.message}`);
+    }
+  };
+
   // =====================================================
   // EXPORT TO EXCEL/CSV FUNCTIONS
   // =====================================================

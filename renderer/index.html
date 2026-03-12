@@ -378,7 +378,12 @@
             <strong>Total PPMP Budget (FY <span class="fiscal-year-display">):</strong> <span id="dashTotalBudget" style="font-size:18px;font-weight:700;margin-left:6px;">--</span>
             <span style="margin-left:20px;opacity:0.8;">|</span>
             <span style="margin-left:20px;"><strong>Items:</strong> <span id="statTotalPlans">--</span></span>
-            <span style="margin-left:20px;"><strong>Stock Cards:</strong> <span id="dashStockCards">--</span></span>
+            <span style="margin-left:20px;opacity:0.8;">|</span>
+            <span style="margin-left:12px;"><i class="fas fa-check-circle" style="color:#68d391;margin-right:4px;"></i><strong>Approved:</strong> <span id="dashApprovedPPMP">0</span> (<span id="dashApprovedBudget">₱0.00</span>)</span>
+            <span style="margin-left:12px;"><i class="fas fa-clock" style="color:#f6ad55;margin-right:4px;"></i><strong>Pending:</strong> <span id="dashPendingPPMP">0</span> (<span id="dashPendingBudget">₱0.00</span>)</span>
+          </div>
+          <div class="info-banner" style="margin-bottom: 16px; background: #f7fafc; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 8px; font-size: 13px;">
+            <span><strong>Stock Cards:</strong> <span id="dashStockCards">--</span></span>
             <span style="margin-left:20px;"><strong>Property Cards:</strong> <span id="statPropertyCards">--</span></span>
             <span style="margin-left:20px;"><strong>ICS Issued:</strong> <span id="statICS">--</span></span>
           </div>
@@ -611,6 +616,10 @@
             <button class="btn btn-secondary" onclick="printCurrentPage()">
               <i class="fas fa-print"></i> Print APP
             </button>
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="appSearchInput" placeholder="Search APP..." oninput="filterAPPTable(this.value)">
+            </div>
           </div>
 
           <!-- APP Version Status Banner -->
@@ -655,10 +664,6 @@
             <div class="summary-card">
               <h4>Active Projects</h4>
               <p class="summary-value" id="appActiveProjects">0</p>
-            </div>
-            <div class="summary-card">
-              <h4>Removed</h4>
-              <p class="summary-value" id="appRemovedCount" style="color: #dc3545;">0</p>
             </div>
             <!-- Dynamic mode stats appended here by JS -->
             <span id="appModeStats" style="display:contents;"></span>

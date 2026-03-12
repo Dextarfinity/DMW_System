@@ -2871,9 +2871,9 @@ body {
 .modal {
   background: #fff;
   border: 1px solid var(--border-color);
-  width: 96%;
-  max-width: 1200px;
-  max-height: 92vh;
+  width: 98%;
+  max-width: 1400px;
+  max-height: 94vh;
   overflow-y: auto;
   margin-bottom: 30px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.2);
@@ -3161,6 +3161,52 @@ body {
 .form-section-header:first-child {
   border-top: none;
 }
+
+/* ==================== GOV CONFIRM / ALERT DIALOG ==================== */
+.gov-dialog-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center;
+  z-index: 9999; backdrop-filter: blur(2px); animation: modalSlideIn 0.15s ease-out;
+}
+.gov-dialog {
+  background: #fff; border-radius: 6px; width: 480px; max-width: 95vw;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.25); overflow: hidden;
+}
+.gov-dialog-header {
+  padding: 14px 20px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid #1a365d;
+}
+.gov-dialog-header.confirm { background: linear-gradient(135deg, #ebf5fb 0%, #d6eaf8 100%); }
+.gov-dialog-header.success { background: linear-gradient(135deg, #eafaf1 0%, #d5f5e3 100%); }
+.gov-dialog-header.error { background: linear-gradient(135deg, #fdedec 0%, #fadbd8 100%); }
+.gov-dialog-header i { font-size: 20px; }
+.gov-dialog-header.confirm i { color: #1a365d; }
+.gov-dialog-header.success i { color: #28a745; }
+.gov-dialog-header.error i { color: #dc3545; }
+.gov-dialog-header h4 {
+  margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.3px; color: #1a365d;
+}
+.gov-dialog-body { padding: 18px 20px; font-size: 13px; color: #2d3748; line-height: 1.6; max-height: 50vh; overflow-y: auto; }
+.gov-dialog-body .item-summary {
+  background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 10px 14px; margin: 10px 0; font-family: 'Segoe UI', monospace; font-size: 12px;
+  max-height: 200px; overflow-y: auto;
+}
+.gov-dialog-body .item-summary .item-line { padding: 3px 0; border-bottom: 1px solid #edf2f7; }
+.gov-dialog-body .item-summary .item-line:last-child { border-bottom: none; }
+.gov-dialog-body .total-line { font-weight: 700; color: #1a365d; font-size: 14px; margin-top: 10px; padding-top: 8px; border-top: 2px solid #1a365d; }
+.gov-dialog-footer {
+  padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px;
+  background: #f8f9fa; border-top: 1px solid #e2e8f0;
+}
+.gov-dialog-footer .btn { min-width: 100px; padding: 8px 18px; font-size: 12px; font-weight: 600; border-radius: 4px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+.gov-dialog-footer .btn-cancel { background: #fff; color: #4a5568; border-color: #cbd5e0; }
+.gov-dialog-footer .btn-cancel:hover { background: #f7fafc; border-color: #a0aec0; }
+.gov-dialog-footer .btn-confirm { background: #1a365d; color: #fff; }
+.gov-dialog-footer .btn-confirm:hover { background: #2d4a7a; }
+.gov-dialog-footer .btn-success { background: #28a745; color: #fff; }
+.gov-dialog-footer .btn-success:hover { background: #218838; }
 
 /* Colored variants for different section types */
 .form-section-header.section-funding {
