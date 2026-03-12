@@ -628,7 +628,7 @@ app.post('/api/auth/register', async (req, res) => {
     console.error('Register error:', err);
     res.status(500).json({ error: err.message });
   }
-});
+});F
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {

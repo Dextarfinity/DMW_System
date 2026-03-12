@@ -6341,6 +6341,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Ensure divisions, procurement modes, items, and UOMs are loaded
     await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+    if (!cachedUOMs.length) try { cachedUOMs = await apiRequest('/uoms'); } catch(e) {}
+    const uomOptions = buildUOMOptions('');
     let allItems = [];
     try { allItems = await apiRequest('/items'); } catch(e) { console.warn('Could not load items'); }
 
@@ -6478,18 +6480,24 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="text" id="manualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
             </div>
           </div>
-          <div class="form-row-3" style="margin-bottom:8px;">
+          <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>Unit <span class="text-danger">*</span></label>
-              <input type="text" id="manualItemUnit" placeholder="pc, lot, box, ream..." value="" style="font-size:12px;">
+              <select class="form-select" id="manualItemUnit" style="font-size:12px;">
+                ${uomOptions}
+              </select>
             </div>
             <div class="form-group">
               <label>Unit Price (₱) <span class="text-danger">*</span></label>
-              <input type="number" id="manualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;">
+              <input type="number" id="manualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;" oninput="calcManualEstBudget()">
             </div>
             <div class="form-group">
               <label>Quantity <span class="text-danger">*</span></label>
-              <input type="number" id="manualItemQty" value="1" min="1" step="1" style="font-size:12px;">
+              <input type="number" id="manualItemQty" value="1" min="1" step="1" style="font-size:12px;" oninput="calcManualEstBudget()">
+            </div>
+            <div class="form-group">
+              <label>Estimated Budget</label>
+              <input type="text" id="manualEstBudget" readonly style="font-size:12px;background:#f0f0f0;" value="₱0.00">
             </div>
           </div>
           <div style="margin-bottom:12px;">
@@ -6518,47 +6526,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
         <div id="ppmpPAPsSection" style="display:none;">
-          <div class="form-section-header">
-            <i class="fas fa-project-diagram"></i> PAP Details (Programs, Activities & Projects)
-          </div>
-
-          <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
-            <!-- Left: PAP Name + Budget -->
-            <div style="flex:2;padding:14px 18px;">
-              <div style="margin-bottom:12px;">
-                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
-                <input type="text" id="papName" placeholder="e.g., Pantry Renovation" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
-              </div>
-              <div style="margin-bottom:12px;">
-                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
-                <div style="display:flex;align-items:center;gap:4px;">
-                  <span style="color:#555;font-size:13px;">₱</span>
-                  <input type="text" id="papEstimatedBudget" inputmode="decimal" placeholder="0.00" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
-                </div>
-              </div>
-            </div>
-            <!-- Vertical separator -->
-            <div style="width:1px;background:#ccc;"></div>
-            <!-- Right: Description -->
-            <div style="flex:1;padding:14px 18px;">
-              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
-              <textarea id="papDescription" rows="4" placeholder="PAP description" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <!-- Manual PAP Item Entry (like Manual NON-PS-DBM) -->
-          <div class="form-section-header"><i class="fas fa-pen"></i> Manual PAP Item Entry</div>
+          <div class="form-section-header"><i class="fas fa-project-diagram"></i> PAP Details (Programs, Activities & Projects)</div>
           <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-            <i class="fas fa-info-circle"></i> Manually enter PAP items below. These will be linked to this PPMP entry.
+            <i class="fas fa-info-circle"></i> Manually enter PAP items below or select from the Item Catalog. All items will be part of a unified list.
           </div>
           <div class="form-row-3" style="margin-bottom:8px;">
             <div class="form-group">
-              <label>Item Name <span class="text-danger">*</span></label>
+              <label>PAP Name <span class="text-danger">*</span></label>
               <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:12px;">
             </div>
             <div class="form-group">
               <label>Description</label>
-              <input type="text" id="papManualItemDesc" placeholder="Specs, details..." style="font-size:12px;">
+              <textarea id="papManualItemDesc" rows="2" placeholder="Specs, details..." style="font-size:12px;resize:vertical;"></textarea>
             </div>
             <div class="form-group">
               <label>Category</label>
@@ -6570,23 +6549,29 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="text" id="papManualItemCategoryCustom" placeholder="Custom category..." style="font-size:11px;margin-top:4px;display:none;">
             </div>
           </div>
-          <div class="form-row-3" style="margin-bottom:8px;">
+          <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>Unit <span class="text-danger">*</span></label>
-              <input type="text" id="papManualItemUnit" placeholder="pc, lot, box, ream..." value="" style="font-size:12px;">
+              <select class="form-select" id="papManualItemUnit" style="font-size:12px;">
+                ${uomOptions}
+              </select>
             </div>
             <div class="form-group">
               <label>Unit Price (₱) <span class="text-danger">*</span></label>
-              <input type="number" id="papManualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;">
+              <input type="number" id="papManualItemPrice" placeholder="0.00" min="0" step="0.01" style="font-size:12px;" oninput="calcPAPEstBudget()">
             </div>
             <div class="form-group">
               <label>Quantity <span class="text-danger">*</span></label>
-              <input type="number" id="papManualItemQty" value="1" min="1" step="1" style="font-size:12px;">
+              <input type="number" id="papManualItemQty" value="1" min="1" step="1" style="font-size:12px;" oninput="calcPAPEstBudget()">
+            </div>
+            <div class="form-group">
+              <label>Estimated Budget</label>
+              <input type="text" id="papManualEstBudget" readonly style="font-size:12px;background:#f0f0f0;" value="₱0.00">
             </div>
           </div>
           <div style="margin-bottom:12px;">
             <button type="button" class="btn btn-sm btn-primary" onclick="addManualPAPItem()" style="padding:8px 20px;font-size:13px;">
-              <i class="fas fa-plus"></i> Add Manual PAP Item
+              <i class="fas fa-plus"></i> Add PAP Item
             </button>
           </div>
 
@@ -6595,7 +6580,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <table class="data-table full-width" style="font-size:11.5px;margin:0;">
               <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
                 <th style="width:30px;">#</th>
-                <th>Item Name</th>
+                <th>PAP Name</th>
                 <th>Description</th>
                 <th style="width:80px;">Category</th>
                 <th style="width:60px;">Unit</th>
@@ -10027,93 +10012,34 @@ Failure to submit the above requirements within the prescribed period shall cons
     const procSource = document.getElementById('ppmpProcurementSource')?.value || 'NON PS-DBM';
     const isPAPs = procSource === 'PAPs';
     
-    // --- PAPs Mode: Save as a PAP entity via /api/paps ---
+    // --- Build unified items list based on procurement source ---
+    let items = [];
     if (isPAPs) {
-      const papName = document.getElementById('papName')?.value?.trim() || '';
-      if (!papName) { alert('Please enter the PAP Name.'); return; }
-      
-      const papItems = window._papSelectedItems || [];
-      if (papItems.length === 0) {
-        alert('Please add at least one item to the PAP.');
-        return;
-      }
-      
-      const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
-      const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
-      const deptId = deptIdMap[division] || (parseInt(division) || null);
-      
-      const estimatedBudget = parseFloat(document.getElementById('papEstimatedBudget')?.value) || 0;
-      const description = document.getElementById('papDescription')?.value?.trim() || '';
-      const centralize = document.getElementById('papCentralize')?.checked || false;
-      
-      const papData = {
-        pap_name: papName,
-        description: description,
-        dept_id: deptId,
-        fiscal_year: parseInt(fiscalYear),
-        estimated_budget: estimatedBudget,
-        account_code: document.getElementById('papAccountCode')?.value?.trim() || null,
-        centralize: centralize,
-        period_jan: document.getElementById('papPeriodJan')?.checked || false,
-        period_feb: document.getElementById('papPeriodFeb')?.checked || false,
-        period_mar: document.getElementById('papPeriodMar')?.checked || false,
-        period_apr: document.getElementById('papPeriodApr')?.checked || false,
-        period_may: document.getElementById('papPeriodMay')?.checked || false,
-        period_jun: document.getElementById('papPeriodJun')?.checked || false,
-        period_jul: document.getElementById('papPeriodJul')?.checked || false,
-        period_aug: document.getElementById('papPeriodAug')?.checked || false,
-        period_sep: document.getElementById('papPeriodSep')?.checked || false,
-        period_oct: document.getElementById('papPeriodOct')?.checked || false,
-        period_nov: document.getElementById('papPeriodNov')?.checked || false,
-        period_dec: document.getElementById('papPeriodDec')?.checked || false,
-        items: papItems.map(it => ({
-          item_id: it.item_id || null,
-          item_code: it.item_code || null,
-          product_category: it.product_category || null,
-          account_code: it.account_code || null,
-          product_description: it.product_description || null,
-          available_at: it.available_at || null,
-          quantity: parseFloat(it.quantity || 0),
-          uom: it.uom || null,
-          unit_price: parseFloat(it.unit_price || 0),
-          total_amount: parseFloat(it.total_amount || 0),
-          procurement_source: 'PAPs'
-        }))
-      };
-      
-      const totalBudget = papData.estimated_budget || papItems.reduce((sum, it) => sum + (parseFloat(it.quantity || 0) * parseFloat(it.unit_price || 0)), 0);
-      if (!confirm('Create PAP "' + papName + '" with ' + papItems.length + ' items?\n\nEstimated Budget: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}))) return;
-      
-      try {
-        await apiRequest('/paps', 'POST', papData);
-        alert('PAP created successfully!');
-        closeModal();
-        if (typeof loadPAPs === 'function') loadPAPs();
-        if (typeof loadPlans === 'function') loadPlans();
-      } catch (err) {
-        alert('Error creating PAP: ' + err.message);
-      }
+      // PAPs: items from _papSelectedItems (manual + catalog combined)
+      items = (window._papSelectedItems || []).map(it => ({
+        item_id: it.item_id || null,
+        item_name: it.item_name || it.product_description || '',
+        item_code: it.item_code || '',
+        item_unit: it.unit || it.uom || '',
+        item_category: it.category || it.product_category || '',
+        item_description: it.description || it.product_description || '',
+        description: it.description || it.product_description || it.item_name || '',
+        unit: it.unit || it.uom || '',
+        unit_price: parseFloat(it.unit_price || 0),
+        quantity: parseInt(it.quantity || 1),
+        budget: (parseFloat(it.unit_price || 0)) * (parseInt(it.quantity || 1)),
+        procurement_source: 'PAPs',
+        is_manual: it.is_manual || false
+      }));
+    } else {
+      // PS-DBM / NON PS-DBM / MANUAL-NON-PSDBM: unified from _ppmpSelectedItems
+      items = [...(window._ppmpSelectedItems || [])];
+    }
+
+    if (items.length === 0) {
+      alert('Please add at least one item.');
       return;
     }
-    
-    // --- PS-DBM / NON PS-DBM / Manual Mode: Save as procurement plan entries ---
-    const isManualMode = procSource === 'MANUAL-NON-PSDBM';
-    let catalogItems = window._ppmpSelectedItems || [];
-    let manualItems = window._ppmpManualItems || [];
-
-    if (isManualMode) {
-      if (manualItems.length === 0) {
-        alert('Please add at least one manual item.');
-        return;
-      }
-    } else {
-      if (catalogItems.length === 0) {
-        alert('Please add at least one item from the catalog.');
-        return;
-      }
-    }
-
-    const items = isManualMode ? manualItems : catalogItems;
 
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
@@ -10136,31 +10062,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!confirm(`Save ${items.length} PPMP entries?\n\n${itemSummary}\n\nTotal: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}`)) return;
 
     try {
-      // If manual mode, first create items in the Items Catalog
-      if (isManualMode) {
-        const actualSource = 'NON PS-DBM';
-        for (let i = 0; i < items.length; i++) {
-          const it = items[i];
-          const codePrefix = actualSource === 'PAPs' ? 'PAP-M-' : 'NPD-M-';
+      // Create manual items in the Items Catalog first (for any procurement source)
+      const manualItemsInList = items.filter(it => it.is_manual);
+      if (manualItemsInList.length > 0) {
+        const catalogSource = isPAPs ? 'PAPs' : 'NON PS-DBM';
+        const codePrefix = isPAPs ? 'PAP-M-' : 'NPD-M-';
+        for (let i = 0; i < manualItemsInList.length; i++) {
+          const it = manualItemsInList[i];
           const itemData = {
             code: codePrefix + Date.now() + '-' + i,
             name: it.item_name,
-            description: it.description || it.item_name,
-            unit: it.unit || 'pc',
+            description: it.item_description || it.description || it.item_name,
+            unit: it.unit || it.item_unit || 'pc',
             unit_price: it.unit_price || 0,
-            category: it.category || '',
-            procurement_source: actualSource,
+            category: it.item_category || it.category || '',
+            procurement_source: catalogSource,
             quantity: 0,
             reorder_point: 0
           };
           try {
             const created = await apiRequest('/items', 'POST', itemData);
-            // Update the manual item with the newly created catalog item ID
-            items[i].item_id = created.id;
-            items[i].item_code = created.code;
-            items[i].item_category = created.category || it.category;
-            items[i].item_name = created.name || it.item_name;
-            items[i].procurement_source = actualSource;
+            it.item_id = created.id;
+            it.item_code = created.code;
+            it.item_category = created.category || it.item_category || it.category;
+            it.item_name = created.name || it.item_name;
+            it.procurement_source = catalogSource;
           } catch(catErr) {
             console.error('Failed to create catalog item:', it.item_name, catErr);
             alert('Failed to add item "' + it.item_name + '" to catalog: ' + catErr.message);
@@ -10376,8 +10302,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (!window._ppmpManualItems) window._ppmpManualItems = [];
       renderPAPModalItemsList();
     } else if (source === 'MANUAL-NON-PSDBM') {
-      // Show manual items section
+      // Show manual items section AND catalog section for unified list
       if (manualSection) manualSection.style.display = 'block';
+      if (catalogSection) catalogSection.style.display = 'block';
       if (manualTitle) manualTitle.textContent = 'Manual NON-PS-DBM Item Entry';
       // Show common procurement details + timeline
       if (nonPAPDetails) nonPAPDetails.style.display = 'block';
@@ -10386,8 +10313,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         const el = document.getElementById(id);
         if (el) el.setAttribute('required', '');
       });
-      // Initialize manual items list
+      // Set catalog source filter for NON PS-DBM items
+      window._ppmpCatalogSourceFilter = 'NON PS-DBM';
+      // Initialize items lists
+      if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
       if (!window._ppmpManualItems) window._ppmpManualItems = [];
+      renderPPMPItemsList();
       renderManualCatalogItemsList();
     } else {
       // Show catalog section for PS-DBM / NON PS-DBM
@@ -11019,15 +10950,21 @@ Failure to submit the above requirements within the prescribed period shall cons
         id: null,
         item_id: item.id,
         item_code: item.code || '',
+        item_name: item.name || '',
+        description: item.description || '',
+        category: item.category || '',
         product_category: item.category || '',
         account_code: item.uacs_code || '',
         product_description: item.name || item.description || '',
         available_at: item.procurement_source === 'PS-DBM' ? 'PS-DBM' : 'Non-PSDBM',
         quantity: 1,
         uom: item.unit || 'lot',
+        unit: item.unit || 'lot',
         unit_price: parseFloat(item.unit_price || 0),
         total_amount: parseFloat(item.unit_price || 0),
-        procurement_source: 'PAPs'
+        budget: parseFloat(item.unit_price || 0),
+        procurement_source: 'PAPs',
+        is_manual: false
       };
 
       if (!window._papSelectedItems) window._papSelectedItems = [];
@@ -11048,7 +10985,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     const container = document.getElementById('papItemsListContainer');
     const countEl = document.getElementById('papItemCount');
     const totalEl = document.getElementById('ppmpTotalDisplay');
-    const budgetField = document.getElementById('papEstimatedBudget');
     if (!tbody) return;
 
     const items = window._papSelectedItems || [];
@@ -11056,7 +10992,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       tbody.innerHTML = '';
       if (container) container.style.display = 'none';
       if (countEl) countEl.textContent = '';
-      if (budgetField) budgetField.value = '0.00';
       return;
     }
 
@@ -11081,7 +11016,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     }).join('');
 
     if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
-    if (budgetField) budgetField.value = totalBudget.toFixed(2);
     if (totalEl) totalEl.textContent = 'Total: \u20b1' + totalBudget.toLocaleString('en-PH',{minimumFractionDigits:2});
   };
 
@@ -11095,12 +11029,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     window._papSelectedItems[index].uom = val;
   };
 
-  /** Add a blank manual PAP item row (not from catalog) */
+  /** Add a manual PAP item row (not from catalog) */
   window.addManualPAPItem = function() {
     const name = document.getElementById('papManualItemName')?.value?.trim();
-    if (!name) { alert('Please enter the item name.'); return; }
-    const unit = document.getElementById('papManualItemUnit')?.value?.trim() || '';
-    if (!unit) { alert('Please enter the unit (e.g., pc, lot, box, ream).'); return; }
+    if (!name) { alert('Please enter the PAP Name.'); return; }
+    const unit = document.getElementById('papManualItemUnit')?.value || '';
+    if (!unit) { alert('Please select a unit.'); return; }
     const unitPrice = parseFloat(document.getElementById('papManualItemPrice')?.value);
     if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
     const qty = Math.max(1, parseInt(document.getElementById('papManualItemQty')?.value) || 1);
@@ -11138,7 +11072,25 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('papManualItemUnit').value = '';
     document.getElementById('papManualItemPrice').value = '';
     document.getElementById('papManualItemQty').value = '1';
+    const estBudget = document.getElementById('papManualEstBudget');
+    if (estBudget) estBudget.value = '\u20b10.00';
     document.getElementById('papManualItemName').focus();
+  };
+
+  /** Calculate estimated budget for PAP manual entry form */
+  window.calcPAPEstBudget = function() {
+    const price = parseFloat(document.getElementById('papManualItemPrice')?.value) || 0;
+    const qty = parseInt(document.getElementById('papManualItemQty')?.value) || 1;
+    const el = document.getElementById('papManualEstBudget');
+    if (el) el.value = '\u20b1' + (price * qty).toLocaleString('en-PH', {minimumFractionDigits:2});
+  };
+
+  /** Calculate estimated budget for Non-PSDBM manual entry form */
+  window.calcManualEstBudget = function() {
+    const price = parseFloat(document.getElementById('manualItemPrice')?.value) || 0;
+    const qty = parseInt(document.getElementById('manualItemQty')?.value) || 1;
+    const el = document.getElementById('manualEstBudget');
+    if (el) el.value = '\u20b1' + (price * qty).toLocaleString('en-PH', {minimumFractionDigits:2});
   };
 
   /** Remove a PAP item */
@@ -11380,12 +11332,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (e.target && e.target.id === 'papManualItemCategory') togglePAPManualCategoryCustom();
   });
 
-  /** Add a manual item to the list (not from catalog) */
+  /** Add a manual item to the unified list (not from catalog) */
   window.addManualCatalogItemToList = function() {
     const name = document.getElementById('manualItemName')?.value?.trim();
     if (!name) { alert('Please enter the item name.'); return; }
-    const unit = document.getElementById('manualItemUnit')?.value?.trim() || '';
-    if (!unit) { alert('Please enter the unit (e.g., pc, lot, box, ream).'); return; }
+    const unit = document.getElementById('manualItemUnit')?.value || '';
+    if (!unit) { alert('Please select a unit.'); return; }
     const unitPrice = parseFloat(document.getElementById('manualItemPrice')?.value);
     if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
     const qty = Math.max(1, parseInt(document.getElementById('manualItemQty')?.value) || 1);
@@ -11393,22 +11345,28 @@ Failure to submit the above requirements within the prescribed period shall cons
     const catSel = document.getElementById('manualItemCategory')?.value || '';
     const catCustom = document.getElementById('manualItemCategoryCustom')?.value?.trim() || '';
     const category = catSel === 'OTHER' ? catCustom : catSel;
-    const procSource = document.getElementById('ppmpProcurementSource')?.value || 'MANUAL-NON-PSDBM';
     const actualSource = 'NON PS-DBM';
 
-    if (!window._ppmpManualItems) window._ppmpManualItems = [];
-    window._ppmpManualItems.push({
+    const entry = {
+      item_id: null,
       item_name: name,
-      description: desc,
-      category: category,
+      item_code: '',
+      item_unit: unit,
+      item_category: category,
+      item_description: desc,
+      description: name + (desc ? ' - ' + desc : ''),
       unit: unit,
       unit_price: unitPrice,
       quantity: qty,
       budget: unitPrice * qty,
       procurement_source: actualSource,
       is_manual: true
-    });
-    renderManualCatalogItemsList();
+    };
+
+    // Add to unified selected items list
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+    window._ppmpSelectedItems.push(entry);
+    renderPPMPItemsList();
 
     // Clear inputs for next entry
     document.getElementById('manualItemName').value = '';
@@ -11416,6 +11374,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('manualItemUnit').value = '';
     document.getElementById('manualItemPrice').value = '';
     document.getElementById('manualItemQty').value = '1';
+    const estBudget = document.getElementById('manualEstBudget');
+    if (estBudget) estBudget.value = '\u20b10.00';
     document.getElementById('manualItemName').focus();
   };
 
@@ -11680,7 +11640,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       }).join('');
       return `<tr>
         <td style="text-align:center; color:#888;">${idx + 1}</td>
-        <td style="font-weight:600; font-size:11px;">${escapeHtml(it.item_code)} - ${escapeHtml(it.item_name)}</td>
+        <td style="font-weight:600; font-size:11px;">${it.item_code ? escapeHtml(it.item_code) + ' - ' : ''}${escapeHtml(it.item_name)}</td>
         <td style="max-width:180px;">${descDisplay}</td>
         <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
         <td><input type="number" value="${it.unit_price.toFixed(2)}" min="0" step="0.01" 
