@@ -229,3 +229,5 @@ This value must be automatically calculated using the formula:
 Estimated Budget = Unit Price × Quantity
 3. Handling Logic
 Items manually added and items selected from the Item Catalog should be treated as part of the same unified item list within the system.
+
+sasa
