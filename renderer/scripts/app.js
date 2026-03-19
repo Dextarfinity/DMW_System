@@ -1190,12 +1190,13 @@ async function loadPPMP() {
     // Check if user has multi-division PPMP access
     const hasMultiDivAccess = currentUser.managed_dept_ids && currentUser.managed_dept_ids.length > 1;
 
-    // Roles that can see ALL divisions' PPMP data
+    // Roles that can see ALL divisions' PPMP data (chiefs are NOT included - they only see their division)
     const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
-    const canSeeAll = userHasAnyRole(seeAllPPMPRoles);
+    // Chiefs should be locked to their division even if they have other roles
+    const canSeeAll = userHasAnyRole(seeAllPPMPRoles) && !isChief;
 
-    // Users with multi-division access can switch between their managed divisions (not locked)
-    const isLockedDivision = !canSeeAll && !hasMultiDivAccess;
+    // Chiefs are ALWAYS locked to their division (cannot be overridden by other roles)
+    const isLockedDivision = isChief || (!canSeeAll && !hasMultiDivAccess);
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
@@ -1463,10 +1464,15 @@ async function loadPR() {
     const pr = await apiRequest('/pr');
     cachedPR = pr;
 
-    // Lock division filter for non-admin/non-global roles
+    // Chiefs should be locked to their division even if they have other roles
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const isChief = userHasAnyRole(chiefRoles);
+
+    // Lock division filter for chiefs and non-global roles
     const seeAllRoles = ['admin', 'hope', 'bac_chair', 'bac_secretariat'];
+    const canSeeAll = userHasAnyRole(seeAllRoles) && !isChief;
     const prDivFilter = document.getElementById('prDivisionFilter');
-    if (prDivFilter && !userHasAnyRole(seeAllRoles)) {
+    if (prDivFilter && !canSeeAll) {
       // Auto-select user's division code and disable dropdown
       const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
       const chiefRole = getUserChiefRole();
@@ -1493,14 +1499,25 @@ function filterPRTable() {
   const divVal = document.getElementById('prDivisionFilter')?.value || '';
   let data = cachedPR;
 
-  // Division-based filtering: only admin, hope, bac_chair, bac_secretariat see ALL PRs
+  // Chiefs should be locked to their division even if they have other roles
+  const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+  const isChief = userHasAnyRole(chiefRoles);
+  const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+  const chiefRole = getUserChiefRole();
+
+  // Division-based filtering: only admin, hope, bac_chair, bac_secretariat see ALL PRs (unless they're a chief)
   const seeAllRoles = ['admin', 'hope', 'bac_chair', 'bac_secretariat'];
-  if (!userHasAnyRole(seeAllRoles)) {
+  const canSeeAll = userHasAnyRole(seeAllRoles) && !isChief;
+
+  if (!canSeeAll) {
     // Filter to user's own division only
-    const userDeptCode = (currentUser.department_code || currentUser.division || '').toUpperCase();
+    const userDeptCode = isChief ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '').toUpperCase();
     const userDeptId = currentUser.dept_id;
-    if (userDeptId) {
-      data = data.filter(r => String(r.dept_id) === String(userDeptId) || (r.department_code || '').toUpperCase() === userDeptCode);
+    if (userDeptCode || userDeptId) {
+      data = data.filter(r => {
+        const rDeptCode = (r.department_code || '').toUpperCase();
+        return rDeptCode === userDeptCode || String(r.dept_id) === String(userDeptId);
+      });
     }
   }
 
@@ -2529,24 +2546,19 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       // Division-scope filtering: chiefs only see their own division's budget summary
       const chiefDivMapBudget = { 'chief_fad': 'FAD', 'chief_wrsd': 'WRSD', 'chief_mwpsd': 'MWPSD', 'chief_mwptd': 'MWPTD' };
       const budgetChiefRole = getUserChiefRole();
+      const isChiefForBudget = !!budgetChiefRole;
       const globalBudgetRoles = ['admin', 'hope', 'ord_manager', 'budget_consultant', 'bac_secretariat'];
-      const isGlobalBudgetViewer = userHasAnyRole(globalBudgetRoles);
+      // Chiefs cannot be global budget viewers - they always see only their division
+      const isGlobalBudgetViewer = userHasAnyRole(globalBudgetRoles) && !isChiefForBudget;
       const chiefBudgetDiv = budgetChiefRole ? chiefDivMapBudget[budgetChiefRole] : null;
 
       // Filter data based on role:
-      // - chief_wrsd: sees only WRSD
-      // - chief_fad (+ bac_chair): sees all divisions EXCEPT WRSD
-      // - other chiefs: sees only their own division
+      // - Each chief sees only their own division
       // - global roles (admin, hope, budget_consultant, etc.): sees all
       let budgetSource = grandTotalSource;
       if (!isGlobalBudgetViewer && chiefBudgetDiv) {
-        if (budgetChiefRole === 'chief_wrsd') {
-          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') === 'WRSD');
-        } else if (budgetChiefRole === 'chief_fad') {
-          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') !== 'WRSD');
-        } else {
-          budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') === chiefBudgetDiv);
-        }
+        // Each chief only sees their own division
+        budgetSource = grandTotalSource.filter(p => (p.department_code || 'DMW') === chiefBudgetDiv);
       }
 
       let totalBud = 0, approvedBud = 0, pendingBud = 0, approvedCnt = 0, pendingCnt = 0;
@@ -2580,7 +2592,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
             const d = divMap[dc];
             return `<tr><td style="font-weight:600;">${dc}</td><td>${d.count}</td><td style="text-align:right;">${fmt(d.total)}</td><td style="text-align:right;color:#28a745;">${fmt(d.approved)}</td><td style="text-align:right;color:#e67e22;">${fmt(d.pending)}</td></tr>`;
           }).join('');
-          const headerLabel = (!isGlobalBudgetViewer && chiefBudgetDiv) ? (budgetChiefRole === 'chief_fad' ? 'FAD & Other Divisions Budget' : chiefBudgetDiv + ' Division Budget') : 'Division Budget Breakdown';
+          const headerLabel = (!isGlobalBudgetViewer && chiefBudgetDiv) ? chiefBudgetDiv + ' Division Budget' : 'Division Budget Breakdown';
           ppmpDivBudgetsEl.innerHTML = `
             <div style="background:#fff;border-radius:8px;padding:12px 16px;border:1px solid #e2e8f0;margin-bottom:12px;width:100%;">
               <h4 style="margin:0 0 8px;color:#1a365d;font-size:13px;"><i class="fas fa-building"></i> ${headerLabel}</h4>
@@ -2705,11 +2717,13 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       let approvalInfo = '';
       if (p.status === 'pending') {
         const isWRSD = (p.department_code || deptCode) === 'WRSD';
+        // Show the correct chief label based on the PPMP's division
         const chiefLabel = isWRSD ? 'Chief WRSD' : 'Chief FAD';
-        const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by ${chiefLabel}: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> ${chiefLabel}</span>` : `<span class="approval-badge chief-pending" title="Awaiting ${chiefLabel} approval"><i class="fas fa-clock"></i> ${chiefLabel}</span>`;
-        const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
         const budgetDone = p.approved_by_budget ? `<span class="approval-badge chief-done" title="Approved by Budget Consultant: ${p.budget_approver_name || ''}"><i class="fas fa-check-circle"></i> Budget</span>` : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant approval"><i class="fas fa-clock"></i> Budget</span>`;
-        approvalInfo = `<div class="approval-status-row">${chiefDone}${hopeDone}${budgetDone}</div>`;
+        const hopeDone = p.approved_by_hope ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ''}"><i class="fas fa-check-circle"></i> HOPE</span>` : `<span class="approval-badge hope-pending" title="Awaiting HOPE approval"><i class="fas fa-clock"></i> HOPE</span>`;
+        const chiefDone = p.approved_by_chief ? `<span class="approval-badge chief-done" title="Approved by ${chiefLabel}: ${p.chief_approver_name || ''}"><i class="fas fa-check-circle"></i> ${chiefLabel}</span>` : `<span class="approval-badge chief-pending" title="Awaiting ${chiefLabel} approval"><i class="fas fa-clock"></i> ${chiefLabel}</span>`;
+        // Display order: Budget → HoPE → Chief (of the division)
+        approvalInfo = `<div class="approval-status-row">${budgetDone}${hopeDone}${chiefDone}</div>`;
       } else if (p.status === 'rejected') {
         const declinedBy = p.declined_by_name || 'Unknown';
         const declineReason = p.decline_reason || 'No reason provided';
@@ -2857,9 +2871,9 @@ function renderAPPTable(items, appStatus) {
   const isChief = !!chiefRole;
   const chiefDiv = chiefRole ? chiefDivMap[chiefRole] : '';
 
-  // Roles that can see ALL divisions' APP data
+  // Roles that can see ALL divisions' APP data (chiefs are NOT included - they only see their division)
   const seeAllAPPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
-  const canSeeAll = userHasAnyRole(seeAllAPPRoles);
+  const canSeeAll = userHasAnyRole(seeAllAPPRoles) && !isChief;
 
   // Determine user's division code for filtering
   let userDivCode = '';
@@ -2868,7 +2882,8 @@ function renderAPPTable(items, appStatus) {
   } else if (!canSeeAll) {
     userDivCode = currentUser.department_code || currentUser.division || '';
   }
-  const shouldFilter = !canSeeAll && userDivCode;
+  // Chiefs should ALWAYS be filtered to their division
+  const shouldFilter = isChief || (!canSeeAll && userDivCode);
 
   // Calculate total budget per division only (not overall PPMP total)
   let divisionTotals = {};
@@ -2883,14 +2898,8 @@ function renderAPPTable(items, appStatus) {
   let appTotalBudget = 0;
   let appTotalCount = 0;
   if (shouldFilter) {
-    // chief_wrsd sees only WRSD, chief_fad sees all except WRSD, others see own division
-    if (chiefRole === 'chief_wrsd') {
-      displayItems = items.filter(item => getDeptCode(item) === 'WRSD');
-    } else if (chiefRole === 'chief_fad') {
-      displayItems = items.filter(item => getDeptCode(item) !== 'WRSD');
-    } else {
-      displayItems = items.filter(item => getDeptCode(item) === userDivCode);
-    }
+    // Each chief sees only their own division's data
+    displayItems = items.filter(item => getDeptCode(item) === userDivCode);
     appTotalBudget = displayItems.reduce((s, item) => s + parseFloat(item.total_price || item.unit_price || 0), 0);
     appTotalCount = displayItems.length;
   } else {
@@ -2898,7 +2907,7 @@ function renderAPPTable(items, appStatus) {
   }
 
   if (!displayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + (chiefRole === 'chief_fad' ? 'FAD & other divisions' : (chiefRole === 'chief_wrsd' ? 'WRSD division' : userDivCode + ' division')) : '') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
     return;
   }
 
@@ -7179,9 +7188,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         }
         showToast('Purchase Request submitted for approval!', 'success');
         closeModal();
-        if (typeof loadPurchaseRequests === 'function') loadPurchaseRequests();
-        else if (typeof loadPageData === 'function') loadPageData();
-        else loadPR();
+        if (typeof loadPR === 'function') loadPR();
+        else if (typeof loadPageData === 'function') loadPageData('purchase-requests');
       } catch (err) {
         alert('Error submitting PR: ' + err.message);
       }
@@ -7388,8 +7396,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       }
       alert('RFQ sent successfully!');
       closeModal();
-      if (typeof loadRFQs === 'function') loadRFQs();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadRFQ === 'function') loadRFQ();
+      else if (typeof loadPageData === 'function') loadPageData('rfq');
     } catch (err) { alert('Error sending RFQ: ' + err.message); }
   };
 
@@ -8065,8 +8073,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Purchase Order approved successfully!');
       closeModal();
-      if (typeof loadPurchaseOrders === 'function') loadPurchaseOrders();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
     } catch (err) { alert('Error approving PO: ' + err.message); }
   };
 
@@ -10394,8 +10402,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         buttonText: 'Done'
       });
       closeModal();
-      if (typeof loadPlans === 'function') loadPlans();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
     } catch (err) {
       govAlert({
         title: 'Error Saving PPMP',
@@ -12179,9 +12187,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       showToast('Purchase Request saved as Draft!', 'success');
       closeModal();
-      if (typeof loadPurchaseRequests === 'function') loadPurchaseRequests();
-      else if (typeof loadPageData === 'function') loadPageData();
-      else loadPR();
+      if (typeof loadPR === 'function') loadPR();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-requests');
     } catch (err) {
       alert('Error saving PR: ' + err.message);
     }
@@ -12234,8 +12241,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('RFQ saved as draft!');
       closeModal();
-      if (typeof loadRFQs === 'function') loadRFQs();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadRFQ === 'function') loadRFQ();
+      else if (typeof loadPageData === 'function') loadPageData('rfq');
     } catch (err) {
       alert('Error saving RFQ: ' + err.message);
     }
@@ -12344,8 +12351,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Abstract of Quotations saved as draft!');
       closeModal();
-      if (typeof loadAbstracts === 'function') loadAbstracts();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadAbstract === 'function') loadAbstract();
+      else if (typeof loadPageData === 'function') loadPageData('abstract');
     } catch (err) {
       alert('Error saving Abstract: ' + err.message);
     }
@@ -12384,8 +12391,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Notice of Award saved as draft!');
       closeModal();
-      if (typeof loadNOAs === 'function') loadNOAs();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
     } catch (err) {
       alert('Error issuing NOA: ' + err.message);
     }
@@ -12449,8 +12456,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Purchase Order saved as draft!');
       closeModal();
-      if (typeof loadPurchaseOrders === 'function') loadPurchaseOrders();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
     } catch (err) {
       alert('Error saving PO: ' + err.message);
     }
@@ -12505,8 +12512,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('IAR completed successfully!');
       closeModal();
-      if (typeof loadIARs === 'function') loadIARs();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadIAR === 'function') loadIAR();
+      else if (typeof loadPageData === 'function') loadPageData('iar');
     } catch (err) {
       alert('Error saving IAR: ' + err.message);
     }
@@ -12561,8 +12568,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('BAC Resolution saved as draft!');
       closeModal();
-      if (typeof loadBACResolutions === 'function') loadBACResolutions();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadBACResolution === 'function') loadBACResolution();
+      else if (typeof loadPageData === 'function') loadPageData('bac-resolution');
     } catch (err) {
       alert('Error saving BAC Resolution: ' + err.message);
     }
@@ -12616,8 +12623,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('TWG Report saved as draft!');
       closeModal();
-      if (typeof loadPostQualifications === 'function') loadPostQualifications();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPostQual === 'function') loadPostQual();
+      else if (typeof loadPageData === 'function') loadPageData('post-qual');
     } catch (err) {
       alert('Error saving TWG Report: ' + err.message);
     }
@@ -12695,8 +12702,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Abstract of Quotations submitted successfully!');
       closeModal();
-      if (typeof loadAbstracts === 'function') loadAbstracts();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadAbstract === 'function') loadAbstract();
+      else if (typeof loadPageData === 'function') loadPageData('abstract');
     } catch (err) { alert('Error submitting Abstract: ' + err.message); }
   };
 
@@ -12723,8 +12730,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Notice of Award issued successfully!');
       closeModal();
-      if (typeof loadNOAs === 'function') loadNOAs();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
     } catch (err) { alert('Error issuing NOA: ' + err.message); }
   };
 
@@ -12765,8 +12772,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('BAC Resolution submitted successfully!');
       closeModal();
-      if (typeof loadBACResolutions === 'function') loadBACResolutions();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadBACResolution === 'function') loadBACResolution();
+      else if (typeof loadPageData === 'function') loadPageData('bac-resolution');
     } catch (err) { alert('Error submitting BAC Resolution: ' + err.message); }
   };
 
@@ -12808,8 +12815,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('TWG Report submitted successfully!');
       closeModal();
-      if (typeof loadPostQualifications === 'function') loadPostQualifications();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPostQual === 'function') loadPostQual();
+      else if (typeof loadPageData === 'function') loadPageData('post-qual');
     } catch (err) { alert('Error submitting TWG Report: ' + err.message); }
   };
 
@@ -12835,7 +12842,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('PO marked as accepted!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12856,7 +12864,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('PO Packet compiled successfully!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12877,7 +12886,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Chief signature recorded!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12898,7 +12908,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Director signature recorded!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12921,7 +12932,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       ]);
       alert('Documents attached successfully!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPR === 'function') loadPR();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-requests');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12942,7 +12954,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('Quotation added successfully!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadRFQ === 'function') loadRFQ();
+      else if (typeof loadPageData === 'function') loadPageData('rfq');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -12963,7 +12976,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       alert('NOA marked as received!');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
     } catch (err) {
       alert('Error: ' + err.message);
     }
@@ -15878,8 +15892,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       const result = await apiRequest('/plans/' + planId + '/approve', 'PUT');
       alert(result.message);
       closeModal();
-      if (typeof loadPlans === 'function') loadPlans();
-      else if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
     } catch (err) {
       alert('Approval failed: ' + err.message);
     }
@@ -15954,7 +15968,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       const result = await apiRequest('/plans/' + planId + '/decline', 'PUT', { reason });
       showNotification(result.message, 'success');
       closeModal();
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
     } catch (err) {
       alert('Decline failed: ' + err.message);
     }
@@ -15966,7 +15981,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const result = await apiRequest('/plans/' + planId + '/resubmit', 'PUT');
       showNotification(result.message, 'success');
-      if (typeof loadPageData === 'function') loadPageData();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
     } catch (err) {
       alert('Resubmit failed: ' + err.message);
     }

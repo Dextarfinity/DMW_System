@@ -5,11 +5,18 @@ const http = require('http');
 let mainWindow;
 
 // =====================================================
-// SERVER URL — Electron clients load the UI from here
-// so all frontend updates on the server auto-propagate.
-// Change this IP if the server moves to a different machine.
+// DUAL-NETWORK SERVER DISCOVERY
+// The server PC has two WiFi adapters. Clients on either
+// network can reach it via whichever IP is on their subnet.
 // =====================================================
-const SERVER_URL = 'http://192.168.100.235:3000';
+const SERVER_PORT = 3000;
+const SERVER_IPS = [
+  '192.168.100.235',   // WiFi Network 1
+  '192.168.1.117'      // WiFi Network 2
+];
+
+// Resolved at startup — set by discoverServer()
+let RESOLVED_SERVER_URL = null;
 
 function getAppIconPath() {
   if (process.platform === 'win32') {
@@ -19,14 +26,67 @@ function getAppIconPath() {
 }
 
 /**
- * Quick server reachability check (2-second timeout).
- * Resolves true if the server responds, false otherwise.
+ * Try to reach a specific server IP with a short timeout.
+ * Returns a promise that resolves to the URL if reachable, or null if not.
+ */
+function checkServerIP(ip) {
+  return new Promise((resolve) => {
+    const url = `http://${ip}:${SERVER_PORT}`;
+    const req = http.get(`${url}/api/health`, { timeout: 2000 }, (res) => {
+      if (res.statusCode >= 200 && res.statusCode < 400) {
+        resolve(url);
+      } else {
+        resolve(null);
+      }
+      res.resume();
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+/**
+ * Discover which server IP is reachable.
+ * Tries all candidate IPs in parallel and returns the first one that responds.
+ * Falls back to the first IP if none respond.
+ */
+async function discoverServer() {
+  if (RESOLVED_SERVER_URL) return RESOLVED_SERVER_URL;
+
+  console.log('[DISCOVERY] Checking server IPs:', SERVER_IPS.join(', '));
+
+  // Also try localhost for when running on the server PC itself
+  const candidates = [...SERVER_IPS, 'localhost'];
+
+  // Race all candidates - first one to respond wins
+  const results = await Promise.all(candidates.map(ip => checkServerIP(ip)));
+
+  for (let i = 0; i < results.length; i++) {
+    if (results[i]) {
+      RESOLVED_SERVER_URL = results[i];
+      console.log(`[DISCOVERY] Server found at ${candidates[i]}:${SERVER_PORT}`);
+      return RESOLVED_SERVER_URL;
+    }
+  }
+
+  // Fallback to first IP
+  RESOLVED_SERVER_URL = `http://${SERVER_IPS[0]}:${SERVER_PORT}`;
+  console.warn('[DISCOVERY] No server responded; falling back to', SERVER_IPS[0]);
+  return RESOLVED_SERVER_URL;
+}
+
+/**
+ * Quick server reachability check using the discovered URL.
  */
 function isServerReachable() {
   return new Promise((resolve) => {
-    const req = http.get(`${SERVER_URL}/api/health`, { timeout: 2000 }, (res) => {
+    if (!RESOLVED_SERVER_URL) {
+      resolve(false);
+      return;
+    }
+    const req = http.get(`${RESOLVED_SERVER_URL}/api/health`, { timeout: 2000 }, (res) => {
       resolve(res.statusCode >= 200 && res.statusCode < 400);
-      res.resume(); // consume response to free memory
+      res.resume();
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
@@ -55,14 +115,18 @@ async function createWindow() {
   // Hide the menu bar visually but keep keyboard shortcuts (Ctrl+Shift+I for DevTools)
   mainWindow.setMenuBarVisibility(false);
 
+  // --- Dual-Network Server Discovery ---
+  // Discover which server IP is reachable on the current network
+  await discoverServer();
+
   // --- Dynamic UI loading ---
   // Try loading the frontend from the server so that any HTML/JS/CSS changes
   // made on the server are immediately reflected on every client PC.
   // Falls back to the bundled local files if the server is unreachable.
   const serverUp = await isServerReachable();
-  if (serverUp) {
-    console.log('[UI] Loading frontend from server:', SERVER_URL);
-    mainWindow.loadURL(SERVER_URL);
+  if (serverUp && RESOLVED_SERVER_URL) {
+    console.log('[UI] Loading frontend from server:', RESOLVED_SERVER_URL);
+    mainWindow.loadURL(RESOLVED_SERVER_URL);
   } else {
     console.log('[UI] Server unreachable — loading bundled local files');
     mainWindow.loadFile('renderer/index.html');
