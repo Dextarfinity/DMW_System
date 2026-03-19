@@ -7,15 +7,54 @@
 const { io: ioConnect } = require('socket.io-client');
 
 // =====================================================
-// DUAL-NETWORK SERVER DISCOVERY
-// The server PC has two WiFi adapters. Clients on either
-// network can reach it via whichever IP is on their subnet.
+// EXTERNAL CONFIG - Server IPs loaded from userData
+// This allows updating server IPs without rebuilding the app.
+// Config file: %APPDATA%/dmw-procurement/server-config.json
 // =====================================================
-const SERVER_PORT = 3000;
-const SERVER_IPS = [
-  '192.168.100.235',   // WiFi Network 1 
-  '192.168.1.117'      // WiFi Network 2
+const fs = require('fs');
+const path = require('path');
+
+const DEFAULT_SERVER_IPS = [
+  '192.168.1.117',     // WiFi Network 2 (primary)
+  '192.168.100.235'    // WiFi Network 1
 ];
+const SERVER_PORT = 3000;
+
+// Will be populated from external config or defaults
+let SERVER_IPS = [...DEFAULT_SERVER_IPS];
+
+/**
+ * Load server IPs from external config file (same as main process uses).
+ */
+function loadServerConfig() {
+  try {
+    // Use APPDATA to find the config (same location as Electron's userData)
+    const appData = process.env.APPDATA || (process.platform === 'darwin'
+      ? path.join(process.env.HOME, 'Library', 'Application Support')
+      : path.join(process.env.HOME, '.config'));
+
+    // Electron stores userData in %APPDATA%/<app-name> based on package.json name
+    const configPath = path.join(appData, 'procurement-plan-system', 'server-config.json');
+
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(data);
+      if (Array.isArray(config.serverIPs) && config.serverIPs.length > 0) {
+        SERVER_IPS = config.serverIPs;
+        console.log('[CONFIG] Renderer loaded server IPs from external config:', SERVER_IPS);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('[CONFIG] Renderer could not load external config:', err.message);
+  }
+
+  SERVER_IPS = [...DEFAULT_SERVER_IPS];
+  console.log('[CONFIG] Renderer using default server IPs:', SERVER_IPS);
+}
+
+// Load config immediately
+loadServerConfig();
   
 // Resolved at startup — set by discoverServer()
 let RESOLVED_SERVER_IP = null;

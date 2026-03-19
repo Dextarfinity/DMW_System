@@ -2660,6 +2660,20 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees their own division (dept_id = 4)
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT pr.*, d.name as department_name, d.code as department_code, u.username as requested_by_name,
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
@@ -2669,9 +2683,9 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)
+       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY pr.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2880,6 +2894,19 @@ app.get('/api/rfqs', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT r.*, pr.pr_number, u.username as created_by_name,
               pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name,
@@ -2888,9 +2915,9 @@ app.get('/api/rfqs', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON r.created_by = u.id
        LEFT JOIN LATERAL (SELECT quantity, unit, item_name FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (r.status != 'draft' OR r.created_by = $1 OR $2 = true)
+       WHERE (r.status != 'draft' OR r.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY r.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2992,6 +3019,19 @@ app.get('/api/abstracts', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT a.*, r.rfq_number, s.name as recommended_supplier_name, u.username as created_by_name,
               pr.dept_id as pr_dept_id, dept.code as department_code
@@ -3000,9 +3040,9 @@ app.get('/api/abstracts', authenticateToken, async (req, res) => {
        LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN suppliers s ON a.recommended_supplier_id = s.id
        LEFT JOIN users u ON a.created_by = u.id
-       WHERE (a.status != 'draft' OR a.created_by = $1 OR $2 = true)
+       WHERE (a.status != 'draft' OR a.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY a.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3115,6 +3155,19 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT pq.*,
         a.abstract_number,
@@ -3140,9 +3193,9 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
        LEFT JOIN suppliers s1 ON pq.bidder1_supplier_id = s1.id
        LEFT JOIN suppliers s2 ON pq.bidder2_supplier_id = s2.id
        LEFT JOIN suppliers s3 ON pq.bidder3_supplier_id = s3.id
-       WHERE (pq.status != 'draft' OR pq.created_by = $1 OR $2 = true)
+       WHERE (pq.status != 'draft' OR pq.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY pq.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3205,6 +3258,19 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT br.*, a.abstract_number, s.name as supplier_name,
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
@@ -3222,9 +3288,9 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
        LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
        LEFT JOIN employees eh ON br.hope_id = eh.id
-       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)
+       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY br.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3310,6 +3376,19 @@ app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT n.*, br.resolution_number, s.name as supplier_name, pq.postqual_number,
               r.rfq_number,
@@ -3321,9 +3400,9 @@ app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
        LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN post_qualifications pq ON pq.abstract_id = a.id
-       WHERE (n.status != 'draft' OR n.created_by = $1 OR $2 = true)
+       WHERE (n.status != 'draft' OR n.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY n.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3393,6 +3472,20 @@ app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data (via PR → dept_id)
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees POs linked to their division through PR
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT po.*, s.name as supplier_name, s.address as supplier_address, s.tin as supplier_tin,
               u.username as created_by_name, pr.pr_number, noa.noa_number,
@@ -3403,9 +3496,9 @@ app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
        LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN notices_of_award noa ON po.noa_id = noa.id
-       WHERE (po.status != 'draft' OR po.created_by = $1 OR $2 = true)
+       WHERE (po.status != 'draft' OR po.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY po.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3536,15 +3629,32 @@ app.put('/api/purchase-orders/:id/set-status', authenticateToken, async (req, re
 
 app.get('/api/iars', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+
+    // Division filtering: chief_wrsd only sees WRSD division data (via PO → PR → dept_id)
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees IARs linked to their division through PO → PR
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` WHERE pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT iar.*, po.po_number, s.name as supplier_name,
               u1.username as inspected_by_name, u2.username as received_by_name
        FROM iars iar
        LEFT JOIN purchaseorders po ON iar.po_id = po.id
+       LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u1 ON iar.inspected_by = u1.id
-       LEFT JOIN users u2 ON iar.received_by = u2.id
-       ORDER BY iar.created_at DESC`
+       LEFT JOIN users u2 ON iar.received_by = u2.id${divisionCondition}
+       ORDER BY iar.created_at DESC`,
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }

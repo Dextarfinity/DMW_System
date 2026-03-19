@@ -13,28 +13,34 @@ module.exports = function registerRISEndpoints(app, pool, authenticateToken, bro
     app.get('/api/ris', authenticateToken, async (req, res) => {
       try {
         const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
-        
+
         // Determine which RIS records this user can see based on their role
         let visibilityCondition = '';
         const params = [];
-        
+
         // Check if user has any of the viewable roles
         const viewableRoles = ['HOPE', 'BAC_SEC', 'BUDGET', 'CHIEF_FAD', 'ADMIN', 'SUPPLY_OFFICER'];
-        const userCanViewAll = userRoles.some(r => 
-          r.toUpperCase().includes('ADMIN') || 
+        const userCanViewAll = userRoles.some(r =>
+          r.toUpperCase().includes('ADMIN') ||
           r.toUpperCase().includes('HOPE') ||
-          r.toUpperCase().includes('CHIEF') ||
+          r === 'chief_fad' ||
           r === 'supply_officer'
         );
-        
-        if (!userCanViewAll) {
+
+        // Division filtering: chief_wrsd only sees WRSD division data
+        const isChiefWRSD = userRoles.includes('chief_wrsd');
+
+        if (isChiefWRSD && !userCanViewAll) {
+          // chief_wrsd only sees RIS from WRSD division
+          visibilityCondition = `WHERE (r.division ILIKE '%WRSD%' OR r.division ILIKE '%Welfare Reintegration%')`;
+        } else if (!userCanViewAll) {
           // Regular users can only see RIS where they were the requester or approver
           visibilityCondition = `WHERE r.requested_by_id = $1 OR r.approved_by_id = $1`;
           params.push(req.user.id);
         }
-        
+
         const result = await pool.query(
-          `SELECT r.*, 
+          `SELECT r.*,
                   u1.full_name as created_by_name,
                   u1.designation as created_by_designation,
                   e1.full_name as requested_by_name,
