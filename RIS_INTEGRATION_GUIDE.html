@@ -1,0 +1,860 @@
+<!-- ============================================================
+     RIS (REQUISITION AND ISSUE SLIP) INTEGRATION GUIDE
+     Version: 3.0, Date: March 17, 2026
+     ============================================================ -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RIS Integration Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+        h3 {
+            color: #555;
+        }
+        .step {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            line-height: 1.4;
+        }
+        .file-path {
+            background: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            color: #155724;
+        }
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            color: #0c5460;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #667eea;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f0f0f0;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+        }
+        .checklist li:before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+        .timeline-item {
+            padding-left: 40px;
+            margin: 30px 0;
+            position: relative;
+        }
+        .timeline-item:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #667eea;
+        }
+        .timeline-item:after {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 20px;
+            width: 2px;
+            height: 100%;
+            background: #ddd;
+        }
+        .timeline-item:last-child:after {
+            display: none;
+        }
+        .error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🛠️ RIS (Requisition & Issue Slip) - Complete Integration Guide</h1>
+    <p><strong>Version:</strong> 3.0 | <strong>Date:</strong> March 17, 2026</p>
+    <p><strong>Status:</strong> <span style="color: green; font-weight: bold;">Ready for Integration</span></p>
+
+    <h2>📋 Files Created</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>File Name</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Purpose</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>migration_ris_transactions_v3.sql</code></td>
+                <td>Database</td>
+                <td>server/database/</td>
+                <td>Database schema migrations (11 changes)</td>
+            </tr>
+            <tr>
+                <td><code>ris-endpoints-v3.js</code></td>
+                <td>Backend API</td>
+                <td>server/</td>
+                <td>REST API endpoints (10 endpoints)</td>
+            </tr>
+            <tr>
+                <td><code>ris-form-v3.html</code></td>
+                <td>Frontend UI</td>
+                <td>renderer/</td>
+                <td>HTML modals and forms</td>
+            </tr>
+            <tr>
+                <td><code>ris-functions-v3.js</code></td>
+                <td>Frontend Logic</td>
+                <td>renderer/scripts/</td>
+                <td>JavaScript event handlers (19 functions)</td>
+            </tr>
+            <tr>
+                <td><code>ris-styles-v3.css</code></td>
+                <td>Frontend Styles</td>
+                <td>renderer/styles/</td>
+                <td>CSS styling for RIS forms</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>⚙️ Step 1: Database Setup</h2>
+    <div class="step">
+        <h3>Execute Database Migration</h3>
+        <p>Copy and execute the SQL migration to your PostgreSQL database.</p>
+        
+        <div class="file-path">📁 server/database/migration_ris_transactions_v3.sql</div>
+        
+        <p><strong>Execution Methods:</strong></p>
+        <ul>
+            <li><strong>Using psql command line:</strong></li>
+        </ul>
+        
+        <div class="code-block">psql -U postgres -d procurement_db -f server/database/migration_ris_transactions_v3.sql</div>
+        
+        <ul>
+            <li><strong>Using pgAdmin GUI:</strong> Open Tools → Query Tool → Copy-Paste the SQL → Execute</li>
+            <li><strong>Using Node.js (automatic):</strong> Add to server startup script</li>
+        </ul>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> Ensure the following base tables exist before running migration:
+            <ul>
+                <li><code>users</code> table</li>
+                <li><code>employees</code> table</li>
+                <li><code>items</code> table (master catalog)</li>
+                <li><code>requisition_issue_slips</code> table</li>
+                <li><code>designations</code> table</li>
+            </ul>
+        </div>
+
+        <p><strong>What Gets Created:</strong></p>
+        <ul class="checklist">
+            <li>Additional columns in <code>requisition_issue_slips</code> table (5 new columns)</li>
+            <li>Additional columns in <code>ris_items</code> table (2 new columns)</li>
+            <li>Additional columns in <code>items</code> table (2 new columns)</li>
+            <li><code>ris_notifications</code> table (for role-based visibility)</li>
+            <li><code>ris_approvals</code> table (for approval tracking)</li>
+            <li><code>ris_status_history</code> table (for audit trail)</li>
+            <li>Database view: <code>vw_ris_complete</code></li>
+            <li>Database view: <code>vw_ris_items_with_stock</code></li>
+            <li>Stored procedure: <code>add_manual_item_to_catalog()</code></li>
+            <li>Stored procedure: <code>create_ris_with_notifications()</code></li>
+            <li>Stored procedure: <code>approve_ris()</code></li>
+        </ul>
+
+        <div class="success">
+            ✅ <strong>Verify Success:</strong> Check if new tables exist in your database:
+            <div class="code-block">SELECT * FROM ris_notifications LIMIT 0;
+SELECT * FROM ris_approvals LIMIT 0;
+SELECT * FROM ris_status_history LIMIT 0;</div>
+        </div>
+    </div>
+
+    <h2>⚙️ Step 2: Backend API Integration</h2>
+    <div class="step">
+        <h3>Integrate API Endpoints into server.js</h3>
+        <p>Merge the new endpoints from <code>ris-endpoints-v3.js</code> into your main <code>server.js</code> file.</p>
+
+        <div class="file-path">📁 server/ris-endpoints-v3.js</div>
+
+        <p><strong>Option A: Direct File Import (Recommended)</strong></p>
+        <div class="code-block">// At the top of server.js, add:
+const risEndpoints = require('./ris-endpoints-v3');
+
+// In the app initialization section, add:
+risEndpoints(app, pool, broadcastNotification);</div>
+
+        <p><strong>Option B: Manual Copy-Paste</strong></p>
+        <p>Find the line in <code>server.js</code> where existing RIS endpoints are defined (around line 4600):</p>
+        <div class="code-block">// Look for:
+// GET /api/ris - List all RIS
+app.get('/api/ris', authenticateToken, async (req, res) => {</div>
+
+        <p>Replace the entire RIS section with the content from <code>ris-endpoints-v3.js</code>.</p>
+
+        <p><strong>Required Dependencies Check:</strong></p>
+        <div class="code-block">// Make sure these are available in server.js:
+const pool = require('../database'); // PostgreSQL pool
+const authenticateToken = require('./middleware/auth'); // JWT middleware
+
+// Ensure this function exists:
+function broadcastNotification(event, data) {
+    if (global.io) {
+        global.io.emit(event, data);
+    }
+}</div>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> The endpoints use these roles: <code>HOPE</code>, <code>BAC_SEC</code>, <code>BUDGET</code>, <code>CHIEF_FAD</code>, <code>ADMIN</code>, <code>SUPPLY_OFFICER</code>. Ensure your user system supports these roles.
+        </div>
+
+        <p><strong>All 10 Endpoints Being Added:</strong></p>
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td>GET</td>
+                <td>/api/ris</td>
+                <td>List all RIS (role-based filtering)</td>
+            </tr>
+            <tr>
+                <td>GET</td>
+                <td>/api/ris/:id</td>
+                <td>View single RIS with details</td>
+            </tr>
+            <tr>
+                <td>POST</td>
+                <td>/api/ris</td>
+                <td>Create new RIS (with auto-notifications)</td>
+            </tr>
+            <tr>
+                <td>GET</td>
+                <td>/api/ris/notifications/pending</td>
+                <td>Get pending RIS notifications for user's role</td>
+            </tr>
+            <tr>
+                <td>PUT</td>
+                <td>/api/ris/:id/notifications/viewed</td>
+                <td>Mark notification as viewed</td>
+            </tr>
+            <tr>
+                <td>PUT</td>
+                <td>/api/ris/:id/approve</td>
+                <td>Supply Officer approves RIS (PENDING→APPROVED)</td>
+            </tr>
+            <tr>
+                <td>PUT</td>
+                <td>/api/ris/:id/cancel</td>
+                <td>Cancel/reject RIS</td>
+            </tr>
+            <tr>
+                <td>GET</td>
+                <td>/api/ris/:id/print-template</td>
+                <td>Get RIS formatted for printing</td>
+            </tr>
+            <tr>
+                <td>PUT</td>
+                <td>/api/ris/:id</td>
+                <td>Update PENDING RIS (for manual item auto-catalog)</td>
+            </tr>
+            <tr>
+                <td>DELETE</td>
+                <td>/api/ris/:id</td>
+                <td>Soft-delete RIS (mark as CANCELLED)</td>
+            </tr>
+        </table>
+
+        <div class="success">
+            ✅ <strong>Verify Success:</strong> Start your server and test an endpoint:
+            <div class="code-block">curl -H "Authorization: Bearer YOUR_TOKEN" \
+  http://localhost:3000/api/ris</div>
+        </div>
+    </div>
+
+    <h2>⚙️ Step 3: Frontend Integration Part 1 - HTML & CSS</h2>
+    <div class="step">
+        <h3>Add HTML Forms to renderer/index.html</h3>
+        
+        <div class="file-path">📁 renderer/ris-form-v3.html</div>
+
+        <p><strong>Step 3.1:</strong> Open <code>renderer/index.html</code> and locate the place where you want to add the RIS section. Typically after the Requisition menu item or in the navigation.</p>
+
+        <p><strong>Step 3.2:</strong> Copy the entire content from <code>renderer/ris-form-v3.html</code> and paste it into your <code>index.html</code> file.</p>
+
+        <p><strong>Step 3.3:</strong> Make sure to place it in the correct location - usually in a <code><div id="racAppContainer"></code> or main content area.</p>
+
+        <p><strong>Alternative: Using Include (if your build supports it):</strong></p>
+        <div class="code-block">&lt;!-- In index.html main content area --&gt;
+&lt;div id="risContainer"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+  // Load RIS forms dynamically
+  fetch('/renderer/ris-form-v3.html')
+    .then(r =&gt; r.text())
+    .then(html =&gt; {
+      document.getElementById('risContainer').innerHTML = html;
+    });
+&lt;/script&gt;</div>
+
+        <h3>Add CSS Stylesheet</h3>
+        
+        <div class="file-path">📁 renderer/styles/ris-styles-v3.css</div>
+
+        <p>Add this link to the <code>&lt;head&gt;</code> section of <code>renderer/index.html</code>:</p>
+
+        <div class="code-block">&lt;!-- In &lt;head&gt; section --&gt;
+&lt;link rel="stylesheet" href="/renderer/styles/ris-styles-v3.css"&gt;</div>
+
+        <div class="info">
+            <strong>ℹ️ Note:</strong> If you're using a CSS bundler or Webpack, import the CSS in your main styles:
+            <div class="code-block">@import '/renderer/styles/ris-styles-v3.css';</div>
+        </div>
+
+        <div class="success">
+            ✅ <strong>Verify Success:</strong> Load your application and check that the RIS form modals are visible in the browser's Developer Tools (F12 → Elements tab).
+        </div>
+    </div>
+
+    <h2>⚙️ Step 4: Frontend Integration Part 2 - JavaScript</h2>
+    <div class="step">
+        <h3>Add JavaScript Functions</h3>
+        
+        <div class="file-path">📁 renderer/scripts/ris-functions-v3.js</div>
+
+        <p><strong>Step 4.1:</strong> Add this script reference in <code>renderer/index.html</code> before the closing <code>&lt;/body&gt;</code> tag:</p>
+
+        <div class="code-block">&lt;!-- Before &lt;/body&gt; --&gt;
+&lt;script src="/renderer/scripts/ris-functions-v3.js"&gt;&lt;/script&gt;</div>
+
+        <p><strong>Step 4.2:</strong> Initialize the RIS module when the page loads. Add to your <code>app.js</code> startup code:</p>
+
+        <div class="code-block">// In app.js or your main initialization
+document.addEventListener('DOMContentLoaded', function() {
+    initializeRISModule();
+    // Load the RIS list
+    loadRISList();
+});</div>
+
+        <p><strong>Step 4.3:</strong> Add navigation button to access RIS section. In your navigation menu, add:</p>
+
+        <div class="code-block">&lt;button onclick="showRISSection()" class="nav-button"&gt;
+  &lt;i class="fas fa-file-alt"&gt;&lt;/i&gt; RIS Transactions
+&lt;/button&gt;</div>
+
+        <p>And add this helper function to your main js:</p>
+
+        <div class="code-block">function showRISSection() {
+    document.getElementById('risListSection').style.display = 'block';
+    loadRISList();
+}</div>
+
+        <p><strong>19 JavaScript Functions Added:</strong></p>
+        <table>
+            <tr>
+                <th>Function Name</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td><code>showNewRISForm()</code></td>
+                <td>Display RIS creation modal with auto-filled user data</td>
+            </tr>
+            <tr>
+                <td><code>generateRISNumber()</code></td>
+                <td>Generate unique RIS number</td>
+            </tr>
+            <tr>
+                <td><code>closeRISModal()</code></td>
+                <td>Close the main RIS form modal</td>
+            </tr>
+            <tr>
+                <td><code>addRISItemFromCatalog()</code></td>
+                <td>Open catalog item search modal</td>
+            </tr>
+            <tr>
+                <td><code>selectCatalogItem()</code></td>
+                <td>Add selected catalog item to RIS</td>
+            </tr>
+            <tr>
+                <td><code>closeCatalogModal()</code></td>
+                <td>Close catalog selection modal</td>
+            </tr>
+            <tr>
+                <td><code>addRISItemManual()</code></td>
+                <td>Open manual item entry modal</td>
+            </tr>
+            <tr>
+                <td><code>closeManualItemModal()</code></td>
+                <td>Close manual item entry modal</td>
+            </tr>
+            <tr>
+                <td><code>addManualItemToRIS()</code></td>
+                <td>Add manually entered item to RIS</td>
+            </tr>
+            <tr>
+                <td><code>renderRISItems()</code></td>
+                <td>Render items table with current items</td>
+            </tr>
+            <tr>
+                <td><code>updateRISItemQty()</code></td>
+                <td>Update item quantity in form</td>
+            </tr>
+            <tr>
+                <td><code>removeRISItem()</code></td>
+                <td>Remove item from RIS draft</td>
+            </tr>
+            <tr>
+                <td><code>saveRIS()</code></td>
+                <td>Create new RIS via POST /api/ris</td>
+            </tr>
+            <tr>
+                <td><code>loadRISList()</code></td>
+                <td>Fetch and display all RIS records</td>
+            </tr>
+            <tr>
+                <td><code>viewRISDetail()</code></td>
+                <td>View single RIS with approval options</td>
+            </tr>
+            <tr>
+                <td><code>approveRIS()</code></td>
+                <td>Supply Officer approves RIS</td>
+            </tr>
+            <tr>
+                <td><code>cancelRIS()</code></td>
+                <td>Cancel/reject RIS</td>
+            </tr>
+            <tr>
+                <td><code>printRISTemplate()</code></td>
+                <td>Generate print-ready RIS document</td>
+            </tr>
+            <tr>
+                <td><code>backToRISList()</code></td>
+                <td>Navigate from detail view to list</td>
+            </tr>
+            <tr>
+                <td><code>initializeRISModule()</code></td>
+                <td>Initialize RIS feature on page load</td>
+            </tr>
+        </table>
+
+        <div class="success">
+            ✅ <strong>Verify Success:</strong> Open browser console (F12 → Console) and test:
+            <div class="code-block">showNewRISForm();  // Should display RIS creation form</div>
+        </div>
+    </div>
+
+    <h2>🧪 Step 5: Testing the Integration</h2>
+    <div class="step">
+        <h3>Manual Testing Checklist</h3>
+
+        <p><strong>Test 1: Create New RIS</strong></p>
+        <ul class="checklist">
+            <li>Click "New RIS" button to open form</li>
+            <li>Verify user info is auto-filled (Requested By, Division)</li>
+            <li>Add item from catalog (click "Add from Catalog")</li>
+            <li>Add manual item (click "Add Manually")</li>
+            <li>Enter item description, quantity, unit</li>
+            <li>Click "Create RIS"</li>
+            <li>Verify RIS number is generated automatically</li>
+            <li>Check database: <code>SELECT * FROM requisition_issue_slips ORDER BY id DESC LIMIT 1;</code></li>
+        </ul>
+
+        <p><strong>Test 2: Manual Item Auto-Catalog</strong></p>
+        <ul class="checklist">
+            <li>Create RIS with a manual item (e.g., "Custom Item ABC")</li>
+            <li>Wait for database processing</li>
+            <li>Check items table: <code>SELECT * FROM items WHERE is_manually_added = true;</code></li>
+            <li>Verify new item appears in catalog</li>
+            <li>Verify next RIS can use this item from catalog</li>
+        </ul>
+
+        <p><strong>Test 3: Role-Based Visibility</strong></p>
+        <ul class="checklist">
+            <li>Create RIS as end user</li>
+            <li>Check notifications were sent: <code>SELECT * FROM ris_notifications WHERE ris_id = X;</code></li>
+            <li>Verify all 6 roles appear: HOPE, BAC_SEC, BUDGET, CHIEF_FAD, ADMIN, SUPPLY_OFFICER</li>
+            <li>Login as HOPE user and verify they see the RIS</li>
+            <li>Login as Supply Officer and verify approval options appear</li>
+        </ul>
+
+        <p><strong>Test 4: Approval Workflow</strong></p>
+        <ul class="checklist">
+            <li>Create RIS with status PENDING</li>
+            <li>Login as Supply Officer (Mark E. Marasigan role)</li>
+            <li>Click "Approve" button on RIS</li>
+            <li>Verify status changes to APPROVED</li>
+            <li>Check approvals table: <code>SELECT * FROM ris_approvals WHERE ris_id = X;</code></li>
+            <li>Verify approval timestamp and Supply Officer name recorded</li>
+        </ul>
+
+        <p><strong>Test 5: Print Template</strong></p>
+        <ul class="checklist">
+            <li>Open approved RIS</li>
+            <li>Click "Print Template" button</li>
+            <li>Verify browser print dialog opens</li>
+            <li>Verify all RIS information is formatted correctly</li>
+            <li>Verify signature lines are present for: Requested By, Approved By, Issued By, Received By</li>
+            <li>Print to PDF and verify output</li>
+        </ul>
+
+        <p><strong>Test 6: Stock Level Approval (if using enhanced database view)</strong></p>
+        <ul class="checklist">
+            <li>Create RIS with items from catalog</li>
+            <li>Verify Supply Officer sees current stock levels</li>
+            <li>Approve RIS only if items are in stock</li>
+        </ul>
+
+        <div class="warning">
+            <strong>⚠️ Common Issues:</strong>
+            <ul>
+                <li><strong>401 Unauthorized:</strong> Check JWT token in localStorage</li>
+                <li><strong>404 Not Found:</strong> Verify endpoints are integrated into server.js</li>
+                <li><strong>Database errors:</strong> Run migration SQL file and verify tables exist</li>
+                <li><strong>Modals not showing:</strong> Check CSS is loaded (F12 → Styles tab)</li>
+                <li><strong>Items not appearing:</strong> Verify items table exists and has data</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>📊 Step 6: Validate Against Sample RIS</h2>
+    <div class="step">
+        <h3>Testing with Provided Sample RIS Forms</h3>
+        <p>Use the 6 sample RIS documents provided in the PDF to validate your implementation:</p>
+
+        <ol>
+            <li><strong>WRSD RIS - Alcohol 500mL</strong>
+                <ul>
+                    <li>Create RIS for division: WRSD</li>
+                    <li>Add item: Alcohol (500mL bottle)</li>
+                    <li>Test approval workflow</li>
+                </ul>
+            </li>
+            <li><strong>ORD RIS - Molding Tape</strong>
+                <ul>
+                    <li>Create RIS for division: ORD</li>
+                    <li>Add item: Molding Tape</li>
+                    <li>Test with catalog items</li>
+                </ul>
+            </li>
+            <li><strong>PROTECTION RIS - Multiple Items</strong>
+                <ul>
+                    <li>Create RIS with 3+ items: Tarpaulin, Ballpen, Cartolina</li>
+                    <li>Test multiple item handling</li>
+                </ul>
+            </li>
+            <li><strong>ORD RIS - Customized Stamp</strong>
+                <ul>
+                    <li>Create RIS with manual item (custom stamp)</li>
+                    <li>Verify auto-catalog feature</li>
+                </ul>
+            </li>
+            <li><strong>ORD RIS - Multiple Supplies</strong>
+                <ul>
+                    <li>Create RIS with 5+ mixed items</li>
+                    <li>Test form performance with many items</li>
+                </ul>
+            </li>
+            <li><strong>WRSD RIS - HUDYAKA 2025</strong>
+                <ul>
+                    <li>Create RIS with priority flag</li>
+                    <li>Test special event requisition</li>
+                </ul>
+            </li>
+        </ol>
+
+        <div class="success">
+            ✅ <strong>All Samples Passed:</strong> If all 6 test cases pass, your RIS implementation is complete and ready for production use.
+        </div>
+    </div>
+
+    <h2>🔌 Step 7: Socket.IO Real-Time Notifications (Optional)</h2>
+    <div class="step">
+        <h3>Enable Real-Time Notifications</h3>
+        
+        <p>The API endpoints already include Socket.IO broadcasts. To enable real-time notifications:</p>
+
+        <p><strong>1. Verify Socket.IO is initialized in server.js:</strong></p>
+        <div class="code-block">const io = require('socket.io')(server, {
+    cors: { origin: "*" }
+});
+global.io = io;  // Make available to all modules</div>
+
+        <p><strong>2. Add client-side listener in your main app.js:</strong></p>
+        <div class="code-block">// Connect to Socket.IO
+if (typeof io !== 'undefined') {
+    const socket = io();
+    
+    // Listen for RIS notifications
+    socket.on('ris-created', function(data) {
+        console.log('New RIS created:', data);
+        showToast('New RIS ' + data.ris_no + ' created!', 'info');
+        loadRISList();
+    });
+    
+    socket.on('ris-approved', function(data) {
+        console.log('RIS approved:', data);
+        showToast('RIS ' + data.ris_no + ' approved!', 'success');
+        loadRISList();
+    });
+}</div>
+
+        <p><strong>3. Notifications are sent for:</strong></p>
+        <ul>
+            <li>New RIS creation (to all stakeholder roles)</li>
+            <li>RIS approval (to requestor and all roles)</li>
+            <li>RIS cancellation (to all involved parties)</li>
+            <li>Manual item added to catalog (to SUPPLY_OFFICER role)</li>
+        </ul>
+
+        <div class="info">
+            <strong>ℹ️ Note:</strong> Even without Socket.IO, notifications are stored in <code>ris_notifications</code> table and users will see pending RIS when they call <code>GET /api/ris/notifications/pending</code>
+        </div>
+    </div>
+
+    <h2>📚 Complete Integration Checklist</h2>
+    <div class="step">
+        <ul class="checklist">
+            <li>Execute SQL migration file against PostgreSQL database</li>
+            <li>Verify all 6 new tables exist in database</li>
+            <li>Integrate API endpoints into server.js</li>
+            <li>Test at least one API endpoint with curl or Postman</li>
+            <li>Copy HTML forms from ris-form-v3.html to renderer/index.html</li>
+            <li>Add CSS stylesheet link to index.html</li>
+            <li>Add ris-functions-v3.js script reference to index.html</li>
+            <li>Initialize RIS module on page load</li>
+            <li>Add navigation button to access RIS section</li>
+            <li>Test creating new RIS with catalog item</li>
+            <li>Test creating new RIS with manual item</li>
+            <li>Verify manual item appears in catalog</li>
+            <li>Test approval workflow (as Supply Officer user)</li>
+            <li>Test print template generation</li>
+            <li>Test with all 6 sample RIS forms</li>
+            <li>Verify role-based visibility works</li>
+            <li>Setup Socket.IO notifications (optional but recommended)</li>
+        </ul>
+    </div>
+
+    <h2>🚀 Deployment & Going Live</h2>
+    <div class="step">
+        <h3>Pre-Production Checklist</h3>
+        <ul class="checklist">
+            <li>Run all tests in staging environment</li>
+            <li>Backup existing database before migration</li>
+            <li>Verify all stakeholder roles exist in user system</li>
+            <li>Ensure supply officer (Mark E. Marasigan) is assigned correct role</li>
+            <li>Train end users on: Creating RIS, Adding items, Submit for approval</li>
+            <li>Train Supply Officer on: Reviewing RIS, Approving, Checking stock levels</li>
+            <li>Test email notifications (if integrated)</li>
+            <li>Test print functionality on actual printers</li>
+        </ul>
+
+        <h3>Post-Deployment</h3>
+        <ul class="checklist">
+            <li>Monitor error logs in server console</li>
+            <li>Check database for any constraint violations</li>
+            <li>Verify notifications are reaching stakeholders</li>
+            <li>Track first 10 RIS creations for issues</li>
+            <li>Get user feedback and adjust if needed</li>
+        </ul>
+    </div>
+
+    <h2>📞 Support & Troubleshooting</h2>
+    <div class="step">
+        <h3>Common Issues & Solutions</h3>
+
+        <div class="error">
+            <strong>Error: "Cannot find module './ris-endpoints-v3'"</strong>
+            <p><strong>Solution:</strong> Ensure file path is correct and file exists in server/ directory. Use relative or absolute path in require statement.</p>
+        </div>
+
+        <div class="error">
+            <strong>Error: "RIS_NOTIFICATIONS table does not exist"</strong>
+            <p><strong>Solution:</strong> Run the SQL migration file. Check that all SQL executed without errors.</p>
+        </div>
+
+        <div class="error">
+            <strong>Issue: UI modals not appearing</strong>
+            <p><strong>Solution:</strong> 
+                <br>1. Check CSS is loaded: F12 → Styles tab → search for "ris-modal"
+                <br>2. Check HTML is in page: F12 → Elements tab → search for "risModal"
+                <br>3. Check JS functions: Open browser console, type <code>typeof showNewRISForm</code> should return "function"
+            </p>
+        </div>
+
+        <div class="error">
+            <strong>Issue: Buttons not working / 404 errors</strong>
+            <p><strong>Solution:</strong> 
+                <br>1. Check server is running: <code>curl http://localhost:3000/</code>
+                <br>2. Check API endpoints integrated: Search server.js for "app.get('/api/ris"
+                <br>3. Check authentication token: <code>localStorage.getItem('token')</code> in console
+            </p>
+        </div>
+
+        <div class="error">
+            <strong>Issue: Database errors on RIS creation</strong>
+            <p><strong>Solution:</strong>
+                <br>1. Check user exists: <code>SELECT * FROM users WHERE id = X;</code>
+                <br>2. Check items exist: <code>SELECT * FROM items LIMIT 5;</code>
+                <br>3. Check items table has correct structure: <code>\d items</code> in psql
+            </p>
+        </div>
+    </div>
+
+    <h2>📖 Additional Resources</h2>
+    <div class="step">
+        <p><strong>Files Referenced:</strong></p>
+        <ul>
+            <li>Migration: <code>server/database/migration_ris_transactions_v3.sql</code></li>
+            <li>API: <code>server/ris-endpoints-v3.js</code></li>
+            <li>HTML: <code>renderer/ris-form-v3.html</code></li>
+            <li>JavaScript: <code>renderer/scripts/ris-functions-v3.js</code></li>
+            <li>CSS: <code>renderer/styles/ris-styles-v3.css</code></li>
+        </ul>
+
+        <p><strong>Key API Documentation:</strong></p>
+        <div class="code-block">POST /api/ris
+{
+  "division": "WRSD",
+  "office": "Building A",
+  "ris_date": "2026-03-17",
+  "purpose": "Office Supplies",
+  "items": [
+    {
+      "item_id": 5,
+      "description": "Alcohol 500mL",
+      "quantity": 10,
+      "uom": "bottle",
+      "is_from_catalog": true
+    }
+  ]
+}</div>
+
+        <p><strong>Response:</strong></p>
+        <div class="code-block">{
+  "id": 42,
+  "ris_no": "RIS-2026-00042",
+  "status": "PENDING",
+  "created_at": "2026-03-17T10:30:00Z",
+  "items": [...],
+  "notifications_sent_to": 6,
+  "message": "RIS created successfully"
+}</div>
+    </div>
+
+    <h2>✅ Final Status</h2>
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; text-align: center;">
+        <h2 style="color: white; border: none;">RIS Implementation Complete!</h2>
+        <p style="font-size: 16px;">All components created and ready for integration</p>
+        <p>
+            <strong>Database:</strong> ✅<br>
+            <strong>API Endpoints:</strong> ✅<br>
+            <strong>Frontend UI:</strong> ✅<br>
+            <strong>JavaScript Functions:</strong> ✅<br>
+            <strong>CSS Styling:</strong> ✅
+        </p>
+        <p style="margin-top: 20px; font-size: 14px;">Follow the 7 steps above to integrate and test.</p>
+    </div>
+
+</div>
+</body>
+</html>
