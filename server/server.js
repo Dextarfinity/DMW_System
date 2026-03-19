@@ -148,6 +148,8 @@ const RESOURCE_MAP = {
   '/api/uacs-codes': 'uacs-codes',
   '/api/uoms': 'uoms',
   '/api/suppliers': 'suppliers',
+  '/api/ppmp-sections': 'ppmp-sections',
+  '/api/ppmp-categories': 'ppmp-categories',
   '/api/items': 'items',
   '/api/plans': 'plans',
   '/api/paps': 'paps',
@@ -1489,6 +1491,47 @@ app.delete('/api/suppliers/:id', authenticateToken, async (req, res) => {
     await pool.query('UPDATE suppliers SET is_active = FALSE WHERE id = $1', [req.params.id]);
     res.json({ message: 'Supplier deactivated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==============================================================================
+// PPMP SECTIONS & CATEGORIES
+// ==============================================================================
+
+app.get('/api/ppmp-sections', authenticateToken, async (req, res) => {
+  console.log('[PPMP] GET /api/ppmp-sections called by user:', req.user?.username);
+  try {
+    const result = await pool.query(
+      'SELECT id, name, description, display_order FROM ppmp_sections WHERE is_active = true ORDER BY display_order, name'
+    );
+    console.log('[PPMP] Returning', result.rows.length, 'sections');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[PPMP] Error fetching sections:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/ppmp-categories', authenticateToken, async (req, res) => {
+  console.log('[PPMP] GET /api/ppmp-categories called by user:', req.user?.username);
+  try {
+    const { section_id } = req.query;
+    let query = `SELECT pc.id, pc.name, pc.section_id, pc.description, pc.display_order, ps.name as section_name
+                 FROM ppmp_categories pc
+                 JOIN ppmp_sections ps ON pc.section_id = ps.id
+                 WHERE pc.is_active = true`;
+    const params = [];
+    if (section_id) {
+      query += ' AND pc.section_id = $1';
+      params.push(section_id);
+    }
+    query += ' ORDER BY pc.display_order, pc.name';
+    const result = await pool.query(query, params);
+    console.log('[PPMP] Returning', result.rows.length, 'categories');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[PPMP] Error fetching categories:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==============================================================================

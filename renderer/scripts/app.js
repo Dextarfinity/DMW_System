@@ -13,7 +13,7 @@ const { io: ioConnect } = require('socket.io-client');
 // =====================================================
 const SERVER_PORT = 3000;
 const SERVER_IPS = [
-  '192.168.100.235',   // WiFi Network 1 (original)
+  '192.168.100.235',   // WiFi Network 1 
   '192.168.1.117'      // WiFi Network 2
 ];
   
@@ -596,6 +596,8 @@ let cachedBACRes = [], cachedNOA = [], cachedPO = [], cachedIAR = [];
 // Global caches for divisions & procurement modes (populated once from DB)
 let cachedDivisions = [];
 let cachedProcModes = [];
+let cachedPPMPSections = [];
+let cachedPPMPCategories = [];
 
 // Fetch and cache divisions from DB
 async function ensureDivisionsLoaded() {
@@ -613,6 +615,34 @@ async function ensureProcModesLoaded() {
     cachedProcModes = await apiRequest('/procurement-modes');
   } catch (e) { cachedProcModes = []; }
   return cachedProcModes;
+}
+
+// Fetch and cache PPMP sections from DB
+async function ensurePPMPSectionsLoaded() {
+  if (cachedPPMPSections.length) return cachedPPMPSections;
+  try {
+    console.log('[PPMP] Fetching sections from /ppmp-sections... API_URL:', API_URL, 'authToken:', authToken ? 'SET' : 'NOT SET');
+    cachedPPMPSections = await apiRequest('/ppmp-sections');
+    console.log('[PPMP] Sections loaded:', cachedPPMPSections);
+  } catch (e) {
+    console.error('[PPMP] Error loading sections:', e.message, e);
+    cachedPPMPSections = [];
+  }
+  return cachedPPMPSections;
+}
+
+// Fetch and cache PPMP categories from DB
+async function ensurePPMPCategoriesLoaded() {
+  if (cachedPPMPCategories.length) return cachedPPMPCategories;
+  try {
+    console.log('[PPMP] Fetching categories from /ppmp-categories... API_URL:', API_URL, 'authToken:', authToken ? 'SET' : 'NOT SET');
+    cachedPPMPCategories = await apiRequest('/ppmp-categories');
+    console.log('[PPMP] Categories loaded:', cachedPPMPCategories);
+  } catch (e) {
+    console.error('[PPMP] Error loading categories:', e.message, e);
+    cachedPPMPCategories = [];
+  }
+  return cachedPPMPCategories;
 }
 
 // Build <option> HTML for divisions
@@ -658,6 +688,34 @@ function buildProcModeOptions(selectedMode, includeEmpty = false) {
   });
   return html;
 }
+
+// Build <option> HTML for PPMP sections
+function buildPPMPSectionOptions(selectedName = '', includeEmpty = true) {
+  console.log('[PPMP] Building section options, cached:', cachedPPMPSections.length, 'items');
+  let html = includeEmpty ? '<option value="">-- Select Section --</option>' : '';
+  cachedPPMPSections.forEach(s => {
+    const sel = (s.name === selectedName) ? ' selected' : '';
+    html += `<option value="${escapeHtml(s.name)}"${sel}>${escapeHtml(s.name)}</option>`;
+  });
+  return html;
+}
+
+// Build <option> HTML for PPMP categories (show ALL categories, no filtering)
+function buildPPMPCategoryOptions(selectedName = '') {
+  console.log('[PPMP] Building category options, cached:', cachedPPMPCategories.length, 'items');
+  let html = '<option value="">-- Select Category --</option>';
+  cachedPPMPCategories.forEach(c => {
+    const sel = (c.name === selectedName) ? ' selected' : '';
+    html += `<option value="${escapeHtml(c.name)}"${sel}>${escapeHtml(c.name)}</option>`;
+  });
+  return html;
+}
+
+// Handler for PPMP Section dropdown change - no longer filters categories
+window.onPPMPSectionChange = function(sectionName) {
+  // Categories dropdown is independent - no filtering needed
+  console.log('[PPMP] Section changed to:', sectionName);
+};
 
 // Populate the signup division dropdown from DB
 async function populateSignupDivision() {
@@ -6527,16 +6585,17 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Only Division Chiefs, PPMP Entry Makers, or Admin can submit PPMP entries.');
       return;
     }
-    // Ensure divisions, procurement modes, items, and UOMs are loaded
-    await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+    // Ensure divisions, procurement modes, items, PPMP sections/categories, and UOMs are loaded
+    await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded(), ensurePPMPSectionsLoaded(), ensurePPMPCategoriesLoaded()]);
+    console.log('[PPMP Modal] After Promise.all - Sections:', cachedPPMPSections.length, 'Categories:', cachedPPMPCategories.length);
     if (!cachedUOMs.length) try { cachedUOMs = await apiRequest('/uoms'); } catch(e) {}
     const uomOptions = buildUOMOptions('');
     let allItems = [];
     try { allItems = await apiRequest('/items'); } catch(e) { console.warn('Could not load items'); }
 
-    // Build category filter from items catalog categories only
-    const itemCats = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
-    const categoryOptions = itemCats.map(c => `<option value="${c}">${c}</option>`).join('');
+    // Build section and category options from database
+    const sectionOptions = buildPPMPSectionOptions('');
+    const categoryOptions = buildPPMPCategoryOptions('');
 
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
     const isChief = userHasAnyRole(chiefRoles);
@@ -6602,18 +6661,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="form-row-3">
             <div class="form-group">
               <label>Section <span class="text-danger">*</span></label>
-              <select class="form-select" id="ppmpSection" required>
-                <option value="OFFICE OPERATION">OFFICE OPERATION</option>
-                <option value="SEMI- FURNITURE & FIXTURES">SEMI- FURNITURE & FIXTURES</option>
-                <option value="TRAININGS & ACTIVITIES">TRAININGS & ACTIVITIES</option>
-                <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
-                <option value="GENERAL PROCUREMENT" selected>GENERAL PROCUREMENT</option>
+              <select class="form-select" id="ppmpSection" required onchange="onPPMPSectionChange(this.value)">
+                ${sectionOptions}
               </select>
             </div>
             <div class="form-group">
-              <label>Filter by Category <small style="color:#999;">(optional)</small></label>
+              <label>Category <small style="color:#999;">(filtered by section)</small></label>
               <select class="form-select" id="ppmpCategoryFilterModal">
-                <option value="">-- All Categories --</option>
                 ${categoryOptions}
               </select>
             </div>
