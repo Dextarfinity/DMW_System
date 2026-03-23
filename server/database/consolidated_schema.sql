@@ -149,10 +149,11 @@ CREATE TABLE IF NOT EXISTS uoms (
 -- 9. DIVISIONS (separate from departments for inventory use)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS divisions (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(255) NOT NULL,
+    abbreviation VARCHAR(20),
+    description  TEXT,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================

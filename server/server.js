@@ -980,16 +980,16 @@ app.get('/api/divisions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/divisions', authenticateToken, async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const result = await pool.query('INSERT INTO divisions (name, description) VALUES ($1, $2) RETURNING *', [name, description]);
+    const { name, abbreviation, description } = req.body;
+    const result = await pool.query('INSERT INTO divisions (name, abbreviation, description) VALUES ($1, $2, $3) RETURNING *', [name, abbreviation, description]);
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/divisions/:id', authenticateToken, async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const result = await pool.query('UPDATE divisions SET name=$1, description=$2 WHERE id=$3 RETURNING *', [name, description, req.params.id]);
+    const { name, abbreviation, description } = req.body;
+    const result = await pool.query('UPDATE divisions SET name=$1, abbreviation=$2, description=$3 WHERE id=$4 RETURNING *', [name, abbreviation, description, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

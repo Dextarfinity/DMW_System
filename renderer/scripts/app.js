@@ -688,7 +688,7 @@ async function ensurePPMPCategoriesLoaded() {
 function buildDivisionOptions(selectedCode, includeEmpty = true) {
   let html = includeEmpty ? '<option value="">-- Select Division --</option>' : '';
   cachedDivisions.forEach(d => {
-    const code = d.code || d.abbreviation || d.name;
+    const code = d.abbreviation || d.code || d.name;
     const sel = (code === selectedCode) ? ' selected' : '';
     html += `<option value="${code}" data-deptid="${d.id}"${sel}>${code}</option>`;
   });
@@ -700,7 +700,7 @@ function buildManagedDivisionOptions(managedDeptIds) {
   let html = '<option value="">-- Select Division --</option>';
   const ids = (managedDeptIds || []).map(String);
   cachedDivisions.filter(d => ids.includes(String(d.id))).forEach(d => {
-    const code = d.code || d.abbreviation || d.name;
+    const code = d.abbreviation || d.code || d.name;
     html += `<option value="${code}" data-deptid="${d.id}">${code}</option>`;
   });
   return html;
@@ -710,7 +710,7 @@ function buildManagedDivisionOptions(managedDeptIds) {
 function buildDivisionOptionsById(selectedId, includeEmpty = true, labelStyle = 'short') {
   let html = includeEmpty ? '<option value="">-- Select --</option>' : '';
   cachedDivisions.forEach(d => {
-    const code = d.code || d.abbreviation || d.name;
+    const code = d.abbreviation || d.code || d.name;
     const sel = (String(d.id) === String(selectedId)) ? ' selected' : '';
     const label = labelStyle === 'long' ? `${code} - ${d.name}` : code;
     html += `<option value="${d.id}"${sel}>${label}</option>`;
@@ -750,10 +750,32 @@ function buildPPMPCategoryOptions(selectedName = '') {
   return html;
 }
 
-// Handler for PPMP Section dropdown change - no longer filters categories
+// Handler for PPMP Section dropdown change - auto-set matching category
 window.onPPMPSectionChange = function(sectionName) {
-  // Categories dropdown is independent - no filtering needed
   console.log('[PPMP] Section changed to:', sectionName);
+  // Auto-set category dropdown to match section if a matching category exists
+  const catDropdown = document.getElementById('ppmpCategoryFilterModal');
+  if (catDropdown && sectionName) {
+    // Check if there's a category that matches the section name
+    for (let i = 0; i < catDropdown.options.length; i++) {
+      if (catDropdown.options[i].value.toUpperCase() === sectionName.toUpperCase()) {
+        catDropdown.value = catDropdown.options[i].value;
+        console.log('[PPMP] Auto-set category to:', catDropdown.value);
+        return;
+      }
+    }
+    // If no exact match, look for categories that belong to this section via CATEGORY_TO_SECTION mapping
+    if (typeof CATEGORY_TO_SECTION !== 'undefined') {
+      for (let i = 0; i < catDropdown.options.length; i++) {
+        const catVal = catDropdown.options[i].value;
+        if (catVal && CATEGORY_TO_SECTION[catVal] === sectionName) {
+          catDropdown.value = catVal;
+          console.log('[PPMP] Auto-set category to:', catDropdown.value, '(matched via section mapping)');
+          return;
+        }
+      }
+    }
+  }
 };
 
 // Populate the signup division dropdown from DB
@@ -3493,6 +3515,7 @@ function renderBACResolutionTable(bacRes) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewBACResolutionModal(${b.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printBACResolution(${b.id})"><i class="fas fa-print"></i></button>
           ${!userHasAnyRole(['requester']) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ''}
           ${!userHasAnyRole(['requester']) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ''}
         </div>
@@ -4436,7 +4459,7 @@ function renderDivisionsTable(divisions) {
   tbody.innerHTML = divisions.map(d => `
     <tr>
       <td>${d.id}</td>
-      <td>${d.code || ''}</td>
+      <td>${d.abbreviation || d.code || ''}</td>
       <td>${d.name || ''}</td>
       <td>${d.description || ''}</td>
       <td>
@@ -4453,7 +4476,7 @@ function renderDivisionsGrid(divisions) {
   const grid = document.getElementById('divisionsGrid');
   if (!grid) return;
   if (!divisions || !divisions.length) { grid.innerHTML = '<p style="text-align:center;color:#666;">No divisions found</p>'; return; }
-  
+
   const iconMap = {
     'FAD': { icon: 'fa-calculator', bg: 'bg-primary' },
     'WRSD': { icon: 'fa-hands-helping', bg: 'bg-success' },
@@ -4462,9 +4485,9 @@ function renderDivisionsGrid(divisions) {
     'ORD': { icon: 'fa-user-tie', bg: 'bg-danger' }
   };
   const defaultIcon = { icon: 'fa-building', bg: 'bg-primary' };
-  
+
   grid.innerHTML = divisions.map(d => {
-    const code = (d.code || '').toUpperCase();
+    const code = (d.abbreviation || d.code || '').toUpperCase();
     const style = iconMap[code] || defaultIcon;
     const head = d.head_name || d.division_head || '';
     const role = d.head_role || ('Chief ' + code);
@@ -10240,6 +10263,22 @@ Failure to submit the above requirements within the prescribed period shall cons
   // Division code to dept_id mapping
   const deptIdMap = { 'FAD': 1, 'MWPTD': 2, 'MWPSD': 3, 'WRSD': 4, 'ORD': 5 };
 
+  // Convert full division name to short code for PPMP number generation
+  function getDivisionCode(divisionName) {
+    if (!divisionName) return '';
+    const name = divisionName.toLowerCase();
+    // Check if it's already a short code
+    if (['fad', 'wrsd', 'mwpsd', 'mwptd', 'ord'].includes(name)) return divisionName.toUpperCase();
+    // Map full names to short codes
+    if (name.includes('finance') || name.includes('administrative')) return 'FAD';
+    if (name.includes('welfare') || name.includes('reintegration')) return 'WRSD';
+    if (name.includes('protection') && name.includes('trafficking')) return 'MWPTD';
+    if (name.includes('processing') || (name.includes('service') && !name.includes('reintegration'))) return 'MWPSD';
+    if (name.includes('director')) return 'ORD';
+    // Fallback: try to extract abbreviation from first letters
+    return divisionName.split(/[\s-]+/).map(w => w[0]).join('').toUpperCase().substring(0, 6);
+  }
+
   /**
    * Auto-generate PPMP number based on division and fiscal year
    */
@@ -10257,7 +10296,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       // Fetch existing PPMP entries to determine next sequence number
       const plans = await apiRequest('/plans');
-      const prefix = 'PPMP-' + division + '-' + year + '-';
+      const divCode = getDivisionCode(division);
+      const prefix = 'PPMP-' + divCode + '-' + year + '-';
       let maxSeq = 0;
       plans.forEach(p => {
         if (p.ppmp_no && p.ppmp_no.startsWith(prefix)) {
@@ -10313,6 +10353,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
     const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
+    const category = document.getElementById('ppmpCategoryFilterModal')?.value || document.getElementById('ppmpCategory')?.value || section;
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
@@ -10356,7 +10397,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Generate PPMP numbers for the batch (use full year to match server format)
       const year = String(fiscalYear);
-      const prefix = 'PPMP-' + division + '-' + year + '-';
+      const divCode = getDivisionCode(division);
+      const prefix = 'PPMP-' + divCode + '-' + year + '-';
       let maxSeq = 0;
       const existingNos = new Set();
       try {
@@ -10383,13 +10425,13 @@ Failure to submit the above requirements within the prescribed period shall cons
         existingNos.add(ppmpNo); // Mark as used for next iteration
         return {
           ppmp_no: ppmpNo,
-          dept_id: deptIdMap[division] || null,
+          dept_id: deptIdMap[divCode] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: it.item_category || it.category || '',
+          category: category || it.item_category || it.category || '',
           item_id: it.item_id || null,
-          description: it.description || it.item_name,
-          item_description: it.description || it.item_name,
+          description: it.item_name || it.description,
+          item_description: isPAPs ? (it.description !== it.item_name ? it.description : '') : (it.description || it.item_name),
           project_type: projectType,
           quantity_size: String(it.quantity),
           procurement_mode: procurementMode,
@@ -14492,7 +14534,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const html = `
       <form id="divisionForm" onsubmit="saveNewDivision(event)">
         <div class="form-row">
-          <div class="form-group"><label>Division Code</label><input type="text" id="divCode" placeholder="e.g., FAD" required></div>
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="divAbbr" placeholder="e.g., FAD" maxlength="20" required></div>
           <div class="form-group"><label>Division Name</label><input type="text" id="divName" placeholder="Full name" required></div>
         </div>
         <div class="form-group"><label>Description</label><textarea id="divDesc" rows="2"></textarea></div>
@@ -14506,7 +14548,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
   window.saveNewDivision = async function(e) {
     e.preventDefault();
-    const data = { code: document.getElementById('divCode').value, name: document.getElementById('divName').value, description: document.getElementById('divDesc').value };
+    const data = { abbreviation: document.getElementById('divAbbr').value, name: document.getElementById('divName').value, description: document.getElementById('divDesc').value };
     try { if (!confirm('Are you sure you want to save this division?')) return; await apiRequest('/divisions', 'POST', data); alert('Division saved!'); closeModal(); loadDivisions(); } catch (err) { alert('Error: ' + err.message); }
   };
   window.showEditDivisionModal = async function(id) {
@@ -14515,7 +14557,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const html = `
       <form id="editDivForm" onsubmit="saveEditDivision(event, ${id})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Division #${id}</strong></div>
-        <div class="form-group"><label>Division Name</label><input type="text" id="editDivName" value="${(d.name || '').replace(/"/g, '&quot;')}" required></div>
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="editDivAbbr" value="${(d.abbreviation || '').replace(/"/g, '&quot;')}" maxlength="20" required></div>
+          <div class="form-group"><label>Division Name</label><input type="text" id="editDivName" value="${(d.name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
         <div class="form-group"><label>Description</label><textarea id="editDivDesc" rows="2">${d.description || ''}</textarea></div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -14528,7 +14573,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     if (!confirm('Save changes?')) return;
     try {
-      await apiRequest('/divisions/' + id, 'PUT', { name: document.getElementById('editDivName').value, description: document.getElementById('editDivDesc').value });
+      await apiRequest('/divisions/' + id, 'PUT', { abbreviation: document.getElementById('editDivAbbr').value, name: document.getElementById('editDivName').value, description: document.getElementById('editDivDesc').value });
       showToast('Division updated!', 'success'); closeModal(); loadDivisions();
     } catch (err) { alert('Error: ' + err.message); }
   };
@@ -14871,7 +14916,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-row">
           <div class="form-group">
             <label>ABC (Approved Budget for the Contract)</label>
-            <input type="number" id="bacResABC" placeholder="0.00" step="0.01" required>
+            <input type="number" id="bacResABC" placeholder="0.00" step="0.01" required onchange="togglePhilGEPSFields()">
           </div>
           <div class="form-group">
             <label>Contract Price (LCRB Amount)</label>
@@ -14880,8 +14925,25 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group">
           <label>Description of Procurement</label>
-          <textarea rows="2" placeholder="Brief description of items/services procured" required></textarea>
+          <textarea rows="2" id="bacResDescription" placeholder="Brief description of items/services procured" required></textarea>
         </div>
+
+        <!-- PhilGEPS Posting Dates (shown only when ABC > 200,000) -->
+        <div id="philgepsFieldsSection" style="display: none; background: #fff3e0; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 2px dashed #ff9800;">
+          <div style="font-weight: 600; margin-bottom: 10px; color: #e65100;"><i class="fas fa-globe"></i> PhilGEPS Posting (Required for ABC > ₱200,000)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size: 12px;">Posting Start Date</label>
+              <input type="date" id="bacResPhilgepsFrom" class="form-control">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px;">Posting End Date</label>
+              <input type="date" id="bacResPhilgepsUntil" class="form-control">
+            </div>
+          </div>
+          <small style="color: #666;"><i class="fas fa-info-circle"></i> Posting period must be at least 3 calendar days as per RA 12009 IRR Section 34.3(b)</small>
+        </div>
+
         <div class="form-section-header section-signatories"><i class="fas fa-users"></i> BAC Members (Signatories)</div>
         <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
           <div class="form-row">
@@ -14963,6 +15025,23 @@ Failure to submit the above requirements within the prescribed period shall cons
       </form>
     `;
     openModal('Create BAC Resolution', html);
+  };
+
+  // Toggle PhilGEPS fields based on ABC amount
+  window.togglePhilGEPSFields = function() {
+    const abcInput = document.getElementById('bacResABC');
+    const philgepsSection = document.getElementById('philgepsFieldsSection');
+    const editAbcInput = document.getElementById('editBacResABC');
+    const editPhilgepsSection = document.getElementById('editPhilgepsFieldsSection');
+
+    if (abcInput && philgepsSection) {
+      const abcAmount = parseFloat(abcInput.value) || 0;
+      philgepsSection.style.display = abcAmount > 200000 ? 'block' : 'none';
+    }
+    if (editAbcInput && editPhilgepsSection) {
+      const abcAmount = parseFloat(editAbcInput.value) || 0;
+      editPhilgepsSection.style.display = abcAmount > 200000 ? 'block' : 'none';
+    }
   };
 
   window.addBACBidderRow = function() {
@@ -16357,6 +16436,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       ${getViewAttachmentSectionHTML('bac_resolution', id)}
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printBACResolution(${id});"><i class="fas fa-print"></i> Print BAC Resolution</button>
       </div>
     `;
     openModal('View BAC Resolution', html);
@@ -19944,6 +20024,529 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       console.error('Print NOA error:', err);
       showNotification('Failed to print Notice of Award: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT BAC RESOLUTION ====================
+  // Based on new templates: Declaring Winner (no posting <=200k, with posting >200k) + Recommending Approval
+  window.printBACResolution = async function(bacResId, options = {}) {
+    try {
+      showNotification('Loading BAC Resolution data for print...', 'info');
+
+      // Resolve id
+      let id = bacResId;
+      if (typeof bacResId === 'string' && isNaN(bacResId)) {
+        const cached = cachedBACRes.find(b => b.resolution_number === bacResId);
+        if (cached) id = cached.id;
+      }
+
+      // Fetch full BAC Resolution
+      let bacRes = await apiRequest('/bac-resolutions/' + id);
+      if (!bacRes) {
+        bacRes = cachedBACRes.find(b => b.id === id);
+        if (!bacRes) { showNotification('BAC Resolution not found', 'error'); return; }
+      }
+
+      // Fetch linked abstract for additional data
+      let abstract = null;
+      if (bacRes.abstract_id) {
+        try { abstract = await apiRequest('/abstracts/' + bacRes.abstract_id); } catch(e) {}
+      }
+
+      // Fetch employees for signatories
+      let employees = [];
+      try { employees = await apiRequest('/employees'); } catch(e) {}
+
+      // Helper functions
+      const fmtDate = (d) => {
+        if (!d) return '_______________';
+        const dt = new Date(d);
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return '₱' + num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Number to words helper
+      function numberToWords(num) {
+        if (num === 0) return 'Zero';
+        const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                      'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                      'Seventeen','Eighteen','Nineteen'];
+        const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+        const scales = ['','Thousand','Million','Billion'];
+
+        function convertGroup(n) {
+          let str = '';
+          if (n >= 100) { str += ones[Math.floor(n/100)] + ' Hundred '; n %= 100; }
+          if (n >= 20) { str += tens[Math.floor(n/10)] + ' '; n %= 10; }
+          if (n > 0) { str += ones[n] + ' '; }
+          return str.trim();
+        }
+
+        const wholePart = Math.floor(Math.abs(num));
+        const centsPart = Math.round((Math.abs(num) - wholePart) * 100);
+
+        if (wholePart === 0) return 'Zero Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
+
+        let words = '';
+        let tempNum = wholePart;
+        let scaleIdx = 0;
+        while (tempNum > 0) {
+          const group = tempNum % 1000;
+          if (group > 0) {
+            const groupWords = convertGroup(group);
+            words = groupWords + (scales[scaleIdx] ? ' ' + scales[scaleIdx] : '') + (words ? ' ' : '') + words;
+          }
+          tempNum = Math.floor(tempNum / 1000);
+          scaleIdx++;
+        }
+        return words.trim() + ' Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
+      }
+
+      // Get employee details
+      const getEmployeeName = (empId) => {
+        if (!empId) return '_______________';
+        const emp = employees.find(e => e.id === parseInt(empId));
+        return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+      };
+
+      const getEmployeeDesignation = (empId) => {
+        if (!empId) return '';
+        const emp = employees.find(e => e.id === parseInt(empId));
+        return emp ? (emp.designation_name || '') : '';
+      };
+
+      // Determine if posting is required (ABC > 200,000)
+      const abcAmount = parseFloat(bacRes.abc_amount || 0);
+      const requiresPosting = abcAmount > 200000;
+
+      // Get bidder type (default to LOWEST CALCULATED AND RESPONSIVE)
+      const bidderTypeOptions = [
+        'LOWEST CALCULATED AND RESPONSIVE',
+        'HIGHEST RATED AND RESPONSIVE',
+        'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE',
+        'MOST ADVANTAGEOUS AND RESPONSIVE'
+      ];
+      const selectedBidderType = options.bidderType || bidderTypeOptions[0];
+
+      // Get data from resolution or abstract
+      const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________').toUpperCase();
+      const bidAmount = parseFloat(bacRes.bid_amount || bacRes.contract_price || abstract?.recommended_amount || 0);
+      const prNumber = bacRes.pr_number || abstract?.pr_number || '_______________';
+      const rfqNumber = bacRes.rfq_number || abstract?.rfq_number || '_______________';
+      const procurementDescription = bacRes.description || bacRes.subject || abstract?.description || 'Various office supplies and equipment';
+      const procurementMode = bacRes.procurement_mode || abstract?.procurement_mode || 'Small Value Procurement';
+      const resolutionDate = bacRes.resolution_date || bacRes.date_prepared || new Date();
+      const seriesYear = bacRes.series_year || new Date(resolutionDate).getFullYear();
+
+      // PhilGEPS posting dates (for >200k) - using correct DB field names
+      const philgepsStartDate = bacRes.philgeps_posted_from || options.philgepsStartDate || null;
+      const philgepsEndDate = bacRes.philgeps_posted_until || options.philgepsEndDate || null;
+
+      // BAC Members
+      const chairpersonName = getEmployeeName(bacRes.chairperson_id);
+      const chairpersonDesig = getEmployeeDesignation(bacRes.chairperson_id) || 'Chairperson';
+      const viceChairName = getEmployeeName(bacRes.vice_chairperson_id);
+      const viceChairDesig = getEmployeeDesignation(bacRes.vice_chairperson_id) || 'Vice-Chairperson';
+      const member1Name = getEmployeeName(bacRes.member1_id);
+      const member1Desig = getEmployeeDesignation(bacRes.member1_id) || 'Member';
+      const member2Name = getEmployeeName(bacRes.member2_id);
+      const member2Desig = getEmployeeDesignation(bacRes.member2_id) || 'Member';
+      const member3Name = getEmployeeName(bacRes.member3_id);
+      const member3Desig = getEmployeeDesignation(bacRes.member3_id) || 'Member';
+      const hopeName = getEmployeeName(bacRes.hope_id);
+      const hopeDesig = getEmployeeDesignation(bacRes.hope_id) || 'Regional Director';
+
+      // Build posting-specific WHEREAS clause
+      let postingClause = '';
+      if (requiresPosting) {
+        postingClause = `
+          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
+            Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be posted for a period
+            of three (3) calendar days on the PhilGEPS website, the website of the Procuring Entity, if available, and at any
+            conspicuous place reserved for this purpose within the premises of the Procuring Entity;
+          </p>
+          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC posted the RFQ on the PhilGEPS website,
+            starting <span class="editable-field" contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span>
+            until <span class="editable-field" contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span>;
+          </p>
+        `;
+      } else {
+        postingClause = `
+          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
+            Republic Act No. 12009, procurement projects with ABCs of ₱200,000.00 and below are not subject to mandatory posting
+            requirements;
+          </p>
+          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of
+            known qualifications;
+          </p>
+        `;
+      }
+
+      // Build bidders comparison table
+      let biddersTableRows = '';
+      const bidders = bacRes.bidders || [];
+      if (bidders.length > 0) {
+        bidders.forEach((b, idx) => {
+          biddersTableRows += `
+            <tr>
+              <td style="text-align: center; padding: 6px; border: 1px solid #000;">${idx + 1}</td>
+              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true">${b.name || ''}</td>
+              <td style="text-align: right; padding: 6px; border: 1px solid #000;" contenteditable="true">${fmtCurrency(b.amount)}</td>
+              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true">${b.remarks || ''}</td>
+            </tr>
+          `;
+        });
+      } else {
+        // Default 3 empty rows
+        for (let i = 1; i <= 3; i++) {
+          biddersTableRows += `
+            <tr>
+              <td style="text-align: center; padding: 6px; border: 1px solid #000;">${i}</td>
+              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
+              <td style="text-align: right; padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
+              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
+            </tr>
+          `;
+        }
+      }
+
+      // ========== PAGE 1-2: BAC RESOLUTION DECLARING WINNER ==========
+      const declaringWinnerHTML = `
+        <div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 20px;">
+            <p style="margin: 0; font-weight: bold;">Republic of the Philippines</p>
+            <p style="margin: 0; font-weight: bold;">Department of Migrant Workers</p>
+            <p style="margin: 0;">REGIONAL OFFICE NO. XIII (Caraga)</p>
+            <p style="margin: 0; font-size: 10pt;">J.P. Rosales Avenue, Butuan City</p>
+            <p style="margin: 0; font-size: 10pt;">Telephone No.: (085) 342-8833</p>
+          </div>
+
+          <div style="text-align: center; margin: 25px 0;">
+            <p style="margin: 0; font-weight: bold; font-size: 14pt;">BIDS AND AWARDS COMMITTEE</p>
+          </div>
+
+          <!-- Resolution Number -->
+          <div style="margin: 20px 0;">
+            <p style="margin: 0;"><strong>RESOLUTION NO. <span contenteditable="true">${bacRes.resolution_number || '___'}</span></strong></p>
+            <p style="margin: 0;">Series of <span contenteditable="true">${seriesYear}</span></p>
+          </div>
+
+          <!-- Subject/Title with Dropdown -->
+          <div style="margin: 20px 0; text-align: center;">
+            <p style="margin: 0; font-weight: bold; text-transform: uppercase;">
+              RESOLUTION DECLARING <span contenteditable="true" style="color: #0066cc;">${supplierName}</span>
+              AS THE <select id="bidderTypeSelect" class="bidder-type-dropdown" style="font-weight: bold; font-size: 12pt; border: 1px solid #0066cc; padding: 2px 5px; background: #e6f3ff;">
+                ${bidderTypeOptions.map(opt => `<option value="${opt}" ${opt === selectedBidderType ? 'selected' : ''}>${opt}</option>`).join('')}
+              </select> BIDDER FOR THE PROCUREMENT OF
+              <span contenteditable="true" style="color: #0066cc;">${procurementDescription.toUpperCase()}</span>
+            </p>
+          </div>
+
+          <!-- WHEREAS Clauses -->
+          <div style="margin: 20px 0;">
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> a requirement was submitted to the BAC for the procurement of
+              <span contenteditable="true">${procurementDescription}</span> through <span contenteditable="true">${procurementMode}</span>,
+              with an Approved Budget for the Contract (ABC) of <strong>${fmtCurrency(abcAmount)}</strong>
+              (<span contenteditable="true">${numberToWords(abcAmount)}</span>), inclusive of all government taxes and fees;
+            </p>
+
+            ${postingClause}
+
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> after the deadline for submission, the BAC opened and evaluated the quotations received;
+            </p>
+
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> based on the Abstract of Quotation, below are the results of the price evaluation:
+            </p>
+          </div>
+
+          <!-- Bidders Table -->
+          <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11pt;">
+            <thead>
+              <tr style="background: #f0f0f0;">
+                <th style="border: 1px solid #000; padding: 8px; width: 8%;">No.</th>
+                <th style="border: 1px solid #000; padding: 8px; width: 35%;">Name of Bidder</th>
+                <th style="border: 1px solid #000; padding: 8px; width: 25%;">Total Bid Amount</th>
+                <th style="border: 1px solid #000; padding: 8px; width: 32%;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${biddersTableRows}
+            </tbody>
+          </table>
+
+          <!-- Continuation WHEREAS -->
+          <div style="margin: 20px 0;">
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> after thorough evaluation, the BAC found that <strong><span contenteditable="true">${supplierName}</span></strong>
+              submitted the <span id="bidderTypeText">${selectedBidderType}</span> quotation (LCRB/HRRB/MEARB/MARB) with a total bid amount of
+              <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>),
+              which is within the ABC and compliant with the technical specifications and other requirements;
+            </p>
+
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> the BAC conducted post-qualification and verified that the said bidder has the legal, technical,
+              and financial capability to undertake the obligations of the proposed contract;
+            </p>
+          </div>
+
+          <!-- NOW THEREFORE -->
+          <div style="margin: 20px 0;">
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing premises, the BAC hereby
+              <strong>RESOLVES</strong> to:
+            </p>
+            <ol style="margin: 10px 0 10px 60px;">
+              <li style="margin: 8px 0; text-align: justify;">
+                <strong>DECLARE <span contenteditable="true">${supplierName}</span></strong> as the
+                <span id="bidderTypeText2">${selectedBidderType}</span> Bidder for the procurement of
+                <span contenteditable="true">${procurementDescription}</span>, with a total contract price of
+                <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>);
+              </li>
+              <li style="margin: 8px 0; text-align: justify;">
+                <strong>RECOMMEND</strong> the award of contract to the said bidder, subject to the approval of the
+                Head of the Procuring Entity (HoPE);
+              </li>
+              <li style="margin: 8px 0; text-align: justify;">
+                <strong>DIRECT</strong> the BAC Secretariat to prepare the necessary documents for the issuance of the
+                Notice of Award (NOA) and other pertinent documents.
+              </li>
+            </ol>
+          </div>
+
+          <p style="text-align: justify; text-indent: 40px; margin: 15px 0;">
+            <strong>APPROVED</strong> this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.
+          </p>
+
+          <!-- BAC Members Signatures -->
+          <div style="margin-top: 40px;">
+            <p style="text-align: center; font-weight: bold; margin-bottom: 25px;">BIDS AND AWARDS COMMITTEE</p>
+
+            <!-- First row: Chairperson -->
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="margin: 0; font-weight: bold;" contenteditable="true">${chairpersonName}</p>
+              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">Chairperson</p>
+            </div>
+
+            <!-- Second row: Vice-Chair and Member -->
+            <div style="display: flex; justify-content: space-around; margin: 30px 0;">
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${viceChairName}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Vice-Chairperson</p>
+              </div>
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member1Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
+              </div>
+            </div>
+
+            <!-- Third row: Two more Members -->
+            <div style="display: flex; justify-content: space-around; margin: 30px 0;">
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member2Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
+              </div>
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member3Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // ========== PAGE 3: BAC RESOLUTION RECOMMENDING APPROVAL ==========
+      const recommendingApprovalHTML = `
+        <div style="page-break-before: always; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 20px;">
+            <p style="margin: 0; font-weight: bold;">Republic of the Philippines</p>
+            <p style="margin: 0; font-weight: bold;">Department of Migrant Workers</p>
+            <p style="margin: 0;">REGIONAL OFFICE NO. XIII (Caraga)</p>
+            <p style="margin: 0; font-size: 10pt;">J.P. Rosales Avenue, Butuan City</p>
+            <p style="margin: 0; font-size: 10pt;">Telephone No.: (085) 342-8833</p>
+          </div>
+
+          <div style="text-align: center; margin: 25px 0;">
+            <p style="margin: 0; font-weight: bold; font-size: 14pt;">BIDS AND AWARDS COMMITTEE</p>
+          </div>
+
+          <!-- BAC Resolution Recommending Approval -->
+          <div style="margin: 20px 0;">
+            <p style="margin: 0; font-weight: bold; text-align: center; font-size: 13pt; text-decoration: underline;">
+              BAC RESOLUTION RECOMMENDING APPROVAL OF AWARD
+            </p>
+          </div>
+
+          <div style="margin: 20px 0;">
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              The Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII,
+              after conducting the procurement process in accordance with Republic Act No. 12009 and its
+              Implementing Rules and Regulations, hereby <strong>RECOMMENDS</strong> the approval of the award of contract to:
+            </p>
+          </div>
+
+          <!-- Award Details Table -->
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11pt;">
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; width: 35%; background: #f5f5f5;"><strong>Winning Bidder:</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${supplierName}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Project/Procurement:</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${procurementDescription}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Mode of Procurement:</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${procurementMode}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Approved Budget (ABC):</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;">${fmtCurrency(abcAmount)}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Contract Amount:</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;">${fmtCurrency(bidAmount)}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>PR Reference No.:</strong></td>
+              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${prNumber}</td>
+            </tr>
+          </table>
+
+          <p style="text-align: justify; margin: 20px 0;">
+            This recommendation is made in accordance with the provisions of R.A. No. 12009 and its IRR,
+            and is subject to the approval of the Head of the Procuring Entity (HoPE).
+          </p>
+
+          <p style="text-align: justify; margin: 15px 0;">
+            <strong>Submitted this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.</strong>
+          </p>
+
+          <!-- BAC Members Signatures (compact) -->
+          <div style="margin-top: 30px;">
+            <p style="text-align: center; font-weight: bold; margin-bottom: 20px;">BIDS AND AWARDS COMMITTEE</p>
+
+            <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
+              <div style="text-align: center; width: 30%; margin: 15px 0;">
+                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${chairpersonName}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Chairperson</p>
+              </div>
+              <div style="text-align: center; width: 30%; margin: 15px 0;">
+                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${viceChairName}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Vice-Chairperson</p>
+              </div>
+              <div style="text-align: center; width: 30%; margin: 15px 0;">
+                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member1Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 80px;">
+              <div style="text-align: center; width: 30%; margin: 15px 0;">
+                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member2Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+              </div>
+              <div style="text-align: center; width: 30%; margin: 15px 0;">
+                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member3Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- APPROVED Section -->
+          <div style="margin-top: 40px; border-top: 2px solid #000; padding-top: 20px;">
+            <p style="text-align: center; font-weight: bold; margin-bottom: 15px;">APPROVED:</p>
+
+            <div style="text-align: center; margin-top: 40px;">
+              <p style="margin: 0; font-weight: bold;" contenteditable="true">${hopeName}</p>
+              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">${hopeDesig}</p>
+              <p style="margin: 0; font-size: 10pt;">Head of Procuring Entity (HoPE)</p>
+            </div>
+
+            <p style="text-align: right; margin-top: 30px;">
+              Date: <span contenteditable="true" style="border-bottom: 1px solid #000; padding: 0 30px;">_______________</span>
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Combine all pages
+      const fullContent = declaringWinnerHTML + recommendingApprovalHTML;
+
+      // Add dropdown change handler script
+      const dropdownScript = `
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            const select = document.getElementById('bidderTypeSelect');
+            if (select) {
+              select.addEventListener('change', function() {
+                const val = this.value;
+                const text1 = document.getElementById('bidderTypeText');
+                const text2 = document.getElementById('bidderTypeText2');
+                if (text1) text1.textContent = val;
+                if (text2) text2.textContent = val;
+              });
+            }
+          });
+        </script>
+      `;
+
+      // Add styles for editable fields and dropdown
+      const customStyles = `
+        <style>
+          .editable-field, [contenteditable="true"] {
+            background: #fffde7;
+            padding: 1px 4px;
+            border-radius: 2px;
+            min-width: 50px;
+            display: inline-block;
+          }
+          .editable-field:hover, [contenteditable="true"]:hover {
+            background: #fff9c4;
+          }
+          .editable-field:focus, [contenteditable="true"]:focus {
+            background: #fff59d;
+            outline: 2px solid #ffc107;
+          }
+          .bidder-type-dropdown {
+            font-family: 'Times New Roman', Times, serif;
+            cursor: pointer;
+          }
+          .bidder-type-dropdown:hover {
+            background: #cce5ff !important;
+          }
+          @media print {
+            .bidder-type-dropdown {
+              border: none !important;
+              background: transparent !important;
+              -webkit-appearance: none;
+              appearance: none;
+            }
+            [contenteditable="true"] {
+              background: transparent !important;
+            }
+          }
+        </style>
+      `;
+
+      const html = buildPrintHTML('BAC Resolution - ' + (bacRes.resolution_number || ''), customStyles + fullContent + dropdownScript);
+      openPrintPreview(html, { title: toFilename('BAC_Resolution_' + (bacRes.resolution_number || '')), pageSize: 'A4', landscape: false, editable: true });
+
+    } catch (err) {
+      console.error('Print BAC Resolution error:', err);
+      showNotification('Failed to print BAC Resolution: ' + err.message, 'error');
     }
   };
 
