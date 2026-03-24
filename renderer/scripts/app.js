@@ -892,23 +892,34 @@ function updateItemsStats(items) {
       else if (qty <= reorder) lowStock++;
     }
   });
+
+  const inStock = total - lowStock - outOfStock;
   const el = id => document.getElementById(id);
-  if (el('icTotalItems')) el('icTotalItems').textContent = total;
-  if (el('icPsdbmItems')) el('icPsdbmItems').textContent = psdbm;
-  if (el('icNonPsdbmItems')) el('icNonPsdbmItems').textContent = nonpsdbm;
-  if (el('icLowStock')) el('icLowStock').textContent = lowStock;
-  if (el('icOutOfStock')) el('icOutOfStock').textContent = outOfStock;
+  const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0;
+
+  // Update stat values
+  if (el('icTotalItems')) el('icTotalItems').textContent = total.toLocaleString();
+  if (el('icPsdbmItems')) el('icPsdbmItems').textContent = psdbm.toLocaleString();
+  if (el('icNonPsdbmItems')) el('icNonPsdbmItems').textContent = nonpsdbm.toLocaleString();
+  if (el('icInStock')) el('icInStock').textContent = inStock.toLocaleString();
+  if (el('icLowStock')) el('icLowStock').textContent = lowStock.toLocaleString();
+  if (el('icOutOfStock')) el('icOutOfStock').textContent = outOfStock.toLocaleString();
+
+  // Update percentages
+  if (el('icPsdbmPct')) el('icPsdbmPct').textContent = pct(psdbm, total) + '%';
+  if (el('icNonPsdbmPct')) el('icNonPsdbmPct').textContent = pct(nonpsdbm, total) + '%';
+  if (el('icInStockPct')) el('icInStockPct').textContent = pct(inStock, total) + '%';
+  if (el('icLowStockPct')) el('icLowStockPct').textContent = pct(lowStock, total) + '%';
+  if (el('icOutStockPct')) el('icOutStockPct').textContent = pct(outOfStock, total) + '%';
 
   // --- Charts ---
-  const inStock = total - lowStock - outOfStock;
-
-  // Source pie chart
+  // Source pie chart (flat colors)
   drawPieChart('itemsSourceChart', 'itemsSourceLegend', [
     { label: 'PS-DBM', value: psdbm, color: '#276749' },
     { label: 'NON PS-DBM', value: nonpsdbm, color: '#1e40af' }
   ]);
 
-  // Stock status pie chart
+  // Stock status pie chart (flat colors)
   drawPieChart('itemsStockChart', 'itemsStockLegend', [
     { label: 'In Stock', value: inStock, color: '#276749' },
     { label: 'Low Stock', value: lowStock, color: '#92400e' },
@@ -936,16 +947,17 @@ function drawPieChart(containerId, legendId, data) {
 
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) {
-    container.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:12px;">No data</div>';
+    container.innerHTML = '<div style="text-align:center;color:#888;padding:30px 15px;font-size:12px;"><i class="fas fa-chart-pie" style="font-size:28px;color:#ddd;display:block;margin-bottom:6px;"></i>No data available</div>';
     if (legendEl) legendEl.innerHTML = '';
     return;
   }
 
-  const size = 200;
+  // Compact chart size
+  const size = 180;
   const cx = size / 2, cy = size / 2;
-  const outerR = 76;
+  const outerR = 72;
   const innerR = 36;
-  const midR = (outerR + innerR) / 2; // label radius — center of the ring
+  const midR = (outerR + innerR) / 2;
   let startAngle = -Math.PI / 2;
   let slicePaths = '';
   let labelPaths = '';
@@ -955,30 +967,37 @@ function drawPieChart(containerId, legendId, data) {
     const pct = d.value / total;
     const endAngle = startAngle + pct * 2 * Math.PI;
     const largeArc = pct > 0.5 ? 1 : 0;
-    const x1 = cx + outerR * Math.cos(startAngle);
-    const y1 = cy + outerR * Math.sin(startAngle);
-    const x2 = cx + outerR * Math.cos(endAngle);
-    const y2 = cy + outerR * Math.sin(endAngle);
+
+    // Donut slice path
+    const x1o = cx + outerR * Math.cos(startAngle);
+    const y1o = cy + outerR * Math.sin(startAngle);
+    const x2o = cx + outerR * Math.cos(endAngle);
+    const y2o = cy + outerR * Math.sin(endAngle);
+    const x1i = cx + innerR * Math.cos(endAngle);
+    const y1i = cy + innerR * Math.sin(endAngle);
+    const x2i = cx + innerR * Math.cos(startAngle);
+    const y2i = cy + innerR * Math.sin(startAngle);
 
     if (pct >= 0.999) {
       slicePaths += `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${d.color}" />`;
+      slicePaths += `<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#fff" />`;
     } else {
-      slicePaths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${d.color}" />`;
+      slicePaths += `<path d="M ${x1o} ${y1o} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2o} ${y2o} L ${x1i} ${y1i} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x2i} ${y2i} Z" fill="${d.color}" style="cursor:pointer;">
+        <title>${d.label}: ${d.value.toLocaleString()} (${Math.round(pct * 100)}%)</title>
+      </path>`;
     }
 
-    // Percentage label — placed at center of ring
+    // Percentage label
     const midAngle = startAngle + pct * Math.PI;
     const pctVal = Math.round(pct * 100);
 
-    if (pct >= 0.08) {
-      // Large enough slice: label inside the ring
+    if (pct >= 0.10) {
       const lx = cx + midR * Math.cos(midAngle);
       const ly = cy + midR * Math.sin(midAngle);
-      labelPaths += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="13" font-weight="700" style="text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pctVal}%</text>`;
-    } else if (pct >= 0.01) {
-      // Small slice: draw a line out and label outside
+      labelPaths += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="12" font-weight="700" style="text-shadow:0 1px 2px rgba(0,0,0,0.4);pointer-events:none;">${pctVal}%</text>`;
+    } else if (pct >= 0.02) {
       const lineStartR = outerR + 3;
-      const lineEndR = outerR + 16;
+      const lineEndR = outerR + 14;
       const lx1 = cx + lineStartR * Math.cos(midAngle);
       const ly1 = cy + lineStartR * Math.sin(midAngle);
       const lx2 = cx + lineEndR * Math.cos(midAngle);
@@ -986,25 +1005,25 @@ function drawPieChart(containerId, legendId, data) {
       const textX = cx + (lineEndR + 3) * Math.cos(midAngle);
       const textY = cy + (lineEndR + 3) * Math.sin(midAngle);
       const anchor = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'end' : 'start';
-      labelPaths += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="#666" stroke-width="1"/>`;
-      labelPaths += `<text x="${textX}" y="${textY}" text-anchor="${anchor}" dominant-baseline="middle" fill="#444" font-size="10" font-weight="600">${pctVal}%</text>`;
+      labelPaths += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="#888" stroke-width="1"/>`;
+      labelPaths += `<text x="${textX}" y="${textY}" text-anchor="${anchor}" dominant-baseline="middle" fill="#555" font-size="10" font-weight="600">${pctVal}%</text>`;
     }
 
     startAngle = endAngle;
   });
 
-  // Center hole for donut effect
-  const centerHole = `<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#fff" />`;
-  const centerText = `<text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="#1a365d" font-size="20" font-weight="800">${total}</text>`;
-  const centerLabel = `<text x="${cx}" y="${cy + 10}" text-anchor="middle" fill="#888" font-size="10" font-weight="600">TOTAL</text>`;
+  // Center content
+  const centerBg = `<circle cx="${cx}" cy="${cy}" r="${innerR - 2}" fill="#fff" />`;
+  const centerText = `<text x="${cx}" y="${cy - 3}" text-anchor="middle" fill="#1a365d" font-size="18" font-weight="800">${total.toLocaleString()}</text>`;
+  const centerLabel = `<text x="${cx}" y="${cy + 11}" text-anchor="middle" fill="#888" font-size="8" font-weight="600" letter-spacing="0.5">TOTAL</text>`;
 
-  container.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">${slicePaths}${centerHole}${centerText}${centerLabel}${labelPaths}</svg>`;
+  container.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">${slicePaths}${centerBg}${centerText}${centerLabel}${labelPaths}</svg>`;
 
   // Legend
   if (legendEl) {
     legendEl.innerHTML = data.map(d => {
       const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-      return `<div class="chart-legend-item"><span class="legend-dot" style="background:${d.color}"></span>${d.label}: <strong>${d.value}</strong> (${pct}%)</div>`;
+      return `<div class="chart-legend-item"><span class="legend-dot" style="background:${d.color}"></span>${d.label}: <strong>${d.value.toLocaleString()}</strong> (${pct}%)</div>`;
     }).join('');
   }
 }
@@ -1014,68 +1033,71 @@ function drawBarGraph(containerId, legendId, data, totalItems) {
   const container = document.getElementById(containerId);
   const legendEl = document.getElementById(legendId);
   if (!container) return;
-  if (!data.length) { container.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:13px;">No data</div>'; return; }
+  if (!data.length) {
+    container.innerHTML = '<div style="text-align:center;color:#888;padding:30px 15px;font-size:12px;"><i class="fas fa-chart-bar" style="font-size:28px;color:#ddd;display:block;margin-bottom:6px;"></i>No categories found</div>';
+    if (legendEl) legendEl.innerHTML = '';
+    return;
+  }
 
   const maxVal = Math.max(...data.map(d => d.value), 1);
   const barCount = data.length;
-  const chartW = 460;
-  const chartH = 210;
-  const padLeft = 38;
-  const padBottom = 52;
+  const chartW = 420;
+  const chartH = 190;
+  const padLeft = 36;
+  const padBottom = 48;
   const padTop = 22;
   const padRight = 12;
   const barAreaW = chartW - padLeft - padRight;
   const barAreaH = chartH - padBottom - padTop;
-  const barW = Math.min(38, Math.floor((barAreaW / barCount) * 0.65));
+  const barW = Math.min(36, Math.floor((barAreaW / barCount) * 0.65));
   const gap = (barAreaW - barW * barCount) / (barCount + 1);
 
   let svg = `<svg viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="xMidYMid meet" style="font-family:'Segoe UI',sans-serif;width:100%;height:auto;">`;
 
   // Background
-  svg += `<rect x="${padLeft}" y="${padTop}" width="${barAreaW}" height="${barAreaH}" fill="#fafbfc" rx="3"/>`;
+  svg += `<rect x="${padLeft}" y="${padTop}" width="${barAreaW}" height="${barAreaH}" fill="#f8f9fa" rx="3"/>`;
 
   // Y-axis gridlines + labels
-  const gridLines = 5;
+  const gridLines = 4;
   for (let i = 0; i <= gridLines; i++) {
     const y = padTop + (barAreaH / gridLines) * i;
     const val = Math.round(maxVal - (maxVal / gridLines) * i);
-    svg += `<line x1="${padLeft}" y1="${y}" x2="${padLeft + barAreaW}" y2="${y}" stroke="#e2e5ea" stroke-width="0.7" stroke-dasharray="3,2"/>`;
-    svg += `<text x="${padLeft - 6}" y="${y + 4}" text-anchor="end" fill="#777" font-size="10" font-weight="500">${val}</text>`;
+    svg += `<line x1="${padLeft}" y1="${y}" x2="${padLeft + barAreaW}" y2="${y}" stroke="#e2e5ea" stroke-width="1" ${i > 0 ? 'stroke-dasharray="3,2"' : ''}/>`;
+    svg += `<text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" fill="#666" font-size="9" font-weight="500">${val}</text>`;
   }
 
   // Bars + category labels
   data.forEach((d, i) => {
-    const barH = Math.max(2, (d.value / maxVal) * barAreaH);
+    const barH = Math.max(3, (d.value / maxVal) * barAreaH);
     const x = padLeft + gap + i * (barW + gap);
     const y = padTop + barAreaH - barH;
     const barCenterX = x + barW / 2;
     const baselineY = padTop + barAreaH;
 
-    // Bar shadow
-    svg += `<rect x="${x + 1.5}" y="${y + 1.5}" width="${barW}" height="${barH}" fill="rgba(0,0,0,0.06)" rx="3"/>`;
-    // Bar
-    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${d.color}" rx="3" style="cursor:pointer;">`;
-    svg += `<title>${d.label}: ${d.value} items</title></rect>`;
+    // Bar with rounded top
+    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${d.color}" rx="2" style="cursor:pointer;">
+      <title>${d.label}: ${d.value.toLocaleString()} items (${Math.round((d.value / totalItems) * 100)}%)</title>
+    </rect>`;
 
     // Value on top of bar
-    svg += `<text x="${barCenterX}" y="${y - 5}" text-anchor="middle" fill="#1a365d" font-size="11" font-weight="700">${d.value}</text>`;
+    svg += `<text x="${barCenterX}" y="${y - 4}" text-anchor="middle" fill="#1a365d" font-size="9" font-weight="700">${d.value}</text>`;
 
-    // Category label below bar (rotated 45°)
-    const shortLabel = d.label.length > 14 ? d.label.substring(0, 12) + '…' : d.label;
-    svg += `<text x="${barCenterX}" y="${baselineY + 10}" text-anchor="end" fill="#444" font-size="8.5" font-weight="600" transform="rotate(-45 ${barCenterX} ${baselineY + 10})">${shortLabel}</text>`;
+    // Category label below bar (rotated)
+    const shortLabel = d.label.length > 12 ? d.label.substring(0, 10) + '…' : d.label;
+    svg += `<text x="${barCenterX}" y="${baselineY + 10}" text-anchor="end" fill="#555" font-size="8" font-weight="600" transform="rotate(-40 ${barCenterX} ${baselineY + 10})">${shortLabel}</text>`;
   });
 
   // Baseline
-  svg += `<line x1="${padLeft}" y1="${padTop + barAreaH}" x2="${padLeft + barAreaW}" y2="${padTop + barAreaH}" stroke="#aab" stroke-width="1.2"/>`;
+  svg += `<line x1="${padLeft}" y1="${padTop + barAreaH}" x2="${padLeft + barAreaW}" y2="${padTop + barAreaH}" stroke="#aaa" stroke-width="1"/>`;
   // Y-axis line
-  svg += `<line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + barAreaH}" stroke="#aab" stroke-width="1.2"/>`;
+  svg += `<line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + barAreaH}" stroke="#aaa" stroke-width="1"/>`;
 
   svg += '</svg>';
   container.innerHTML = svg;
 
   // Legend summary
   if (legendEl) {
-    legendEl.innerHTML = `<div class="chart-legend-item" style="font-size:10px;margin-top:4px;"><strong>${totalItems}</strong> total items across <strong>${data.length}</strong> top categories</div>`;
+    legendEl.innerHTML = `<div class="chart-legend-item"><i class="fas fa-layer-group" style="color:#1a365d;margin-right:3px;font-size:10px;"></i><strong>${totalItems.toLocaleString()}</strong> items in <strong>${data.length}</strong> categories</div>`;
   }
 }
 
@@ -2533,44 +2555,43 @@ function renderUsersTable(users) {
 
 /** Format PPMP description for table display.
  *  Format:
- *    Other Supplies and Materials (...)    (bold title = General Description)
- *    ALCOHOL, Ethyl, 1 Gallon              (item name from catalog)
- *       Type: Steel,                       (item_description = additional info)
- *       Size: Width: 39 cm...
+ *    ITEM NAME / PAPS NAME          (bold item name - primary display)
+ *    Description/Specs below        (item_description = additional info)
  */
 function formatPPMPDescription(p) {
   const generalDesc = (p.description || '').trim();
   const itemName    = (p.item_name || '').trim();
   const itemDesc    = (p.item_description || '').trim();
 
-  if (!generalDesc && !itemName && !itemDesc) return escapeHtml(p.remarks || '-');
+  // Primary display: Item Name or General Description (whichever is available)
+  const primaryName = itemName || generalDesc;
+  if (!primaryName && !itemDesc) return escapeHtml(p.remarks || '-');
 
   let html = '';
 
-  // 1) General Description — bold title
-  if (generalDesc) {
-    html += '<strong>' + escapeHtml(generalDesc) + '</strong>';
+  // 1) Item Name / PAPs Name — bold primary display
+  if (primaryName) {
+    html += '<strong style="color:#1a365d;">' + escapeHtml(primaryName) + '</strong>';
   }
 
-  // 2) Item Name from catalog — second line, semi-bold
-  if (itemName) {
-    html += '<div style="margin-top:2px;font-size:12px;font-weight:600;color:#2d3748;">' + escapeHtml(itemName) + '</div>';
-  }
-
-  // 3) item_description — additional specs/details, indented
-  if (itemDesc) {
+  // 2) Item Description / Additional details — below the name
+  if (itemDesc && itemDesc.toLowerCase() !== primaryName.toLowerCase()) {
     const allLines = itemDesc.split('\n');
-    html += '<div class="ppmp-desc-details">';
+    html += '<div class="ppmp-desc-details" style="margin-top:4px;">';
     allLines.forEach(l => {
       const trimmed = l.trim();
       if (trimmed) {
-        html += '<div class="ppmp-desc-line">' + escapeHtml(trimmed) + '</div>';
-      } else {
-        html += '<div class="ppmp-desc-line" style="height:6px;"></div>';
+        html += '<div class="ppmp-desc-line" style="font-size:11px;color:#4a5568;">' + escapeHtml(trimmed) + '</div>';
       }
     });
     html += '</div>';
   }
+
+  // 3) If there's a general description different from item name, show it as subtitle
+  if (generalDesc && itemName && generalDesc.toLowerCase() !== itemName.toLowerCase()) {
+    html += '<div style="font-size:10px;color:#718096;margin-top:2px;font-style:italic;">' + escapeHtml(generalDesc) + '</div>';
+  }
+
   return html || escapeHtml(p.remarks || '-');
 }
 
@@ -10353,7 +10374,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
     const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
-    const category = document.getElementById('ppmpCategoryFilterModal')?.value || document.getElementById('ppmpCategory')?.value || section;
+    // Get the selected category from the dropdown - prioritize user selection
+    const categoryDropdownVal = document.getElementById('ppmpCategoryFilterModal')?.value;
+    const categoryHiddenVal = document.getElementById('ppmpCategory')?.value;
+    // Use the selected category, fallback to section if none selected
+    const selectedCategory = categoryDropdownVal || categoryHiddenVal || section;
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
@@ -10428,7 +10453,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           dept_id: deptIdMap[divCode] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: category || it.item_category || it.category || '',
+          category: selectedCategory,
           item_id: it.item_id || null,
           description: it.item_name || it.description,
           item_description: isPAPs ? (it.description !== it.item_name ? it.description : '') : (it.description || it.item_name),
@@ -15769,38 +15794,171 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('Director Signature', html);
   };
 
-  // APP Consolidation function
+  // APP Consolidation function - Only BAC Secretary can consolidate
   window.consolidateAPP = async function() {
-    if (!confirm('Consolidate all PPMP entries into APP for FY ' + getCurrentFiscalYear() + '?\n\nThis will transform PPMP codes into APP codes and display all entries.')) return;
-    
+    // Only BAC Secretary can consolidate PPMP to APP
+    const allowedRoles = ['bac_secretariat', 'admin'];
+    if (!userHasAnyRole(allowedRoles)) {
+      await govAlert({
+        title: 'Access Denied',
+        bodyHtml: `
+          <div style="text-align:center; padding: 10px 0;">
+            <i class="fas fa-lock" style="font-size:48px; color:#b91c1c; margin-bottom:12px;"></i>
+            <p style="font-size:14px; color:#333; margin-bottom:8px;">Only the <strong>BAC Secretariat</strong> can consolidate PPMP entries into APP.</p>
+            <p style="font-size:12px; color:#666;">Please contact the BAC Secretary to perform this action.</p>
+          </div>`,
+        type: 'error',
+        buttonText: 'Understood'
+      });
+      return;
+    }
+
+    const fy = getCurrentFiscalYear();
+
     try {
+      // Fetch approved PPMP entries that are ready for consolidation
+      const allPlans = await apiRequest('/plans');
+      const approvedPlans = (allPlans || []).filter(p =>
+        p.fiscal_year === parseInt(fy) &&
+        p.status === 'approved' &&
+        !p.consolidated_to_app
+      );
+
+      if (approvedPlans.length === 0) {
+        await govAlert({
+          title: 'No PPMP Entries to Consolidate',
+          bodyHtml: `
+            <div style="text-align:center; padding: 10px 0;">
+              <i class="fas fa-folder-open" style="font-size:48px; color:#92400e; margin-bottom:12px;"></i>
+              <p style="font-size:14px; color:#333;">There are no <strong>fully approved</strong> PPMP entries ready for consolidation for FY ${fy}.</p>
+              <p style="font-size:12px; color:#666; margin-top:8px;">PPMP entries must be approved by all required approvers before they can be consolidated into the APP.</p>
+            </div>`,
+          type: 'error',
+          buttonText: 'OK'
+        });
+        return;
+      }
+
+      // Group by division for summary
+      const byDivision = {};
+      let totalBudget = 0;
+      approvedPlans.forEach(p => {
+        const div = p.department_name || p.department_code || 'Unknown';
+        if (!byDivision[div]) byDivision[div] = { count: 0, total: 0 };
+        byDivision[div].count++;
+        byDivision[div].total += parseFloat(p.total_amount || 0);
+        totalBudget += parseFloat(p.total_amount || 0);
+      });
+
+      // Build division breakdown HTML
+      const divisionLines = Object.entries(byDivision).map(([div, data]) =>
+        `<tr>
+          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">${div}</td>
+          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.count}</td>
+          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:right;">₱${data.total.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        </tr>`
+      ).join('');
+
+      const confirmed = await govConfirm({
+        title: 'Consolidate PPMP to APP',
+        bodyHtml: `
+          <div class="gov-form-header" style="margin-bottom:16px; padding:12px; background:linear-gradient(135deg, #1a365d, #2c5282); color:#fff; border-radius:6px;">
+            <div style="font-size:11px; letter-spacing:0.5px;">Republic of the Philippines</div>
+            <div style="font-size:10px;">Department of Migrant Workers — Regional Office XIII</div>
+            <div style="font-size:14px; font-weight:700; margin-top:4px;">PPMP TO APP CONSOLIDATION</div>
+            <div style="font-size:11px;">Fiscal Year ${fy}</div>
+          </div>
+
+          <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:6px; padding:10px 14px; margin-bottom:14px;">
+            <div style="font-size:12px; color:#92400e; font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Important Notice</div>
+            <div style="font-size:11px; color:#78350f; margin-top:4px;">This action will consolidate all approved PPMP entries into the Annual Procurement Plan (APP). PPMP codes will be transformed to APP codes.</div>
+          </div>
+
+          <div style="font-size:12px; font-weight:700; color:#1a365d; margin-bottom:8px; border-bottom:2px solid #1a365d; padding-bottom:4px;">
+            <i class="fas fa-list-alt"></i> CONSOLIDATION SUMMARY
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px; background:#fff; border:1px solid #e2e8f0; border-radius:4px;">
+            <thead>
+              <tr style="background:#f7fafc;">
+                <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #1a365d; font-weight:700;">Division</th>
+                <th style="padding:8px 10px; text-align:center; border-bottom:2px solid #1a365d; font-weight:700;">Items</th>
+                <th style="padding:8px 10px; text-align:right; border-bottom:2px solid #1a365d; font-weight:700;">Est. Budget</th>
+              </tr>
+            </thead>
+            <tbody>${divisionLines}</tbody>
+            <tfoot>
+              <tr style="background:#f0fdf4; font-weight:700;">
+                <td style="padding:8px 10px; border-top:2px solid #1a365d;">TOTAL</td>
+                <td style="padding:8px 10px; text-align:center; border-top:2px solid #1a365d;">${approvedPlans.length}</td>
+                <td style="padding:8px 10px; text-align:right; border-top:2px solid #1a365d; color:#276749;">₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div style="background:#ebf5fb; border:1px solid #3182ce; border-radius:6px; padding:10px 14px;">
+            <div style="font-size:11px; color:#1e40af;"><i class="fas fa-user-shield"></i> <strong>Consolidating Officer:</strong> ${currentUser?.full_name || currentUser?.username || 'BAC Secretariat'}</div>
+            <div style="font-size:10px; color:#4a5568; margin-top:4px;">Date: ${new Date().toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
+          </div>
+        `,
+        confirmText: 'Consolidate to APP',
+        cancelText: 'Cancel'
+      });
+
+      if (!confirmed) return;
+
       // Call server consolidation endpoint
-      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: getCurrentFiscalYear() });
-      
+      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
+
       // Reload APP data to reflect current state
       await loadAPP();
-      
-      // Show summary using server-provided department breakdown
-      let summary = 'APP Consolidation Complete!\n\n';
-      summary += 'PPMP entries consolidated into APP with codes transformed (PPMP → APP).\n\n';
-      summary += 'Breakdown by Division:\n';
+
+      // Show success using govAlert
+      let divBreakdown = '';
       if (result.by_department) {
-        result.by_department.forEach(dept => {
-          const name = dept.department_name || 'Unknown';
-          summary += '  ' + name + ': ' + dept.count + ' items — ₱' + parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n';
-        });
+        divBreakdown = result.by_department.map(dept =>
+          `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #e2e8f0;">
+            <span>${dept.department_name || 'Unknown'}</span>
+            <span><strong>${dept.count}</strong> items — ₱${parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
+          </div>`
+        ).join('');
       }
-      summary += '\nTotal: ' + result.total_items + ' active items | Active ABC: ₱' + result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2});
-      if (result.available_budget > 0) {
-        summary += '\nAvailable Budget (from removed items): ₱' + result.available_budget.toLocaleString('en-PH', {minimumFractionDigits:2});
-        summary += '\nTotal Approved Budget: ₱' + result.total_approved.toLocaleString('en-PH', {minimumFractionDigits:2});
-      }
-      alert(summary);
-      
+
+      await govAlert({
+        title: 'Consolidation Successful',
+        bodyHtml: `
+          <div style="text-align:center; padding:10px 0;">
+            <i class="fas fa-check-circle" style="font-size:48px; color:#276749; margin-bottom:12px;"></i>
+            <p style="font-size:14px; color:#333; font-weight:600;">APP Consolidation Complete!</p>
+          </div>
+          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:12px; margin:12px 0; font-size:12px;">
+            ${divBreakdown}
+            <div style="display:flex; justify-content:space-between; padding-top:8px; margin-top:8px; border-top:2px solid #276749; font-weight:700; color:#276749;">
+              <span>Total Active Items:</span>
+              <span>${result.total_items} items — ₱${result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
+            </div>
+          </div>
+          <p style="font-size:11px; color:#666; text-align:center;">PPMP entries have been successfully consolidated into the Annual Procurement Plan.</p>
+        `,
+        type: 'success',
+        buttonText: 'View APP'
+      });
+
       // Navigate to APP page to show results
       if (typeof navigateTo === 'function') navigateTo('app');
     } catch (err) {
-      alert('Consolidation failed: ' + err.message);
+      await govAlert({
+        title: 'Consolidation Failed',
+        bodyHtml: `
+          <div style="text-align:center; padding:10px 0;">
+            <i class="fas fa-times-circle" style="font-size:48px; color:#b91c1c; margin-bottom:12px;"></i>
+            <p style="font-size:14px; color:#333;">Failed to consolidate PPMP entries.</p>
+            <p style="font-size:12px; color:#b91c1c; margin-top:8px;">${err.message}</p>
+          </div>
+        `,
+        type: 'error',
+        buttonText: 'OK'
+      });
     }
   };
 
@@ -17082,19 +17240,33 @@ Failure to submit the above requirements within the prescribed period shall cons
       const ppmpNo = plan.ppmp_no || 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
       const totalAmt = parseFloat(plan.total_amount || 0);
       const statusVal = plan.status || 'draft';
+      const isPAPsEntry = (plan.procurement_source || '').toUpperCase() === 'PAPS';
+      const currentCategory = plan.category || currentSection;
 
       // Build item info for display (read-only linked item)
       const linkedItem = allItems.find(i => String(i.id) === String(plan.item_id));
-      
+
       // Item description: use item_description column, fallback to description
       const currentItemDesc = plan.item_description || plan.description || '';
 
+      // Build category options from items
+      const allCategories = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+      const categoryOptions = allCategories.map(c =>
+        `<option value="${c}" ${c === currentCategory ? 'selected' : ''}>${c}</option>`
+      ).join('');
+
       const html = `
         <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
+          <div class="info-banner" style="margin-bottom: 16px; background: #ebf5fb; border-left: 4px solid #1a365d; padding: 10px 14px;">
+            <i class="fas fa-edit" style="color: #1a365d;"></i>
+            <strong>EDIT PPMP ENTRY</strong><br>
+            <small style="color: #555;">Project Procurement Management Plan — ${isPAPsEntry ? 'PAPs Entry' : 'Item Entry'}</small>
+          </div>
+
           <div class="form-row">
             <div class="form-group">
-              <label>PPMP No.</label>
-              <input type="text" name="ppmp_no" value="${ppmpNo}" readonly style="background: #f5f5f5;">
+              <label>PPMP No. <small style="color:#666;">(editable)</small></label>
+              <input type="text" name="ppmp_no" value="${ppmpNo}" style="font-weight:600;">
             </div>
             <div class="form-group">
               <label>Division</label>
@@ -17121,52 +17293,86 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-row">
             <div class="form-group">
               <label>Procurement Source</label>
-              <select class="form-select" name="procurement_source">
-                <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM</option>
-                <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM</option>
+              <select class="form-select" name="procurement_source" id="editProcurementSource" onchange="toggleEditPPMPSourceMode(this.value)">
+                <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM (Items Catalog)</option>
+                <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM (Items Catalog)</option>
                 <option value="PAPs" ${(plan.procurement_source||plan.item_procurement_source||'')==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
                 <option value="MANUAL-NON-PSDBM" ${(plan.procurement_source||'')==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
               </select>
             </div>
           </div>
 
-          <div class="form-section-header"><i class="fas fa-layer-group"></i> Linked Items <small style="font-weight:400; color:#4a5568;">(check items to link, each with its own description)</small></div>
-          ${plan.item_id && linkedItem ? `
-          <div style="background:#e8f7ed; border:1px solid #c6f6d5; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
-            <div style="font-size:12px; font-weight:600; color:#276749; margin-bottom:4px;"><i class="fas fa-link"></i> Currently Linked Item</div>
-            <div style="font-size:13px; font-weight:700; color:#1a202c;">${escapeHtml(linkedItem.code || '')} — ${escapeHtml(linkedItem.name || '')}</div>
-            <div style="font-size:11px; color:#4a5568;">${linkedItem.unit || ''} @ ₱${parseFloat(linkedItem.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
-            ${currentItemDesc ? `<div style="margin-top:6px; font-size:12px; color:#2d3748; white-space:pre-line; background:#fff; padding:6px 8px; border-radius:4px; border:1px solid #e2e8f0;"><strong>Item Description:</strong>\n${escapeHtml(currentItemDesc)}</div>` : ''}
-          </div>` : (plan.item_description ? `
-          <div style="background:#ebf8ff; border:1px solid #bee3f8; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
-            <div style="font-size:12px; font-weight:600; color:#2b6cb0; margin-bottom:4px;"><i class="fas fa-info-circle"></i> Current Item Description</div>
-            <div style="font-size:12px; color:#2d3748; white-space:pre-line;">${escapeHtml(plan.item_description)}</div>
-          </div>` : '')}
-          <div class="form-row">
-            <div class="form-group">
-              <label>Section <span class="text-danger">*</span></label>
-              <select class="form-select" id="ppmpSection" name="section" required>
-                <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
-                <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
-                <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
-                <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
-                <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
-              </select>
+          <!-- CATALOG ITEMS SECTION -->
+          <div id="editCatalogSection" style="${isPAPsEntry ? 'display:none;' : ''}">
+            <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
+            ${plan.item_id && linkedItem ? `
+            <div style="background:#e8f7ed; border:1px solid #c6f6d5; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
+              <div style="font-size:12px; font-weight:600; color:#276749; margin-bottom:4px;"><i class="fas fa-link"></i> Currently Linked Item</div>
+              <div style="font-size:13px; font-weight:700; color:#1a202c;">${escapeHtml(linkedItem.code || '')} — ${escapeHtml(linkedItem.name || '')}</div>
+              <div style="font-size:11px; color:#4a5568;">${linkedItem.unit || ''} @ ₱${parseFloat(linkedItem.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
+            </div>` : ''}
+            <div class="form-row">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="ppmpSection" name="section" required>
+                  <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
+                  <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
+                  <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
+                  <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
+                  <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <select class="form-select" name="category" id="editPPMPCategory">
+                  <option value="">-- Select Category --</option>
+                  ${categoryOptions}
+                </select>
+              </div>
             </div>
-            <div class="form-group" style="display:flex;flex:1;min-width:0;align-items:flex-end;">
-              <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="width:100%;height:36px;"><i class="fas fa-layer-group"></i> Select Items from Catalog</button>
+            <div class="form-group" style="margin-bottom:12px;">
+              <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="width:100%;"><i class="fas fa-layer-group"></i> Select Items from Catalog</button>
             </div>
+            <div id="ppmpEditItemsList" style="margin-bottom:12px;"></div>
+            <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
           </div>
 
-          <div id="ppmpEditItemsList" style="margin-bottom:16px;">
-            <!-- Selected items rendered by JS -->
+          <!-- PAPs / MANUAL ITEMS SECTION -->
+          <div id="editPAPsSection" style="${isPAPsEntry ? '' : 'display:none;'}">
+            <div class="form-section-header"><i class="fas fa-project-diagram"></i> PAPs Entry Details</div>
+            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+              <i class="fas fa-info-circle"></i> PAPs — Programs, Activities & Projects
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="ppmpSectionPAPs" name="section_paps">
+                  <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
+                  <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
+                  <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
+                  <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
+                  <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <input type="text" name="category_paps" id="editPAPsCategory" value="${currentCategory}" placeholder="e.g., Training, Activity, Project">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>PAPs Name / Item Name <span class="text-danger">*</span></label>
+              <input type="text" name="paps_name" id="editPAPsName" value="${escapeHtml(plan.description || plan.item_name || '')}" required placeholder="e.g., Training on Financial Management">
+            </div>
+            <div class="form-group">
+              <label>Description / Specifications</label>
+              <textarea name="paps_description" id="editPAPsDesc" rows="3" placeholder="Detailed description, objectives, participants, etc.">${escapeHtml(currentItemDesc)}</textarea>
+            </div>
           </div>
-          <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
 
           <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Details</div>
           <div class="form-group">
             <label>General Description & Objective</label>
-            <textarea name="description" rows="2" id="ppmpDescription" >${plan.description || ''}</textarea>
+            <textarea name="description" rows="2" id="ppmpDescription">${plan.description || ''}</textarea>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -17236,13 +17442,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </form>
       `;
-      openModal('Edit PPMP', html);
+      openModal('Edit PPMP Entry — ' + ppmpNo, html);
 
       // Store edit context
       window._ppmpEditPlanId = planId;
       window._ppmpEditPlan = plan;
       window._ppmpEditCheckedItems = {};
-      
+
       // Pre-check the currently linked item with its description
       if (plan.item_id && linkedItem) {
         window._ppmpEditCheckedItems[String(plan.item_id)] = {
@@ -17258,6 +17464,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       alert('Failed to load PPMP for editing: ' + err.message);
     }
+  };
+
+  /** Toggle Edit PPMP modal sections based on procurement source */
+  window.toggleEditPPMPSourceMode = function(source) {
+    const catalogSection = document.getElementById('editCatalogSection');
+    const papsSection = document.getElementById('editPAPsSection');
+    const isPAPs = source === 'PAPs';
+
+    if (catalogSection) catalogSection.style.display = isPAPs ? 'none' : '';
+    if (papsSection) papsSection.style.display = isPAPs ? '' : 'none';
   };
 
   /**

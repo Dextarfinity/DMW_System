@@ -1290,48 +1290,75 @@
             <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
           </div>
 
-          <!-- Summary Dashboard: Stats + Pie Charts -->
+          <!-- Summary Dashboard: Stats + Charts -->
           <div class="items-dashboard">
-            <!-- Left: Stat Cards -->
-            <div class="items-stats-col">
+            <!-- Top Row: Stat Cards (Horizontal) -->
+            <div class="items-stats-row">
               <div class="items-stat-card">
-                <div class="stat-icon bg-primary"><i class="fas fa-boxes"></i></div>
-                <div class="stat-info"><h3 id="icTotalItems">0</h3><p>Total Items</p></div>
+                <div class="stat-icon bg-primary"><i class="fas fa-cube"></i></div>
+                <div class="stat-info">
+                  <h3 id="icTotalItems">0</h3>
+                  <p>Total Items</p>
+                </div>
               </div>
               <div class="items-stat-card">
                 <div class="stat-icon bg-success"><i class="fas fa-store"></i></div>
-                <div class="stat-info"><h3 id="icPsdbmItems">0</h3><p>PS-DBM</p></div>
+                <div class="stat-info">
+                  <h3 id="icPsdbmItems">0</h3>
+                  <p>PS-DBM</p>
+                  <span class="stat-pct" id="icPsdbmPct">0%</span>
+                </div>
               </div>
               <div class="items-stat-card">
                 <div class="stat-icon bg-info"><i class="fas fa-warehouse"></i></div>
-                <div class="stat-info"><h3 id="icNonPsdbmItems">0</h3><p>NON PS-DBM</p></div>
+                <div class="stat-info">
+                  <h3 id="icNonPsdbmItems">0</h3>
+                  <p>NON PS-DBM</p>
+                  <span class="stat-pct" id="icNonPsdbmPct">0%</span>
+                </div>
+              </div>
+              <div class="items-stat-card">
+                <div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info">
+                  <h3 id="icInStock">0</h3>
+                  <p>In Stock</p>
+                  <span class="stat-pct success" id="icInStockPct">0%</span>
+                </div>
               </div>
               <div class="items-stat-card">
                 <div class="stat-icon bg-warning"><i class="fas fa-exclamation-triangle"></i></div>
-                <div class="stat-info"><h3 id="icLowStock">0</h3><p>Low Stock</p></div>
+                <div class="stat-info">
+                  <h3 id="icLowStock">0</h3>
+                  <p>Low Stock</p>
+                  <span class="stat-pct warning" id="icLowStockPct">0%</span>
+                </div>
               </div>
               <div class="items-stat-card">
                 <div class="stat-icon bg-danger"><i class="fas fa-times-circle"></i></div>
-                <div class="stat-info"><h3 id="icOutOfStock">0</h3><p>Out of Stock</p></div>
+                <div class="stat-info">
+                  <h3 id="icOutOfStock">0</h3>
+                  <p>Out of Stock</p>
+                  <span class="stat-pct danger" id="icOutStockPct">0%</span>
+                </div>
               </div>
             </div>
-            <!-- Center: Source Pie Chart -->
-            <div class="items-chart-card">
-              <div class="chart-title"><i class="fas fa-chart-pie"></i> Procurement Source</div>
-              <div class="chart-container" id="itemsSourceChart"></div>
-              <div class="chart-legend" id="itemsSourceLegend"></div>
-            </div>
-            <!-- Right: Stock Status Pie Chart -->
-            <div class="items-chart-card">
-              <div class="chart-title"><i class="fas fa-chart-pie"></i> Stock Status</div>
-              <div class="chart-container" id="itemsStockChart"></div>
-              <div class="chart-legend" id="itemsStockLegend"></div>
-            </div>
-            <!-- Far Right: Top Categories -->
-            <div class="items-chart-card">
-              <div class="chart-title"><i class="fas fa-chart-bar"></i> Top Categories</div>
-              <div class="chart-container" id="itemsCategoryChart"></div>
-              <div class="chart-legend" id="itemsCategoryLegend"></div>
+            <!-- Bottom Row: Charts -->
+            <div class="items-charts-row">
+              <div class="items-chart-card">
+                <div class="chart-title"><i class="fas fa-chart-pie"></i> Procurement Source</div>
+                <div class="chart-container" id="itemsSourceChart"></div>
+                <div class="chart-legend" id="itemsSourceLegend"></div>
+              </div>
+              <div class="items-chart-card">
+                <div class="chart-title"><i class="fas fa-chart-pie"></i> Stock Status</div>
+                <div class="chart-container" id="itemsStockChart"></div>
+                <div class="chart-legend" id="itemsStockLegend"></div>
+              </div>
+              <div class="items-chart-card chart-wide">
+                <div class="chart-title"><i class="fas fa-chart-bar"></i> Top Categories</div>
+                <div class="chart-container bar-container" id="itemsCategoryChart"></div>
+                <div class="chart-legend" id="itemsCategoryLegend"></div>
+              </div>
             </div>
           </div>
 
