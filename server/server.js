@@ -1634,6 +1634,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
               it.procurement_source as item_procurement_source,
+              pap.pap_name as pap_pap_name,
               pp.item_description, pp.section as section
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
@@ -1643,7 +1644,8 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id
        LEFT JOIN users du ON pp.declined_by = du.id
-       LEFT JOIN items it ON pp.item_id = it.id`;
+       LEFT JOIN items it ON pp.item_id = it.id
+       LEFT JOIN paps pap ON pp.pap_id = pap.id`;
     const params = [];
     const conditions = [];
     
@@ -1705,13 +1707,15 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
       `SELECT pp.*, d.name as department_name, d.code as department_code,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
+              pap.pap_name as pap_pap_name,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
               bu.username as budget_approver_name,
               du.username as declined_by_name
-       FROM procurementplans pp 
-       LEFT JOIN departments d ON pp.dept_id = d.id 
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
        LEFT JOIN items it ON pp.item_id = it.id
+       LEFT JOIN paps pap ON pp.pap_id = pap.id
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id

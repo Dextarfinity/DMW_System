@@ -11,8 +11,8 @@ let mainWindow;
 // Config file: %APPDATA%/procurement-plan-system/server-config.json
 // =====================================================
 const DEFAULT_SERVER_IPS = [
-  '192.168.1.117',     // WiFi Network 2 
-  '192.168.100.235'    // WiFi Network 1
+  '192.168.1.117',     // WiFi Network 
+  '192.168.100.235'    // WiFi Network 
 ];
 const SERVER_PORT = 3000;
 

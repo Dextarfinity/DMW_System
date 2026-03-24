@@ -892,34 +892,23 @@ function updateItemsStats(items) {
       else if (qty <= reorder) lowStock++;
     }
   });
-
-  const inStock = total - lowStock - outOfStock;
   const el = id => document.getElementById(id);
-  const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0;
-
-  // Update stat values
-  if (el('icTotalItems')) el('icTotalItems').textContent = total.toLocaleString();
-  if (el('icPsdbmItems')) el('icPsdbmItems').textContent = psdbm.toLocaleString();
-  if (el('icNonPsdbmItems')) el('icNonPsdbmItems').textContent = nonpsdbm.toLocaleString();
-  if (el('icInStock')) el('icInStock').textContent = inStock.toLocaleString();
-  if (el('icLowStock')) el('icLowStock').textContent = lowStock.toLocaleString();
-  if (el('icOutOfStock')) el('icOutOfStock').textContent = outOfStock.toLocaleString();
-
-  // Update percentages
-  if (el('icPsdbmPct')) el('icPsdbmPct').textContent = pct(psdbm, total) + '%';
-  if (el('icNonPsdbmPct')) el('icNonPsdbmPct').textContent = pct(nonpsdbm, total) + '%';
-  if (el('icInStockPct')) el('icInStockPct').textContent = pct(inStock, total) + '%';
-  if (el('icLowStockPct')) el('icLowStockPct').textContent = pct(lowStock, total) + '%';
-  if (el('icOutStockPct')) el('icOutStockPct').textContent = pct(outOfStock, total) + '%';
+  if (el('icTotalItems')) el('icTotalItems').textContent = total;
+  if (el('icPsdbmItems')) el('icPsdbmItems').textContent = psdbm;
+  if (el('icNonPsdbmItems')) el('icNonPsdbmItems').textContent = nonpsdbm;
+  if (el('icLowStock')) el('icLowStock').textContent = lowStock;
+  if (el('icOutOfStock')) el('icOutOfStock').textContent = outOfStock;
 
   // --- Charts ---
-  // Source pie chart (flat colors)
+  const inStock = total - lowStock - outOfStock;
+
+  // Source pie chart
   drawPieChart('itemsSourceChart', 'itemsSourceLegend', [
     { label: 'PS-DBM', value: psdbm, color: '#276749' },
     { label: 'NON PS-DBM', value: nonpsdbm, color: '#1e40af' }
   ]);
 
-  // Stock status pie chart (flat colors)
+  // Stock status pie chart
   drawPieChart('itemsStockChart', 'itemsStockLegend', [
     { label: 'In Stock', value: inStock, color: '#276749' },
     { label: 'Low Stock', value: lowStock, color: '#92400e' },
@@ -947,17 +936,16 @@ function drawPieChart(containerId, legendId, data) {
 
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) {
-    container.innerHTML = '<div style="text-align:center;color:#888;padding:30px 15px;font-size:12px;"><i class="fas fa-chart-pie" style="font-size:28px;color:#ddd;display:block;margin-bottom:6px;"></i>No data available</div>';
+    container.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:12px;">No data</div>';
     if (legendEl) legendEl.innerHTML = '';
     return;
   }
 
-  // Compact chart size
-  const size = 180;
+  const size = 200;
   const cx = size / 2, cy = size / 2;
-  const outerR = 72;
+  const outerR = 76;
   const innerR = 36;
-  const midR = (outerR + innerR) / 2;
+  const midR = (outerR + innerR) / 2; // label radius — center of the ring
   let startAngle = -Math.PI / 2;
   let slicePaths = '';
   let labelPaths = '';
@@ -967,37 +955,30 @@ function drawPieChart(containerId, legendId, data) {
     const pct = d.value / total;
     const endAngle = startAngle + pct * 2 * Math.PI;
     const largeArc = pct > 0.5 ? 1 : 0;
-
-    // Donut slice path
-    const x1o = cx + outerR * Math.cos(startAngle);
-    const y1o = cy + outerR * Math.sin(startAngle);
-    const x2o = cx + outerR * Math.cos(endAngle);
-    const y2o = cy + outerR * Math.sin(endAngle);
-    const x1i = cx + innerR * Math.cos(endAngle);
-    const y1i = cy + innerR * Math.sin(endAngle);
-    const x2i = cx + innerR * Math.cos(startAngle);
-    const y2i = cy + innerR * Math.sin(startAngle);
+    const x1 = cx + outerR * Math.cos(startAngle);
+    const y1 = cy + outerR * Math.sin(startAngle);
+    const x2 = cx + outerR * Math.cos(endAngle);
+    const y2 = cy + outerR * Math.sin(endAngle);
 
     if (pct >= 0.999) {
       slicePaths += `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${d.color}" />`;
-      slicePaths += `<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#fff" />`;
     } else {
-      slicePaths += `<path d="M ${x1o} ${y1o} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2o} ${y2o} L ${x1i} ${y1i} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x2i} ${y2i} Z" fill="${d.color}" style="cursor:pointer;">
-        <title>${d.label}: ${d.value.toLocaleString()} (${Math.round(pct * 100)}%)</title>
-      </path>`;
+      slicePaths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${d.color}" />`;
     }
 
-    // Percentage label
+    // Percentage label — placed at center of ring
     const midAngle = startAngle + pct * Math.PI;
     const pctVal = Math.round(pct * 100);
 
-    if (pct >= 0.10) {
+    if (pct >= 0.08) {
+      // Large enough slice: label inside the ring
       const lx = cx + midR * Math.cos(midAngle);
       const ly = cy + midR * Math.sin(midAngle);
-      labelPaths += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="12" font-weight="700" style="text-shadow:0 1px 2px rgba(0,0,0,0.4);pointer-events:none;">${pctVal}%</text>`;
-    } else if (pct >= 0.02) {
+      labelPaths += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="13" font-weight="700" style="text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pctVal}%</text>`;
+    } else if (pct >= 0.01) {
+      // Small slice: draw a line out and label outside
       const lineStartR = outerR + 3;
-      const lineEndR = outerR + 14;
+      const lineEndR = outerR + 16;
       const lx1 = cx + lineStartR * Math.cos(midAngle);
       const ly1 = cy + lineStartR * Math.sin(midAngle);
       const lx2 = cx + lineEndR * Math.cos(midAngle);
@@ -1005,25 +986,25 @@ function drawPieChart(containerId, legendId, data) {
       const textX = cx + (lineEndR + 3) * Math.cos(midAngle);
       const textY = cy + (lineEndR + 3) * Math.sin(midAngle);
       const anchor = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'end' : 'start';
-      labelPaths += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="#888" stroke-width="1"/>`;
-      labelPaths += `<text x="${textX}" y="${textY}" text-anchor="${anchor}" dominant-baseline="middle" fill="#555" font-size="10" font-weight="600">${pctVal}%</text>`;
+      labelPaths += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="#666" stroke-width="1"/>`;
+      labelPaths += `<text x="${textX}" y="${textY}" text-anchor="${anchor}" dominant-baseline="middle" fill="#444" font-size="10" font-weight="600">${pctVal}%</text>`;
     }
 
     startAngle = endAngle;
   });
 
-  // Center content
-  const centerBg = `<circle cx="${cx}" cy="${cy}" r="${innerR - 2}" fill="#fff" />`;
-  const centerText = `<text x="${cx}" y="${cy - 3}" text-anchor="middle" fill="#1a365d" font-size="18" font-weight="800">${total.toLocaleString()}</text>`;
-  const centerLabel = `<text x="${cx}" y="${cy + 11}" text-anchor="middle" fill="#888" font-size="8" font-weight="600" letter-spacing="0.5">TOTAL</text>`;
+  // Center hole for donut effect
+  const centerHole = `<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#fff" />`;
+  const centerText = `<text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="#1a365d" font-size="20" font-weight="800">${total}</text>`;
+  const centerLabel = `<text x="${cx}" y="${cy + 10}" text-anchor="middle" fill="#888" font-size="10" font-weight="600">TOTAL</text>`;
 
-  container.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">${slicePaths}${centerBg}${centerText}${centerLabel}${labelPaths}</svg>`;
+  container.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">${slicePaths}${centerHole}${centerText}${centerLabel}${labelPaths}</svg>`;
 
   // Legend
   if (legendEl) {
     legendEl.innerHTML = data.map(d => {
       const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-      return `<div class="chart-legend-item"><span class="legend-dot" style="background:${d.color}"></span>${d.label}: <strong>${d.value.toLocaleString()}</strong> (${pct}%)</div>`;
+      return `<div class="chart-legend-item"><span class="legend-dot" style="background:${d.color}"></span>${d.label}: <strong>${d.value}</strong> (${pct}%)</div>`;
     }).join('');
   }
 }
@@ -1033,71 +1014,68 @@ function drawBarGraph(containerId, legendId, data, totalItems) {
   const container = document.getElementById(containerId);
   const legendEl = document.getElementById(legendId);
   if (!container) return;
-  if (!data.length) {
-    container.innerHTML = '<div style="text-align:center;color:#888;padding:30px 15px;font-size:12px;"><i class="fas fa-chart-bar" style="font-size:28px;color:#ddd;display:block;margin-bottom:6px;"></i>No categories found</div>';
-    if (legendEl) legendEl.innerHTML = '';
-    return;
-  }
+  if (!data.length) { container.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-size:13px;">No data</div>'; return; }
 
   const maxVal = Math.max(...data.map(d => d.value), 1);
   const barCount = data.length;
-  const chartW = 420;
-  const chartH = 190;
-  const padLeft = 36;
-  const padBottom = 48;
+  const chartW = 460;
+  const chartH = 210;
+  const padLeft = 38;
+  const padBottom = 52;
   const padTop = 22;
   const padRight = 12;
   const barAreaW = chartW - padLeft - padRight;
   const barAreaH = chartH - padBottom - padTop;
-  const barW = Math.min(36, Math.floor((barAreaW / barCount) * 0.65));
+  const barW = Math.min(38, Math.floor((barAreaW / barCount) * 0.65));
   const gap = (barAreaW - barW * barCount) / (barCount + 1);
 
   let svg = `<svg viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="xMidYMid meet" style="font-family:'Segoe UI',sans-serif;width:100%;height:auto;">`;
 
   // Background
-  svg += `<rect x="${padLeft}" y="${padTop}" width="${barAreaW}" height="${barAreaH}" fill="#f8f9fa" rx="3"/>`;
+  svg += `<rect x="${padLeft}" y="${padTop}" width="${barAreaW}" height="${barAreaH}" fill="#fafbfc" rx="3"/>`;
 
   // Y-axis gridlines + labels
-  const gridLines = 4;
+  const gridLines = 5;
   for (let i = 0; i <= gridLines; i++) {
     const y = padTop + (barAreaH / gridLines) * i;
     const val = Math.round(maxVal - (maxVal / gridLines) * i);
-    svg += `<line x1="${padLeft}" y1="${y}" x2="${padLeft + barAreaW}" y2="${y}" stroke="#e2e5ea" stroke-width="1" ${i > 0 ? 'stroke-dasharray="3,2"' : ''}/>`;
-    svg += `<text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" fill="#666" font-size="9" font-weight="500">${val}</text>`;
+    svg += `<line x1="${padLeft}" y1="${y}" x2="${padLeft + barAreaW}" y2="${y}" stroke="#e2e5ea" stroke-width="0.7" stroke-dasharray="3,2"/>`;
+    svg += `<text x="${padLeft - 6}" y="${y + 4}" text-anchor="end" fill="#777" font-size="10" font-weight="500">${val}</text>`;
   }
 
   // Bars + category labels
   data.forEach((d, i) => {
-    const barH = Math.max(3, (d.value / maxVal) * barAreaH);
+    const barH = Math.max(2, (d.value / maxVal) * barAreaH);
     const x = padLeft + gap + i * (barW + gap);
     const y = padTop + barAreaH - barH;
     const barCenterX = x + barW / 2;
     const baselineY = padTop + barAreaH;
 
-    // Bar with rounded top
-    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${d.color}" rx="2" style="cursor:pointer;">
-      <title>${d.label}: ${d.value.toLocaleString()} items (${Math.round((d.value / totalItems) * 100)}%)</title>
-    </rect>`;
+    // Bar shadow
+    svg += `<rect x="${x + 1.5}" y="${y + 1.5}" width="${barW}" height="${barH}" fill="rgba(0,0,0,0.06)" rx="3"/>`;
+    // Bar
+    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${d.color}" rx="3" style="cursor:pointer;">`;
+    svg += `<title>${d.label}: ${d.value} items</title></rect>`;
 
     // Value on top of bar
-    svg += `<text x="${barCenterX}" y="${y - 4}" text-anchor="middle" fill="#1a365d" font-size="9" font-weight="700">${d.value}</text>`;
+    svg += `<text x="${barCenterX}" y="${y - 5}" text-anchor="middle" fill="#1a365d" font-size="11" font-weight="700">${d.value}</text>`;
 
-    // Category label below bar (rotated)
-    const shortLabel = d.label.length > 12 ? d.label.substring(0, 10) + '…' : d.label;
-    svg += `<text x="${barCenterX}" y="${baselineY + 10}" text-anchor="end" fill="#555" font-size="8" font-weight="600" transform="rotate(-40 ${barCenterX} ${baselineY + 10})">${shortLabel}</text>`;
+    // Category label below bar (rotated 45°)
+    const shortLabel = d.label.length > 14 ? d.label.substring(0, 12) + '…' : d.label;
+    svg += `<text x="${barCenterX}" y="${baselineY + 10}" text-anchor="end" fill="#444" font-size="8.5" font-weight="600" transform="rotate(-45 ${barCenterX} ${baselineY + 10})">${shortLabel}</text>`;
   });
 
   // Baseline
-  svg += `<line x1="${padLeft}" y1="${padTop + barAreaH}" x2="${padLeft + barAreaW}" y2="${padTop + barAreaH}" stroke="#aaa" stroke-width="1"/>`;
+  svg += `<line x1="${padLeft}" y1="${padTop + barAreaH}" x2="${padLeft + barAreaW}" y2="${padTop + barAreaH}" stroke="#aab" stroke-width="1.2"/>`;
   // Y-axis line
-  svg += `<line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + barAreaH}" stroke="#aaa" stroke-width="1"/>`;
+  svg += `<line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + barAreaH}" stroke="#aab" stroke-width="1.2"/>`;
 
   svg += '</svg>';
   container.innerHTML = svg;
 
   // Legend summary
   if (legendEl) {
-    legendEl.innerHTML = `<div class="chart-legend-item"><i class="fas fa-layer-group" style="color:#1a365d;margin-right:3px;font-size:10px;"></i><strong>${totalItems.toLocaleString()}</strong> items in <strong>${data.length}</strong> categories</div>`;
+    legendEl.innerHTML = `<div class="chart-legend-item" style="font-size:10px;margin-top:4px;"><strong>${totalItems}</strong> total items across <strong>${data.length}</strong> top categories</div>`;
   }
 }
 
@@ -2555,43 +2533,58 @@ function renderUsersTable(users) {
 
 /** Format PPMP description for table display.
  *  Format:
- *    ITEM NAME / PAPS NAME          (bold item name - primary display)
- *    Description/Specs below        (item_description = additional info)
+ *    Other Supplies and Materials (...)    (bold title = General Description)
+ *    ALCOHOL, Ethyl, 1 Gallon              (item name from catalog)
+ *       Type: Steel,                       (item_description = additional info)
+ *       Size: Width: 39 cm...
  */
 function formatPPMPDescription(p) {
-  const generalDesc = (p.description || '').trim();
-  const itemName    = (p.item_name || '').trim();
-  const itemDesc    = (p.item_description || '').trim();
+  const isPAPs = (p.procurement_source || p.item_procurement_source || '') === 'PAPs';
+  // Manual NON PS-DBM entries have no item_id and no item_name from catalog
+  const isManualEntry = !p.item_id && !p.item_name && (p.procurement_source === 'NON PS-DBM' || p.procurement_source === 'MANUAL-NON-PSDBM');
 
-  // Primary display: Item Name or General Description (whichever is available)
-  const primaryName = itemName || generalDesc;
-  if (!primaryName && !itemDesc) return escapeHtml(p.remarks || '-');
+  let titleLine, detailLine, specsLine;
+
+  if (isPAPs || isManualEntry) {
+    // PAPs and Manual entries: p.description stores Name (bold title), p.item_description stores detail
+    titleLine = (p.description || '').trim();
+    detailLine = (p.item_description || '').trim();
+    specsLine = ''; // No additional specs for PAPs/Manual
+  } else {
+    // Catalog items (PS-DBM / NON PS-DBM with item_id): p.description is title, item_name is detail, item_description is specs
+    titleLine = (p.description || '').trim();
+    detailLine = (p.item_name || '').trim();
+    specsLine = (p.item_description || '').trim();
+  }
+
+  if (!titleLine && !detailLine && !specsLine) return escapeHtml(p.remarks || '-');
 
   let html = '';
 
-  // 1) Item Name / PAPs Name — bold primary display
-  if (primaryName) {
-    html += '<strong style="color:#1a365d;">' + escapeHtml(primaryName) + '</strong>';
+  // 1) Title — bold (Item/PAP Name for PAPs/Manual, General Description for catalog items)
+  if (titleLine) {
+    html += '<strong>' + escapeHtml(titleLine) + '</strong>';
   }
 
-  // 2) Item Description / Additional details — below the name
-  if (itemDesc && itemDesc.toLowerCase() !== primaryName.toLowerCase()) {
-    const allLines = itemDesc.split('\n');
-    html += '<div class="ppmp-desc-details" style="margin-top:4px;">';
+  // 2) Detail line — semi-bold (Description for PAPs/Manual, Item Name for catalog items)
+  if (detailLine) {
+    html += '<div style="margin-top:2px;font-size:12px;font-weight:600;color:#2d3748;">' + escapeHtml(detailLine) + '</div>';
+  }
+
+  // 3) Specs/additional details — indented (catalog items only)
+  if (specsLine) {
+    const allLines = specsLine.split('\n');
+    html += '<div class="ppmp-desc-details">';
     allLines.forEach(l => {
       const trimmed = l.trim();
       if (trimmed) {
-        html += '<div class="ppmp-desc-line" style="font-size:11px;color:#4a5568;">' + escapeHtml(trimmed) + '</div>';
+        html += '<div class="ppmp-desc-line">' + escapeHtml(trimmed) + '</div>';
+      } else {
+        html += '<div class="ppmp-desc-line" style="height:6px;"></div>';
       }
     });
     html += '</div>';
   }
-
-  // 3) If there's a general description different from item name, show it as subtitle
-  if (generalDesc && itemName && generalDesc.toLowerCase() !== itemName.toLowerCase()) {
-    html += '<div style="font-size:10px;color:#718096;margin-top:2px;font-style:italic;">' + escapeHtml(generalDesc) + '</div>';
-  }
-
   return html || escapeHtml(p.remarks || '-');
 }
 
@@ -6857,11 +6850,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group">
               <label>PAP Name <span class="text-danger">*</span></label>
-              <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:13px;">
+              <input type="text" id="papManualItemName" placeholder="e.g., Office Renovation" style="font-size:13px;" oninput="syncNewPAPNameWithDescription(this.value)">
             </div>
             <div class="form-group">
               <label>Description</label>
-              <textarea id="papManualItemDesc" rows="2" placeholder="Specs, details..." style="font-size:13px;resize:vertical;"></textarea>
+              <textarea id="papManualItemDesc" rows="2" placeholder="Specs, details..." style="font-size:13px;resize:vertical;" oninput="syncNewPAPDescWithGeneral(this.value)"></textarea>
             </div>
           </div>
           <div class="form-row" style="margin-bottom:8px;">
@@ -10374,11 +10367,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
     const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
     const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
-    // Get the selected category from the dropdown - prioritize user selection
-    const categoryDropdownVal = document.getElementById('ppmpCategoryFilterModal')?.value;
-    const categoryHiddenVal = document.getElementById('ppmpCategory')?.value;
-    // Use the selected category, fallback to section if none selected
-    const selectedCategory = categoryDropdownVal || categoryHiddenVal || section;
+    const category = document.getElementById('ppmpCategoryFilterModal')?.value || document.getElementById('ppmpCategory')?.value || section;
     const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
     const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
     const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
@@ -10453,10 +10442,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           dept_id: deptIdMap[divCode] || null,
           fiscal_year: parseInt(fiscalYear),
           section: section,
-          category: selectedCategory,
+          category: category || it.item_category || it.category || '',
           item_id: it.item_id || null,
-          description: it.item_name || it.description,
-          item_description: isPAPs ? (it.description !== it.item_name ? it.description : '') : (it.description || it.item_name),
+          description: isPAPs
+            ? it.item_name  // PAP Name only (for bold title display)
+            : (it.item_name || it.description),
+          item_description: isPAPs
+            ? (it.description || '')  // PAP Description only (for semi-bold detail display)
+            : (it.description || it.item_name),
           project_type: projectType,
           quantity_size: String(it.quantity),
           procurement_mode: procurementMode,
@@ -15794,171 +15787,38 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('Director Signature', html);
   };
 
-  // APP Consolidation function - Only BAC Secretary can consolidate
+  // APP Consolidation function
   window.consolidateAPP = async function() {
-    // Only BAC Secretary can consolidate PPMP to APP
-    const allowedRoles = ['bac_secretariat', 'admin'];
-    if (!userHasAnyRole(allowedRoles)) {
-      await govAlert({
-        title: 'Access Denied',
-        bodyHtml: `
-          <div style="text-align:center; padding: 10px 0;">
-            <i class="fas fa-lock" style="font-size:48px; color:#b91c1c; margin-bottom:12px;"></i>
-            <p style="font-size:14px; color:#333; margin-bottom:8px;">Only the <strong>BAC Secretariat</strong> can consolidate PPMP entries into APP.</p>
-            <p style="font-size:12px; color:#666;">Please contact the BAC Secretary to perform this action.</p>
-          </div>`,
-        type: 'error',
-        buttonText: 'Understood'
-      });
-      return;
-    }
-
-    const fy = getCurrentFiscalYear();
-
+    if (!confirm('Consolidate all PPMP entries into APP for FY ' + getCurrentFiscalYear() + '?\n\nThis will transform PPMP codes into APP codes and display all entries.')) return;
+    
     try {
-      // Fetch approved PPMP entries that are ready for consolidation
-      const allPlans = await apiRequest('/plans');
-      const approvedPlans = (allPlans || []).filter(p =>
-        p.fiscal_year === parseInt(fy) &&
-        p.status === 'approved' &&
-        !p.consolidated_to_app
-      );
-
-      if (approvedPlans.length === 0) {
-        await govAlert({
-          title: 'No PPMP Entries to Consolidate',
-          bodyHtml: `
-            <div style="text-align:center; padding: 10px 0;">
-              <i class="fas fa-folder-open" style="font-size:48px; color:#92400e; margin-bottom:12px;"></i>
-              <p style="font-size:14px; color:#333;">There are no <strong>fully approved</strong> PPMP entries ready for consolidation for FY ${fy}.</p>
-              <p style="font-size:12px; color:#666; margin-top:8px;">PPMP entries must be approved by all required approvers before they can be consolidated into the APP.</p>
-            </div>`,
-          type: 'error',
-          buttonText: 'OK'
-        });
-        return;
-      }
-
-      // Group by division for summary
-      const byDivision = {};
-      let totalBudget = 0;
-      approvedPlans.forEach(p => {
-        const div = p.department_name || p.department_code || 'Unknown';
-        if (!byDivision[div]) byDivision[div] = { count: 0, total: 0 };
-        byDivision[div].count++;
-        byDivision[div].total += parseFloat(p.total_amount || 0);
-        totalBudget += parseFloat(p.total_amount || 0);
-      });
-
-      // Build division breakdown HTML
-      const divisionLines = Object.entries(byDivision).map(([div, data]) =>
-        `<tr>
-          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">${div}</td>
-          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.count}</td>
-          <td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:right;">₱${data.total.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-        </tr>`
-      ).join('');
-
-      const confirmed = await govConfirm({
-        title: 'Consolidate PPMP to APP',
-        bodyHtml: `
-          <div class="gov-form-header" style="margin-bottom:16px; padding:12px; background:linear-gradient(135deg, #1a365d, #2c5282); color:#fff; border-radius:6px;">
-            <div style="font-size:11px; letter-spacing:0.5px;">Republic of the Philippines</div>
-            <div style="font-size:10px;">Department of Migrant Workers — Regional Office XIII</div>
-            <div style="font-size:14px; font-weight:700; margin-top:4px;">PPMP TO APP CONSOLIDATION</div>
-            <div style="font-size:11px;">Fiscal Year ${fy}</div>
-          </div>
-
-          <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:6px; padding:10px 14px; margin-bottom:14px;">
-            <div style="font-size:12px; color:#92400e; font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Important Notice</div>
-            <div style="font-size:11px; color:#78350f; margin-top:4px;">This action will consolidate all approved PPMP entries into the Annual Procurement Plan (APP). PPMP codes will be transformed to APP codes.</div>
-          </div>
-
-          <div style="font-size:12px; font-weight:700; color:#1a365d; margin-bottom:8px; border-bottom:2px solid #1a365d; padding-bottom:4px;">
-            <i class="fas fa-list-alt"></i> CONSOLIDATION SUMMARY
-          </div>
-
-          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px; background:#fff; border:1px solid #e2e8f0; border-radius:4px;">
-            <thead>
-              <tr style="background:#f7fafc;">
-                <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #1a365d; font-weight:700;">Division</th>
-                <th style="padding:8px 10px; text-align:center; border-bottom:2px solid #1a365d; font-weight:700;">Items</th>
-                <th style="padding:8px 10px; text-align:right; border-bottom:2px solid #1a365d; font-weight:700;">Est. Budget</th>
-              </tr>
-            </thead>
-            <tbody>${divisionLines}</tbody>
-            <tfoot>
-              <tr style="background:#f0fdf4; font-weight:700;">
-                <td style="padding:8px 10px; border-top:2px solid #1a365d;">TOTAL</td>
-                <td style="padding:8px 10px; text-align:center; border-top:2px solid #1a365d;">${approvedPlans.length}</td>
-                <td style="padding:8px 10px; text-align:right; border-top:2px solid #1a365d; color:#276749;">₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          <div style="background:#ebf5fb; border:1px solid #3182ce; border-radius:6px; padding:10px 14px;">
-            <div style="font-size:11px; color:#1e40af;"><i class="fas fa-user-shield"></i> <strong>Consolidating Officer:</strong> ${currentUser?.full_name || currentUser?.username || 'BAC Secretariat'}</div>
-            <div style="font-size:10px; color:#4a5568; margin-top:4px;">Date: ${new Date().toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
-          </div>
-        `,
-        confirmText: 'Consolidate to APP',
-        cancelText: 'Cancel'
-      });
-
-      if (!confirmed) return;
-
       // Call server consolidation endpoint
-      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
-
+      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: getCurrentFiscalYear() });
+      
       // Reload APP data to reflect current state
       await loadAPP();
-
-      // Show success using govAlert
-      let divBreakdown = '';
+      
+      // Show summary using server-provided department breakdown
+      let summary = 'APP Consolidation Complete!\n\n';
+      summary += 'PPMP entries consolidated into APP with codes transformed (PPMP → APP).\n\n';
+      summary += 'Breakdown by Division:\n';
       if (result.by_department) {
-        divBreakdown = result.by_department.map(dept =>
-          `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #e2e8f0;">
-            <span>${dept.department_name || 'Unknown'}</span>
-            <span><strong>${dept.count}</strong> items — ₱${parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
-          </div>`
-        ).join('');
+        result.by_department.forEach(dept => {
+          const name = dept.department_name || 'Unknown';
+          summary += '  ' + name + ': ' + dept.count + ' items — ₱' + parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n';
+        });
       }
-
-      await govAlert({
-        title: 'Consolidation Successful',
-        bodyHtml: `
-          <div style="text-align:center; padding:10px 0;">
-            <i class="fas fa-check-circle" style="font-size:48px; color:#276749; margin-bottom:12px;"></i>
-            <p style="font-size:14px; color:#333; font-weight:600;">APP Consolidation Complete!</p>
-          </div>
-          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:12px; margin:12px 0; font-size:12px;">
-            ${divBreakdown}
-            <div style="display:flex; justify-content:space-between; padding-top:8px; margin-top:8px; border-top:2px solid #276749; font-weight:700; color:#276749;">
-              <span>Total Active Items:</span>
-              <span>${result.total_items} items — ₱${result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
-            </div>
-          </div>
-          <p style="font-size:11px; color:#666; text-align:center;">PPMP entries have been successfully consolidated into the Annual Procurement Plan.</p>
-        `,
-        type: 'success',
-        buttonText: 'View APP'
-      });
-
+      summary += '\nTotal: ' + result.total_items + ' active items | Active ABC: ₱' + result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2});
+      if (result.available_budget > 0) {
+        summary += '\nAvailable Budget (from removed items): ₱' + result.available_budget.toLocaleString('en-PH', {minimumFractionDigits:2});
+        summary += '\nTotal Approved Budget: ₱' + result.total_approved.toLocaleString('en-PH', {minimumFractionDigits:2});
+      }
+      alert(summary);
+      
       // Navigate to APP page to show results
       if (typeof navigateTo === 'function') navigateTo('app');
     } catch (err) {
-      await govAlert({
-        title: 'Consolidation Failed',
-        bodyHtml: `
-          <div style="text-align:center; padding:10px 0;">
-            <i class="fas fa-times-circle" style="font-size:48px; color:#b91c1c; margin-bottom:12px;"></i>
-            <p style="font-size:14px; color:#333;">Failed to consolidate PPMP entries.</p>
-            <p style="font-size:12px; color:#b91c1c; margin-top:8px;">${err.message}</p>
-          </div>
-        `,
-        type: 'error',
-        buttonText: 'OK'
-      });
+      alert('Consolidation failed: ' + err.message);
     }
   };
 
@@ -17205,27 +17065,79 @@ Failure to submit the above requirements within the prescribed period shall cons
   // EDIT MODALS - Modify existing records
   // =====================================================
 
-  // Edit PPMP Modal
+  // Edit PPMP Modal - Enhanced with intelligent data fetching and auto-population
   window.showEditPPMPModal = async function(planId) {
     try {
+      // ===== PRIMARY KEY LOOKUP AND FETCH =====
+      // Fetch the specific PPMP entry from database using planId as primary key
+      console.log('[PPMP EDIT] Fetching PPMP entry with planId:', planId);
       const plan = await apiRequest('/plans/' + planId);
-      await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+      console.log('[PPMP EDIT] PPMP entry fetched successfully:', plan);
+
+      // ===== CREATE STRUCTURED DATA FOR SPECIFIC ENTRY =====
+      // Extract all fetched data into a structured object with comprehensive fallback logic
+      // For MANUAL-NON-PSDBM items, data is stored in plan_items table (accessed via plan.items array)
+      // For catalog items, data comes from items table JOIN (as plan.item_name, plan.item_unit, etc.)
+      // For PAPs, the PAP Name comes from plan.description (same as General Description & Objective)
+      console.log('[PPMP EDIT] Raw plan data from database:', JSON.stringify(plan, null, 2));
+
+      // Check if there are items in plan_items table (for manual/PAP entries)
+      const planItem = (plan.items && plan.items.length > 0) ? plan.items[0] : null;
+      console.log('[PPMP EDIT] Plan item from plan_items table:', planItem);
+
+      const specificEntryData = {
+        // For item_name: check plan (from items JOIN), then plan_items table, then fallbacks
+        item_name: plan.item_name || (planItem ? planItem.item_name : '') || plan.name || plan.manual_item_name || plan.pap_item_name || plan.title || '',
+        // For PAP Name: use plan.description (same source as General Description & Objective)
+        pap_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
+        // For Manual Item Name: use plan.description (same source as General Description & Objective)
+        manual_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
+        // For description: check plan_items first for detailed description, then plan.item_description
+        item_description: (planItem ? planItem.item_description : '') || plan.item_description || plan.description || plan.manual_item_desc || plan.pap_item_desc || plan.specs || '',
+        // For unit: PRIORITIZE items table JOIN (plan.item_unit), then plan_items table
+        item_unit: plan.item_unit || (planItem ? planItem.unit : '') || plan.unit || plan.manual_item_unit || plan.pap_item_unit || plan.uom || 'pc',
+        // For unit_price: PRIORITIZE items table JOIN (plan.item_unit_price), then plan_items table
+        unit_price: parseFloat(plan.item_unit_price || (planItem ? planItem.unit_price : 0) || plan.unit_price || plan.manual_item_price || plan.pap_item_price || plan.price || 0) || 0,
+        // For quantity: check plan_items total_qty or individual quarters, then plan.quantity_size
+        quantity_size: parseFloat((planItem ? (planItem.total_qty || planItem.q1_qty || planItem.quantity) : 0) || plan.quantity_size || plan.quantity || plan.manual_item_qty || plan.pap_item_qty || plan.qty || 1) || 1,
+        // For total: check plan_items total_price, then plan.total_amount
+        total_amount: parseFloat((planItem ? planItem.total_price : 0) || plan.total_amount || plan.estimated_budget || plan.manual_est_budget || plan.pap_est_budget || plan.budget || plan.amount || 0) || 0
+      };
+      console.log('[PPMP EDIT] Structured entry data created:', specificEntryData);
+      console.log('[PPMP EDIT] Item Name:', specificEntryData.item_name);
+      console.log('[PPMP EDIT] PAP Name:', specificEntryData.pap_name);
+      console.log('[PPMP EDIT] Manual Name:', specificEntryData.manual_name);
+      console.log('[PPMP EDIT] Item Unit:', specificEntryData.item_unit);
+      console.log('[PPMP EDIT] Unit Price:', specificEntryData.unit_price);
       
-      // Load items catalog for item selector
-      let allItems = [];
-      try { allItems = await apiRequest('/items'); } catch(e) { console.warn('Could not load items'); }
-      window._ppmpItemsCache = allItems;
+      // Store for use in initialization block and validation
+      window._ppmpEditSpecificEntryData = specificEntryData;
 
-      // Build category filter options from item catalog
-      const itemCats = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
-      const catFilterOptions = itemCats.map(c => `<option value="${c}">${c}</option>`).join('');
+      // Load required data in parallel for efficiency (including PPMP sections and categories from DB)
+      const [divisionsLoaded, procModesLoaded, sectionsLoaded, categoriesLoaded, allItems, uomList] = await Promise.all([
+        ensureDivisionsLoaded().catch(() => []),
+        ensureProcModesLoaded().catch(() => []),
+        ensurePPMPSectionsLoaded().catch(() => []),
+        ensurePPMPCategoriesLoaded().catch(() => []),
+        apiRequest('/items').catch(() => []),
+        apiRequest('/uoms').catch(() => [])
+      ]);
 
-      // Build item options (all items, pre-select linked one)
-      const itemOptions = allItems.map(i => `<option value="${i.id}" ${String(i.id) === String(plan.item_id) ? 'selected' : ''} data-category="${(i.category || '').replace(/"/g, '&quot;')}">${i.code} - ${i.name} (${i.unit || ''} @ ₱${parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</option>`).join('');
+      window._ppmpItemsCache = allItems || [];
+      console.log('[PPMP EDIT] Database resources loaded.');
+      console.log('[PPMP EDIT] Sections count:', cachedPPMPSections.length);
+      console.log('[PPMP EDIT] Categories count:', cachedPPMPCategories.length);
 
-      // Current section value
-      const currentSection = plan.section || 'GENERAL PROCUREMENT';
+      // Build UOM options
+      const uomOptions = (uomList || []).map(u =>
+        `<option value="${escapeHtml(u.name || u)}">${escapeHtml(u.name || u)}</option>`
+      ).join('') || '<option value="pc">pc</option><option value="lot">lot</option><option value="set">set</option><option value="unit">unit</option>';
 
+      // Determine procurement source from DB (normalize for dropdown)
+      const dbProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
+      console.log('[PPMP EDIT] Procurement source determined:', dbProcSource);
+
+      // Get department info
       function getDeptCode(name) {
         if (!name) return 'DMW';
         const lower = name.toLowerCase();
@@ -17238,47 +17150,100 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       const deptCode = plan.department_code || getDeptCode(plan.department_name);
       const ppmpNo = plan.ppmp_no || 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
-      const totalAmt = parseFloat(plan.total_amount || 0);
-      const statusVal = plan.status || 'draft';
-      const isPAPsEntry = (plan.procurement_source || '').toUpperCase() === 'PAPS';
-      const currentCategory = plan.category || currentSection;
 
-      // Build item info for display (read-only linked item)
+      // Parse status and section values (numeric values moved to specificEntryData block)
+      const statusVal = plan.status || 'draft';
+      const currentSection = plan.section || 'GENERAL PROCUREMENT';
+      const currentCategory = plan.category || plan.item_category || '';
+
+      // Get linked item from catalog
       const linkedItem = allItems.find(i => String(i.id) === String(plan.item_id));
 
-      // Item description: use item_description column, fallback to description
-      const currentItemDesc = plan.item_description || plan.description || '';
+      // Build section options from database using the helper function
+      const sectionOptions = buildPPMPSectionOptions(currentSection, true);
+      console.log('[PPMP EDIT] Section dropdown built with current section:', currentSection);
 
-      // Build category options from items
-      const allCategories = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
-      const categoryOptions = allCategories.map(c =>
-        `<option value="${c}" ${c === currentCategory ? 'selected' : ''}>${c}</option>`
-      ).join('');
+      // Build category options from database using the helper function
+      const categoryOptionsHtml = buildPPMPCategoryOptions(currentCategory);
+      console.log('[PPMP EDIT] Category dropdown built with current category:', currentCategory);
+
+      // Determine which section to show based on procurement source
+      const isPAPs = dbProcSource === 'PAPs';
+      const isManual = dbProcSource === 'MANUAL-NON-PSDBM' || dbProcSource === 'NON PS-DBM';
+      const showCatalogSection = !isPAPs && !isManual;
+      const showManualSection = isManual;
+      const showPAPsSection = isPAPs;
+
+      // Populate item details using specificEntryData (with HTML escaping)
+      const itemName = escapeHtml(specificEntryData.item_name);
+      const itemDesc = escapeHtml(specificEntryData.item_description);
+      const itemUnit = escapeHtml(specificEntryData.item_unit);
+      const unitPrice = specificEntryData.unit_price;
+      const quantity = specificEntryData.quantity_size;
+      const totalAmt = specificEntryData.total_amount;
+
+      // PAP-specific values: PAP Name is in plan.description, detail is in plan.item_description
+      const papNameValue = escapeHtml(plan.description || (planItem ? planItem.item_name : '') || '');
+      const papDescValue = escapeHtml(plan.item_description || (planItem ? planItem.item_description : '') || '');
+
+      // Manual-specific values: Same logic as PAPs - Item Name is in plan.description, detail is in plan.item_description
+      const manualNameValue = escapeHtml(plan.description || (planItem ? planItem.item_name : '') || '');
+      const manualDescValue = escapeHtml(plan.item_description || (planItem ? planItem.item_description : '') || '');
+
+      console.log('[PPMP EDIT] Section determination - isPAPs:', isPAPs, 'isManual:', isManual, 'showCatalog:', showCatalogSection);
+
+      // Determine plan type checkboxes
+      const isIndicative = plan.plan_type === 'INDICATIVE' || (plan.plan_type || '').includes('INDICATIVE');
+      const isFinal = plan.plan_type === 'FINAL' || (plan.plan_type || '').includes('FINAL');
 
       const html = `
         <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
           <div class="info-banner" style="margin-bottom: 16px; background: #ebf5fb; border-left: 4px solid #1a365d; padding: 10px 14px;">
-            <i class="fas fa-edit" style="color: #1a365d;"></i>
-            <strong>EDIT PPMP ENTRY</strong><br>
-            <small style="color: #555;">Project Procurement Management Plan — ${isPAPsEntry ? 'PAPs Entry' : 'Item Entry'}</small>
+            <i class="fas fa-info-circle" style="color: #1a365d;"></i>
+            <strong>PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</strong><br>
+            <small style="color: #555;">Per NGPA Form — RA 12009 IRR Section 7.7.2</small>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>PPMP No. <span class="text-danger">*</span></label>
+              <input type="text" name="ppmp_no" id="editPpmpNo" value="${escapeHtml(ppmpNo)}" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>Fiscal Year <span class="text-danger">*</span></label>
+              <input type="number" name="fiscal_year" value="${plan.fiscal_year}" required style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>End-User / Division <span class="text-danger">*</span></label>
+              <input type="text" value="${escapeHtml(deptCode)}" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+              <input type="hidden" name="dept_id" value="${plan.dept_id || ''}">
+            </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label>PPMP No. <small style="color:#666;">(editable)</small></label>
-              <input type="text" name="ppmp_no" value="${ppmpNo}" style="font-weight:600;">
+              <label>Plan Type</label>
+              <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                  <input type="checkbox" id="editPpmpIndicative" name="plan_type_indicative" ${isIndicative ? 'checked' : ''}> INDICATIVE
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                  <input type="checkbox" id="editPpmpFinal" name="plan_type_final" ${isFinal ? 'checked' : ''}> FINAL
+                </label>
+              </div>
             </div>
             <div class="form-group">
-              <label>Division</label>
-              <input type="text" value="${deptCode} - ${plan.department_name || ''}" readonly style="background: #f5f5f5;">
-              <input type="hidden" name="dept_id" value="${plan.dept_id || ''}">
+              <label>Procurement Source <span class="text-danger">*</span></label>
+              <select class="form-select" name="procurement_source" id="editPPMPProcSource" onchange="toggleEditPPMPSourceMode(this.value)">
+                <option value="NON PS-DBM" ${dbProcSource==='NON PS-DBM'?'selected':''}>NON PS-DBM (Items Catalog)</option>
+                <option value="PS-DBM" ${dbProcSource==='PS-DBM'?'selected':''}>PS-DBM (Items Catalog)</option>
+                <option value="PAPs" ${dbProcSource==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
+                <option value="MANUAL-NON-PSDBM" ${dbProcSource==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
+              </select>
             </div>
           </div>
+
           <div class="form-row">
-            <div class="form-group">
-              <label>Fiscal Year <span class="text-danger">*</span></label>
-              <input type="number" name="fiscal_year" value="${plan.fiscal_year}" required>
-            </div>
             <div class="form-group">
               <label>Status <span class="text-danger">*</span></label>
               <select class="form-select" name="status" required>
@@ -17290,111 +17255,164 @@ Failure to submit the above requirements within the prescribed period shall cons
               </select>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Procurement Source</label>
-              <select class="form-select" name="procurement_source" id="editProcurementSource" onchange="toggleEditPPMPSourceMode(this.value)">
-                <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM (Items Catalog)</option>
-                <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM (Items Catalog)</option>
-                <option value="PAPs" ${(plan.procurement_source||plan.item_procurement_source||'')==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
-                <option value="MANUAL-NON-PSDBM" ${(plan.procurement_source||'')==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
-              </select>
-            </div>
-          </div>
 
-          <!-- CATALOG ITEMS SECTION -->
-          <div id="editCatalogSection" style="${isPAPsEntry ? 'display:none;' : ''}">
+          <!-- ===== CATALOG ITEMS SECTION (PS-DBM / NON PS-DBM) ===== -->
+          <div id="editPPMPCatalogSection" style="display:${showCatalogSection && !showManualSection && !showPAPsSection ? 'block' : 'none'};">
             <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
-            ${plan.item_id && linkedItem ? `
-            <div style="background:#e8f7ed; border:1px solid #c6f6d5; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
-              <div style="font-size:12px; font-weight:600; color:#276749; margin-bottom:4px;"><i class="fas fa-link"></i> Currently Linked Item</div>
-              <div style="font-size:13px; font-weight:700; color:#1a202c;">${escapeHtml(linkedItem.code || '')} — ${escapeHtml(linkedItem.name || '')}</div>
-              <div style="font-size:11px; color:#4a5568;">${linkedItem.unit || ''} @ ₱${parseFloat(linkedItem.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
-            </div>` : ''}
-            <div class="form-row">
+            <div class="form-row-3">
               <div class="form-group">
                 <label>Section <span class="text-danger">*</span></label>
-                <select class="form-select" id="ppmpSection" name="section" required>
-                  <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
-                  <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
-                  <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
-                  <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
-                  <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
+                <select class="form-select" id="ppmpEditSection" name="section" required>
+                  ${sectionOptions}
                 </select>
               </div>
               <div class="form-group">
-                <label>Category</label>
-                <select class="form-select" name="category" id="editPPMPCategory">
-                  <option value="">-- Select Category --</option>
-                  ${categoryOptions}
+                <label>Category <small style="color:#999;">(filtered by section)</small></label>
+                <select class="form-select" id="ppmpEditCategory" name="category">
+                  ${categoryOptionsHtml}
                 </select>
               </div>
+              <div class="form-group" style="display:flex;flex:1;min-width:0;">
+                <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="font-size:13px;width:100%;height:100%;box-sizing:border-box;">
+                  <i class="fas fa-search"></i> Select Item from Catalog
+                </button>
+              </div>
             </div>
-            <div class="form-group" style="margin-bottom:12px;">
-              <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="width:100%;"><i class="fas fa-layer-group"></i> Select Items from Catalog</button>
+            <span id="ppmpEditItemCount" style="font-size:12px; color:#4a5568; margin-bottom:8px; display:block;"></span>
+            <div id="ppmpEditItemsList" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px;">
+              <!-- Selected items rendered by JS -->
             </div>
-            <div id="ppmpEditItemsList" style="margin-bottom:12px;"></div>
             <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
           </div>
 
-          <!-- PAPs / MANUAL ITEMS SECTION -->
-          <div id="editPAPsSection" style="${isPAPsEntry ? '' : 'display:none;'}">
-            <div class="form-section-header"><i class="fas fa-project-diagram"></i> PAPs Entry Details</div>
+          <!-- ===== MANUAL ITEMS SECTION (Create NON-PS-DBM Manually) ===== -->
+          <div id="editPPMPManualSection" style="display:${showManualSection ? 'block' : 'none'};">
+            <div class="form-section-header"><i class="fas fa-pen"></i> <span id="editPpmpManualSectionTitle">Manual Item Entry</span></div>
             <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-              <i class="fas fa-info-circle"></i> PAPs — Programs, Activities & Projects
+              <i class="fas fa-info-circle"></i> Items entered here will be <strong>automatically added to the Items Catalog</strong> once this PPMP is fully approved.
             </div>
-            <div class="form-row">
+            <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group">
                 <label>Section <span class="text-danger">*</span></label>
-                <select class="form-select" id="ppmpSectionPAPs" name="section_paps">
-                  <option value="OFFICE OPERATION" ${currentSection==='OFFICE OPERATION'?'selected':''}>OFFICE OPERATION</option>
-                  <option value="SEMI- FURNITURE & FIXTURES" ${currentSection==='SEMI- FURNITURE & FIXTURES'?'selected':''}>SEMI- FURNITURE & FIXTURES</option>
-                  <option value="TRAININGS & ACTIVITIES" ${currentSection==='TRAININGS & ACTIVITIES'?'selected':''}>TRAININGS & ACTIVITIES</option>
-                  <option value="CAPITAL OUTLAY" ${currentSection==='CAPITAL OUTLAY'?'selected':''}>CAPITAL OUTLAY</option>
-                  <option value="GENERAL PROCUREMENT" ${currentSection==='GENERAL PROCUREMENT'?'selected':''}>GENERAL PROCUREMENT</option>
+                <select class="form-select" id="manualSection" name="section" style="font-size:13px;">
+                  ${sectionOptions}
                 </select>
               </div>
               <div class="form-group">
-                <label>Category</label>
-                <input type="text" name="category_paps" id="editPAPsCategory" value="${currentCategory}" placeholder="e.g., Training, Activity, Project">
+                <label>Category <span class="text-danger">*</span></label>
+                <select class="form-select" id="manualCategory" name="category" style="font-size:13px;">
+                  ${categoryOptionsHtml}
+                </select>
               </div>
             </div>
-            <div class="form-group">
-              <label>PAPs Name / Item Name <span class="text-danger">*</span></label>
-              <input type="text" name="paps_name" id="editPAPsName" value="${escapeHtml(plan.description || plan.item_name || '')}" required placeholder="e.g., Training on Financial Management">
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Item Name <span class="text-danger">*</span></label>
+                <input type="text" id="manualItemName" value="${manualNameValue}" placeholder="e.g., Ballpen, Black" style="font-size:13px;" oninput="syncManualNameWithDescription(this.value)">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="manualItemDesc" value="${manualDescValue}" placeholder="Specs, size, color..." style="font-size:13px;" oninput="syncManualDescWithGeneral(this.value)">
+              </div>
             </div>
-            <div class="form-group">
-              <label>Description / Specifications</label>
-              <textarea name="paps_description" id="editPAPsDesc" rows="3" placeholder="Detailed description, objectives, participants, etc.">${escapeHtml(currentItemDesc)}</textarea>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Unit <span class="text-danger">*</span></label>
+                <select class="form-select" id="manualItemUnit" style="font-size:13px;">
+                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Unit Price (₱) <span class="text-danger">*</span></label>
+                <input type="number" id="manualItemPrice" value="${unitPrice.toFixed(2)}" min="0" step="0.01" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="manualItemQty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Est. Budget</label>
+                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+              </div>
             </div>
           </div>
 
-          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Details</div>
+          <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
+          <div id="editPPMPPAPsSection" style="display:${showPAPsSection ? 'block' : 'none'};">
+            <div class="form-section-header"><i class="fas fa-project-diagram"></i> PAP Details (Programs, Activities & Projects)</div>
+            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+              <i class="fas fa-info-circle"></i> Manually enter PAP items below or select from the Item Catalog. All items will be part of a unified list.
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="papSection" name="section" style="font-size:13px;">
+                  ${sectionOptions}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category <span class="text-danger">*</span></label>
+                <select class="form-select" id="papCategory" name="category" style="font-size:13px;">
+                  ${categoryOptionsHtml}
+                </select>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>PAP Name <span class="text-danger">*</span></label>
+                <input type="text" id="papManualItemName" name="pap_manual_item_name" value="${papNameValue}" placeholder="e.g., Office Renovation" style="font-size:13px;" oninput="syncPAPNameWithDescription(this.value)">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea id="papManualItemDesc" name="pap_manual_item_desc" rows="2" placeholder="Specs, details..." style="font-size:13px;resize:vertical;" oninput="syncPAPDescWithGeneral(this.value)">${papDescValue}</textarea>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Unit <span class="text-danger">*</span></label>
+                <select class="form-select" id="papManualItemUnit" name="pap_manual_item_unit" style="font-size:13px;">
+                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Unit Price (₱) <span class="text-danger">*</span></label>
+                <input type="number" id="papManualItemPrice" name="pap_manual_item_price" value="${unitPrice.toFixed(2)}" min="0" step="0.01" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="papManualItemQty" name="pap_manual_item_qty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Est. Budget</label>
+                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+              </div>
+            </div>
+          </div>
+
+          <div id="editPpmpNonPAPDetails">
+          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
+
           <div class="form-group">
             <label>General Description & Objective</label>
-            <textarea name="description" rows="2" id="ppmpDescription">${plan.description || ''}</textarea>
+            <textarea name="description" rows="2" id="ppmpEditDescription" style="font-size:13px;" oninput="syncDescriptionWithPAPName(this.value)">${escapeHtml(plan.description || '')}</textarea>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Type of Project</label>
-              <select class="form-select" name="project_type">
+              <label>Type of Project <span class="text-danger">*</span></label>
+              <select class="form-select" name="project_type" required>
                 <option value="Goods" ${plan.project_type==='Goods'?'selected':''}>Goods</option>
                 <option value="Infrastructure" ${plan.project_type==='Infrastructure'?'selected':''}>Infrastructure</option>
                 <option value="Consulting Services" ${plan.project_type==='Consulting Services'?'selected':''}>Consulting Services</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Quantity & Size</label>
-              <input type="text" name="quantity_size" value="${plan.quantity_size || ''}">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Mode of Procurement</label>
-              <select class="form-select" name="procurement_mode">
+              <label>Mode of Procurement <span class="text-danger">*</span></label>
+              <select class="form-select" name="procurement_mode" required>
                 ${buildProcModeOptions(plan.procurement_mode || 'Small Value Procurement')}
               </select>
             </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label>Pre-Procurement Conference</label>
               <select class="form-select" name="pre_procurement">
@@ -17402,29 +17420,9 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <option value="YES" ${plan.pre_procurement==='YES'?'selected':''}>YES</option>
               </select>
             </div>
-          </div>
-          <div class="form-row-3">
             <div class="form-group">
-              <label>Start of Procurement</label>
-              <input type="month" name="start_date" value="${parseMonthYearToInput(plan.start_date || '')}">
-            </div>
-            <div class="form-group">
-              <label>End of Procurement</label>
-              <input type="month" name="end_date" value="${parseMonthYearToInput(plan.end_date || '')}">
-            </div>
-            <div class="form-group">
-              <label>Expected Delivery</label>
-              <input type="month" name="delivery_period" value="${parseMonthYearToInput(plan.delivery_period || '')}">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Total Amount (ABC) <span class="text-danger">*</span></label>
-              <input type="number" name="total_amount" id="ppmpBudget" step="0.01" value="${totalAmt.toFixed(2)}" required>
-            </div>
-            <div class="form-group">
-              <label>Funding Source</label>
-              <select class="form-select" name="fund_source">
+              <label>Source of Funds <span class="text-danger">*</span></label>
+              <select class="form-select" name="fund_source" required>
                 <option value="GAA ${plan.fiscal_year} - Current Appropriation" ${(plan.fund_source||'').includes('Current') ? 'selected' : ''}>GAA ${plan.fiscal_year} - Current Appropriation</option>
                 <option value="GAA ${plan.fiscal_year}" ${plan.fund_source===('GAA '+plan.fiscal_year) ? 'selected' : ''}>GAA ${plan.fiscal_year}</option>
                 <option value="GAA" ${plan.fund_source==='GAA'?'selected':''}>GAA</option>
@@ -17432,48 +17430,421 @@ Failure to submit the above requirements within the prescribed period shall cons
               </select>
             </div>
           </div>
+
+          <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Start of Procurement <span class="text-danger">*</span></label>
+              <input type="month" name="start_date" value="${parseMonthYearToInput(plan.start_date || '')}" required>
+            </div>
+            <div class="form-group">
+              <label>End of Procurement <span class="text-danger">*</span></label>
+              <input type="month" name="end_date" value="${parseMonthYearToInput(plan.end_date || '')}" required>
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery <span class="text-danger">*</span></label>
+              <input type="month" name="delivery_period" value="${parseMonthYearToInput(plan.delivery_period || '')}" required>
+            </div>
+          </div>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments & Remarks</div>
+          <div class="form-group">
+            <label>Supporting Documents <small style="color:#999;">(optional)</small></label>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <label class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; border:1px solid #ccc; padding:6px 12px; border-radius:4px;">
+                <i class="fas fa-paperclip"></i> Choose File
+                <input type="file" id="editPpmpAttachment" name="attachment" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none;" onchange="updateFileLabel(this, 'editPpmpFileLabel')">
+              </label>
+              <span id="editPpmpFileLabel" style="font-size:12px; color:#888;">${plan.attachment ? escapeHtml(plan.attachment) : 'No file selected'}</span>
+            </div>
+          </div>
           <div class="form-group">
             <label>Remarks</label>
-            <textarea name="remarks" rows="2">${plan.remarks || ''}</textarea>
+            <textarea id="ppmpRemarks" name="remarks" rows="2" placeholder="Additional remarks (optional)"></textarea>
           </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantity/Size</label>
+              <input type="text" name="quantity_size" value="${escapeHtml(plan.quantity_size || '')}" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>Total Amount (ABC) <span class="text-danger">*</span></label>
+              <input type="number" name="total_amount" id="ppmpEditBudget" step="0.01" value="${totalAmt.toFixed(2)}" required>
+            </div>
+          </div>
+
           <div class="form-group" style="text-align: right; margin-top: 20px;">
+            <div id="editPpmpTotalDisplay" style="display:inline-block; margin-right:20px; font-size:14px; font-weight:700; color:#1a365d;"></div>
             <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
           </div>
         </form>
       `;
-      openModal('Edit PPMP Entry — ' + ppmpNo, html);
+
+      openModal('EDIT PPMP ENTRY — ' + escapeHtml(ppmpNo), html);
 
       // Store edit context
       window._ppmpEditPlanId = planId;
       window._ppmpEditPlan = plan;
       window._ppmpEditCheckedItems = {};
 
-      // Pre-check the currently linked item with its description
-      if (plan.item_id && linkedItem) {
+      // Pre-check the currently linked item with its description (for catalog mode)
+      if (plan.item_id && linkedItem && !isPAPs && !isManual) {
         window._ppmpEditCheckedItems[String(plan.item_id)] = {
           item_id: plan.item_id,
           item: linkedItem,
-          description: currentItemDesc,
+          description: plan.item_description || plan.description || '',
           isOriginal: true
         };
       }
 
-      // Render the checkbox items list
-      renderEditPPMPItemsList();
+      // Render the checkbox items list for catalog mode
+      if (showCatalogSection && !showManualSection && !showPAPsSection) {
+        renderEditPPMPItemsList();
+      }
+
+      // ===== setTimeout INITIALIZATION BLOCK =====
+      // DOM-dependent population and initialization logic
+      setTimeout(() => {
+        console.log('[PPMP EDIT] Initialization block started - DOM is ready');
+        
+        // 1. PROCUREMENT SOURCE AUTO-SELECTION
+        const procSourceSelect = document.getElementById('editPPMPProcSource');
+        if (procSourceSelect) {
+          procSourceSelect.value = dbProcSource;
+          console.log('[PPMP EDIT] Procurement source auto-selected to:', dbProcSource);
+          // Call toggle function to show/hide appropriate sections
+          toggleEditPPMPSourceMode(dbProcSource);
+          console.log('[PPMP EDIT] Section toggle called for source:', dbProcSource);
+        }
+
+        // 2. POPULATE MANUAL ITEM FIELDS (if applicable)
+        if (isManual) {
+          console.log('[PPMP EDIT] Populating manual item fields with specificEntryData:', specificEntryData);
+
+          // Populate Item Name (uses same source as General Description & Objective)
+          const manualItemNameEl = document.getElementById('manualItemName');
+          if (manualItemNameEl) {
+            manualItemNameEl.value = specificEntryData.manual_name;
+            console.log('[PPMP EDIT] Manual Item Name populated (from description):', specificEntryData.manual_name);
+          }
+
+          // Populate Description
+          const manualItemDescEl = document.getElementById('manualItemDesc');
+          if (manualItemDescEl) {
+            manualItemDescEl.value = specificEntryData.item_description;
+            console.log('[PPMP EDIT] Manual Item Desc populated:', specificEntryData.item_description);
+          }
+
+          // SYNC: General Description & Objective should have same value as Manual Item Name
+          const descriptionEl = document.getElementById('ppmpEditDescription');
+          if (descriptionEl && specificEntryData.manual_name) {
+            descriptionEl.value = specificEntryData.manual_name;
+            console.log('[PPMP EDIT] General Description synced with Manual Item Name:', specificEntryData.manual_name);
+          }
+
+          // Populate Unit Dropdown - ensure proper selection
+          const manualItemUnitEl = document.getElementById('manualItemUnit');
+          if (manualItemUnitEl) {
+            const unitValue = specificEntryData.item_unit;
+            manualItemUnitEl.value = unitValue;
+            // If exact match fails, try case-insensitive match
+            if (manualItemUnitEl.value !== unitValue) {
+              for (let i = 0; i < manualItemUnitEl.options.length; i++) {
+                if (manualItemUnitEl.options[i].value.toLowerCase() === unitValue.toLowerCase()) {
+                  manualItemUnitEl.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+            console.log('[PPMP EDIT] Manual Item Unit populated:', unitValue, '-> selected:', manualItemUnitEl.value);
+          }
+
+          // Populate Unit Price
+          const manualItemPriceEl = document.getElementById('manualItemPrice');
+          if (manualItemPriceEl) {
+            manualItemPriceEl.value = specificEntryData.unit_price.toFixed(2);
+            console.log('[PPMP EDIT] Manual Item Price populated:', specificEntryData.unit_price.toFixed(2));
+          }
+
+          // Populate Quantity
+          const manualItemQtyEl = document.getElementById('manualItemQty');
+          if (manualItemQtyEl) {
+            manualItemQtyEl.value = specificEntryData.quantity_size.toString();
+            console.log('[PPMP EDIT] Manual Item Qty populated:', specificEntryData.quantity_size);
+          }
+
+          // Populate Estimated Budget
+          const manualEstBudgetEl = document.getElementById('manualEstBudget');
+          if (manualEstBudgetEl) {
+            manualEstBudgetEl.value = specificEntryData.total_amount.toFixed(2);
+            console.log('[PPMP EDIT] Manual Est Budget populated:', specificEntryData.total_amount.toFixed(2));
+          }
+        }
+
+        // 3. POPULATE PAP FIELDS (if applicable)
+        if (isPAPs) {
+          console.log('[PPMP EDIT] Populating PAP fields with specificEntryData:', specificEntryData);
+
+          // Populate PAP Name (uses same source as General Description & Objective)
+          const papItemNameEl = document.getElementById('papManualItemName');
+          if (papItemNameEl) {
+            papItemNameEl.value = specificEntryData.pap_name;
+            console.log('[PPMP EDIT] PAP Name populated (from description):', specificEntryData.pap_name);
+          }
+
+          // Populate Description (textarea)
+          const papItemDescEl = document.getElementById('papManualItemDesc');
+          if (papItemDescEl) {
+            papItemDescEl.value = specificEntryData.item_description;
+            console.log('[PPMP EDIT] PAP Item Desc populated:', specificEntryData.item_description);
+          }
+
+          // SYNC: General Description & Objective should have same value as PAP Name
+          const descriptionEl = document.getElementById('ppmpEditDescription');
+          if (descriptionEl && specificEntryData.pap_name) {
+            descriptionEl.value = specificEntryData.pap_name;
+            console.log('[PPMP EDIT] General Description synced with PAP Name:', specificEntryData.pap_name);
+          }
+
+          // Populate Unit Dropdown - fetched from items table JOIN
+          const papItemUnitEl = document.getElementById('papManualItemUnit');
+          if (papItemUnitEl) {
+            const unitValue = specificEntryData.item_unit;
+            papItemUnitEl.value = unitValue;
+            // If exact match fails, try case-insensitive match
+            if (papItemUnitEl.value !== unitValue) {
+              for (let i = 0; i < papItemUnitEl.options.length; i++) {
+                if (papItemUnitEl.options[i].value.toLowerCase() === unitValue.toLowerCase()) {
+                  papItemUnitEl.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+            console.log('[PPMP EDIT] PAP Unit populated (from items table):', unitValue, '-> selected:', papItemUnitEl.value);
+          }
+
+          // Populate Unit Price - fetched from items table JOIN
+          const papItemPriceEl = document.getElementById('papManualItemPrice');
+          if (papItemPriceEl) {
+            papItemPriceEl.value = specificEntryData.unit_price.toFixed(2);
+            console.log('[PPMP EDIT] PAP Unit Price populated (from items table):', specificEntryData.unit_price.toFixed(2));
+          }
+
+          // Populate Quantity
+          const papItemQtyEl = document.getElementById('papManualItemQty');
+          if (papItemQtyEl) {
+            papItemQtyEl.value = specificEntryData.quantity_size.toString();
+            console.log('[PPMP EDIT] PAP Item Qty populated:', specificEntryData.quantity_size);
+          }
+
+          // Populate Estimated Budget
+          const papEstBudgetEl = document.getElementById('papManualEstBudget');
+          if (papEstBudgetEl) {
+            papEstBudgetEl.value = specificEntryData.total_amount.toFixed(2);
+            console.log('[PPMP EDIT] PAP Est Budget populated:', specificEntryData.total_amount.toFixed(2));
+          }
+        }
+
+        // 4. POPULATE REMARKS FIELD (conditional - only if remarks exist)
+        // Note: Do NOT use escapeHtml() for textarea .value - it displays as plain text, not HTML
+        const remarksField = document.getElementById('ppmpRemarks');
+        if (remarksField) {
+          if (plan.remarks) {
+            remarksField.value = plan.remarks;
+            console.log('[PPMP EDIT] Remarks field populated with database value');
+          } else {
+            remarksField.value = '';
+            console.log('[PPMP EDIT] Remarks field left blank (no remarks in database)');
+          }
+        }
+
+        console.log('[PPMP EDIT] Initialization block completed successfully');
+      }, 0);
     } catch (err) {
       alert('Failed to load PPMP for editing: ' + err.message);
     }
   };
 
-  /** Toggle Edit PPMP modal sections based on procurement source */
+  /**
+   * Toggle Edit PPMP modal sections based on procurement source selection
+   */
   window.toggleEditPPMPSourceMode = function(source) {
-    const catalogSection = document.getElementById('editCatalogSection');
-    const papsSection = document.getElementById('editPAPsSection');
-    const isPAPs = source === 'PAPs';
+    const catalogSection = document.getElementById('editPPMPCatalogSection');
+    const manualSection = document.getElementById('editPPMPManualSection');
+    const papsSection = document.getElementById('editPPMPPAPsSection');
 
-    if (catalogSection) catalogSection.style.display = isPAPs ? 'none' : '';
-    if (papsSection) papsSection.style.display = isPAPs ? '' : 'none';
+    // Hide all sections first
+    if (catalogSection) catalogSection.style.display = 'none';
+    if (manualSection) manualSection.style.display = 'none';
+    if (papsSection) papsSection.style.display = 'none';
+
+    // Show appropriate section based on source
+    if (source === 'PAPs') {
+      if (papsSection) papsSection.style.display = 'block';
+    } else if (source === 'MANUAL-NON-PSDBM') {
+      if (manualSection) manualSection.style.display = 'block';
+    } else {
+      // PS-DBM or NON PS-DBM - show catalog section
+      if (catalogSection) catalogSection.style.display = 'block';
+    }
+  };
+
+  /**
+   * Calculate estimated budget for manual item entry in Edit modal
+   */
+  window.calcEditManualEstBudget = function() {
+    const price = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('manualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const budgetField = document.getElementById('manualEstBudget');
+    const totalField = document.getElementById('ppmpEditBudget');
+    if (budgetField) budgetField.value = estBudget.toFixed(2);
+    if (totalField) totalField.value = estBudget.toFixed(2);
+  };
+
+  /**
+   * Calculate estimated budget for PAP entry in Edit modal
+   */
+  window.calcEditPAPEstBudget = function() {
+    const price = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('papManualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const budgetField = document.getElementById('papManualEstBudget');
+    const totalField = document.getElementById('ppmpEditBudget');
+    if (budgetField) budgetField.value = estBudget.toFixed(2);
+    if (totalField) totalField.value = estBudget.toFixed(2);
+  };
+
+  /**
+   * Sync PAP Name with General Description & Objective field
+   * Called when PAP Name input changes - combines PAP Name + PAP Description
+   */
+  window.syncPAPNameWithDescription = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in PAPs mode
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const papDescField = document.getElementById('papManualItemDesc');
+      if (descField) {
+        // Combine PAP Name + PAP Description for General Description
+        const papDesc = papDescField?.value?.trim() || '';
+        const combined = papDesc ? (value + ': ' + papDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync PAP Description with General Description & Objective field
+   * Called when PAP Description textarea changes - combines PAP Name + PAP Description
+   */
+  window.syncPAPDescWithGeneral = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in PAPs mode
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const papNameField = document.getElementById('papManualItemName');
+      if (descField) {
+        // Combine PAP Name + PAP Description for General Description
+        const papName = papNameField?.value?.trim() || '';
+        const combined = value ? (papName + ': ' + value) : papName;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync Manual Item Name with General Description & Objective field
+   * Called when Manual Item Name input changes - combines Manual Name + Manual Description
+   */
+  window.syncManualNameWithDescription = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in MANUAL-NON-PSDBM mode
+    if (procSource === 'MANUAL-NON-PSDBM') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const manualDescField = document.getElementById('manualItemDesc');
+      if (descField) {
+        // Combine Manual Item Name + Manual Description for General Description
+        const manualDesc = manualDescField?.value?.trim() || '';
+        const combined = manualDesc ? (value + ': ' + manualDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced Manual Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync Manual Item Description with General Description & Objective field
+   * Called when Manual Item Description input changes - combines Manual Name + Manual Description
+   */
+  window.syncManualDescWithGeneral = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in MANUAL-NON-PSDBM mode
+    if (procSource === 'MANUAL-NON-PSDBM') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const manualNameField = document.getElementById('manualItemName');
+      if (descField) {
+        // Combine Manual Item Name + Manual Description for General Description
+        const manualName = manualNameField?.value?.trim() || '';
+        const combined = value ? (manualName + ': ' + value) : manualName;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced Manual Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync General Description & Objective - NO reverse sync
+   * NOTE: Do NOT sync back from General Description to name fields
+   * General Description is auto-combined from Name + Description fields
+   */
+  window.syncDescriptionWithPAPName = function(value) {
+    // Do NOT sync back to any name field - this prevents duplication
+    // General Description is a combined output, not an input
+    console.log('[PPMP EDIT] General Description changed (no reverse sync):', value);
+  };
+
+  /**
+   * Sync PAP Name with General Description for NEW PPMP Modal
+   * Called when PAP Name input changes - combines PAP Name + PAP Description
+   */
+  window.syncNewPAPNameWithDescription = function(value) {
+    const procSource = document.getElementById('ppmpProcurementSource')?.value;
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpDescription');
+      const papDescField = document.getElementById('papManualItemDesc');
+      if (descField) {
+        const papDesc = papDescField?.value?.trim() || '';
+        const combined = papDesc ? (value + ': ' + papDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP NEW] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync PAP Description with General Description for NEW PPMP Modal
+   * Called when PAP Description textarea changes - combines PAP Name + PAP Description
+   */
+  window.syncNewPAPDescWithGeneral = function(value) {
+    const procSource = document.getElementById('ppmpProcurementSource')?.value;
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpDescription');
+      const papNameField = document.getElementById('papManualItemName');
+      if (descField) {
+        const papName = papNameField?.value?.trim() || '';
+        const combined = value ? (papName + ': ' + value) : papName;
+        descField.value = combined;
+        console.log('[PPMP NEW] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
   };
 
   /**
@@ -17706,18 +18077,19 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Submit Edit PPMP — handles multiple checked items or no items
+  // Submit Edit PPMP — handles Manual, PAPs, and Catalog modes
   window.submitEditPPMP = async function(e, planId) {
     e.preventDefault();
-    const checked = window._ppmpEditCheckedItems || {};
-    const checkedIds = Object.keys(checked);
-
     const form = e.target;
+    const procSource = form.procurement_source?.value || 'NON PS-DBM';
     const deptId = form.querySelector('input[name="dept_id"]')?.value || window._ppmpEditPlan?.dept_id || null;
+
+    // Build common data from form fields
     const commonData = {
       dept_id: deptId ? parseInt(deptId) : null,
       fiscal_year: parseInt(form.fiscal_year.value),
       status: form.status.value,
-      section: form.section?.value || 'GENERAL PROCUREMENT',
+      section: document.getElementById('ppmpEditSection')?.value || form.section?.value || 'GENERAL PROCUREMENT',
       description: form.description?.value || null,
       project_type: form.project_type?.value || 'Goods',
       quantity_size: form.quantity_size?.value || null,
@@ -17729,103 +18101,208 @@ Failure to submit the above requirements within the prescribed period shall cons
       total_amount: parseFloat(form.total_amount.value),
       fund_source: form.fund_source?.value || 'GAA',
       remarks: form.remarks.value,
-      procurement_source: (() => { const ps = form.procurement_source?.value || 'NON PS-DBM'; return ps === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : ps; })()
+      category: document.getElementById('ppmpEditCategory')?.value || null,
+      procurement_source: procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource
     };
 
-    // Separate: the original item (update existing plan) vs new items (batch create)
-    const originalEntry = checkedIds.find(id => checked[id].isOriginal);
-    const newEntries = checkedIds.filter(id => !checked[id].isOriginal);
-
-    // Build confirmation message
-    if (checkedIds.length === 0) {
-      if (!confirm('Save PPMP changes? (No items linked)')) return;
-    } else {
-      const totalItems = checkedIds.length;
-      const itemSummary = checkedIds.map((id, i) => {
-        const c = checked[id];
-        return '  ' + (i+1) + '. ' + (c.item?.name || 'Item #' + id) + (c.isOriginal ? ' (current)' : ' (NEW)');
-      }).join('\n');
-      if (!confirm('Save changes for ' + totalItems + ' item(s)?\n\n' + itemSummary + '\n\n' + (newEntries.length > 0 ? newEntries.length + ' new PPMP entries will be created.' : 'Updating existing entry.'))) return;
-    }
-
     try {
-      let savedCount = 0;
+      // Handle different procurement source modes
+      if (procSource === 'MANUAL-NON-PSDBM') {
+        // Manual item entry mode - get data from correct form field IDs
+        const itemName = document.getElementById('manualItemName')?.value?.trim() || '';
+        const itemDesc = document.getElementById('manualItemDesc')?.value?.trim() || '';
+        const itemUnit = document.getElementById('manualItemUnit')?.value || 'pc';
+        const itemPrice = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
+        const itemQty = document.getElementById('manualItemQty')?.value || '1';
+        const manualSection = document.getElementById('manualSection')?.value || commonData.section;
+        const manualCategory = document.getElementById('manualCategory')?.value || commonData.category;
 
-      if (checkedIds.length === 0) {
-        // No items checked — update plan fields, preserve existing item linkage
+        console.log('[PPMP EDIT] Manual item data:', { itemName, itemDesc, itemUnit, itemPrice, itemQty });
+
+        if (!itemName) {
+          alert('Please enter an Item Name for manual entry.');
+          return;
+        }
+
+        if (!confirm('Save PPMP changes (Manual NON-PS-DBM item)?')) return;
+
         const data = {
           ...commonData,
           ppmp_no: form.ppmp_no?.value || undefined,
-          item_id: window._ppmpEditPlan?.item_id || null,
-          category: window._ppmpEditPlan?.category || null,
-          item_description: window._ppmpEditPlan?.item_description || null
+          item_id: null, // Manual items don't have item_id
+          description: itemName, // Store Item Name as description (for bold title display)
+          item_description: itemDesc, // Store detail description separately
+          quantity_size: itemQty,
+          section: manualSection,
+          category: manualCategory,
+          total_amount: itemPrice * (parseFloat(itemQty) || 1),
+          // Include items array for plan_items table storage
+          items: [{
+            item_code: 'MANUAL-' + Date.now(),
+            item_name: itemName,
+            item_description: itemDesc,
+            unit: itemUnit,
+            unit_price: itemPrice,
+            category: manualCategory,
+            q1_qty: parseInt(itemQty) || 1,
+            q2_qty: 0,
+            q3_qty: 0,
+            q4_qty: 0,
+            remarks: commonData.remarks || ''
+          }]
         };
+
         await apiRequest('/plans/' + planId, 'PUT', data);
-        savedCount = 1;
+        alert('PPMP entry saved successfully!');
+
+      } else if (procSource === 'PAPs') {
+        // PAPs mode - get data from correct form field IDs
+        const papName = document.getElementById('papManualItemName')?.value?.trim() || '';
+        const papDesc = document.getElementById('papManualItemDesc')?.value?.trim() || '';
+        const papUnit = document.getElementById('papManualItemUnit')?.value || 'lot';
+        const papPrice = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
+        const papQty = document.getElementById('papManualItemQty')?.value || '1';
+        const papSection = document.getElementById('papSection')?.value || commonData.section;
+        const papCategory = document.getElementById('papCategory')?.value || commonData.category;
+
+        console.log('[PPMP EDIT] PAP item data:', { papName, papDesc, papUnit, papPrice, papQty });
+
+        if (!papName) {
+          alert('Please enter a PAP Name.');
+          return;
+        }
+
+        if (!confirm('Save PPMP changes (PAP entry)?')) return;
+
+        const data = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: null,
+          item_description: papDesc, // Store detail description separately
+          description: papName, // Store PAP Name as main description (for display as title)
+          quantity_size: papQty,
+          section: papSection,
+          category: papCategory,
+          total_amount: papPrice * (parseFloat(papQty) || 1),
+          procurement_source: 'PAPs',
+          // Include items array for plan_items table storage
+          items: [{
+            item_code: 'PAP-' + Date.now(),
+            item_name: papName,
+            item_description: papDesc,
+            unit: papUnit,
+            unit_price: papPrice,
+            category: papCategory,
+            q1_qty: parseInt(papQty) || 1,
+            q2_qty: 0,
+            q3_qty: 0,
+            q4_qty: 0,
+            remarks: commonData.remarks || ''
+          }]
+        };
+
+        await apiRequest('/plans/' + planId, 'PUT', data);
+        alert('PPMP entry saved successfully!');
+
       } else {
-      // 1. Update the original PPMP entry
-      if (originalEntry) {
-        const origDesc = checked[originalEntry].description || null;
-        const origData = {
-          ...commonData,
-          ppmp_no: form.ppmp_no?.value || undefined,
-          item_id: parseInt(originalEntry),
-          category: checked[originalEntry].item?.category || null,
-          item_description: origDesc
-        };
-        await apiRequest('/plans/' + planId, 'PUT', origData);
-        savedCount++;
-      } else if (checkedIds.length > 0) {
-        // No original item — update with the first checked item
-        const firstId = checkedIds[0];
-        const firstDesc = checked[firstId].description || null;
-        const firstData = {
-          ...commonData,
-          ppmp_no: form.ppmp_no?.value || undefined,
-          item_id: parseInt(firstId),
-          category: checked[firstId].item?.category || null,
-          item_description: firstDesc
-        };
-        await apiRequest('/plans/' + planId, 'PUT', firstData);
-        savedCount++;
-        // Remove from newEntries since it was used for the update
-        const idx = newEntries.indexOf(firstId);
-        if (idx > -1) newEntries.splice(idx, 1);
-      }
+        // Catalog mode (PS-DBM / NON PS-DBM)
+        const checked = window._ppmpEditCheckedItems || {};
+        const checkedIds = Object.keys(checked);
 
-      // 2. Batch create new PPMP entries for additional checked items
-      if (newEntries.length > 0) {
-        const entries = newEntries.map(id => {
-          const c = checked[id];
-          const itemPrice = parseFloat(c.item?.unit_price || 0);
-          const itemQty = parseFloat(commonData.quantity_size || 1);
-          const itemTotal = itemPrice * itemQty;
-          return {
+        // Separate: the original item (update existing plan) vs new items (batch create)
+        const originalEntry = checkedIds.find(id => checked[id].isOriginal);
+        const newEntries = checkedIds.filter(id => !checked[id].isOriginal);
+
+        // Build confirmation message
+        if (checkedIds.length === 0) {
+          if (!confirm('Save PPMP changes? (No items linked)')) return;
+        } else {
+          const totalItems = checkedIds.length;
+          const itemSummary = checkedIds.map((id, i) => {
+            const c = checked[id];
+            return '  ' + (i+1) + '. ' + (c.item?.name || 'Item #' + id) + (c.isOriginal ? ' (current)' : ' (NEW)');
+          }).join('\n');
+          if (!confirm('Save changes for ' + totalItems + ' item(s)?\n\n' + itemSummary + '\n\n' + (newEntries.length > 0 ? newEntries.length + ' new PPMP entries will be created.' : 'Updating existing entry.'))) return;
+        }
+
+        let savedCount = 0;
+
+        if (checkedIds.length === 0) {
+          // No items checked — update plan fields, preserve existing item linkage
+          const data = {
             ...commonData,
-            item_id: parseInt(id),
-            category: c.item?.category || null,
-            item_description: c.description || null,
-            description: c.description || commonData.description,
-            total_amount: itemTotal
+            ppmp_no: form.ppmp_no?.value || undefined,
+            item_id: window._ppmpEditPlan?.item_id || null,
+            item_description: window._ppmpEditPlan?.item_description || null
           };
-        });
+          await apiRequest('/plans/' + planId, 'PUT', data);
+          savedCount = 1;
+        } else {
+          // 1. Update the original PPMP entry
+          if (originalEntry) {
+            const origDesc = checked[originalEntry].description || null;
+            const origData = {
+              ...commonData,
+              ppmp_no: form.ppmp_no?.value || undefined,
+              item_id: parseInt(originalEntry),
+              category: checked[originalEntry].item?.category || commonData.category,
+              item_description: origDesc
+            };
+            await apiRequest('/plans/' + planId, 'PUT', origData);
+            savedCount++;
+          } else if (checkedIds.length > 0) {
+            // No original item — update with the first checked item
+            const firstId = checkedIds[0];
+            const firstDesc = checked[firstId].description || null;
+            const firstData = {
+              ...commonData,
+              ppmp_no: form.ppmp_no?.value || undefined,
+              item_id: parseInt(firstId),
+              category: checked[firstId].item?.category || commonData.category,
+              item_description: firstDesc
+            };
+            await apiRequest('/plans/' + planId, 'PUT', firstData);
+            savedCount++;
+            // Remove from newEntries since it was used for the update
+            const idx = newEntries.indexOf(firstId);
+            if (idx > -1) newEntries.splice(idx, 1);
+          }
 
-        try {
-          const result = await apiRequest('/plans/batch', 'POST', { entries });
-          savedCount += result.count || entries.length;
-        } catch(batchErr) {
-          // Fallback: create one by one
-          for (const entry of entries) {
+          // 2. Batch create new PPMP entries for additional checked items
+          if (newEntries.length > 0) {
+            const entries = newEntries.map(id => {
+              const c = checked[id];
+              const itemPrice = parseFloat(c.item?.unit_price || 0);
+              const itemQty = parseFloat(commonData.quantity_size || 1);
+              const itemTotal = itemPrice * itemQty;
+              return {
+                ...commonData,
+                item_id: parseInt(id),
+                category: c.item?.category || commonData.category,
+                item_description: c.description || null,
+                description: c.description || commonData.description,
+                total_amount: itemTotal
+              };
+            });
+
             try {
-              await apiRequest('/plans', 'POST', entry);
-              savedCount++;
-            } catch(e) { console.error('Failed to save new entry:', e); }
+              const result = await apiRequest('/plans/batch', 'POST', { entries });
+              savedCount += result.count || entries.length;
+            } catch(batchErr) {
+              // Fallback: create one by one
+              for (const entry of entries) {
+                try {
+                  await apiRequest('/plans', 'POST', entry);
+                  savedCount++;
+                } catch(e) { console.error('Failed to save new entry:', e); }
+              }
+            }
           }
         }
-      }
-      } // end else (items checked)
 
-      alert('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!');
+        alert('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!');
+      }
+
       closeModal();
       loadPPMP();
     } catch (err) {
