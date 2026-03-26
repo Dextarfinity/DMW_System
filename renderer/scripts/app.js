@@ -4308,12 +4308,11 @@ function renderPTRTable(ptrs) {
 function renderRISTable(ris) {
   const tbody = document.getElementById('risTableBody');
   if (!tbody) return;
-  if (!ris.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No RIS entries found</td></tr>'; return; }
+  if (!ris.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No RIS entries found</td></tr>'; return; }
   tbody.innerHTML = ris.map(r => `
     <tr>
       <td>${r.ris_no || ''}</td>
       <td>${r.ris_date ? new Date(r.ris_date).toLocaleDateString() : ''}</td>
-      <td>${r.division || ''}</td>
       <td>${r.division || ''}</td>
       <td>${r.purpose || ''}</td>
       <td>${r.requested_by_name || ''}</td>
@@ -4932,7 +4931,7 @@ document.addEventListener('DOMContentLoaded', () => {
       modalOverlay.classList.remove('show');
     }
     // Remove any leftover sub-modal overlays from previous session
-    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay').forEach(el => el.remove());
+    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay').forEach(el => el.remove());
 
     // Update user info in sidebar
     if (userNameEl) {
@@ -6023,7 +6022,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Close any open modals/overlays before showing login
     if (modalOverlay) modalOverlay.classList.remove('show');
-    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay').forEach(el => el.remove());
+    document.querySelectorAll('#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay').forEach(el => el.remove());
 
     // Show login overlay
     if (loginOverlay) {
@@ -9244,6 +9243,15 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group"><label>Bid Amount</label><input type="number" step="0.01" id="editBacBidAmount" value="${b.bid_amount || 0}"></div>
         </div>
         <div class="form-group">
+          <label>Bidder Type Classification</label>
+          <select id="editBacBidderType" class="form-select">
+            <option value="LOWEST CALCULATED AND RESPONSIVE (LCRB)" ${b.bidder_type === 'LOWEST CALCULATED AND RESPONSIVE (LCRB)' ? 'selected' : ''}>LOWEST CALCULATED AND RESPONSIVE (LCRB)</option>
+            <option value="HIGHEST RATED AND RESPONSIVE (HRRB)" ${b.bidder_type === 'HIGHEST RATED AND RESPONSIVE (HRRB)' ? 'selected' : ''}>HIGHEST RATED AND RESPONSIVE (HRRB)</option>
+            <option value="MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)" ${b.bidder_type === 'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)' ? 'selected' : ''}>MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)</option>
+            <option value="MOST ADVANTAGEOUS AND RESPONSIVE (MARB)" ${b.bidder_type === 'MOST ADVANTAGEOUS AND RESPONSIVE (MARB)' ? 'selected' : ''}>MOST ADVANTAGEOUS AND RESPONSIVE (MARB)</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Status</label>
           <select id="editBacStatus" class="form-select">
             <option value="on_going" ${b.status==='on_going'?'selected':''}>ON-GOING</option>
@@ -9305,6 +9313,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const hopeId = document.getElementById('editBacHopeId')?.value || null;
     const abstractId = document.getElementById('editBacLinkedAbstract')?.value || null;
     const recSupplierId = document.getElementById('editBacRecSupplierId')?.value || null;
+    const bidderType = document.getElementById('editBacBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
 
     const data = {
       resolution_number: document.getElementById('editBacNumber').value,
@@ -9315,6 +9324,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       recommended_supplier_id: recSupplierId ? parseInt(recSupplierId) : null,
       recommended_awardee_name: document.getElementById('editBacAwardee').value,
       bid_amount: parseFloat(document.getElementById('editBacBidAmount').value) || 0,
+      bidder_type: bidderType,
       status: document.getElementById('editBacStatus').value,
       bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
       bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
@@ -12629,6 +12639,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
+    const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
 
     // BAC member employee IDs
     const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
@@ -12649,6 +12660,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         procurement_mode: 'SVP',
         abc_amount: abcAmount,
         bid_amount: contractPrice,
+        bidder_type: bidderType,
         status: 'draft',
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
@@ -12841,6 +12853,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
+    const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
     const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
     const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
     const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
@@ -12853,7 +12866,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const data = {
         resolution_number: resNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
         resolution_date: new Date().toISOString().split('T')[0], procurement_mode: 'SVP',
-        abc_amount: abcAmount, bid_amount: contractPrice, status: 'on_going',
+        abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
         bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
@@ -14051,8 +14064,21 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // RIS Modals
+  // =====================================================
+  // RIS CATALOG ITEM PICKER (similar to PPMP)
+  // =====================================================
+
   window.showNewRISModal = async function() {
     await ensureDivisionsLoaded();
+    // Load items cache
+    try {
+      window._risItemsCache = await apiRequest('/items');
+    } catch (e) {
+      window._risItemsCache = [];
+    }
+    // Initialize selected items
+    window._risSelectedItems = [];
+
     const html = `
       <form id="risForm" onsubmit="saveNewRIS(event)">
         <div class="form-row">
@@ -14062,46 +14088,74 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div class="form-group">
             <label>Division</label>
-            <select class="form-select" id="risDivision">
-              <option value="">-- Select --</option>
+            <select class="form-select" id="risDivision" onchange="updateRISApproverByDivision()" required>
               ${buildDivisionOptions('')}
             </select>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Office</label>
-            <input type="text" id="risOffice" placeholder="Office name">
-          </div>
-          <div class="form-group">
-            <label>Purpose</label>
-            <input type="text" id="risPurpose" placeholder="Purpose of requisition" required>
-          </div>
+        <div class="form-group">
+          <label>Purpose</label>
+          <textarea id="risPurpose" placeholder="Purpose of requisition" rows="3" style="resize:vertical;min-height:60px;" required></textarea>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Requested By</label>
-            <select class="form-select" id="risRequestedBy"><option value="">-- Select Employee --</option></select>
-          </div>
-          <div class="form-group">
-            <label>Approved By</label>
-            <select class="form-select" id="risApprovedBy"><option value="">-- Select Employee --</option></select>
-          </div>
+        <div class="form-group">
+          <label>Requested By</label>
+          <select class="form-select" id="risRequestedBy"><option value="">-- Select Employee --</option></select>
         </div>
-        <h4 style="margin-top: 15px;">Items</h4>
-        <div id="risItemsContainer">
-          <div class="form-row ris-item-row">
-            <div class="form-group" style="flex:3">
-              <label>Item</label>
-              <select class="form-select ris-item-select"><option value="">-- Select --</option></select>
+
+        <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                <input type="checkbox" id="risApprovedByCheck" checked style="width:16px;height:16px;">
+                <span>Approved By: <strong id="risApproverName">REGIENALD S. ESPALDON</strong></span>
+              </label>
+              <input type="hidden" id="risApprovedByName" value="REGIENALD S. ESPALDON">
+              <input type="hidden" id="risApprovedByDesignation" value="Chief Administrative Officer">
             </div>
-            <div class="form-group" style="flex:1">
-              <label>Qty</label>
-              <input type="number" class="ris-item-qty" min="1" value="1">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                <input type="checkbox" id="risIssuedByCheck" checked style="width:16px;height:16px;">
+                <span>Issued By: <strong>MARK E. MARASIGAN</strong></span>
+              </label>
+              <input type="hidden" id="risIssuedByName" value="MARK E. MARASIGAN">
+              <input type="hidden" id="risIssuedByDesignation" value="Administrative Aide IV">
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-outline" onclick="addRISItemRow()" style="margin-top:5px;"><i class="fas fa-plus"></i> Add Item</button>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px;margin-bottom:10px;">
+          <h4 style="margin:0;"><i class="fas fa-boxes"></i> Items</h4>
+          <button type="button" class="btn btn-primary btn-sm" onclick="showRISCatalogItemModal()">
+            <i class="fas fa-layer-group"></i> Select Items from Catalog
+          </button>
+        </div>
+
+        <div id="risItemsListContainer" style="display:none;margin-bottom:15px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span id="risItemCount" style="font-size:12px;color:#4a5568;"></span>
+          </div>
+          <div style="max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+            <table class="data-table full-width" style="font-size:12px;margin-bottom:0;">
+              <thead style="position:sticky;top:0;background:#f7fafc;z-index:1;">
+                <tr>
+                  <th style="width:30px;">#</th>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th style="width:80px;">Unit</th>
+                  <th style="width:80px;">Qty</th>
+                  <th style="width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="risItemsListBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="risNoItemsMsg" style="padding:20px;text-align:center;color:#718096;background:#f7fafc;border-radius:6px;font-size:13px;">
+          <i class="fas fa-info-circle"></i> No items added yet. Click "Select Items from Catalog" to add items.
+        </div>
+
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save RIS</button>
@@ -14110,57 +14164,288 @@ Failure to submit the above requirements within the prescribed period shall cons
     `;
     openModal('New Requisition & Issue Slip', html);
     loadEmployeesDropdown('risRequestedBy');
-    loadEmployeesDropdown('risApprovedBy');
-    loadItemsDropdown(document.querySelector('.ris-item-select').id || 'risItemSelect0');
-    // Load items into the first select
-    (async () => {
-      try {
-        const items = await apiRequest('/items');
-        const selects = document.querySelectorAll('.ris-item-select');
-        selects.forEach(sel => {
-          items.forEach(item => {
-            const opt = document.createElement('option');
-            opt.value = item.id;
-            opt.textContent = item.code + ' - ' + item.name;
-            sel.appendChild(opt);
-          });
-        });
-      } catch(e) {}
-    })();
+    // Update approver based on initial division
+    setTimeout(() => updateRISApproverByDivision(), 100);
   };
-  window.addRISItemRow = function() {
-    const container = document.getElementById('risItemsContainer');
-    const row = document.createElement('div');
-    row.className = 'form-row ris-item-row';
-    row.innerHTML = '<div class="form-group" style="flex:3"><select class="form-select ris-item-select"><option value="">-- Select --</option></select></div><div class="form-group" style="flex:1"><input type="number" class="ris-item-qty" min="1" value="1"></div><div class="form-group" style="flex:0"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'.ris-item-row\').remove()"><i class="fas fa-times"></i></button></div>';
-    container.appendChild(row);
-    (async () => {
-      try {
-        const items = await apiRequest('/items');
-        const sel = row.querySelector('.ris-item-select');
-        items.forEach(item => { const o = document.createElement('option'); o.value = item.id; o.textContent = item.code + ' - ' + item.name; sel.appendChild(o); });
-      } catch(e) {}
-    })();
+
+  /** Update RIS approver name based on selected division */
+  window.updateRISApproverByDivision = function() {
+    const divisionSelect = document.getElementById('risDivision') || document.getElementById('editRISDivision');
+    const approverNameEl = document.getElementById('risApproverName') || document.getElementById('editRISApproverName');
+    const approverHiddenEl = document.getElementById('risApprovedByName') || document.getElementById('editRISApprovedByName');
+    const approverDesigEl = document.getElementById('risApprovedByDesignation') || document.getElementById('editRISApprovedByDesignation');
+    if (!divisionSelect || !approverNameEl) return;
+
+    const division = (divisionSelect.value || '').toUpperCase();
+    // WRSD → MAKINANO, all others → ESPALDON
+    if (division === 'WRSD') {
+      approverNameEl.textContent = 'EVAL B. MAKINANO';
+      if (approverHiddenEl) approverHiddenEl.value = 'EVAL B. MAKINANO';
+      if (approverDesigEl) approverDesigEl.value = 'Chief WRSD';
+    } else {
+      approverNameEl.textContent = 'REGIENALD S. ESPALDON';
+      if (approverHiddenEl) approverHiddenEl.value = 'REGIENALD S. ESPALDON';
+      if (approverDesigEl) approverDesigEl.value = 'Chief Administrative Officer';
+    }
   };
+
+  /** Open a modal to select catalog items for RIS */
+  window.showRISCatalogItemModal = function() {
+    const allItems = window._risItemsCache || [];
+    const catFilter = document.getElementById('risCategoryFilter')?.value || '';
+
+    // Filter items by category if set
+    let filteredItems = allItems;
+    if (catFilter) {
+      filteredItems = allItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+
+    // Get unique categories for filter dropdown
+    const categories = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+    const categoryOptions = categories.map(c => `<option value="${c}" ${catFilter === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    const itemRows = filteredItems.map(item => {
+      const alreadyAdded = (window._risSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return `<tr class="ris-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+                  onclick="${alreadyAdded ? '' : 'selectRISCatalogItem(' + item.id + ', this)'}"
+                  style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td>${escapeHtml(item.code || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.name || '')}</td>
+        <td>${escapeHtml(item.description || '').substring(0, 50)}${(item.description || '').length > 50 ? '...' : ''}</td>
+        <td>${escapeHtml(item.unit || '')}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'risCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:850px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Items from Catalog</h4>
+          <button onclick="document.getElementById('risCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;display:flex;gap:10px;flex-wrap:wrap;">
+          <select class="form-select" id="risCategoryFilter" onchange="filterRISCatalogByCategory()" style="width:180px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+            <option value="">-- All Categories --</option>
+            ${categoryOptions}
+          </select>
+          <input type="text" id="risCatalogModalSearch" placeholder="Search by item code, name, description..."
+            oninput="filterRISCatalogModalItems(this.value)"
+            style="flex:1;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Unit</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="risCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid #e2e8f0;text-align:right;">
+          <button type="button" onclick="document.getElementById('risCatalogItemOverlay').remove()" class="btn btn-primary" style="padding:8px 24px;">
+            <i class="fas fa-check"></i> Done
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items by category in RIS catalog modal */
+  window.filterRISCatalogByCategory = function() {
+    const catFilter = document.getElementById('risCategoryFilter')?.value || '';
+    const searchText = document.getElementById('risCatalogModalSearch')?.value || '';
+    const allItems = window._risItemsCache || [];
+
+    let filteredItems = allItems;
+    if (catFilter) {
+      filteredItems = filteredItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      filteredItems = filteredItems.filter(i =>
+        (i.code || '').toLowerCase().includes(search) ||
+        (i.name || '').toLowerCase().includes(search) ||
+        (i.description || '').toLowerCase().includes(search) ||
+        (i.category || '').toLowerCase().includes(search)
+      );
+    }
+
+    const tbody = document.getElementById('risCatalogModalBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = filteredItems.map(item => {
+      const alreadyAdded = (window._risSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return `<tr class="ris-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+                  onclick="${alreadyAdded ? '' : 'selectRISCatalogItem(' + item.id + ', this)'}"
+                  style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td>${escapeHtml(item.code || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.name || '')}</td>
+        <td>${escapeHtml(item.description || '').substring(0, 50)}${(item.description || '').length > 50 ? '...' : ''}</td>
+        <td>${escapeHtml(item.unit || '')}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  /** Filter items in the RIS catalog modal by search text */
+  window.filterRISCatalogModalItems = function(text) {
+    const tbody = document.getElementById('risCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into RIS items list */
+  window.selectRISCatalogItem = function(itemId, rowEl) {
+    const allItems = window._risItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
+
+    // Prevent duplicates
+    if ((window._risSelectedItems || []).some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.');
+      return;
+    }
+
+    const entry = {
+      item_id: parseInt(itemId),
+      item_code: item.code || '',
+      item_name: item.name || '',
+      item_unit: item.unit || '',
+      item_description: item.description || '',
+      quantity: 1
+    };
+    if (!window._risSelectedItems) window._risSelectedItems = [];
+    window._risSelectedItems.push(entry);
+
+    renderRISItemsList();
+
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+  };
+
+  /** Render the selected items list for RIS */
+  window.renderRISItemsList = function() {
+    const tbody = document.getElementById('risItemsListBody');
+    const container = document.getElementById('risItemsListContainer');
+    const noItemsMsg = document.getElementById('risNoItemsMsg');
+    const countEl = document.getElementById('risItemCount');
+    if (!tbody) return;
+
+    const items = window._risSelectedItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (noItemsMsg) noItemsMsg.style.display = 'block';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+    if (noItemsMsg) noItemsMsg.style.display = 'none';
+
+    tbody.innerHTML = items.map((it, idx) => `
+      <tr>
+        <td style="text-align:center;color:#888;">${idx + 1}</td>
+        <td style="font-weight:600;font-size:11px;">${escapeHtml(it.item_code)}</td>
+        <td>${escapeHtml(it.item_name)}</td>
+        <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
+        <td>
+          <input type="number" value="${it.quantity}" min="1" step="1"
+            style="width:60px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;border-radius:3px;"
+            onchange="updateRISItemQty(${idx}, this.value)">
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="btn btn-sm" onclick="removeRISItem(${idx})"
+            style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove">
+            <i class="fas fa-times"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+  };
+
+  /** Remove an item from the RIS items list by index */
+  window.removeRISItem = function(index) {
+    window._risSelectedItems.splice(index, 1);
+    renderRISItemsList();
+  };
+
+  /** Update quantity for an item in the RIS list */
+  window.updateRISItemQty = function(index, qty) {
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._risSelectedItems[index].quantity = q;
+    renderRISItemsList();
+  };
+
   window.saveNewRIS = async function(e) {
     e.preventDefault();
-    const itemRows = document.querySelectorAll('.ris-item-row');
-    const items = [];
-    itemRows.forEach(row => {
-      const itemId = row.querySelector('.ris-item-select')?.value;
-      const qty = row.querySelector('.ris-item-qty')?.value;
-      if (itemId) items.push({ item_id: parseInt(itemId), quantity: parseInt(qty) || 1 });
-    });
+    const selectedItems = window._risSelectedItems || [];
+    if (selectedItems.length === 0) {
+      alert('Please add at least one item to the RIS.');
+      return;
+    }
+    const items = selectedItems.map(it => ({
+      item_id: it.item_id,
+      quantity: it.quantity,
+      description: it.item_name || '',
+      uom: it.unit || ''
+    }));
+
+    // Get requested by from dropdown
+    const reqSel = document.getElementById('risRequestedBy');
+    const reqName = reqSel && reqSel.selectedIndex > 0 ? reqSel.options[reqSel.selectedIndex].textContent : null;
+
+    // Get approved by and issued by from checkboxes
+    const approvedByChecked = document.getElementById('risApprovedByCheck')?.checked;
+    const issuedByChecked = document.getElementById('risIssuedByCheck')?.checked;
+
     const data = {
-      date_issued: document.getElementById('risDate').value,
+      ris_date: document.getElementById('risDate').value,
       division: document.getElementById('risDivision').value,
-      office: document.getElementById('risOffice').value,
       purpose: document.getElementById('risPurpose').value,
-      requested_by: parseInt(document.getElementById('risRequestedBy').value) || null,
-      approved_by: parseInt(document.getElementById('risApprovedBy').value) || null,
+      requested_by_id: parseInt(reqSel?.value) || null,
+      requested_by_name: reqName,
+      approved_by_name: approvedByChecked ? document.getElementById('risApprovedByName')?.value : null,
+      approved_by_designation: approvedByChecked ? document.getElementById('risApprovedByDesignation')?.value : null,
+      issued_by_name: issuedByChecked ? document.getElementById('risIssuedByName')?.value : null,
+      issued_by_designation: issuedByChecked ? document.getElementById('risIssuedByDesignation')?.value : null,
       items: items
     };
-    try { if (!confirm('Are you sure you want to save this RIS?')) return; await apiRequest('/ris', 'POST', data); alert('RIS saved!'); closeModal(); loadRIS(); } catch (err) { alert('Error: ' + err.message); }
+    try {
+      if (!confirm('Are you sure you want to save this RIS?')) return;
+      await apiRequest('/ris', 'POST', data);
+      showToast('RIS saved successfully!', 'success');
+      closeModal();
+      loadRIS();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
   };
   window.showViewRISModal = async function(id) {
     openModal('RIS Details', '<div class="view-details"><p>Loading RIS...</p></div>');
@@ -14173,7 +14458,6 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="detail-item"><span class="label">RIS No.</span><span class="value">${ris.ris_no || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Date</span><span class="value">${ris.ris_date ? new Date(ris.ris_date).toLocaleDateString() : 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Division</span><span class="value">${ris.division || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Office</span><span class="value">${ris.office || ris.division || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Purpose</span><span class="value">${ris.purpose || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Requested By</span><span class="value">${ris.requested_by_name || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Approved By</span><span class="value">${ris.approved_by_name || 'N/A'}</span></div>
@@ -14188,40 +14472,73 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
   window.showEditRISModal = async function(id) {
+    await ensureDivisionsLoaded();
     let ris = {};
     try { ris = await apiRequest('/ris/' + id); } catch (err) { alert('Could not load RIS'); return; }
+
+    // Determine initial approver based on division
+    const division = (ris.division || '').toUpperCase();
+    const isWRSD = division === 'WRSD';
+    const defaultApprover = isWRSD ? 'EVAL B. MAKINANO' : 'REGIENALD S. ESPALDON';
+    const defaultApproverDesig = isWRSD ? 'Chief WRSD' : 'Chief Administrative Officer';
+    const approverName = ris.approved_by_name || defaultApprover;
+    const approverDesig = ris.approved_by_designation || defaultApproverDesig;
+    const issuedName = ris.issued_by_name || 'MARK E. MARASIGAN';
+    const issuedDesig = ris.issued_by_designation || 'Administrative Aide IV';
+
     const html = `
       <form id="editRISForm" onsubmit="saveEditRIS(event, ${id})">
         <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit RIS #${ris.ris_no || id}</strong></div>
         <div class="form-row">
-    await ensureDivisionsLoaded();
           <div class="form-group"><label>RIS No.</label><input type="text" id="editRISNo" value="${ris.ris_no || ''}"></div>
           <div class="form-group"><label>Date</label><input type="date" id="editRISDate" value="${ris.ris_date ? ris.ris_date.split('T')[0] : ''}"></div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Division</label>
-            <select class="form-select" id="editRISDivision">
-              <option value="">-- Select --</option>
-              <option value="FAD" ${ris.division==='FAD'?'selected':''}>FAD</option>
-              <option value="WRSD" ${ris.division==='WRSD'?'selected':''}>WRSD</option>
-              <option value="MWPD" ${ris.division==='MWPD'?'selected':''}>MWPD</option>
-              <option value="MWProD" ${ris.division==='MWProD'?'selected':''}>MWProD</option>
-              <option value="ORD" ${ris.division==='ORD'?'selected':''}>ORD</option>
-            </${buildDivisionOptions(ris.division || '')}ect" id="editRISRequestedBy"><option value="">-- Select Employee --</option></select></div>
-          <div class="form-group"><label>Approved By</label><select class="form-select" id="editRISApprovedBy"><option value="">-- Select Employee --</option></select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Issued By</label><select class="form-select" id="editRISIssuedBy"><option value="">-- Select Employee --</option></select></div>
-          <div class="form-group"><label>Received By</label><select class="form-select" id="editRISReceivedBy"><option value="">-- Select Employee --</option></select></div>
+            <select class="form-select" id="editRISDivision" onchange="updateRISApproverByDivision()" required>
+              ${buildDivisionOptions(ris.division || '')}
+            </select>
+          </div>
+          <div class="form-group"><label>Requested By</label><select class="form-select" id="editRISRequestedBy"><option value="">-- Select Employee --</option></select></div>
         </div>
         <div class="form-group">
-          <label>Status</label>
-          <select class="form-select" id="editRISStatus">
-            <option value="DRAFT" ${ris.status==='DRAFT'?'selected':''}>Draft</option>
-            <option value="POSTED" ${ris.status==='POSTED'?'selected':''}>Posted</option>
-            <option value="CANCELLED" ${ris.status==='CANCELLED'?'selected':''}>Cancelled</option>
-          </select>
+          <label>Purpose</label>
+          <textarea id="editRISPurpose" rows="3" style="resize:vertical;min-height:60px;">${ris.purpose || ''}</textarea>
+        </div>
+
+        <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                <input type="checkbox" id="editRISApprovedByCheck" ${ris.approved_by_name ? 'checked' : ''} style="width:16px;height:16px;">
+                <span>Approved By: <strong id="editRISApproverName">${approverName}</strong></span>
+              </label>
+              <input type="hidden" id="editRISApprovedByName" value="${approverName}">
+              <input type="hidden" id="editRISApprovedByDesignation" value="${approverDesig}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+                <input type="checkbox" id="editRISIssuedByCheck" ${ris.issued_by_name ? 'checked' : ''} style="width:16px;height:16px;">
+                <span>Issued By: <strong>${issuedName}</strong></span>
+              </label>
+              <input type="hidden" id="editRISIssuedByName" value="${issuedName}">
+              <input type="hidden" id="editRISIssuedByDesignation" value="${issuedDesig}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group"><label>Received By</label><select class="form-select" id="editRISReceivedBy"><option value="">-- Select Employee --</option></select></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="editRISStatus">
+              <option value="PENDING" ${ris.status==='PENDING'?'selected':''}>Pending</option>
+              <option value="POSTED" ${ris.status==='POSTED'?'selected':''}>Posted</option>
+              <option value="CANCELLED" ${ris.status==='CANCELLED'?'selected':''}>Cancelled</option>
+            </select>
+          </div>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -14230,18 +14547,19 @@ Failure to submit the above requirements within the prescribed period shall cons
       </form>`;
     openModal('Edit RIS', html);
     loadEmployeesDropdown('editRISRequestedBy', ris.requested_by_id);
-    loadEmployeesDropdown('editRISApprovedBy', ris.approved_by_id);
-    loadEmployeesDropdown('editRISIssuedBy', ris.issued_by_id);
     loadEmployeesDropdown('editRISReceivedBy', ris.received_by_id);
   };
   window.saveEditRIS = async function(e, id) {
     e.preventDefault();
     if (!confirm('Save changes?')) return;
     const reqSel = document.getElementById('editRISRequestedBy');
-    const appSel = document.getElementById('editRISApprovedBy');
-    const issSel = document.getElementById('editRISIssuedBy');
     const recSel = document.getElementById('editRISReceivedBy');
     const getName = sel => { const t = sel.options[sel.selectedIndex]?.textContent; return t && t !== '-- Select Employee --' ? t : null; };
+
+    // Get approved by and issued by from checkboxes
+    const approvedByChecked = document.getElementById('editRISApprovedByCheck')?.checked;
+    const issuedByChecked = document.getElementById('editRISIssuedByCheck')?.checked;
+
     try {
       await apiRequest('/ris/' + id, 'PUT', {
         ris_no: document.getElementById('editRISNo').value,
@@ -14251,10 +14569,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: document.getElementById('editRISStatus').value,
         requested_by_id: parseInt(reqSel.value) || null,
         requested_by_name: getName(reqSel),
-        approved_by_id: parseInt(appSel.value) || null,
-        approved_by_name: getName(appSel),
-        issued_by_id: parseInt(issSel.value) || null,
-        issued_by_name: getName(issSel),
+        approved_by_name: approvedByChecked ? document.getElementById('editRISApprovedByName')?.value : null,
+        approved_by_designation: approvedByChecked ? document.getElementById('editRISApprovedByDesignation')?.value : null,
+        issued_by_name: issuedByChecked ? document.getElementById('editRISIssuedByName')?.value : null,
+        issued_by_designation: issuedByChecked ? document.getElementById('editRISIssuedByDesignation')?.value : null,
         received_by_id: parseInt(recSel.value) || null,
         received_by_name: getName(recSel)
       });
@@ -14931,13 +15249,22 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-sm btn-outline" onclick="addBACBidderRow()"><i class="fas fa-plus"></i> Add Bidder</button>
         </div>
         <div class="form-section-header section-items"><i class="fas fa-award"></i> Award Details</div>
+        <div class="form-group">
+          <label>Bidder Type Classification</label>
+          <select class="form-select" id="bacResBidderType" required>
+            <option value="LOWEST CALCULATED AND RESPONSIVE (LCRB)">LOWEST CALCULATED AND RESPONSIVE (LCRB)</option>
+            <option value="HIGHEST RATED AND RESPONSIVE (HRRB)">HIGHEST RATED AND RESPONSIVE (HRRB)</option>
+            <option value="MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)">MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)</option>
+            <option value="MOST ADVANTAGEOUS AND RESPONSIVE (MARB)">MOST ADVANTAGEOUS AND RESPONSIVE (MARB)</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>ABC (Approved Budget for the Contract)</label>
             <input type="number" id="bacResABC" placeholder="0.00" step="0.01" required onchange="togglePhilGEPSFields()">
           </div>
           <div class="form-group">
-            <label>Contract Price (LCRB Amount)</label>
+            <label>Contract Price (Winning Bid Amount)</label>
             <input type="number" id="bacResContractPrice" placeholder="0.00" step="0.01" required>
           </div>
         </div>
@@ -20819,12 +21146,31 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Get bidder type (default to LOWEST CALCULATED AND RESPONSIVE)
       const bidderTypeOptions = [
-        'LOWEST CALCULATED AND RESPONSIVE',
-        'HIGHEST RATED AND RESPONSIVE',
-        'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE',
-        'MOST ADVANTAGEOUS AND RESPONSIVE'
+        'LOWEST CALCULATED AND RESPONSIVE (LCRB)',
+        'HIGHEST RATED AND RESPONSIVE (HRRB)',
+        'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)',
+        'MOST ADVANTAGEOUS AND RESPONSIVE (MARB)'
       ];
-      const selectedBidderType = options.bidderType || bidderTypeOptions[0];
+      const selectedBidderType = bacRes.bidder_type || options.bidderType || bidderTypeOptions[0];
+
+      // Parse bidder type into name and abbreviation parts
+      // e.g., "LOWEST CALCULATED AND RESPONSIVE (LCRB)" -> { name: "LOWEST CALCULATED AND RESPONSIVE", abbrev: "LCRB" }
+      const parseBidderType = (fullType) => {
+        const match = fullType.match(/^(.+?)\s*\(([A-Z]+)\)$/);
+        if (match) {
+          return { name: match[1].trim(), abbrev: match[2] };
+        }
+        return { name: fullType, abbrev: '' };
+      };
+
+      const bidderTypeParts = parseBidderType(selectedBidderType);
+      // For title: "LOWEST CALCULATED AND RESPONSIVE" (uppercase, no abbrev)
+      const bidderTypeForTitle = bidderTypeParts.name.toUpperCase();
+      // For resolve section: "Lowest Calculated and Responsive Bidder (LCRB)" (title case with abbrev)
+      const toTitleCase = (str) => str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      const bidderTypeForResolve = toTitleCase(bidderTypeParts.name) + ' Bidder' + (bidderTypeParts.abbrev ? ` (${bidderTypeParts.abbrev})` : '');
+      // For quotation text: "Lowest Calculated and Responsive" (title case, no abbrev, no "Bidder")
+      const bidderTypeForQuotation = toTitleCase(bidderTypeParts.name);
 
       // Get data from resolution or abstract
       const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________').toUpperCase();
@@ -20854,23 +21200,25 @@ Failure to submit the above requirements within the prescribed period shall cons
       const hopeName = getEmployeeName(bacRes.hope_id);
       const hopeDesig = getEmployeeDesignation(bacRes.hope_id) || 'Regional Director';
 
-      // Build posting-specific WHEREAS clause
+      // Build posting-specific WHEREAS clause based on PDF templates
       let postingClause = '';
       if (requiresPosting) {
+        // For ABCs above ₱200,000 - requires PhilGEPS posting for 3 calendar days
         postingClause = `
           <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
             <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
-            Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be posted for a period
-            of three (3) calendar days on the PhilGEPS website, the website of the Procuring Entity, if available, and at any
-            conspicuous place reserved for this purpose within the premises of the Procuring Entity;
+            Republic Act No. 12009, the RFQ shall be posted for a period of three (3) calendar days on the PhilGEPS website,
+            the website of the Procuring Entity, if available, and at any conspicuous place reserved for this purpose within
+            the premises of the Procuring Entity;
           </p>
           <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC posted the RFQ on the PhilGEPS website,
-            starting <span class="editable-field" contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span>
+            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC posted the RFQ on the PhilGEPS
+            website, starting <span class="editable-field" contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span>
             until <span class="editable-field" contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span>;
           </p>
         `;
       } else {
+        // For ABCs of ₱200,000.00 and below - no mandatory posting required
         postingClause = `
           <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
             <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
@@ -20878,8 +21226,8 @@ Failure to submit the above requirements within the prescribed period shall cons
             requirements;
           </p>
           <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of
-            known qualifications;
+            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers
+            of known qualifications;
           </p>
         `;
       }
@@ -20937,9 +21285,11 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Subject/Title with Dropdown -->
           <div style="margin: 20px 0; text-align: center;">
             <p style="margin: 0; font-weight: bold; text-transform: uppercase;">
-              RESOLUTION DECLARING <span contenteditable="true" style="color: #0066cc;">${supplierName}</span>
-              AS THE <select id="bidderTypeSelect" class="bidder-type-dropdown" style="font-weight: bold; font-size: 12pt; border: 1px solid #0066cc; padding: 2px 5px; background: #e6f3ff;">
-                ${bidderTypeOptions.map(opt => `<option value="${opt}" ${opt === selectedBidderType ? 'selected' : ''}>${opt}</option>`).join('')}
+              A RESOLUTION DECLARING THE <select id="bidderTypeSelect" class="bidder-type-dropdown" style="font-weight: bold; font-size: 12pt; color: #0066cc; border: 1px solid #0066cc; padding: 2px 5px; background: #e6f3ff; text-transform: uppercase;">
+                ${bidderTypeOptions.map(opt => {
+                  const parts = parseBidderType(opt);
+                  return `<option value="${opt}" ${opt === selectedBidderType ? 'selected' : ''}>${parts.name}</option>`;
+                }).join('')}
               </select> BIDDER FOR THE PROCUREMENT OF
               <span contenteditable="true" style="color: #0066cc;">${procurementDescription.toUpperCase()}</span>
             </p>
@@ -20984,7 +21334,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div style="margin: 20px 0;">
             <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
               <strong>WHEREAS,</strong> after thorough evaluation, the BAC found that <strong><span contenteditable="true">${supplierName}</span></strong>
-              submitted the <span id="bidderTypeText">${selectedBidderType}</span> quotation (LCRB/HRRB/MEARB/MARB) with a total bid amount of
+              submitted the <span id="bidderTypeText" style="color: #0066cc; font-weight: bold;">${bidderTypeForQuotation}</span> quotation with a total bid amount of
               <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>),
               which is within the ABC and compliant with the technical specifications and other requirements;
             </p>
@@ -21004,7 +21354,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <ol style="margin: 10px 0 10px 60px;">
               <li style="margin: 8px 0; text-align: justify;">
                 <strong>DECLARE <span contenteditable="true">${supplierName}</span></strong> as the
-                <span id="bidderTypeText2">${selectedBidderType}</span> Bidder for the procurement of
+                <span id="bidderTypeText2" style="color: #0066cc; font-weight: bold;">${bidderTypeForResolve}</span> for the procurement of
                 <span contenteditable="true">${procurementDescription}</span>, with a total contract price of
                 <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>);
               </li>
@@ -21060,7 +21410,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       `;
 
-      // ========== PAGE 3: BAC RESOLUTION RECOMMENDING APPROVAL ==========
+      // ========== PAGE 3: BAC RESOLUTION RECOMMENDING APPROVAL AND APPROVAL ==========
+      // Based on new PDF template: "BAC Reso Recommending Approval and Approval - sample.pdf"
       const recommendingApprovalHTML = `
         <div style="page-break-before: always; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
           <!-- Header -->
@@ -21076,107 +21427,135 @@ Failure to submit the above requirements within the prescribed period shall cons
             <p style="margin: 0; font-weight: bold; font-size: 14pt;">BIDS AND AWARDS COMMITTEE</p>
           </div>
 
-          <!-- BAC Resolution Recommending Approval -->
+          <!-- Resolution Number -->
           <div style="margin: 20px 0;">
-            <p style="margin: 0; font-weight: bold; text-align: center; font-size: 13pt; text-decoration: underline;">
-              BAC RESOLUTION RECOMMENDING APPROVAL OF AWARD
+            <p style="margin: 0;"><strong>RESOLUTION NO. <span contenteditable="true">${bacRes.resolution_number || '___'}</span>-A</strong></p>
+            <p style="margin: 0;">Series of <span contenteditable="true">${seriesYear}</span></p>
+          </div>
+
+          <!-- Subject/Title -->
+          <div style="margin: 20px 0; text-align: center;">
+            <p style="margin: 0; font-weight: bold; text-transform: uppercase;">
+              RESOLUTION RECOMMENDING TO THE HEAD OF THE PROCURING ENTITY (HoPE) THE APPROVAL
+              OF THE AWARD OF CONTRACT TO <span contenteditable="true" style="color: #0066cc;">${supplierName}</span>
+              FOR THE PROCUREMENT OF <span contenteditable="true" style="color: #0066cc;">${procurementDescription.toUpperCase()}</span>
             </p>
           </div>
 
+          <!-- WHEREAS Clauses -->
           <div style="margin: 20px 0;">
             <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              The Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII,
-              after conducting the procurement process in accordance with Republic Act No. 12009 and its
-              Implementing Rules and Regulations, hereby <strong>RECOMMENDS</strong> the approval of the award of contract to:
+              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC), in its Resolution No.
+              <span contenteditable="true">${bacRes.resolution_number || '___'}</span>, Series of <span contenteditable="true">${seriesYear}</span>,
+              declared <strong><span contenteditable="true">${supplierName}</span></strong> as the <span id="bidderTypeText3" style="color: #0066cc; font-weight: bold;">${bidderTypeForResolve}</span>
+              for the procurement of <span contenteditable="true">${procurementDescription}</span>;
+            </p>
+
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> the said procurement has a total contract price of <strong>${fmtCurrency(bidAmount)}</strong>
+              (<span contenteditable="true">${numberToWords(bidAmount)}</span>), which is within the Approved Budget for the
+              Contract (ABC) of <strong>${fmtCurrency(abcAmount)}</strong>;
+            </p>
+
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>WHEREAS,</strong> the BAC has verified that the winning bidder has the legal, technical, and
+              financial capability to undertake the obligations of the proposed contract;
             </p>
           </div>
 
-          <!-- Award Details Table -->
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11pt;">
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; width: 35%; background: #f5f5f5;"><strong>Winning Bidder:</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${supplierName}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Project/Procurement:</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${procurementDescription}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Mode of Procurement:</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${procurementMode}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Approved Budget (ABC):</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;">${fmtCurrency(abcAmount)}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>Contract Amount:</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;">${fmtCurrency(bidAmount)}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid #000; padding: 8px; background: #f5f5f5;"><strong>PR Reference No.:</strong></td>
-              <td style="border: 1px solid #000; padding: 8px;" contenteditable="true">${prNumber}</td>
-            </tr>
-          </table>
+          <!-- NOW THEREFORE -->
+          <div style="margin: 20px 0;">
+            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing premises, the BAC hereby
+              <strong>RESOLVES</strong> to:
+            </p>
+            <ol style="margin: 10px 0 10px 60px;">
+              <li style="margin: 8px 0; text-align: justify;">
+                <strong>RECOMMEND</strong> to the Head of the Procuring Entity (HoPE) the approval of the Award of
+                Contract to <strong><span contenteditable="true">${supplierName}</span></strong> for the procurement of
+                <span contenteditable="true">${procurementDescription}</span>, with a total contract price of
+                <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>);
+              </li>
+              <li style="margin: 8px 0; text-align: justify;">
+                <strong>AUTHORIZE</strong> the issuance of the corresponding Notice of Award (NOA) upon approval of
+                the Head of the Procuring Entity (HoPE).
+              </li>
+            </ol>
+          </div>
 
-          <p style="text-align: justify; margin: 20px 0;">
-            This recommendation is made in accordance with the provisions of R.A. No. 12009 and its IRR,
-            and is subject to the approval of the Head of the Procuring Entity (HoPE).
+          <p style="text-align: justify; text-indent: 40px; margin: 15px 0;">
+            <strong>APPROVED</strong> this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.
           </p>
+        </div>
+      `;
 
-          <p style="text-align: justify; margin: 15px 0;">
-            <strong>Submitted this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.</strong>
-          </p>
+      // ========== PAGE 3: SIGNATURE PAGE FOR RECOMMENDING APPROVAL ==========
+      // Based on sample PDF: "BAC Reso Recommending Approval and Approval - sample.pdf" (Page 2)
+      const dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
+      const signaturePageHTML = `
+        <div style="page-break-before: always; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
+          <!-- DMW Logo Header -->
+          <div style="text-align: center; margin-bottom: 30px; margin-top: 20px;">
+            ${dmwLogo ? `<img src="${dmwLogo}" style="width: 80px; height: 80px;" alt="DMW Logo">` : ''}
+          </div>
 
-          <!-- BAC Members Signatures (compact) -->
-          <div style="margin-top: 30px;">
-            <p style="text-align: center; font-weight: bold; margin-bottom: 20px;">BIDS AND AWARDS COMMITTEE</p>
+          <!-- Bids and Awards Committee Title -->
+          <div style="text-align: center; margin: 30px 0 50px 0;">
+            <p style="margin: 0; font-weight: bold; font-size: 14pt; text-decoration: underline;">Bids and Awards Committee</p>
+          </div>
 
-            <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
-              <div style="text-align: center; width: 30%; margin: 15px 0;">
-                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${chairpersonName}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Chairperson</p>
+          <!-- BAC Members Signatures -->
+          <div style="margin-top: 50px;">
+            <!-- First row: Chairperson -->
+            <div style="text-align: center; margin: 40px 0;">
+              <p style="margin: 0; font-weight: bold;" contenteditable="true">${chairpersonName}</p>
+              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">Chairperson</p>
+            </div>
+
+            <!-- Second row: Vice-Chair and Member -->
+            <div style="display: flex; justify-content: space-around; margin: 40px 0;">
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${viceChairName}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Vice-Chairperson</p>
               </div>
-              <div style="text-align: center; width: 30%; margin: 15px 0;">
-                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${viceChairName}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Vice-Chairperson</p>
-              </div>
-              <div style="text-align: center; width: 30%; margin: 15px 0;">
-                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member1Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member1Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
               </div>
             </div>
-            <div style="display: flex; justify-content: center; gap: 80px;">
-              <div style="text-align: center; width: 30%; margin: 15px 0;">
-                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member2Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+
+            <!-- Third row: Two more Members -->
+            <div style="display: flex; justify-content: space-around; margin: 40px 0;">
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member2Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
               </div>
-              <div style="text-align: center; width: 30%; margin: 15px 0;">
-                <p style="margin: 0; font-weight: bold; font-size: 11pt;" contenteditable="true">${member3Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 2px; font-size: 10pt;">Member</p>
+              <div style="text-align: center; width: 45%;">
+                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member3Name}</p>
+                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
               </div>
             </div>
           </div>
 
-          <!-- APPROVED Section -->
-          <div style="margin-top: 40px; border-top: 2px solid #000; padding-top: 20px;">
-            <p style="text-align: center; font-weight: bold; margin-bottom: 15px;">APPROVED:</p>
+          <!-- APPROVED BY HoPE Section -->
+          <div style="margin-top: 60px; border-top: 2px solid #000; padding-top: 25px;">
+            <p style="text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 13pt;">APPROVED BY:</p>
 
             <div style="text-align: center; margin-top: 40px;">
               <p style="margin: 0; font-weight: bold;" contenteditable="true">${hopeName}</p>
               <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">${hopeDesig}</p>
-              <p style="margin: 0; font-size: 10pt;">Head of Procuring Entity (HoPE)</p>
+              <p style="margin: 0; font-size: 10pt; font-style: italic;">Head of Procuring Entity (HoPE)</p>
             </div>
 
             <p style="text-align: right; margin-top: 30px;">
-              Date: <span contenteditable="true" style="border-bottom: 1px solid #000; padding: 0 30px;">_______________</span>
+              Date: <span contenteditable="true" style="border-bottom: 1px solid #000; padding: 0 40px;">_______________</span>
             </p>
           </div>
         </div>
       `;
 
-      // Combine all pages
-      const fullContent = declaringWinnerHTML + recommendingApprovalHTML;
+      // Combine all pages: Page 1 (Declaring Winner) + Page 2 (Recommending Approval) + Page 3 (Signature Page)
+      const fullContent = declaringWinnerHTML + recommendingApprovalHTML + signaturePageHTML;
 
       // Add dropdown change handler script
       const dropdownScript = `
@@ -21185,11 +21564,27 @@ Failure to submit the above requirements within the prescribed period shall cons
             const select = document.getElementById('bidderTypeSelect');
             if (select) {
               select.addEventListener('change', function() {
-                const val = this.value;
+                const fullVal = this.value;
+                // Parse the bidder type: "LOWEST CALCULATED AND RESPONSIVE (LCRB)" -> { name, abbrev }
+                const match = fullVal.match(/^(.+?)\\s*\\(([A-Z]+)\\)$/);
+                let name = fullVal, abbrev = '';
+                if (match) {
+                  name = match[1].trim();
+                  abbrev = match[2];
+                }
+                // Title case helper
+                const toTitleCase = (str) => str.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());
+                // For quotation: "Lowest Calculated and Responsive"
+                const forQuotation = toTitleCase(name);
+                // For resolve: "Lowest Calculated and Responsive Bidder (LCRB)"
+                const forResolve = toTitleCase(name) + ' Bidder' + (abbrev ? ' (' + abbrev + ')' : '');
+
                 const text1 = document.getElementById('bidderTypeText');
                 const text2 = document.getElementById('bidderTypeText2');
-                if (text1) text1.textContent = val;
-                if (text2) text2.textContent = val;
+                const text3 = document.getElementById('bidderTypeText3');
+                if (text1) text1.textContent = forQuotation;
+                if (text2) text2.textContent = forResolve;
+                if (text3) text3.textContent = forResolve;
               });
             }
           });

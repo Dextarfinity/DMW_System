@@ -3324,11 +3324,11 @@ app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
     const result = await pool.query(
-      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null]
+      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3336,11 +3336,11 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
     const result = await pool.query(
-      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, status=$9, bac_chairperson_id=$10, bac_vice_chairperson_id=$11, bac_member1_id=$12, bac_member2_id=$13, bac_member3_id=$14, hope_id=$15, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$16 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, req.params.id]
+      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$17 RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
