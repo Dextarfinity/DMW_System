@@ -4322,6 +4322,7 @@ function renderRISTable(ris) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewRISModal(${r.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" title="Print" onclick="printRIS(${r.id})"><i class="fas fa-print"></i></button>
           ${r.status === 'draft' ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ''}
           <button class="btn-icon" title="Edit" onclick="showEditRISModal(${r.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RIS', ${r.id})"><i class="fas fa-trash"></i></button>
@@ -4865,7 +4866,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (modalOverlay) {
       modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) {
+        if (e.target === modalOverlay && !window._modalPreventOutsideClose) {
           closeModal();
         }
       });
@@ -4968,8 +4969,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect to Socket.IO for real-time sync across all Electron clients
     connectSocket();
 
-    // Navigate to dashboard
-    navigateTo('dashboard');
+    // Navigate to saved page or dashboard
+    const savedPage = localStorage.getItem('dmw_current_page');
+    navigateTo(savedPage || 'dashboard');
   }
 
   // Format role for display (As-Is Roles)
@@ -5710,6 +5712,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // Save current page to localStorage for persistence on reload
+    localStorage.setItem('dmw_current_page', pageId);
+
     // Update page title
     if (pageTitle) {
       pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
@@ -6045,7 +6050,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Open modal with content
-  function openModal(title, contentHtml) {
+  // options: { preventOutsideClose: boolean } - if true, clicking outside won't close the modal
+  function openModal(title, contentHtml, options = {}) {
+    window._modalPreventOutsideClose = options.preventOutsideClose || false;
     if (modalTitle) {
       modalTitle.textContent = title;
     }
@@ -6062,6 +6069,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close modal
   function closeModal() {
+    window._modalPreventOutsideClose = false; // Reset flag when closing
     if (modalOverlay) {
       modalOverlay.classList.remove('show');
     }
@@ -6978,7 +6986,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </form>
     `;
-    openModal('New PPMP Entry', html);
+    openModal('New PPMP Entry', html, { preventOutsideClose: true });
     // Store items data for dropdown filtering
     window._ppmpItemsCache = allItems;
     // Initialize the items list
@@ -7109,7 +7117,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
       </form>
     `;
-    openModal('Create Purchase Request (PR)', html);
+    openModal('Create Purchase Request (PR)', html, { preventOutsideClose: true });
     window._docSelectedItems['pr'] = [];
   };
 
@@ -7364,7 +7372,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
       </form>
     `;
-    openModal('Create Request for Quotation (RFQ)', html);
+    openModal('Create Request for Quotation (RFQ)', html, { preventOutsideClose: true });
     window._docSelectedItems['rfq'] = [];
     // If a PR was preselected, auto-fill items
     if (preselectedPrNumber) {
@@ -7625,7 +7633,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
       </form>
     `;
-    openModal('Create Abstract of Quotations (AOQ)', html);
+    openModal('Create Abstract of Quotations (AOQ)', html, { preventOutsideClose: true });
   };
 
   // When user selects an RFQ in the Abstract form, auto-fill items, purpose, ABC, specs from that RFQ + linked PR
@@ -7866,7 +7874,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Issue Notice of Award (NOA)', html);
+    openModal('Issue Notice of Award (NOA)', html, { preventOutsideClose: true });
 
     // Store suppliers data for address auto-fill
     window._noaSuppliers = suppliers;
@@ -8041,7 +8049,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Create Purchase Order (PO)', html);
+    openModal('Create Purchase Order (PO)', html, { preventOutsideClose: true });
     window._docSelectedItems['po'] = [];
 
     // Dynamically populate NOA dropdown
@@ -8276,7 +8284,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </form>
       `;
-      openModal('Edit Purchase Request (Draft)', html);
+      openModal('Edit Purchase Request (Draft)', html, { preventOutsideClose: true });
       // Initialize catalog picker with existing items
       window._docSelectedItems['editpr'] = [];
       if (items.length > 0) {
@@ -8400,7 +8408,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit Purchase Request', html);
+    openModal('Edit Purchase Request', html, { preventOutsideClose: true });
   };
 
   // Dynamic helpers for Edit PR (same pattern as New PR)
@@ -8665,7 +8673,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit RFQ', html);
+    openModal('Edit RFQ', html, { preventOutsideClose: true });
 
     // Attach live preview for specs textarea
     const specsTA = document.getElementById('editRfqItemSpecs');
@@ -8911,7 +8919,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit Abstract of Quotations', html);
+    openModal('Edit Abstract of Quotations', html, { preventOutsideClose: true });
   };
 
   // Add item row for edit abstract modal
@@ -9144,7 +9152,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit Post-Qualification', html);
+    openModal('Edit Post-Qualification', html, { preventOutsideClose: true });
   };
   window.saveEditPostQual = async function(e, id) {
     e.preventDefault();
@@ -9299,7 +9307,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit BAC Resolution', html);
+    openModal('Edit BAC Resolution', html, { preventOutsideClose: true });
   };
   window.saveEditBACResolution = async function(e, id) {
     e.preventDefault();
@@ -9448,7 +9456,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit Notice of Award', html);
+    openModal('Edit Notice of Award', html, { preventOutsideClose: true });
   };
   window.saveEditNOA = async function(e, id) {
     e.preventDefault();
@@ -9541,7 +9549,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit Purchase Order', html);
+    openModal('Edit Purchase Order', html, { preventOutsideClose: true });
 
     // Dynamically populate NOA dropdown in edit modal
     (async () => {
@@ -9649,7 +9657,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit IAR', html);
+    openModal('Edit IAR', html, { preventOutsideClose: true });
 
     // Dynamically populate PO dropdown in edit modal
     (async () => {
@@ -9906,7 +9914,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Inspection & Acceptance Report (IAR - Appendix 62)', html);
+    openModal('Inspection & Acceptance Report (IAR - Appendix 62)', html, { preventOutsideClose: true });
     window._docSelectedItems['iar'] = [];
 
     // Dynamically populate PO dropdown
@@ -11410,34 +11418,45 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('papManualItemPrice').value = '';
     document.getElementById('papManualItemQty').value = '1';
     const estBudget = document.getElementById('papManualEstBudget');
-    if (estBudget) estBudget.value = '0';
+    if (estBudget) {
+      estBudget.value = '0';
+      delete estBudget.dataset.manualEdit; // Reset manual edit flag for next entry
+    }
     document.getElementById('papManualItemName').focus();
   };
 
   /** Calculate estimated budget for PAP manual entry form */
   window.calcPAPEstBudget = function() {
+    const el = document.getElementById('papManualEstBudget');
+    // Skip auto-calculation if user manually edited the budget
+    if (el && el.dataset.manualEdit === 'true') return;
     const price = parseFloat(document.getElementById('papManualItemPrice')?.value) || 0;
     const qty = parseInt(document.getElementById('papManualItemQty')?.value) || 1;
-    const el = document.getElementById('papManualEstBudget');
     if (el) el.value = (price * qty).toFixed(2);
   };
 
   /** Sync PAP price/qty when user manually edits budget */
   window.syncPAPBudgetFromEdit = function() {
-    // User edited the budget directly — no auto-recalc needed, just let them type
+    // Mark that user has manually edited the budget - don't auto-recalc anymore
+    const el = document.getElementById('papManualEstBudget');
+    if (el) el.dataset.manualEdit = 'true';
   };
 
   /** Calculate estimated budget for Non-PSDBM manual entry form */
   window.calcManualEstBudget = function() {
+    const el = document.getElementById('manualEstBudget');
+    // Skip auto-calculation if user manually edited the budget
+    if (el && el.dataset.manualEdit === 'true') return;
     const price = parseFloat(document.getElementById('manualItemPrice')?.value) || 0;
     const qty = parseInt(document.getElementById('manualItemQty')?.value) || 1;
-    const el = document.getElementById('manualEstBudget');
     if (el) el.value = (price * qty).toFixed(2);
   };
 
   /** Sync manual budget when user manually edits budget */
   window.syncManualBudgetFromEdit = function() {
-    // User edited the budget directly — no auto-recalc needed, just let them type
+    // Mark that user has manually edited the budget - don't auto-recalc anymore
+    const el = document.getElementById('manualEstBudget');
+    if (el) el.dataset.manualEdit = 'true';
   };
 
   /** Remove a PAP item */
@@ -11721,7 +11740,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     document.getElementById('manualItemPrice').value = '';
     document.getElementById('manualItemQty').value = '1';
     const estBudget = document.getElementById('manualEstBudget');
-    if (estBudget) estBudget.value = '0';
+    if (estBudget) {
+      estBudget.value = '0';
+      delete estBudget.dataset.manualEdit; // Reset manual edit flag for next entry
+    }
     document.getElementById('manualItemName').focus();
   };
 
@@ -14093,9 +14115,17 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
         </div>
-        <div class="form-group">
-          <label>Purpose</label>
-          <textarea id="risPurpose" placeholder="Purpose of requisition" rows="3" style="resize:vertical;min-height:60px;" required></textarea>
+        <div class="form-row" style="align-items:stretch;">
+          <div class="form-group">
+            <label>Purpose</label>
+            <textarea id="risPurpose" placeholder="Purpose of requisition" rows="3" style="resize:vertical;min-height:60px;flex:1;" required></textarea>
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;">
+            <label>Items</label>
+            <button type="button" class="btn btn-primary" onclick="showRISCatalogItemModal()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <i class="fas fa-search"></i> Select Items from Catalog
+            </button>
+          </div>
         </div>
         <div class="form-group">
           <label>Requested By</label>
@@ -14104,20 +14134,17 @@ Failure to submit the above requirements within the prescribed period shall cons
 
         <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
           <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <p style="font-size:11px;color:#718096;margin:0 0 10px;"><i class="fas fa-info-circle"></i> Signatories will be automatically set upon approval.</p>
           <div class="form-row" style="margin-bottom:0;">
             <div class="form-group" style="margin-bottom:0;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-                <input type="checkbox" id="risApprovedByCheck" checked style="width:16px;height:16px;">
-                <span>Approved By: <strong id="risApproverName">REGIENALD S. ESPALDON</strong></span>
-              </label>
+              <label style="font-size:12px;color:#4a5568;">Approved By</label>
+              <input type="text" id="risApproverName" value="REGIENALD S. ESPALDON" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
               <input type="hidden" id="risApprovedByName" value="REGIENALD S. ESPALDON">
               <input type="hidden" id="risApprovedByDesignation" value="Chief Administrative Officer">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-                <input type="checkbox" id="risIssuedByCheck" checked style="width:16px;height:16px;">
-                <span>Issued By: <strong>MARK E. MARASIGAN</strong></span>
-              </label>
+              <label style="font-size:12px;color:#4a5568;">Issued By</label>
+              <input type="text" value="MARK E. MARASIGAN" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
               <input type="hidden" id="risIssuedByName" value="MARK E. MARASIGAN">
               <input type="hidden" id="risIssuedByDesignation" value="Administrative Aide IV">
             </div>
@@ -14126,9 +14153,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px;margin-bottom:10px;">
           <h4 style="margin:0;"><i class="fas fa-boxes"></i> Items</h4>
-          <button type="button" class="btn btn-primary btn-sm" onclick="showRISCatalogItemModal()">
-            <i class="fas fa-layer-group"></i> Select Items from Catalog
-          </button>
         </div>
 
         <div id="risItemsListContainer" style="display:none;margin-bottom:15px;">
@@ -14162,7 +14186,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('New Requisition & Issue Slip', html);
+    openModal('New Requisition & Issue Slip', html, { preventOutsideClose: true });
     loadEmployeesDropdown('risRequestedBy');
     // Update approver based on initial division
     setTimeout(() => updateRISApproverByDivision(), 100);
@@ -14179,11 +14203,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const division = (divisionSelect.value || '').toUpperCase();
     // WRSD → MAKINANO, all others → ESPALDON
     if (division === 'WRSD') {
-      approverNameEl.textContent = 'EVAL B. MAKINANO';
+      approverNameEl.value = 'EVAL B. MAKINANO';
       if (approverHiddenEl) approverHiddenEl.value = 'EVAL B. MAKINANO';
       if (approverDesigEl) approverDesigEl.value = 'Chief WRSD';
     } else {
-      approverNameEl.textContent = 'REGIENALD S. ESPALDON';
+      approverNameEl.value = 'REGIENALD S. ESPALDON';
       if (approverHiddenEl) approverHiddenEl.value = 'REGIENALD S. ESPALDON';
       if (approverDesigEl) approverDesigEl.value = 'Chief Administrative Officer';
     }
@@ -14421,20 +14445,17 @@ Failure to submit the above requirements within the prescribed period shall cons
     const reqSel = document.getElementById('risRequestedBy');
     const reqName = reqSel && reqSel.selectedIndex > 0 ? reqSel.options[reqSel.selectedIndex].textContent : null;
 
-    // Get approved by and issued by from checkboxes
-    const approvedByChecked = document.getElementById('risApprovedByCheck')?.checked;
-    const issuedByChecked = document.getElementById('risIssuedByCheck')?.checked;
-
     const data = {
       ris_date: document.getElementById('risDate').value,
       division: document.getElementById('risDivision').value,
       purpose: document.getElementById('risPurpose').value,
       requested_by_id: parseInt(reqSel?.value) || null,
       requested_by_name: reqName,
-      approved_by_name: approvedByChecked ? document.getElementById('risApprovedByName')?.value : null,
-      approved_by_designation: approvedByChecked ? document.getElementById('risApprovedByDesignation')?.value : null,
-      issued_by_name: issuedByChecked ? document.getElementById('risIssuedByName')?.value : null,
-      issued_by_designation: issuedByChecked ? document.getElementById('risIssuedByDesignation')?.value : null,
+      // Signatories will be set upon approval
+      approved_by_name: null,
+      approved_by_designation: null,
+      issued_by_name: null,
+      issued_by_designation: null,
       items: items
     };
     try {
@@ -14448,7 +14469,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
   window.showViewRISModal = async function(id) {
-    openModal('RIS Details', '<div class="view-details"><p>Loading RIS...</p></div>');
+    openModal('RIS Details', '<div class="view-details"><p>Loading RIS...</p></div>', { preventOutsideClose: true });
     try {
       const ris = await apiRequest('/ris/' + id);
       const content = `
@@ -14466,9 +14487,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="detail-item"><span class="label">Status</span><span class="value">${ris.status || 'draft'}</span></div>
           </div>
         </div>`;
-      openModal('RIS Details', content);
+      openModal('RIS Details', content, { preventOutsideClose: true });
     } catch (err) {
-      openModal('Error', '<div class="view-details"><p>Error loading RIS: ' + err.message + '</p></div>');
+      openModal('Error', '<div class="view-details"><p>Error loading RIS: ' + err.message + '</p></div>', { preventOutsideClose: true });
     }
   };
   window.showEditRISModal = async function(id) {
@@ -14509,20 +14530,17 @@ Failure to submit the above requirements within the prescribed period shall cons
 
         <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
           <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <p style="font-size:11px;color:#718096;margin:0 0 10px;"><i class="fas fa-info-circle"></i> Signatories will be automatically set upon approval.</p>
           <div class="form-row" style="margin-bottom:0;">
             <div class="form-group" style="margin-bottom:0;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-                <input type="checkbox" id="editRISApprovedByCheck" ${ris.approved_by_name ? 'checked' : ''} style="width:16px;height:16px;">
-                <span>Approved By: <strong id="editRISApproverName">${approverName}</strong></span>
-              </label>
+              <label style="font-size:12px;color:#4a5568;">Approved By</label>
+              <input type="text" id="editRISApproverName" value="${approverName}" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
               <input type="hidden" id="editRISApprovedByName" value="${approverName}">
               <input type="hidden" id="editRISApprovedByDesignation" value="${approverDesig}">
             </div>
             <div class="form-group" style="margin-bottom:0;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-                <input type="checkbox" id="editRISIssuedByCheck" ${ris.issued_by_name ? 'checked' : ''} style="width:16px;height:16px;">
-                <span>Issued By: <strong>${issuedName}</strong></span>
-              </label>
+              <label style="font-size:12px;color:#4a5568;">Issued By</label>
+              <input type="text" value="${issuedName}" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
               <input type="hidden" id="editRISIssuedByName" value="${issuedName}">
               <input type="hidden" id="editRISIssuedByDesignation" value="${issuedDesig}">
             </div>
@@ -14545,7 +14563,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>`;
-    openModal('Edit RIS', html);
+    openModal('Edit RIS', html, { preventOutsideClose: true });
     loadEmployeesDropdown('editRISRequestedBy', ris.requested_by_id);
     loadEmployeesDropdown('editRISReceivedBy', ris.received_by_id);
   };
@@ -14556,10 +14574,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     const recSel = document.getElementById('editRISReceivedBy');
     const getName = sel => { const t = sel.options[sel.selectedIndex]?.textContent; return t && t !== '-- Select Employee --' ? t : null; };
 
-    // Get approved by and issued by from checkboxes
-    const approvedByChecked = document.getElementById('editRISApprovedByCheck')?.checked;
-    const issuedByChecked = document.getElementById('editRISIssuedByCheck')?.checked;
-
     try {
       await apiRequest('/ris/' + id, 'PUT', {
         ris_no: document.getElementById('editRISNo').value,
@@ -14569,10 +14583,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: document.getElementById('editRISStatus').value,
         requested_by_id: parseInt(reqSel.value) || null,
         requested_by_name: getName(reqSel),
-        approved_by_name: approvedByChecked ? document.getElementById('editRISApprovedByName')?.value : null,
-        approved_by_designation: approvedByChecked ? document.getElementById('editRISApprovedByDesignation')?.value : null,
-        issued_by_name: issuedByChecked ? document.getElementById('editRISIssuedByName')?.value : null,
-        issued_by_designation: issuedByChecked ? document.getElementById('editRISIssuedByDesignation')?.value : null,
         received_by_id: parseInt(recSel.value) || null,
         received_by_name: getName(recSel)
       });
@@ -15369,7 +15379,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Create BAC Resolution', html);
+    openModal('Create BAC Resolution', html, { preventOutsideClose: true });
   };
 
   // Toggle PhilGEPS fields based on ABC amount
@@ -15616,7 +15626,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('TWG Evaluation Report / Post-Qualification', html);
+    openModal('TWG Evaluation Report / Post-Qualification', html, { preventOutsideClose: true });
   };
 
   window.addTWGPriceRow = function() {
@@ -15931,7 +15941,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Accept Purchase Order', html);
+    openModal('Accept Purchase Order', html, { preventOutsideClose: true });
   };
 
   // Mark Delivered Modal (NEW - per spec v1.2)
@@ -16053,7 +16063,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Compile PO Packet', html);
+    openModal('Compile PO Packet', html, { preventOutsideClose: true });
   };
 
   // Chief Sign Modal (NEW - per spec v1.2)
@@ -16179,7 +16189,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Set APP Status — FY ' + getCurrentFiscalYear(), html);
+    openModal('Set APP Status — FY ' + getCurrentFiscalYear(), html, { preventOutsideClose: true });
   };
 
   // Submit APP Status
@@ -16507,7 +16517,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-primary" onclick="closeModal(); showCreatePRFromAPPModal(${item.id});"><i class="fas fa-file-signature"></i> Create PR</button>
       </div>
     `;
-    openModal('View APP Project', html);
+    openModal('View APP Project', html, { preventOutsideClose: true });
   };
 
   // Adjust APP Budget Modal
@@ -16548,7 +16558,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </button>
       </div>
     `;
-    openModal('Adjust APP Budget', html);
+    openModal('Adjust APP Budget', html, { preventOutsideClose: true });
   };
 
   // Adjust APP Budget API call
@@ -16627,7 +16637,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
-    openModal('View Purchase Request', html);
+    openModal('View Purchase Request', html, { preventOutsideClose: true });
   };
 
   // View RFQ Details — dynamic
@@ -16675,7 +16685,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-outline" onclick="printRFQ(${id});"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
-    openModal('View RFQ Details', html);
+    openModal('View RFQ Details', html, { preventOutsideClose: true });
   };
 
   // View Abstract Details — dynamic
@@ -16705,7 +16715,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
       </div>
     `;
-    openModal('View Abstract of Quotations', html);
+    openModal('View Abstract of Quotations', html, { preventOutsideClose: true });
   };
 
   // View Post-Qual Details — dynamic
@@ -16744,7 +16754,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
       </div>
     `;
-    openModal('View Post-Qualification', html);
+    openModal('View Post-Qualification', html, { preventOutsideClose: true });
   };
 
   // View BAC Resolution Details — dynamic
@@ -16784,7 +16794,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-outline" onclick="printBACResolution(${id});"><i class="fas fa-print"></i> Print BAC Resolution</button>
       </div>
     `;
-    openModal('View BAC Resolution', html);
+    openModal('View BAC Resolution', html, { preventOutsideClose: true });
   };
 
   // View NOA Details — dynamic
@@ -16821,7 +16831,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
       </div>
     `;
-    openModal('View Notice of Award', html);
+    openModal('View Notice of Award', html, { preventOutsideClose: true });
   };
 
   // View PO Details — dynamic
@@ -16856,7 +16866,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-outline" onclick="printPurchaseOrder(${p.id});"><i class="fas fa-print"></i> Print</button>
       </div>
     `;
-    openModal('View Purchase Order', html);
+    openModal('View Purchase Order', html, { preventOutsideClose: true });
   };
 
   // View IAR Details — dynamic
@@ -16922,7 +16932,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <button type="button" class="btn btn-outline" onclick="printRecord('IAR', '${i.iar_number}');"><i class="fas fa-print"></i> Print Appendix 62</button>
       </div>
     `;
-    openModal('View IAR (Appendix 62)', html);
+    openModal('View IAR (Appendix 62)', html, { preventOutsideClose: true });
   };
 
   // View PO Packet Details with Attachment Table
@@ -19204,7 +19214,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Submit to APP', html);
+    openModal('Submit to APP', html, { preventOutsideClose: true });
   };
 
   // Create PR from APP Modal
@@ -19244,7 +19254,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Create PR from APP', html);
+    openModal('Create PR from APP', html, { preventOutsideClose: true });
   };
 
   // Approve PR Modal
@@ -19280,7 +19290,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Approve Purchase Request', html);
+    openModal('Approve Purchase Request', html, { preventOutsideClose: true });
   };
 
   // Return PR Modal
@@ -19314,7 +19324,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Return Purchase Request', html);
+    openModal('Return Purchase Request', html, { preventOutsideClose: true });
   };
 
   // Attach Annex 1 Modal
@@ -19380,7 +19390,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Submit PR for Approval', html);
+    openModal('Submit PR for Approval', html, { preventOutsideClose: true });
   };
 
   // Create RFQ from PR Modal
@@ -19427,7 +19437,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Create RFQ from PR', html);
+    openModal('Create RFQ from PR', html, { preventOutsideClose: true });
   };
 
   // Add Quotation Modal
@@ -19512,7 +19522,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Create Abstract from RFQ', html);
+    openModal('Create Abstract from RFQ', html, { preventOutsideClose: true });
   };
 
   // Mark NOA Received Modal
@@ -19547,7 +19557,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal('Mark NOA Received', html);
+    openModal('Mark NOA Received', html, { preventOutsideClose: true });
   };
 
   // Submit to COA Modal
@@ -22715,6 +22725,303 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       console.error('Print Abstract error:', err);
       showNotification('Failed to print Abstract: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT RIS (REQUISITION AND ISSUE SLIP - APPENDIX 50) ====================
+  window.printRIS = async function(risId) {
+    try {
+      showNotification('Loading RIS data for print...', 'info');
+
+      // Resolve id from cache if string
+      let id = risId;
+      if (typeof risId === 'string' && isNaN(risId)) {
+        const cached = cachedRIS?.find(r => r.ris_no === risId);
+        if (cached) id = cached.id;
+      }
+
+      const ris = await apiRequest('/ris/' + id);
+      if (!ris) { showNotification('RIS not found', 'error'); return; }
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+      // Build item rows
+      const items = ris.items || [];
+      let itemsHTML = '';
+
+      if (items.length > 0) {
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity || 0);
+          itemsHTML += `
+            <tr>
+              <td class="ris-cell-center">${item.stock_no || ''}</td>
+              <td class="ris-cell-center">${item.uom || item.item_unit || ''}</td>
+              <td class="ris-cell-desc">${item.description || item.item_name || ''}</td>
+              <td class="ris-cell-center">${qty}</td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center">${qty}</td>
+              <td class="ris-cell-desc"></td>
+            </tr>`;
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Add empty rows to fill space (minimum ~12 visible rows for form look)
+      const minRows = 12;
+      for (let i = items.length; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="ris-cell-center">&nbsp;</td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-desc"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-desc"></td>
+            </tr>`;
+      }
+
+      const bodyContent = `
+        <style>
+          /* RIS-specific print styles matching Appendix 50 */
+          .ris-form-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 4px 0 2px 0;
+            letter-spacing: 1px;
+          }
+          .ris-appendix {
+            text-align: center;
+            font-size: 8pt;
+            font-style: italic;
+            font-family: Arial, sans-serif;
+            margin-bottom: 8px;
+            color: #444;
+          }
+          .ris-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-header-table td {
+            padding: 2px 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-header-label {
+            font-weight: normal;
+            color: #333;
+          }
+          .ris-header-value {
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+          }
+          .ris-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-info-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-info-label {
+            font-weight: normal;
+            color: #333;
+            white-space: nowrap;
+          }
+          .ris-info-value {
+            font-weight: bold;
+          }
+          .ris-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-items-table thead th {
+            border: 1px solid #333;
+            padding: 4px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            background: #f5f5f5;
+          }
+          .ris-items-table tbody td {
+            border: 1px solid #333;
+            padding: 3px 5px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-cell-center { text-align: center; }
+          .ris-cell-right { text-align: right; }
+          .ris-cell-desc { text-align: left; }
+          .ris-purpose-row td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            font-size: 10pt;
+          }
+          .ris-sig-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-sig-table td {
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .ris-sig-label {
+            font-weight: normal;
+            font-size: 8pt;
+          }
+          .ris-sig-name {
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            padding-top: 40px !important;
+          }
+          .ris-sig-designation {
+            text-align: center;
+            font-size: 8pt;
+            color: #444;
+            padding-bottom: 5px !important;
+          }
+          .ris-qty-header {
+            text-align: center;
+            font-size: 8pt;
+            font-weight: bold;
+            border: 1px solid #333;
+            padding: 2px;
+          }
+        </style>
+
+        <table class="ris-header-table" style="margin-bottom:5px;">
+          <tr>
+            <td style="width:70%;">
+              <span class="ris-header-label">Entity Name:</span>
+              <span class="ris-header-value" style="display:inline-block;min-width:200px;" contenteditable="true">DEPARTMENT OF MIGRANT WORKERS - CARAGA</span>
+            </td>
+            <td style="width:30%;">
+              <span class="ris-header-label">Fund Cluster:</span>
+              <span class="ris-header-value" style="display:inline-block;min-width:80px;" contenteditable="true">01101101</span>
+            </td>
+          </tr>
+        </table>
+
+        <div class="ris-form-title">REQUISITION AND ISSUE SLIP</div>
+        <div class="ris-appendix">(Appendix 50)</div>
+
+        <table class="ris-info-table">
+          <tr>
+            <td class="ris-info-label" style="width:18%;">Division:</td>
+            <td class="ris-info-value" style="width:32%;" contenteditable="true">${ris.division || ''}</td>
+            <td class="ris-info-label" style="width:18%;">Responsibility Center Code:</td>
+            <td class="ris-info-value" style="width:32%;" contenteditable="true">${ris.division || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-info-label">RIS No.:</td>
+            <td class="ris-info-value" contenteditable="true">${ris.ris_no || ''}</td>
+            <td class="ris-info-label">Date:</td>
+            <td class="ris-info-value" contenteditable="true">${fmtDate(ris.ris_date)}</td>
+          </tr>
+        </table>
+
+        <table class="ris-items-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:10%;">Stock No.</th>
+              <th rowspan="2" style="width:8%;">Unit</th>
+              <th rowspan="2">Description</th>
+              <th colspan="3" style="width:24%;">Quantity</th>
+              <th rowspan="2" style="width:15%;">Remarks</th>
+            </tr>
+            <tr>
+              <th class="ris-qty-header" style="width:8%;">RIS</th>
+              <th class="ris-qty-header" style="width:8%;">Available</th>
+              <th class="ris-qty-header" style="width:8%;">Issue</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+
+        <table class="ris-info-table" style="margin-top:0;">
+          <tr>
+            <td class="ris-info-label" style="width:12%;">Purpose:</td>
+            <td class="ris-info-value" colspan="3" contenteditable="true">${ris.purpose || ''}</td>
+          </tr>
+        </table>
+
+        <table class="ris-sig-table">
+          <tr>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Requested by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Approved by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Issued by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Received by:</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;">Signature:</td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-name" contenteditable="true">${ris.requested_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.approved_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.issued_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.received_by_name || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Printed Name:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-designation" contenteditable="true">${ris.requested_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.approved_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.issued_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.received_by_designation || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Designation:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-designation" contenteditable="true">${fmtDate(ris.ris_date)}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.approved_by_name ? fmtDate(ris.ris_date) : ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.issued_by_name ? fmtDate(ris.ris_date) : ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.received_by_name ? fmtDate(ris.ris_date) : ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Date:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('RIS - ' + ris.ris_no, bodyContent);
+      openPrintPreview(html, { title: toFilename('RIS_' + ris.ris_no), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print RIS error:', err);
+      showNotification('Failed to print RIS: ' + err.message, 'error');
     }
   };
 
