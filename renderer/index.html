@@ -1208,7 +1208,7 @@
                 <tr>
                   <th rowspan="2" class="pkt-th-fixed">PR Number</th>
                   <th rowspan="2" class="pkt-th-fixed">Office/Section</th>
-                  <th colspan="7" class="text-center pkt-th-docs-header">Supporting Documents</th>
+                  <th colspan="9" class="text-center pkt-th-docs-header">Supporting Documents</th>
                   <th rowspan="2" class="pkt-th-fixed">Status</th>
                   <th rowspan="2" class="pkt-th-fixed">Actions</th>
                 </tr>
@@ -1220,10 +1220,12 @@
                   <th class="pkt-doc-col-header">ABSTRACT</th>
                   <th class="pkt-doc-col-header">RFQ</th>
                   <th class="pkt-doc-col-header">PR</th>
+                  <th class="pkt-doc-col-header">IAR</th>
+                  <th class="pkt-doc-col-header">IAR SUPP. DOCS</th>
                 </tr>
               </thead>
               <tbody id="poPacketTableBody">
-                <tr><td colspan="11" class="text-center">Loading document monitoring data...</td></tr>
+                <tr><td colspan="13" class="text-center">Loading document monitoring data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1987,6 +1989,7 @@
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" onclick="showNewTripTicketModal()"><i class="fas fa-plus"></i> New Trip Ticket</button>
+            <button class="btn btn-outline" id="tripViewToggle" onclick="toggleTripCalendarView()"><i class="fas fa-calendar-alt"></i> Calendar View</button>
             <button class="btn btn-outline" onclick="exportToExcel('TripTickets')"><i class="fas fa-file-excel"></i> Export</button>
             <button class="btn btn-outline" onclick="printCurrentPage()"><i class="fas fa-print"></i> Print</button>
             <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="Search trip tickets..."></div>
@@ -1998,24 +2001,45 @@
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-          <div class="data-card">
-            <table class="data-table full-width">
-              <thead>
-                <tr>
-                  <th>Ticket No.</th>
-                  <th>Date</th>
-                  <th>Passenger</th>
-                  <th>Vehicle</th>
-                  <th>Destination</th>
-                  <th>Purpose</th>
-                  <th>Departure</th>
-                  <th>Arrival</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="tripTicketsTableBody"></tbody>
-            </table>
+
+          <!-- Calendar View -->
+          <div id="tripCalendarView" style="display:none;">
+            <div class="data-card" style="padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;">
+                <button class="btn btn-outline btn-sm" onclick="changeTripCalendarMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                <h3 id="tripCalendarTitle" style="margin:0;font-size:1.2rem;"></h3>
+                <button class="btn btn-outline btn-sm" onclick="changeTripCalendarMonth(1)"><i class="fas fa-chevron-right"></i></button>
+              </div>
+              <div id="tripCalendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+              <div id="tripCalendarLegend" style="margin-top:12px;display:flex;gap:15px;font-size:0.8rem;">
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-right:4px;"></span>Pending</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>Scheduled</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:4px;"></span>Completed</span>
+                <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px;"></span>Cancelled</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table View -->
+          <div id="tripTableView">
+            <div class="data-card">
+              <table class="data-table full-width">
+                <thead>
+                  <tr>
+                    <th>Ticket No.</th>
+                    <th>Date</th>
+                    <th>Passenger</th>
+                    <th>Destination</th>
+                    <th>Purpose</th>
+                    <th>Departure</th>
+                    <th>Arrival</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tripTicketsTableBody"></tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -2259,7 +2283,6 @@
                 <tr>
                   <th>Date & Time</th>
                   <th>User</th>
-                  <th>Role</th>
                   <th>Department</th>
                   <th>Action</th>
                   <th>Module</th>
@@ -2270,7 +2293,7 @@
                 </tr>
               </thead>
               <tbody id="alTableBody">
-                <tr><td colspan="10" class="text-center" style="padding:30px;color:#636e78;">Loading activity logs...</td></tr>
+                <tr><td colspan="9" class="text-center" style="padding:30px;color:#636e78;">Loading activity logs...</td></tr>
               </tbody>
             </table>
           </div>

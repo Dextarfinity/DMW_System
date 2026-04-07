@@ -1214,7 +1214,8 @@ function buildCategoryOptions(selectedValue) {
 function buildUOMOptions(selectedValue) {
   const sv = (selectedValue || '').toUpperCase();
   return '<option value="">-- Select Unit --</option>' +
-    cachedUOMs.map(u =>
+    cachedUOMs.filter(u => (u.abbreviation || '').toLowerCase() !== 'pc')
+    .map(u =>
       `<option value="${u.abbreviation}" ${u.abbreviation === sv ? 'selected' : ''}>${u.abbreviation} - ${u.name}</option>`
     ).join('');
 }
@@ -1251,13 +1252,23 @@ async function loadPPMP() {
     // Check if user has multi-division PPMP access
     const hasMultiDivAccess = currentUser.managed_dept_ids && currentUser.managed_dept_ids.length > 1;
 
+    // === SPECIAL USER ACCESS CONTROL ===
+    // REGIENALD S. ESPALDON: access all pending PPMP except WRSD (dept_id=4)
+    // EVAL B. MAKINANO: access and approve ALL pending entries
+    // ANNE JANE M. HALLASGO: WRSD PPMP encoder (dept_id=4)
+    const userName = (currentUser.full_name || '').toUpperCase();
+    const isEspaldon = userName.includes('ESPALDON');
+    const isMakinano = userName.includes('MAKINANO');
+    const isHallasgo = userName.includes('HALLASGO');
+
     // Roles that can see ALL divisions' PPMP data (chiefs are NOT included - they only see their division)
     const seeAllPPMPRoles = ['admin', 'hope', 'ord_manager', 'bac_secretariat', 'budget_consultant'];
-    // Chiefs should be locked to their division even if they have other roles
-    const canSeeAll = userHasAnyRole(seeAllPPMPRoles) && !isChief;
+    // Chiefs should be locked to their division UNLESS they have special cross-division access
+    const hasSpecialAccess = isEspaldon || isMakinano;
+    const canSeeAll = userHasAnyRole(seeAllPPMPRoles) || hasSpecialAccess;
 
-    // Chiefs are ALWAYS locked to their division (cannot be overridden by other roles)
-    const isLockedDivision = isChief || (!canSeeAll && !hasMultiDivAccess);
+    // Chiefs are locked to their division unless they have special cross-division access
+    const isLockedDivision = (isChief && !hasSpecialAccess) || (!canSeeAll && !hasMultiDivAccess);
 
     const divFilter = document.getElementById('ppmpDivisionFilter');
     const modeFilter = document.getElementById('ppmpModeFilter');
@@ -1323,10 +1334,20 @@ async function loadPPMP() {
 
     const ppmp = await apiRequest(url);
     
+    // === SPECIAL ACCESS: ESPALDON sees all except WRSD (dept_id=4) ===
+    let accessFiltered = ppmp;
+    if (isEspaldon) {
+      accessFiltered = ppmp.filter(p => p.dept_id !== 4 && (p.department_code || '').toUpperCase() !== 'WRSD');
+    }
+    // HALLASGO sees only WRSD (dept_id=4) entries
+    if (isHallasgo) {
+      accessFiltered = ppmp.filter(p => p.dept_id === 4 || (p.department_code || '').toUpperCase() === 'WRSD');
+    }
+
     // Apply client-side text search across ALL visible columns
     const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const selectedCategory = catFilter ? catFilter.value : '';
-    let filtered = ppmp;
+    let filtered = accessFiltered;
 
     // Category filter (also matches section)
     if (selectedCategory) {
@@ -1363,8 +1384,8 @@ async function loadPPMP() {
     // Populate category filter dropdown from loaded data (sections + categories)
     if (catFilter) {
       const currentVal = catFilter.value;
-      const sections = [...new Set(ppmp.map(p => p.section).filter(Boolean))].sort();
-      const cats = [...new Set(ppmp.map(p => p.item_category || p.category).filter(Boolean))].sort();
+      const sections = [...new Set(accessFiltered.map(p => p.section).filter(Boolean))].sort();
+      const cats = [...new Set(accessFiltered.map(p => p.item_category || p.category).filter(Boolean))].sort();
       let optionsHtml = '<option value="">All Sections / Categories</option>';
       if (sections.length > 0) {
         optionsHtml += '<optgroup label="── Sections ──">';
@@ -1379,11 +1400,29 @@ async function loadPPMP() {
       catFilter.innerHTML = optionsHtml;
     }
     
-    renderPPMPTable(filtered, ppmp);
+    renderPPMPTable(filtered, accessFiltered);
 
     // Update division banner
     let banner = document.getElementById('ppmpDivisionBanner');
-    if (hasMultiDivAccess) {
+    if (hasSpecialAccess) {
+      // Special cross-division access user
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ppmpDivisionBanner';
+        banner.className = 'ppmp-division-banner';
+        const ppmpSection = document.getElementById('ppmp');
+        const pageActions = ppmpSection?.querySelector('.page-actions');
+        if (pageActions) {
+          pageActions.parentNode.insertBefore(banner, pageActions);
+        }
+      }
+      if (isEspaldon) {
+        banner.innerHTML = `<i class="fas fa-building"></i> Showing all PPMP entries <strong>except WRSD</strong>`;
+      } else if (isMakinano) {
+        banner.innerHTML = `<i class="fas fa-building"></i> Showing <strong>ALL</strong> division PPMP entries (with approval access)`;
+      }
+      banner.style.display = '';
+    } else if (hasMultiDivAccess) {
       // Multi-division user — show banner listing managed divisions
       const managedCodes = cachedDivisions.filter(d => currentUser.managed_dept_ids.map(String).includes(String(d.id))).map(d => d.code || d.name);
       if (!banner) {
@@ -1960,10 +1999,119 @@ async function loadCapitalOutlay() {
 async function loadTripTickets() {
   try {
     const tickets = await apiRequest('/trip-tickets');
+    window._cachedTripTickets = tickets;
     renderTripTicketsTable(tickets);
+    if (document.getElementById('tripCalendarView')?.style.display !== 'none') {
+      renderTripCalendar(tickets);
+    }
     return tickets;
   } catch (err) { console.log('Using demo trip tickets data'); return []; }
 }
+
+// Trip Ticket Calendar View
+let _tripCalendarMonth = new Date().getMonth();
+let _tripCalendarYear = new Date().getFullYear();
+
+window.toggleTripCalendarView = function() {
+  const calView = document.getElementById('tripCalendarView');
+  const tblView = document.getElementById('tripTableView');
+  const btn = document.getElementById('tripViewToggle');
+  if (!calView || !tblView) return;
+  const showingCal = calView.style.display !== 'none';
+  if (showingCal) {
+    calView.style.display = 'none';
+    tblView.style.display = '';
+    if (btn) btn.innerHTML = '<i class="fas fa-calendar-alt"></i> Calendar View';
+  } else {
+    calView.style.display = '';
+    tblView.style.display = 'none';
+    if (btn) btn.innerHTML = '<i class="fas fa-table"></i> Table View';
+    renderTripCalendar(window._cachedTripTickets || []);
+  }
+};
+
+window.changeTripCalendarMonth = function(delta) {
+  _tripCalendarMonth += delta;
+  if (_tripCalendarMonth > 11) { _tripCalendarMonth = 0; _tripCalendarYear++; }
+  if (_tripCalendarMonth < 0) { _tripCalendarMonth = 11; _tripCalendarYear--; }
+  renderTripCalendar(window._cachedTripTickets || []);
+};
+
+function renderTripCalendar(tickets) {
+  const grid = document.getElementById('tripCalendarGrid');
+  const title = document.getElementById('tripCalendarTitle');
+  if (!grid || !title) return;
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  title.textContent = `${months[_tripCalendarMonth]} ${_tripCalendarYear}`;
+
+  const firstDay = new Date(_tripCalendarYear, _tripCalendarMonth, 1).getDay();
+  const daysInMonth = new Date(_tripCalendarYear, _tripCalendarMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // Group tickets by date
+  const tripsByDate = {};
+  (tickets || []).forEach(t => {
+    const d = t.date_of_travel ? t.date_of_travel.split('T')[0] : null;
+    if (d) { if (!tripsByDate[d]) tripsByDate[d] = []; tripsByDate[d].push(t); }
+  });
+
+  const statusColor = { pending: '#3b82f6', scheduled: '#f59e0b', completed: '#10b981', cancelled: '#ef4444', in_progress: '#f59e0b' };
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = dayNames.map(d => `<div style="text-align:center;font-weight:600;font-size:0.75rem;padding:6px 0;color:#64748b;">${d}</div>`).join('');
+
+  // Empty cells for days before first day
+  for (let i = 0; i < firstDay; i++) html += '<div style="min-height:70px;"></div>';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${_tripCalendarYear}-${String(_tripCalendarMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = dateStr === todayStr;
+    const dayTrips = tripsByDate[dateStr] || [];
+    const bg = isToday ? '#eff6ff' : '#fff';
+    const border = isToday ? '2px solid #3b82f6' : '1px solid #e2e8f0';
+
+    html += `<div style="min-height:70px;border:${border};border-radius:6px;padding:4px;background:${bg};cursor:${dayTrips.length?'pointer':'default'};overflow:hidden;" ${dayTrips.length ? `onclick="showTripCalendarDay('${dateStr}')"` : ''}>`;
+    html += `<div style="font-size:0.75rem;font-weight:${isToday?'700':'500'};color:${isToday?'#3b82f6':'#374151'};">${day}</div>`;
+    dayTrips.slice(0, 3).forEach(t => {
+      const color = statusColor[(t.status || 'pending').toLowerCase()] || '#6b7280';
+      html += `<div style="font-size:0.6rem;background:${color}22;color:${color};border-left:2px solid ${color};padding:1px 3px;margin-top:2px;border-radius:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(t.destination||'').replace(/"/g,'&quot;')} - ${(t.requested_by_employee||'').replace(/"/g,'&quot;')}">${t.destination || t.trip_ticket_no || 'Trip'}</div>`;
+    });
+    if (dayTrips.length > 3) html += `<div style="font-size:0.6rem;color:#6b7280;margin-top:1px;">+${dayTrips.length - 3} more</div>`;
+    html += '</div>';
+  }
+
+  grid.innerHTML = html;
+}
+
+window.showTripCalendarDay = function(dateStr) {
+  const tickets = (window._cachedTripTickets || []).filter(t => t.date_of_travel && t.date_of_travel.split('T')[0] === dateStr);
+  if (!tickets.length) return;
+  const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const statusColor = { pending: '#3b82f6', scheduled: '#f59e0b', completed: '#10b981', cancelled: '#ef4444', in_progress: '#f59e0b' };
+  const rows = tickets.map(t => {
+    const color = statusColor[(t.status || 'pending').toLowerCase()] || '#6b7280';
+    return `
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid ${color};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${t.trip_ticket_no || 'N/A'}</strong>
+          <span class="status-badge ${(t.status||'pending').toLowerCase()}" style="font-size:0.75rem;">${t.status || 'Pending'}</span>
+        </div>
+        <div style="font-size:0.85rem;color:#4b5563;margin-top:6px;">
+          <div><i class="fas fa-map-marker-alt" style="width:16px;color:#6b7280;"></i> ${t.destination || 'N/A'}</div>
+          <div><i class="fas fa-user" style="width:16px;color:#6b7280;"></i> ${t.requested_by_employee || 'N/A'}</div>
+          <div><i class="fas fa-clock" style="width:16px;color:#6b7280;"></i> ${t.time_of_departure || 'N/A'}</div>
+          ${t.purpose ? `<div><i class="fas fa-info-circle" style="width:16px;color:#6b7280;"></i> ${t.purpose}</div>` : ''}
+        </div>
+        <div style="margin-top:8px;text-align:right;">
+          <button class="btn btn-sm btn-outline" onclick="closeModal(); showViewTripTicketModal(${t.id})"><i class="fas fa-eye"></i> View</button>
+          <button class="btn btn-sm btn-outline" onclick="closeModal(); showEditTripTicketModal(${t.id})"><i class="fas fa-edit"></i> Edit</button>
+        </div>
+      </div>`;
+  }).join('');
+  openModal(`Trips on ${dateLabel}`, `<div style="max-height:400px;overflow-y:auto;">${rows}</div>`);
+};
 
 async function loadOffices() {
   try {
@@ -2812,7 +2960,10 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       const userRoles = currentUser.roles || [userRole];
       const isWRSDEntry = (p.department_code || deptCode) === 'WRSD';
       // chief_wrsd can only approve WRSD entries; chief_fad/bac_chair can only approve non-WRSD entries
-      const chiefCanApprove = isWRSDEntry ? userHasRole('chief_wrsd') : userHasAnyRole(['chief_fad', 'bac_chair']);
+      // EXCEPTION: MAKINANO can approve ALL entries regardless of division
+      const userNameUpper = (currentUser.full_name || '').toUpperCase();
+      const isMakinanoUser = userNameUpper.includes('MAKINANO');
+      const chiefCanApprove = isMakinanoUser || (isWRSDEntry ? userHasRole('chief_wrsd') : userHasAnyRole(['chief_fad', 'bac_chair']));
       const canApprove = p.status === 'pending' && (chiefCanApprove || userRoles.some(r => ['hope', 'budget_consultant', 'admin'].includes(r)));
       const alreadyApprovedByChief = !!p.approved_by_chief;
       const alreadyApprovedByHope = !!p.approved_by_hope;
@@ -3641,7 +3792,7 @@ function renderPOPacketTable(rows) {
   const tbody = document.getElementById('poPacketTableBody');
   if (!tbody) return;
   if (!rows || !rows.length) { 
-    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No transactions found for monitoring</td></tr>'; 
+    tbody.innerHTML = '<tr><td colspan="13" class="text-center">No transactions found for monitoring</td></tr>'; 
     return; 
   }
 
@@ -3654,16 +3805,18 @@ function renderPOPacketTable(rows) {
     { key: 'bac', entityType: 'bac_resolution', idField: 'bac_res_id', numField: 'resolution_number' },
     { key: 'abstract', entityType: 'abstract', idField: 'abstract_id', numField: 'abstract_number' },
     { key: 'rfq', entityType: 'rfq', idField: 'rfq_id', numField: 'rfq_number' },
-    { key: 'pr', entityType: 'purchase_request', idField: 'pr_id', numField: 'pr_number' }
+    { key: 'pr', entityType: 'purchase_request', idField: 'pr_id', numField: 'pr_number' },
+    { key: 'iar', entityType: 'iar', idField: 'iar_id', numField: 'iar_number' },
+    { key: 'iar_supporting', entityType: 'iar_supporting', idField: 'iar_id', numField: 'iar_number' }
   ];
 
   function overallStatus(r) {
     if (r.packet_status === 'submitted_to_coa') return '<span class="status-badge coa-submitted">Submitted to COA</span>';
     if (r.packet_status === 'signed') return '<span class="status-badge approved">Signed</span>';
     if (r.packet_status === 'for_signing') return '<span class="status-badge for-signing">For Signing</span>';
-    const has = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id].filter(Boolean).length;
-    if (has >= 7) return '<span class="status-badge approved">Complete</span>';
-    return '<span class="status-badge pending">Incomplete (' + has + '/7)</span>';
+    const has = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id, r.iar_id].filter(Boolean).length;
+    if (has >= 8) return '<span class="status-badge approved">Complete</span>';
+    return '<span class="status-badge pending">Incomplete (' + has + '/8)</span>';
   }
 
   tbody.innerHTML = rows.map((r, idx) => {
@@ -3688,7 +3841,7 @@ function renderPOPacketTable(rows) {
       <td class="pkt-td-ref"><strong>${r.pr_number || '-'}</strong></td>
       <td class="pkt-td-div">${officeDisplay}</td>
       ${docCells}
-      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 7</span></div></td>
+      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 9</span></div></td>
       <td class="pkt-td-actions" style="text-align:center;vertical-align:middle;">
         <button class="btn btn-primary" onclick="pktConsolidateFiles('${rowId}')" title="Consolidate all attached files" style="padding:5px 10px;font-size:10px;white-space:nowrap;"><i class="fas fa-folder-open" style="margin-right:4px;"></i> Consolidate Files</button>
       </td>
@@ -3766,6 +3919,11 @@ window.pktLoadCellAttachments = async function(entityType, entityId, uniqueKey, 
     }).join('');
   } catch (err) {
     container.innerHTML = '<span class="pkt-cell-nofile" style="color:var(--danger-color);">!</span>';
+    // Register empty array on failure so count is accurate
+    if (!window._pktCellAtts) window._pktCellAtts = {};
+    if (!window._pktCellAtts[rowId]) window._pktCellAtts[rowId] = {};
+    window._pktCellAtts[rowId][uniqueKey] = [];
+    if (rowId) pktUpdateRowStatus(rowId);
   }
 };
 
@@ -3775,15 +3933,15 @@ function pktUpdateRowStatus(rowId) {
   if (!statusCell) return;
   const count = (window._pktAttCounts[rowId] && window._pktAttCounts[rowId].total) || 0;
   let badgeClass, label;
-  if (count >= 7) {
+  if (count >= 9) {
     badgeClass = 'approved';
     label = 'Complete';
   } else if (count >= 4) {
     badgeClass = 'pending';
-    label = count + ' / 7';
+    label = count + ' / 9';
   } else {
     badgeClass = 'rejected';
-    label = count + ' / 7';
+    label = count + ' / 9';
   }
   const dlBtn = count > 0 ? `<button class="pkt-dl-all-btn" onclick="pktDownloadAllMerged('${rowId}')" title="Download all as merged PDF"><i class="fas fa-file-download"></i></button>` : '';
   statusCell.innerHTML = `<div class="pkt-status-wrapper"><span class="status-badge ${badgeClass}">${label}</span>${dlBtn}</div>`;
@@ -3806,8 +3964,8 @@ function updatePOPacketSummary(rows) {
   // For initial render, use entity ID presence as proxy
   let complete = 0, inProgress = 0, notStarted = 0;
   rows.forEach(r => {
-    const docs = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id].filter(Boolean).length;
-    if (docs >= 7) complete++;
+    const docs = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id, r.iar_id].filter(Boolean).length;
+    if (docs >= 8) complete++;
     else if (docs >= 1) inProgress++;
     else notStarted++;
   });
@@ -4403,13 +4561,12 @@ function renderCapitalOutlayTable(items) {
 function renderTripTicketsTable(tickets) {
   const tbody = document.getElementById('tripTicketsTableBody');
   if (!tbody) return;
-  if (!tickets.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center">No trip tickets found</td></tr>'; return; }
+  if (!tickets.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center">No trip tickets found</td></tr>'; return; }
   tbody.innerHTML = tickets.map(t => `
     <tr>
       <td>${t.trip_ticket_no || ''}</td>
       <td>${t.date_of_travel ? new Date(t.date_of_travel).toLocaleDateString() : ''}</td>
       <td>${t.requested_by_employee || ''}</td>
-      <td>${t.destination || ''}</td>
       <td>${t.destination || ''}</td>
       <td>${t.purpose || ''}</td>
       <td>${t.time_of_departure || ''}</td>
@@ -6769,6 +6926,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </button>
             </div>
           </div>
+          <!-- Quick-add section removed per requirements -->
           <span id="ppmpItemCount" style="font-size:12px; color:#4a5568; margin-bottom:8px; display:block;"></span>
           </div>
           <div id="ppmpItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">
@@ -7068,11 +7226,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <label>Date</label>
             <input type="date" id="prDate" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
+          <div class="form-group" style="display:flex; align-items:flex-end;">
+            ${buildCatalogButtonHTML('pr')}
+          </div>
         </div>
 
         <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Item Details</div>
         <div class="form-items-section">
-          ${buildCatalogPickerHTML('pr', prCatOpts, prItemOpts, true)}
+          ${buildCatalogItemsTableHTML('pr', true)}
           <div style="text-align:right; margin-top:8px;">
             <strong id="prTotalAmount">\u20b10.00</strong>
           </div>
@@ -7089,7 +7250,7 @@ document.addEventListener('DOMContentLoaded', () => {
 Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded"></textarea>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
             <div style="margin-bottom: 12px;">
@@ -7119,6 +7280,26 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     `;
     openModal('Create Purchase Request (PR)', html, { preventOutsideClose: true });
     window._docSelectedItems['pr'] = [];
+
+    // Auto-populate from APP item if redirected from APP page
+    if (window._prFromAPPItem) {
+      const appItem = window._prFromAPPItem;
+      window._prFromAPPItem = null; // Clear so it doesn't re-trigger
+      setTimeout(() => {
+        const appSelect = document.getElementById('prAppItemSelect');
+        if (appSelect && appItem.id) {
+          appSelect.value = String(appItem.id);
+          if (appSelect.value === String(appItem.id)) {
+            // Trigger validation and PR number generation
+            validatePRAppItem(appSelect);
+            generatePRNumber(appSelect);
+            // Pre-populate purpose
+            const purposeEl = document.getElementById('prPurpose');
+            if (purposeEl) purposeEl.value = appItem.item_name || appItem.description || '';
+          }
+        }
+      }, 100);
+    }
   };
 
   window.addPRItemRow = function() {
@@ -7335,22 +7516,27 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
             ${prOptions}
           </select>
         </div>
-        <div class="form-group">
-          <label>Deadline for Quotation Submission</label>
-          <input type="date" id="rfqDeadline" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Deadline for Quotation Submission</label>
+            <input type="date" id="rfqDeadline" required>
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end;">
+            ${buildCatalogButtonHTML('rfq')}
+          </div>
         </div>
         <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Items</div>
         <div class="form-items-section">
-        ${buildCatalogPickerHTML('rfq', rfqCatOpts, rfqItemOpts, true)}
+        ${buildCatalogItemsTableHTML('rfq', true)}
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> RFQ Document (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="rfqDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'rfqDocumentLabel')">
+                <input type="file" id="rfqDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'rfqDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('rfqDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="rfqDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -7448,7 +7634,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   };
 
   window.sendRFQ = async function() {
-    if(!validateAttachment('rfqDocument', 'RFQ Document')) return;
     if (!confirm('Are you sure you want to send this RFQ?')) return;
     const rfqNumber = document.getElementById('rfqNumber')?.value || '';
     const rfqDate = document.getElementById('rfqDate')?.value || '';
@@ -7487,10 +7672,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   window.showNewAbstractModal = async function() {
     // Ensure RFQ data is loaded
     if (!cachedRFQ || cachedRFQ.length === 0) { try { cachedRFQ = await apiRequest('/rfq'); } catch(e) {} }
-    // Load suppliers from DB
-    let suppliers = [];
-    try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
-    const supplierOptions = suppliers.map(s => `<option value="${s.id}">${s.name || s.company_name || ''}</option>`).join('');
     // Build RFQ options sorted by rfq_number
     const sortedRFQs = [...(cachedRFQ || [])].sort((a, b) => (a.rfq_number || '').localeCompare(b.rfq_number || ''));
     const rfqOptions = sortedRFQs.map(r => {
@@ -7552,22 +7733,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
                   <strong>Supplier Names:</strong>
                 </td>
                 <td colspan="2" style="background: #e3f2fd;">
-                  <select id="absSupplier1Id" class="form-select" style="width: 100%; font-size: 11px;" onchange="onAbsSupplierChange(1, this)">
-                    <option value="">-- NO BIDDER --</option>
-                    ${supplierOptions}
-                  </select>
+                  <input type="text" id="absSupplier1Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 1 name" oninput="onAbsSupplierChange(1, this)">
                 </td>
                 <td colspan="2" style="background: #d0e8ff;">
-                  <select id="absSupplier2Id" class="form-select" style="width: 100%; font-size: 11px;" onchange="onAbsSupplierChange(2, this)">
-                    <option value="">-- NO BIDDER --</option>
-                    ${supplierOptions}
-                  </select>
+                  <input type="text" id="absSupplier2Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 2 name" oninput="onAbsSupplierChange(2, this)">
                 </td>
                 <td colspan="2" style="background: #bbdefb;">
-                  <select id="absSupplier3Id" class="form-select" style="width: 100%; font-size: 11px;" onchange="onAbsSupplierChange(3, this)">
-                    <option value="">-- NO BIDDER --</option>
-                    ${supplierOptions}
-                  </select>
+                  <input type="text" id="absSupplier3Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 3 name" oninput="onAbsSupplierChange(3, this)">
                 </td>
               </tr>
             </tbody>
@@ -7592,6 +7764,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
           </table>
         </div>
         <button type="button" class="btn btn-sm btn-outline" onclick="addAbstractItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addAbstractBidderCol()" style="margin-left:8px;"><i class="fas fa-user-plus"></i> Add Bidder</button>
         </div>
         <div class="form-section-header"><i class="fas fa-certificate"></i> Certification / Recommendation</div>
         <div class="form-group">
@@ -7605,13 +7778,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
           <textarea rows="4" id="abstractItemSpecs" placeholder="Auto-filled from RFQ specifications when RFQ is selected..."></textarea>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Abstract of Quotations (Signed by BAC)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="abstractDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'abstractDocumentLabel')">
+                <input type="file" id="abstractDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'abstractDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('abstractDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="abstractDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -7619,7 +7792,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
             <div>
               <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Supplier Quotations (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="supplierQuotations" accept=".pdf,.jpg,.jpeg,.png" required multiple style="display: none;" onchange="updateFileLabel(this, 'supplierQuotationsLabel', true)">
+                <input type="file" id="supplierQuotations" accept=".pdf,.jpg,.jpeg,.png" multiple style="display: none;" onchange="updateFileLabel(this, 'supplierQuotationsLabel', true)">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('supplierQuotations').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
                 <span id="supplierQuotationsLabel" style="font-size: 12px; color: #666;">No files selected</span>
               </div>
@@ -7693,18 +7866,20 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   window.addAbstractItemRow = function() {
     const tbody = document.getElementById('abstractItemsBody');
     const row = document.createElement('tr');
-    row.innerHTML = `
-      <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
-      <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
-      <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
-      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
-      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-    `;
+    const count = window._abstractBidderCount || 3;
+    let bidderCells = '';
+    for (let i = 0; i < count; i++) {
+      const bg = _absBgColorsCell[i % _absBgColorsCell.length];
+      bidderCells +=
+        '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" min="0" onchange="calcAbstractTotal(this)"></td>' +
+        '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" readonly></td>';
+    }
+    row.innerHTML =
+      '<td><input type="number" placeholder="0" style="width:45px;font-size:11px;" min="0"></td>' +
+      '<td><select class="form-select" style="width:50px;font-size:11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>' +
+      '<td><input type="text" placeholder="Item description..." style="width:100%;font-size:11px;"></td>' +
+      '<td><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;" min="0"></td>' +
+      bidderCells;
     tbody.appendChild(row);
   };
 
@@ -7720,19 +7895,82 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   };
 
   // Update supplier column header when a supplier dropdown changes
-  window.onAbsSupplierChange = function(slotNum, selectEl) {
+  window.onAbsSupplierChange = function(slotNum, inputEl) {
     const headerEl = document.getElementById('absSupplier' + slotNum + 'Header');
     if (!headerEl) return;
-    const selectedText = selectEl.value ? selectEl.options[selectEl.selectedIndex].text : 'NO BIDDER';
-    headerEl.textContent = selectedText;
+    headerEl.textContent = inputEl.value.trim() || 'Supplier ' + slotNum;
+  };
+
+  // Track current bidder count for abstract
+  window._abstractBidderCount = 3;
+
+  // Alternating background colors for supplier columns
+  const _absBgColors = ['#e3f2fd', '#d0e8ff', '#bbdefb', '#c8e6c9', '#fff9c4', '#f8bbd0', '#d1c4e9', '#b2dfdb'];
+  const _absBgColorsCell = ['#f5f9ff', '#dce9fc', '#cddff5', '#e8f5e9', '#fffde7', '#fce4ec', '#ede7f6', '#e0f2f1'];
+
+  /** Add a new bidder/supplier column to the Abstract of Quotations table */
+  window.addAbstractBidderCol = function() {
+    window._abstractBidderCount++;
+    const n = window._abstractBidderCount;
+    const bgHeader = _absBgColors[(n - 1) % _absBgColors.length];
+    const bgCell = _absBgColorsCell[(n - 1) % _absBgColorsCell.length];
+
+    // 1. Add <th colspan="2"> to the first header row
+    const table = document.querySelector('#abstractItemsBody')?.closest('table');
+    if (!table) return;
+    const headerRow1 = table.querySelector('thead tr:first-child');
+    const headerRow2 = table.querySelector('thead tr:nth-child(2)');
+    if (headerRow1) {
+      const th = document.createElement('th');
+      th.colSpan = 2;
+      th.style.cssText = 'text-align:center;background:' + bgHeader + ';';
+      th.id = 'absSupplier' + n + 'Header';
+      th.textContent = 'Supplier ' + n;
+      headerRow1.appendChild(th);
+    }
+    // 2. Add unit price + total price sub-headers
+    if (headerRow2) {
+      const th1 = document.createElement('th');
+      th1.style.cssText = 'width:90px;background:' + bgHeader + ';';
+      th1.textContent = 'Unit Price';
+      const th2 = document.createElement('th');
+      th2.style.cssText = 'width:90px;background:' + bgHeader + ';';
+      th2.textContent = 'Total Price';
+      headerRow2.appendChild(th1);
+      headerRow2.appendChild(th2);
+    }
+
+    // 3. Add bidder name input to the supplier names row (first tbody)
+    const supplierNamesRow = table.querySelector('tbody tr:first-child');
+    if (supplierNamesRow) {
+      const td = document.createElement('td');
+      td.colSpan = 2;
+      td.style.background = bgHeader;
+      td.innerHTML = '<input type="text" id="absSupplier' + n + 'Id" class="form-select" style="width:100%;font-size:11px;" placeholder="Enter Bidder ' + n + ' name" oninput="onAbsSupplierChange(' + n + ', this)">';
+      supplierNamesRow.appendChild(td);
+    }
+
+    // 4. For each item row in abstractItemsBody, add 2 new cells
+    const itemRows = document.getElementById('abstractItemsBody')?.querySelectorAll('tr');
+    if (itemRows) {
+      itemRows.forEach(row => {
+        const td1 = document.createElement('td');
+        td1.style.background = bgCell;
+        td1.innerHTML = '<input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" min="0" onchange="calcAbstractTotal(this)">';
+        const td2 = document.createElement('td');
+        td2.style.background = bgCell;
+        td2.innerHTML = '<input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" readonly>';
+        row.appendChild(td1);
+        row.appendChild(td2);
+      });
+    }
   };
 
   // Also used by edit modal
-  window.onEditAbsSupplierChange = function(slotNum, selectEl) {
+  window.onEditAbsSupplierChange = function(slotNum, inputEl) {
     const headerEl = document.getElementById('editAbsSupplier' + slotNum + 'Header');
     if (!headerEl) return;
-    const selectedText = selectEl.value ? selectEl.options[selectEl.selectedIndex].text : 'NO BIDDER';
-    headerEl.textContent = selectedText;
+    headerEl.textContent = inputEl.value.trim() || 'Supplier ' + slotNum;
   };
 
   window.showNewNOAModal = async function() {
@@ -7779,7 +8017,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
           <div class="form-row">
             <div class="form-group">
               <label>Linked BAC Resolution</label>
-              <select class="form-select" id="noaLinkedBAC" required>
+              <select class="form-select" id="noaLinkedBAC" required onchange="noaAutoFillFromBAC(this.value)">
                 <option value="">-- Select BAC Resolution --</option>
                 ${bacOptions}
               </select>
@@ -7813,10 +8051,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
           <div class="form-group" style="margin-bottom: 8px;">
             <label>Company/Supplier Name</label>
-            <select class="form-select" id="noaSupplierId" required onchange="noaFillSupplierAddress()">
-              <option value="">-- Select Supplier --</option>
-              ${supplierOptions}
-            </select>
+            <input type="text" id="noaSupplierName" class="form-select" placeholder="Enter winning bidder / supplier name" required>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label>Address</label>
@@ -7854,13 +8089,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div>
               <label style="font-weight: 600; display: block;"><i class="fas fa-award"></i> NOA Document (Signed by HoPE)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="noaDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'noaDocumentLabel')">
+                <input type="file" id="noaDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'noaDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('noaDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="noaDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -7900,17 +8135,27 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-  // Auto-fill supplier address when supplier selected in NOA modal
-  window.noaFillSupplierAddress = function() {
-    const supplierId = document.getElementById('noaSupplierId')?.value;
-    const addressField = document.getElementById('noaAddress');
-    if (!supplierId || !addressField || !window._noaSuppliers) return;
-    const supplier = window._noaSuppliers.find(s => s.id == supplierId);
-    if (supplier && supplier.address) {
-      addressField.value = supplier.address;
-    } else {
-      addressField.value = '';
-    }
+  // noaFillSupplierAddress removed — supplier is now a free-text input
+
+  // Auto-fill NOA supplier and contract amount from linked BAC Resolution's abstract
+  window.noaAutoFillFromBAC = async function(bacResId) {
+    if (!bacResId) return;
+    try {
+      const bacRes = await apiRequest('/bac-resolutions/' + bacResId);
+      if (bacRes && bacRes.abstract_id) {
+        const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+        if (abstract) {
+          const supplierField = document.getElementById('noaSupplierName');
+          const amountField = document.getElementById('noaContractAmount');
+          if (supplierField && abstract.recommended_supplier_name) {
+            supplierField.value = abstract.recommended_supplier_name;
+          }
+          if (amountField && abstract.recommended_amount) {
+            amountField.value = abstract.recommended_amount;
+          }
+        }
+      }
+    } catch (e) { console.warn('[NOA] Could not auto-fill from BAC:', e.message); }
   };
 
   window.showNewPOModal = async function() {
@@ -7995,7 +8240,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group">
           <label>Linked NOA (Issued)</label>
-          <select class="form-select" id="poLinkedNOA" required>
+          <select class="form-select" id="poLinkedNOA" required onchange="poAutoFillFromNOA(this.value)">
             <option value="">-- Select NOA --</option>
           </select>
         </div>
@@ -8021,13 +8266,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> In case of failure to make the full delivery within the time specified above, a penalty of one-tenth (1/10) of one percent for every day of delay shall be imposed.
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-file-contract"></i> Purchase Order Document (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="poDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'poDocumentLabel')">
+                <input type="file" id="poDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'poDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('poDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="poDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -8056,6 +8301,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     (async () => {
       try {
         const noaList = cachedNOA.length ? cachedNOA : await apiRequest('/noa');
+        window._poNOAList = noaList;
         const sel = document.getElementById('poLinkedNOA');
         if (sel && noaList.length) {
           noaList.forEach(n => {
@@ -8084,6 +8330,35 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (supplier) {
       if (addressField) addressField.value = supplier.address || '';
       if (tinField) tinField.value = supplier.tin || '';
+    }
+  };
+
+  // Auto-fill PO supplier from linked NOA's supplier name
+  window.poAutoFillFromNOA = function(noaId) {
+    if (!noaId || !window._poNOAList) return;
+    const noa = window._poNOAList.find(n => String(n.id) === String(noaId));
+    if (!noa) return;
+    // Auto-fill supplier: use supplier_id directly if available, otherwise match by name
+    const sel = document.getElementById('poSupplierId');
+    if (sel) {
+      if (noa.supplier_id) {
+        sel.value = String(noa.supplier_id);
+        poFillSupplierDetails();
+      } else if (noa.supplier_name) {
+        const noaName = noa.supplier_name.toLowerCase().trim();
+        for (const opt of sel.options) {
+          if (opt.textContent.toLowerCase().trim().includes(noaName)) {
+            sel.value = opt.value;
+            poFillSupplierDetails();
+            break;
+          }
+        }
+      }
+    }
+    // Auto-fill contract amount
+    const amountField = document.getElementById('poTotalAmount');
+    if (amountField && noa.contract_amount) {
+      amountField.value = parseFloat(noa.contract_amount).toFixed(2);
     }
   };
 
@@ -8119,7 +8394,6 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   window.approvePO = async function() {
-    if(!validateAttachment('poDocument', 'Purchase Order Document')) return;
     if (!confirm('Approve this Purchase Order?')) return;
     const poNumber = document.getElementById('poNumber')?.value || '';
     const poDate = document.getElementById('poDate')?.value || '';
@@ -8256,7 +8530,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <textarea rows="4" id="editPrItemSpecs" placeholder="Enter item specifications, one per line...">${(pr.item_specifications || '').replace(/</g, '&lt;')}</textarea>
           </div>
 
-          <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+          <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
           <div class="form-attachment-section">
             <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
               <div style="margin-bottom: 12px;">
@@ -8789,13 +9063,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const slot = [null, null, null];
     existingQuotations.forEach((q, idx) => { if (idx < 3) slot[idx] = q; });
 
-    // Build supplier select with pre-selected value
-    function buildSupplierSelect(slotNum, selectedId) {
-      const opts = suppliers.map(s => `<option value="${s.id}" ${s.id == selectedId ? 'selected' : ''}>${s.name || s.company_name || ''}</option>`).join('');
-      return `<select id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" onchange="onEditAbsSupplierChange(${slotNum}, this)">
-        <option value="">-- NO BIDDER --</option>
-        ${opts}
-      </select>`;
+    // Build supplier text input with pre-filled value
+    function buildSupplierInput(slotNum, existingName) {
+      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || '')}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
     }
 
     // Build header labels
@@ -8896,9 +9166,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             <tbody>
               <tr>
                 <td colspan="4" style="padding: 4px;"><strong>Supplier Names:</strong></td>
-                <td colspan="2" style="background: #e3f2fd;">${buildSupplierSelect(1, slot[0] ? slot[0].supplier_id : '')}</td>
-                <td colspan="2" style="background: #d0e8ff;">${buildSupplierSelect(2, slot[1] ? slot[1].supplier_id : '')}</td>
-                <td colspan="2" style="background: #bbdefb;">${buildSupplierSelect(3, slot[2] ? slot[2].supplier_id : '')}</td>
+                <td colspan="2" style="background: #e3f2fd;">${buildSupplierInput(1, slot[0] ? slot[0].supplier_name : '')}</td>
+                <td colspan="2" style="background: #d0e8ff;">${buildSupplierInput(2, slot[1] ? slot[1].supplier_name : '')}</td>
+                <td colspan="2" style="background: #bbdefb;">${buildSupplierInput(3, slot[2] ? slot[2].supplier_name : '')}</td>
               </tr>
             </tbody>
             <tbody id="editAbstractItemsBody">
@@ -8946,13 +9216,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!confirm('Are you sure you want to save these changes?')) return;
     const rfqIdVal = document.getElementById('editAbsRfqId')?.value || null;
 
-    // Gather supplier IDs from dropdowns
-    const supplier1Id = document.getElementById('editAbsSupplier1Id')?.value || '';
-    const supplier2Id = document.getElementById('editAbsSupplier2Id')?.value || '';
-    const supplier3Id = document.getElementById('editAbsSupplier3Id')?.value || '';
-    const supplier1Name = supplier1Id ? document.getElementById('editAbsSupplier1Id')?.options[document.getElementById('editAbsSupplier1Id').selectedIndex]?.text : '';
-    const supplier2Name = supplier2Id ? document.getElementById('editAbsSupplier2Id')?.options[document.getElementById('editAbsSupplier2Id').selectedIndex]?.text : '';
-    const supplier3Name = supplier3Id ? document.getElementById('editAbsSupplier3Id')?.options[document.getElementById('editAbsSupplier3Id').selectedIndex]?.text : '';
+    // Gather supplier names from text inputs
+    const supplier1Name = document.getElementById('editAbsSupplier1Id')?.value?.trim() || '';
+    const supplier2Name = document.getElementById('editAbsSupplier2Id')?.value?.trim() || '';
+    const supplier3Name = document.getElementById('editAbsSupplier3Id')?.value?.trim() || '';
 
     // Gather items from table rows
     const itemRows = document.querySelectorAll('#editAbstractItemsBody tr');
@@ -8982,12 +9249,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     const quotations = [];
     const supplierBids = [];
     const supplierSlots = [
-      { id: supplier1Id, name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
-      { id: supplier2Id, name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
-      { id: supplier3Id, name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
     ];
     supplierSlots.forEach((slot, idx) => {
-      if (slot.id) {
+      if (slot.name) {
         const qItems = slot.items.map(it => ({
           item_description: it.desc,
           quantity: it.qty,
@@ -8995,14 +9262,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           unit_price: it[slot.priceKey]
         }));
         quotations.push({
-          supplier_id: parseInt(slot.id),
+          supplier_name: slot.name,
           bid_amount: slot.total,
           is_compliant: true,
           remarks: null,
           rank_no: idx + 1,
           items: qItems
         });
-        supplierBids.push({ id: parseInt(slot.id), name: slot.name, total: slot.total });
+        supplierBids.push({ name: slot.name, total: slot.total });
       }
     });
 
@@ -9019,7 +9286,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       rfq_id: rfqIdVal ? parseInt(rfqIdVal) : null,
       date_prepared: document.getElementById('editAbsDate').value || null,
       purpose: document.getElementById('editAbsPurpose').value,
-      recommended_supplier_id: recommendedSupplier ? recommendedSupplier.id : null,
+      recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
       recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
       status: document.getElementById('editAbsStatus').value,
       item_specifications: document.getElementById('editAbsItemSpecs')?.value.trim() || null,
@@ -9061,14 +9328,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Load suppliers from DB for bidder dropdowns
     let suppliers = [];
     try { suppliers = await apiRequest('/suppliers'); } catch(e) { console.error('Failed to load suppliers:', e); }
-    function buildSupplierSelect(fieldId, selectedId) {
-      const opts = suppliers.map(s =>
-        `<option value="${s.id}" ${s.id == selectedId ? 'selected' : ''}>${s.name || s.company_name || ''}${s.contact_person ? ' — ' + s.contact_person : ''}</option>`
-      ).join('');
-      return `<select id="${fieldId}" class="form-select" style="font-size: 11px;">
-        <option value="">-- NO BIDDER --</option>
-        ${opts}
-      </select>`;
+    function buildBidderInput(fieldId, existingName) {
+      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || '')}">`;
     }
 
     const html = `
@@ -9129,21 +9390,21 @@ Failure to submit the above requirements within the prescribed period shall cons
             ${buildEmpSelect('editTwgMember4Id', p.twg_member4_id, false)}
           </div>
         </div>
-        <div class="form-section-header section-items"><i class="fas fa-store"></i> Bidders (from Suppliers)</div>
+        <div class="form-section-header section-items"><i class="fas fa-store"></i> Bidders</div>
         <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
           <div class="form-row">
             <div class="form-group" style="margin-bottom: 8px;">
               <label style="font-size: 12px; font-weight: 600;">Bidder 1</label>
-              ${buildSupplierSelect('editBidder1', p.bidder1_supplier_id)}
+              ${buildBidderInput('editBidder1', p.bidder1_name || '')}
             </div>
             <div class="form-group" style="margin-bottom: 8px;">
               <label style="font-size: 12px; font-weight: 600;">Bidder 2</label>
-              ${buildSupplierSelect('editBidder2', p.bidder2_supplier_id)}
+              ${buildBidderInput('editBidder2', p.bidder2_name || '')}
             </div>
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-size: 12px; font-weight: 600;">Bidder 3</label>
-            ${buildSupplierSelect('editBidder3', p.bidder3_supplier_id)}
+            ${buildBidderInput('editBidder3', p.bidder3_name || '')}
           </div>
         </div>
         ${getEditAttachmentSectionHTML('post_qualification', id, 'editPqAttachment')}
@@ -9165,9 +9426,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const twgMember4Id = document.getElementById('editTwgMember4Id')?.value || null;
     const abstractId = document.getElementById('editPqLinkedAbstract')?.value || null;
 
-    const bidder1SupplierId = document.getElementById('editBidder1')?.value || null;
-    const bidder2SupplierId = document.getElementById('editBidder2')?.value || null;
-    const bidder3SupplierId = document.getElementById('editBidder3')?.value || null;
+    const bidder1Name = document.getElementById('editBidder1')?.value.trim() || null;
+    const bidder2Name = document.getElementById('editBidder2')?.value.trim() || null;
+    const bidder3Name = document.getElementById('editBidder3')?.value.trim() || null;
 
     const data = {
       postqual_number: document.getElementById('editPqNumber').value,
@@ -9184,9 +9445,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
       twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
       twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
-      bidder1_supplier_id: bidder1SupplierId ? parseInt(bidder1SupplierId) : null,
-      bidder2_supplier_id: bidder2SupplierId ? parseInt(bidder2SupplierId) : null,
-      bidder3_supplier_id: bidder3SupplierId ? parseInt(bidder3SupplierId) : null
+      bidder1_name: bidder1Name,
+      bidder2_name: bidder2Name,
+      bidder3_name: bidder3Name
     };
     try {
       await apiRequest('/post-qualifications/' + id, 'PUT', data);
@@ -9410,10 +9671,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label>Company/Supplier</label>
-            <select class="form-select" id="editNoaSupplierId" required>
-              <option value="">-- Select Supplier --</option>
-              ${supplierOptions}
-            </select>
+            <input type="text" id="editNoaSupplierName" class="form-select" placeholder="Enter winning bidder / supplier name" value="${escapeHtml(n.supplier_name || '')}" required>
           </div>
         </div>
 
@@ -9465,7 +9723,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       noa_number: document.getElementById('editNoaNumber').value,
       bac_resolution_id: document.getElementById('editNoaLinkedBAC')?.value ? parseInt(document.getElementById('editNoaLinkedBAC').value) : null,
       rfq_id: document.getElementById('editNoaRFQRef')?.value ? parseInt(document.getElementById('editNoaRFQRef').value) : null,
-      supplier_id: document.getElementById('editNoaSupplierId')?.value ? parseInt(document.getElementById('editNoaSupplierId').value) : null,
+      supplier_name: document.getElementById('editNoaSupplierName')?.value.trim() || null,
       contract_amount: parseFloat(document.getElementById('editNoaAmount').value) || 0,
       date_issued: document.getElementById('editNoaDateIssued').value || null,
       bidder_receipt_date: document.getElementById('editNoaReceiptDate').value || null,
@@ -9807,7 +10065,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="form-group">
             <label>PO No. / Date</label>
             <div style="display: flex; gap: 8px;">
-              <select class="form-select" id="iarLinkedPO" required style="flex: 2;">
+              <select class="form-select" id="iarLinkedPO" required style="flex: 2;" onchange="iarAutoFillFromPO(this.value)">
                 <option value="">-- Select PO --</option>
               </select>
               <input type="date" id="iarPODate" style="flex: 1;">
@@ -9828,28 +10086,33 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="iarInvoiceNo" placeholder="Supplier's Sales Invoice No." required>
           </div>
         </div>
-        <div class="form-group">
-          <label>Responsibility Center Code</label>
-          <input type="text" placeholder="Responsibility Center Code">
+        <div class="form-row">
+          <div class="form-group" style="flex:2;">
+            <label>Responsibility Center Code</label>
+            <input type="text" placeholder="Responsibility Center Code">
+          </div>
+          <div class="form-group" style="flex:1; display:flex; align-items:flex-end;">
+            ${buildCatalogButtonHTML('iar')}
+          </div>
         </div>
         <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Items</div>
         <div class="form-items-section">
-        ${buildCatalogPickerHTML('iar', iarCatOpts, iarItemOpts, false)}
+        ${buildCatalogItemsTableHTML('iar', false)}
         </div>
         <div class="form-section-header section-inspection"><i class="fas fa-search"></i> Inspection</div>
         <div style="background: #d0e8ff; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
-          <div class="form-row">
-            <div class="form-group" style="margin-bottom: 5px;">
-              <label style="font-size: 12px;">Date Inspected</label>
-              <input type="date" id="iarInspectionDate" required>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:end;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Date Inspected</label>
+              <input type="date" id="iarInspectionDate" required style="font-size:12px;">
             </div>
-            <div class="form-group" style="margin-bottom: 5px;">
-              <label style="font-size: 12px;">Inspection Officer / Property Custodian</label>
-              <input type="text" id="iarInspector" placeholder="Name of Inspector" required>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Inspection Officer / Property Custodian</label>
+              <input type="text" id="iarInspector" placeholder="Name of Inspector" required style="font-size:12px;">
             </div>
-          </div>
-          <div class="form-group" style="margin-bottom: 0; font-size: 12px;">
-            <label><input type="checkbox" checked> I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</label>
+            <div class="form-group" style="margin-bottom: 0; display:flex; align-items:center; padding-top:18px;">
+              <label style="font-size: 11px;"><input type="checkbox" checked> I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</label>
+            </div>
           </div>
         </div>
         <div class="form-section-header section-acceptance"><i class="fas fa-check-circle"></i> Acceptance</div>
@@ -9879,13 +10142,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <textarea rows="4" id="iarItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
         </div>
 
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-clipboard-check"></i> IAR Document (Signed - Appendix 62)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="iarDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'iarDocumentLabel')">
+                <input type="file" id="iarDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'iarDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="iarDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -9893,7 +10156,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-file-invoice"></i> Supplier Invoice (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="iarInvoice" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'iarInvoiceLabel')">
+                <input type="file" id="iarInvoice" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'iarInvoiceLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarInvoice').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="iarInvoiceLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -9901,7 +10164,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div>
               <label style="font-weight: 600; display: block;"><i class="fas fa-truck"></i> Delivery Receipt (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="iarDeliveryReceipt" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'iarDeliveryReceiptLabel')">
+                <input type="file" id="iarDeliveryReceipt" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'iarDeliveryReceiptLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarDeliveryReceipt').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="iarDeliveryReceiptLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -9921,6 +10184,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     (async () => {
       try {
         const poList = cachedPO.length ? cachedPO : await apiRequest('/po');
+        window._iarPOList = poList;
         const sel = document.getElementById('iarLinkedPO');
         if (sel && poList.length) {
           poList.forEach(p => {
@@ -9932,6 +10196,17 @@ Failure to submit the above requirements within the prescribed period shall cons
         }
       } catch (err) { console.error('Failed to load PO list:', err); }
     })();
+  };
+
+  // Auto-fill IAR supplier name from linked PO
+  window.iarAutoFillFromPO = function(poId) {
+    if (!poId || !window._iarPOList) return;
+    const po = window._iarPOList.find(p => String(p.id) === String(poId));
+    if (!po) return;
+    const supplierField = document.getElementById('iarSupplier');
+    if (supplierField && po.supplier_name) {
+      supplierField.value = po.supplier_name;
+    }
   };
 
   window.addIARItemRow = function() {
@@ -10218,7 +10493,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <option value="services">Services</option>
           </select>
         </div>
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
             <div style="margin-bottom: 12px;">
@@ -10479,7 +10754,19 @@ Failure to submit the above requirements within the prescribed period shall cons
           total_amount: it.budget,
           status: 'pending',
           procurement_source: it.procurement_source || (procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource),
-          remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim()
+          remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim(),
+          // Persist unit/price data to plan_items so Edit modal can retrieve them
+          items: [{
+            item_code: it.item_code || '',
+            item_name: it.item_name || '',
+            item_description: it.item_description || it.description || '',
+            unit: it.item_unit || it.unit || 'pc',
+            unit_price: parseFloat(it.unit_price || 0),
+            category: it.item_category || it.category || '',
+            q1_qty: it.quantity || 0,
+            q2_qty: 0, q3_qty: 0, q4_qty: 0,
+            remarks: ''
+          }]
         };
       });
 
@@ -11817,6 +12104,43 @@ Failure to submit the above requirements within the prescribed period shall cons
   // =====================================================
 
   /** Open a modal to select catalog items for PPMP (similar to PAP item picker) */
+  /**
+   * Quick-add an item NOT in catalog to the PPMP items list (auto-categorized as NON PS-DBM)
+   */
+  window.addPPMPQuickItem = function() {
+    const nameEl = document.getElementById('ppmpQuickAddName');
+    const descEl = document.getElementById('ppmpQuickAddDesc');
+    const unitEl = document.getElementById('ppmpQuickAddUnit');
+    const priceEl = document.getElementById('ppmpQuickAddPrice');
+    const name = (nameEl?.value || '').trim();
+    if (!name) { alert('Please enter an item name.'); nameEl?.focus(); return; }
+    const unitPrice = parseFloat(priceEl?.value || 0) || 0;
+    const unit = unitEl?.value || 'unit';
+    const desc = (descEl?.value || '').trim();
+    const entry = {
+      item_id: null,
+      item_name: name,
+      item_code: '',
+      item_unit: unit,
+      item_category: '',
+      item_description: desc,
+      description: desc || name,
+      unit_price: unitPrice,
+      quantity: 1,
+      budget: unitPrice,
+      procurement_source: 'NON PS-DBM',
+      is_quick_add: true
+    };
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+    window._ppmpSelectedItems.push(entry);
+    renderPPMPItemsList();
+    // Clear quick-add inputs
+    if (nameEl) nameEl.value = '';
+    if (descEl) descEl.value = '';
+    if (priceEl) priceEl.value = '';
+    showToast('Item added: ' + name, 'success');
+  };
+
   window.showPPMPCatalogItemModal = function() {
     const allItems = window._ppmpItemsCache || [];
     const sourceFilter = window._ppmpCatalogSourceFilter || 'NON PS-DBM';
@@ -11975,6 +12299,15 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
+   * Allow editing the description/specifications for an item in the list.
+   */
+  window.updatePPMPItemDesc = function(index, desc) {
+    if (!window._ppmpSelectedItems || !window._ppmpSelectedItems[index]) return;
+    window._ppmpSelectedItems[index].item_description = desc;
+    window._ppmpSelectedItems[index].description = desc;
+  };
+
+  /**
    * Render the selected items list table and update totals.
    */
   window.renderPPMPItemsList = function() {
@@ -11998,24 +12331,19 @@ Failure to submit the above requirements within the prescribed period shall cons
     let totalBudget = 0;
     tbody.innerHTML = items.map((it, idx) => {
       totalBudget += it.budget;
-      // Format description for display: show first line bold, rest as sub-details
-      const descLines = (it.description || '').split('\n');
-      const descDisplay = descLines.map((line, li) => {
-        const trimmed = line.trim();
-        if (li === 0) return '<strong style="font-size:11px;">' + escapeHtml(trimmed) + '</strong>';
-        return '<div style="font-size:10px; color:#4a5568; font-style:italic; padding-left:8px;">' + escapeHtml(trimmed) + '</div>';
-      }).join('');
+      const descText = it.item_description || it.description || '';
       return `<tr>
         <td style="text-align:center; color:#888;">${idx + 1}</td>
         <td style="font-weight:600; font-size:11px;">${it.item_code ? escapeHtml(it.item_code) + ' - ' : ''}${escapeHtml(it.item_name)}</td>
-        <td style="max-width:180px;">${descDisplay}</td>
+        <td style="max-width:180px;"><textarea rows="2" style="width:100%;font-size:10px;padding:2px 4px;resize:vertical;"
+              oninput="updatePPMPItemDesc(${idx}, this.value)">${escapeHtml(descText)}</textarea></td>
         <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
-        <td><input type="number" value="${it.unit_price.toFixed(2)}" min="0" step="0.01" 
+        <td><input type="text" inputmode="decimal" value="${it.unit_price.toFixed(2)}" 
               style="width:80px; font-size:11px; text-align:right; padding:2px 4px;"
-              onchange="updatePPMPItemPrice(${idx}, this.value)"></td>
+              oninput="updatePPMPItemPrice(${idx}, this.value)"></td>
         <td><input type="number" value="${it.quantity}" min="1" step="1" 
               style="width:60px; font-size:11px; text-align:center; padding:2px 4px;"
-              onchange="updatePPMPItemQty(${idx}, this.value)"></td>
+              oninput="updatePPMPItemQty(${idx}, this.value)"></td>
         <td style="text-align:right; font-weight:600; font-size:11px;">₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
         <td style="text-align:center;">
           <button type="button" class="btn btn-sm" onclick="removePPMPItem(${idx})" 
@@ -12053,30 +12381,19 @@ Failure to submit the above requirements within the prescribed period shall cons
     ).join('');
   };
 
-  /** Build the complete catalog picker HTML section for a given prefix */
+  /** Build the complete catalog picker HTML section for a given prefix (modal-based) */
   window.buildCatalogPickerHTML = function(prefix, categoryOptions, itemOptions, showPrice) {
     if (showPrice === undefined) showPrice = true;
+    // Store showPrice preference per prefix for modal/render use
+    if (!window._docPrefixShowPrice) window._docPrefixShowPrice = {};
+    window._docPrefixShowPrice[prefix] = showPrice;
     const priceHeaders = showPrice
       ? '<th style="width:90px;">Unit Price</th><th style="width:90px;">Total</th>'
       : '';
     return '<div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>' +
-      '<div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;">' +
-        '<div class="form-group" style="flex:1; min-width:150px; margin-bottom:0;">' +
-          '<label>Filter by Category</label>' +
-          '<select class="form-select" id="' + prefix + 'CatFilter" onchange="filterDocItemsByCategory(\'' + prefix + '\', this.value)">' +
-            '<option value="">-- All Categories --</option>' + categoryOptions +
-          '</select>' +
-        '</div>' +
-        '<div class="form-group" style="flex:2; min-width:200px; margin-bottom:0;">' +
-          '<label>Select Item from Catalog</label>' +
-          '<select class="form-select" id="' + prefix + 'ItemSelect">' +
-            '<option value="">-- Select Item --</option>' + itemOptions +
-          '</select>' +
-        '</div>' +
-        '<div style="margin-bottom:0;">' +
-          '<button type="button" class="btn btn-sm btn-primary" onclick="addDocItemToList(\'' + prefix + '\')" style="padding:6px 16px; white-space:nowrap;">' +
-            '<i class="fas fa-plus"></i> Add Item</button>' +
-        '</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<button type="button" class="btn btn-primary" onclick="showDocCatalogItemModal(\'' + prefix + '\')" style="width:100%;padding:10px 20px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">' +
+          '<i class="fas fa-search"></i> Select from Items Catalog</button>' +
       '</div>' +
       '<span id="' + prefix + 'ItemCount" style="font-size:12px; color:#4a5568;"></span>' +
       '<div id="' + prefix + 'ItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">' +
@@ -12094,6 +12411,141 @@ Failure to submit the above requirements within the prescribed period shall cons
         '</table>' +
       '</div>' +
       '<div id="' + prefix + 'TotalDisplay" style="font-size:14px; font-weight:700; color:#1a365d; margin-bottom:10px;"></div>';
+  };
+
+  /** Build ONLY the catalog button (no items table) for inline placement */
+  window.buildCatalogButtonHTML = function(prefix) {
+    return '<button type="button" class="btn btn-primary" onclick="showDocCatalogItemModal(\'' + prefix + '\')" ' +
+      'style="width:100%;padding:10px 20px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">' +
+      '<i class="fas fa-search"></i> Select from Items Catalog</button>';
+  };
+
+  /** Build the items list table portion of the catalog picker (no button) */
+  window.buildCatalogItemsTableHTML = function(prefix, showPrice) {
+    if (showPrice === undefined) showPrice = true;
+    if (!window._docPrefixShowPrice) window._docPrefixShowPrice = {};
+    window._docPrefixShowPrice[prefix] = showPrice;
+    const priceHeaders = showPrice
+      ? '<th style="width:90px;">Unit Price</th><th style="width:90px;">Total</th>'
+      : '';
+    return '<span id="' + prefix + 'ItemCount" style="font-size:12px; color:#4a5568;"></span>' +
+      '<div id="' + prefix + 'ItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">' +
+        '<table class="data-table full-width" style="font-size:11.5px; margin:0;">' +
+          '<thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">' +
+            '<th style="width:30px;">#</th>' +
+            '<th>Item Name</th>' +
+            '<th>Description</th>' +
+            '<th style="width:60px;">Unit</th>' +
+            priceHeaders +
+            '<th style="width:70px;">Qty</th>' +
+            '<th style="width:40px;"></th>' +
+          '</tr></thead>' +
+          '<tbody id="' + prefix + 'ItemsListBody"></tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div id="' + prefix + 'TotalDisplay" style="font-size:14px; font-weight:700; color:#1a365d; margin-bottom:10px;"></div>';
+  };
+
+  /** Show a modal catalog item picker for PR, RFQ, PO, IAR (any doc prefix) */
+  window.showDocCatalogItemModal = function(prefix) {
+    const allItems = window._ppmpItemsCache || [];
+    const selectedItems = window._docSelectedItems[prefix] || [];
+
+    const itemRows = allItems.map(item => {
+      const alreadyAdded = selectedItems.some(si => String(si.item_id) === String(item.id));
+      return '<tr class="doc-catalog-select-row' + (alreadyAdded ? ' already-added' : '') + '" ' +
+        'onclick="' + (alreadyAdded ? '' : "selectDocCatalogItem('" + prefix + "'," + item.id + ",this)") + '" ' +
+        'style="cursor:' + (alreadyAdded ? 'default' : 'pointer') + ';' + (alreadyAdded ? 'opacity:0.5;' : '') + '">' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + parseInt(item.quantity || 0).toLocaleString() + '</td>' +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : '') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'docCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Item from Catalog</h4>
+          <button onclick="document.getElementById('docCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="docCatalogModalSearch" placeholder="Search by item code, name, category, description..."
+            oninput="filterDocCatalogModalItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Unit</th>
+              <th>Unit Price</th>
+              <th>Stock</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="docCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items in the document catalog modal */
+  window.filterDocCatalogModalItems = function(text) {
+    const tbody = document.getElementById('docCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into a document's item list */
+  window.selectDocCatalogItem = function(prefix, itemId, rowEl) {
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
+    if (!window._docSelectedItems[prefix]) window._docSelectedItems[prefix] = [];
+    if (window._docSelectedItems[prefix].some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.'); return;
+    }
+    const description = typeof buildItemDescription === 'function' ? buildItemDescription(item) : (item.description || item.name || '');
+    const unitPrice = parseFloat(item.unit_price || 0);
+    window._docSelectedItems[prefix].push({
+      item_id: parseInt(itemId),
+      item_name: item.name || '',
+      item_code: item.code || '',
+      item_unit: item.unit || '',
+      item_category: item.category || '',
+      item_description: item.description || '',
+      description: description,
+      unit_price: unitPrice,
+      quantity: 1,
+      total: unitPrice
+    });
+    renderDocItemsList(prefix);
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
   };
 
   /** Ensure items catalog is loaded into cache */
@@ -12389,13 +12841,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
     const purpose = document.getElementById('abstractPurpose')?.value || '';
 
-    // Gather supplier IDs from dropdowns
-    const supplier1Id = document.getElementById('absSupplier1Id')?.value || '';
-    const supplier2Id = document.getElementById('absSupplier2Id')?.value || '';
-    const supplier3Id = document.getElementById('absSupplier3Id')?.value || '';
-    const supplier1Name = supplier1Id ? document.getElementById('absSupplier1Id')?.options[document.getElementById('absSupplier1Id').selectedIndex]?.text : '';
-    const supplier2Name = supplier2Id ? document.getElementById('absSupplier2Id')?.options[document.getElementById('absSupplier2Id').selectedIndex]?.text : '';
-    const supplier3Name = supplier3Id ? document.getElementById('absSupplier3Id')?.options[document.getElementById('absSupplier3Id').selectedIndex]?.text : '';
+    // Gather supplier names from text inputs
+    const supplier1Name = document.getElementById('absSupplier1Id')?.value.trim() || '';
+    const supplier2Name = document.getElementById('absSupplier2Id')?.value.trim() || '';
+    const supplier3Name = document.getElementById('absSupplier3Id')?.value.trim() || '';
 
     // Gather items from table rows
     const itemRows = document.querySelectorAll('#abstractItemsBody tr');
@@ -12426,12 +12875,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     const quotations = [];
     const supplierBids = [];
     const supplierSlots = [
-      { id: supplier1Id, name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
-      { id: supplier2Id, name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
-      { id: supplier3Id, name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
     ];
     supplierSlots.forEach((slot, idx) => {
-      if (slot.id) {
+      if (slot.name) {
         const qItems = slot.items.map(it => ({
           item_description: it.desc,
           quantity: it.qty,
@@ -12439,14 +12888,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           unit_price: it[slot.priceKey]
         }));
         quotations.push({
-          supplier_id: parseInt(slot.id),
+          supplier_name: slot.name,
           bid_amount: slot.total,
           is_compliant: true,
           remarks: null,
           rank_no: idx + 1,
           items: qItems
         });
-        supplierBids.push({ id: parseInt(slot.id), name: slot.name, total: slot.total });
+        supplierBids.push({ name: slot.name, total: slot.total });
       }
     });
 
@@ -12468,7 +12917,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         purpose: purpose,
         status: 'draft',
         item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
-        recommended_supplier_id: recommendedSupplier ? recommendedSupplier.id : null,
+        recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
         recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
         quotations: sortedQuotations
       };
@@ -12498,7 +12947,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const noaDate = document.getElementById('noaDate')?.value || '';
     const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
     const rfqId = document.getElementById('noaRFQRef')?.value || '';
-    const supplierId = document.getElementById('noaSupplierId')?.value || '';
+    const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
     const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
 
     if (!confirm('Save this Notice of Award as draft?')) return;
@@ -12508,7 +12957,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         noa_number: noaNumber,
         bac_resolution_id: bacResId ? parseInt(bacResId) : null,
         rfq_id: rfqId ? parseInt(rfqId) : null,
-        supplier_id: supplierId ? parseInt(supplierId) : null,
+        supplier_name: supplierName,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
         status: 'draft'
@@ -12772,12 +13221,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const abstractDate = document.getElementById('abstractDate')?.value || '';
     const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
     const purpose = document.getElementById('abstractPurpose')?.value || '';
-    const supplier1Id = document.getElementById('absSupplier1Id')?.value || '';
-    const supplier2Id = document.getElementById('absSupplier2Id')?.value || '';
-    const supplier3Id = document.getElementById('absSupplier3Id')?.value || '';
-    const supplier1Name = supplier1Id ? document.getElementById('absSupplier1Id')?.options[document.getElementById('absSupplier1Id').selectedIndex]?.text : '';
-    const supplier2Name = supplier2Id ? document.getElementById('absSupplier2Id')?.options[document.getElementById('absSupplier2Id').selectedIndex]?.text : '';
-    const supplier3Name = supplier3Id ? document.getElementById('absSupplier3Id')?.options[document.getElementById('absSupplier3Id').selectedIndex]?.text : '';
+    const supplier1Name = document.getElementById('absSupplier1Id')?.value.trim() || '';
+    const supplier2Name = document.getElementById('absSupplier2Id')?.value.trim() || '';
+    const supplier3Name = document.getElementById('absSupplier3Id')?.value.trim() || '';
     const itemRows = document.querySelectorAll('#abstractItemsBody tr');
     const itemsData = [];
     itemRows.forEach(row => {
@@ -12800,15 +13246,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     const quotations = [];
     const supplierBids = [];
     const supplierSlots = [
-      { id: supplier1Id, name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
-      { id: supplier2Id, name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
-      { id: supplier3Id, name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
     ];
     supplierSlots.forEach((slot, idx) => {
-      if (slot.id) {
+      if (slot.name) {
         const qItems = slot.items.map(it => ({ item_description: it.desc, quantity: it.qty, unit: it.unit, unit_price: it[slot.priceKey] }));
-        quotations.push({ supplier_id: parseInt(slot.id), bid_amount: slot.total, is_compliant: true, remarks: null, rank_no: idx + 1, items: qItems });
-        supplierBids.push({ id: parseInt(slot.id), name: slot.name, total: slot.total });
+        quotations.push({ supplier_name: slot.name, bid_amount: slot.total, is_compliant: true, remarks: null, rank_no: idx + 1, items: qItems });
+        supplierBids.push({ name: slot.name, total: slot.total });
       }
     });
     supplierBids.sort((a, b) => a.total - b.total);
@@ -12821,7 +13267,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         abstract_number: abstractNumber, rfq_id: rfqId ? parseInt(rfqId) : null,
         date_prepared: abstractDate || null, purpose: purpose, status: 'on_going',
         item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
-        recommended_supplier_id: recommendedSupplier ? recommendedSupplier.id : null,
+        recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
         recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
         quotations: sortedQuotations
       };
@@ -12845,13 +13291,13 @@ Failure to submit the above requirements within the prescribed period shall cons
     const noaDate = document.getElementById('noaDate')?.value || '';
     const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
     const rfqId = document.getElementById('noaRFQRef')?.value || '';
-    const supplierId = document.getElementById('noaSupplierId')?.value || '';
+    const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
     const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
     if (!confirm('Are you sure you want to issue this Notice of Award?')) return;
     try {
       const data = {
         noa_number: noaNumber, bac_resolution_id: bacResId ? parseInt(bacResId) : null,
-        rfq_id: rfqId ? parseInt(rfqId) : null, supplier_id: supplierId ? parseInt(supplierId) : null,
+        rfq_id: rfqId ? parseInt(rfqId) : null, supplier_name: supplierName,
         contract_amount: contractAmount, date_issued: noaDate || null, status: 'issued'
       };
       const result = await apiRequest('/notices-of-award', 'POST', data);
@@ -12921,9 +13367,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const twgMember2Id = document.getElementById('twgMember2Id')?.value || null;
     const twgMember3Id = document.getElementById('twgMember3Id')?.value || null;
     const twgMember4Id = document.getElementById('twgMember4Id')?.value || null;
-    const bidder1SupplierId = document.getElementById('twgBidder1')?.value || null;
-    const bidder2SupplierId = document.getElementById('twgBidder2')?.value || null;
-    const bidder3SupplierId = document.getElementById('twgBidder3')?.value || null;
+    const bidder1Name = document.getElementById('twgBidder1')?.value.trim() || null;
+    const bidder2Name = document.getElementById('twgBidder2')?.value.trim() || null;
+    const bidder3Name = document.getElementById('twgBidder3')?.value.trim() || null;
     if (!subject) { alert('Please enter the subject.'); return; }
     if (!confirm('Are you sure you want to submit this TWG Report?')) return;
     try {
@@ -12935,9 +13381,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
         twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
         twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
-        bidder1_supplier_id: bidder1SupplierId ? parseInt(bidder1SupplierId) : null,
-        bidder2_supplier_id: bidder2SupplierId ? parseInt(bidder2SupplierId) : null,
-        bidder3_supplier_id: bidder3SupplierId ? parseInt(bidder3SupplierId) : null
+        bidder1_name: bidder1Name,
+        bidder2_name: bidder2Name,
+        bidder3_name: bidder3Name
       };
       const result = await apiRequest('/post-qualifications', 'POST', data);
       const pqId = result.id || result.postqual_id;
@@ -14604,16 +15050,6 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="date" id="tripDate" value="${new Date().toISOString().split('T')[0]}" required>
           </div>
           <div class="form-group">
-            <label>Vehicle</label>
-            <input type="text" id="tripVehicle" placeholder="Vehicle description" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Plate Number</label>
-            <input type="text" id="tripPlate" placeholder="ABC-1234">
-          </div>
-          <div class="form-group">
             <label>Driver</label>
             <select class="form-select" id="tripDriver"><option value="">-- Select Employee --</option></select>
           </div>
@@ -14665,8 +15101,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const data = {
       date_of_trip: document.getElementById('tripDate').value,
-      vehicle_description: document.getElementById('tripVehicle').value,
-      plate_number: document.getElementById('tripPlate').value,
       driver_id: parseInt(document.getElementById('tripDriver').value) || null,
       destination: document.getElementById('tripDest').value,
       purpose: document.getElementById('tripPurpose').value,
@@ -14695,7 +15129,6 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="detail-item"><span class="label">Destination</span><span class="value">${tt.destination || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Purpose</span><span class="value">${tt.purpose || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Contact No.</span><span class="value">${tt.contact_no || 'N/A'}</span></div>
-            <div class="detail-item"><span class="label">Vehicle ID</span><span class="value">${tt.vehicle_id || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Passengers</span><span class="value">${typeof tt.passengers === 'object' ? JSON.stringify(tt.passengers) : (tt.passengers || 'N/A')}</span></div>
             <div class="detail-item"><span class="label">Requested By</span><span class="value">${tt.requested_by_employee || 'N/A'}</span></div>
             <div class="detail-item"><span class="label">Approved By</span><span class="value">${tt.approved_by_employee || 'N/A'}</span></div>
@@ -15351,13 +15784,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
         </div>
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-gavel"></i> BAC Resolution Document (Signed by BAC Members)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="bacResDocument" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'bacResDocumentLabel')">
+                <input type="file" id="bacResDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'bacResDocumentLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('bacResDocument').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="bacResDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -15429,11 +15862,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     try { abstracts = cachedAbstract && cachedAbstract.length > 0 ? cachedAbstract : await apiRequest('/abstracts'); } catch(e) {}
     const abstractOptions = abstracts.map(a => `<option value="${a.id}">${a.abstract_number || 'AOQ-' + a.id}${a.recommended_supplier_name ? ' — ' + a.recommended_supplier_name : ''}${a.recommended_amount ? ' (₱' + Number(a.recommended_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`).join('');
 
-    // Load suppliers from DB for bidder dropdowns
-    let suppliers = [];
-    try { suppliers = await apiRequest('/suppliers'); } catch(e) { console.error('Failed to load suppliers:', e); }
-    const supplierOptions = suppliers.map(s => `<option value="${s.id}">${s.name || s.company_name || ''}${s.contact_person ? ' — ' + s.contact_person : ''}</option>`).join('');
-
     const html = `
       <form id="postQualForm" onsubmit="saveNewPostQual(event)">
         <div class="info-banner" style="margin-bottom: 15px;">
@@ -15476,7 +15904,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-section-header section-inspection"><i class="fas fa-tasks"></i> Required Documents Verification</div>
         <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Mark as Pass or N/A for each bidder</p>
         <div style="overflow-x: auto;">
-          <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 700px;">
+          <table id="twgDocsTable" class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 700px;">
             <thead>
               <tr>
                 <th>Required Documents</th>
@@ -15487,13 +15915,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             </thead>
             <tbody>
               <tr>
-                <td colspan="4" style="padding: 4px;"><strong>Bidder Names (from Suppliers):</strong></td>
+                <td colspan="4" style="padding: 4px;"><strong>Bidder Names:</strong></td>
               </tr>
               <tr>
                 <td></td>
-                <td style="background: #f5f9ff;"><select id="twgBidder1" class="form-select" style="font-size: 11px;"><option value="">-- NO BIDDER --</option>${supplierOptions}</select></td>
-                <td style="background: #dce9fc;"><select id="twgBidder2" class="form-select" style="font-size: 11px;"><option value="">-- NO BIDDER --</option>${supplierOptions}</select></td>
-                <td style="background: #cddff5;"><select id="twgBidder3" class="form-select" style="font-size: 11px;"><option value="">-- NO BIDDER --</option>${supplierOptions}</select></td>
+                <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
+                <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
+                <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
               </tr>
               <tr>
                 <td>Latest Income Tax Return (ITR)</td>
@@ -15556,6 +15984,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </tbody>
         </table>
         <button type="button" class="btn btn-sm btn-outline" onclick="addTWGPriceRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addTWGBidderCol()" style="margin-left:8px;"><i class="fas fa-user-plus"></i> Add Bidder</button>
         <div class="form-section-header section-signatories"><i class="fas fa-users"></i> TWG Members (Signatories)</div>
         <div style="background: #e8eaf6; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
           <div class="form-row">
@@ -15598,13 +16027,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
         </div>
-        <div class="form-section-header"><i class="fas fa-paperclip"></i> Required Attachments</div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
         <div class="form-attachment-section">
           <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
             <div style="margin-bottom: 12px;">
               <label style="font-weight: 600; display: block;"><i class="fas fa-user-check"></i> TWG Report (Signed)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="postQualReport" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateFileLabel(this, 'postQualReportLabel')">
+                <input type="file" id="postQualReport" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'postQualReportLabel')">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('postQualReport').click()"><i class="fas fa-upload"></i> Upload</button>
                 <span id="postQualReportLabel" style="font-size: 12px; color: #666;">No file selected</span>
               </div>
@@ -15612,7 +16041,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div>
               <label style="font-weight: 600; display: block;"><i class="fas fa-folder-open"></i> Bidder Documents (Scanned)</label>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="file" id="postQualBidderDocs" accept=".pdf,.jpg,.jpeg,.png" required multiple style="display: none;" onchange="updateFileLabel(this, 'postQualBidderDocsLabel', true)">
+                <input type="file" id="postQualBidderDocs" accept=".pdf,.jpg,.jpeg,.png" multiple style="display: none;" onchange="updateFileLabel(this, 'postQualBidderDocsLabel', true)">
                 <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('postQualBidderDocs').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
                 <span id="postQualBidderDocsLabel" style="font-size: 12px; color: #666;">No files selected</span>
               </div>
@@ -15629,16 +16058,84 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('TWG Evaluation Report / Post-Qualification', html, { preventOutsideClose: true });
   };
 
+  // Track current bidder count for Post-Qual / TWG
+  window._twgBidderCount = 3;
+
+  /** Add a new bidder column to both TWG tables (Required Documents + Price Comparison) */
+  window.addTWGBidderCol = function() {
+    window._twgBidderCount++;
+    const n = window._twgBidderCount;
+    const bgHeader = _absBgColors[(n - 1) % _absBgColors.length];
+    const bgCell = _absBgColorsCell[(n - 1) % _absBgColorsCell.length];
+
+    // === Required Documents Verification table ===
+    const docsTable = document.getElementById('twgDocsTable');
+    if (docsTable) {
+      const headerRow = docsTable.querySelector('thead tr');
+      if (headerRow) {
+        const th = document.createElement('th');
+        th.style.cssText = 'width:120px;background:' + bgHeader + ';';
+        th.textContent = 'Bidder ' + n;
+        headerRow.appendChild(th);
+      }
+      const tbody = docsTable.querySelector('tbody');
+      if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, idx) => {
+          const td = document.createElement('td');
+          td.style.background = bgCell;
+          if (idx === 0) {
+            // "Bidder Names:" label row — update colspan
+            const labelCell = row.querySelector('td[colspan]');
+            if (labelCell) labelCell.setAttribute('colspan', n + 1);
+          } else if (idx === 1) {
+            // Bidder name input row
+            td.innerHTML = '<input type="text" id="twgBidder' + n + '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' + n + ' name">';
+            row.appendChild(td);
+          } else {
+            // Document check rows
+            td.innerHTML = '<select class="form-select" style="font-size:11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select>';
+            row.appendChild(td);
+          }
+        });
+      }
+    }
+
+    // === Price Comparison table ===
+    const priceTable = document.getElementById('twgPriceBody')?.closest('table');
+    if (priceTable) {
+      const priceHeader = priceTable.querySelector('thead tr');
+      if (priceHeader) {
+        const th = document.createElement('th');
+        th.style.cssText = 'width:100px;background:' + bgHeader + ';';
+        th.textContent = 'Bidder ' + n;
+        priceHeader.appendChild(th);
+      }
+      const priceBody = document.getElementById('twgPriceBody');
+      if (priceBody) {
+        Array.from(priceBody.rows).forEach(row => {
+          const td = document.createElement('td');
+          td.style.background = bgCell;
+          td.innerHTML = '<input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;">';
+          row.appendChild(td);
+        });
+      }
+    }
+  };
+
   window.addTWGPriceRow = function() {
     const tbody = document.getElementById('twgPriceBody');
+    const count = window._twgBidderCount || 3;
     const row = document.createElement('tr');
-    row.innerHTML = `
-      <td><input type="text" placeholder="Item/Service" style="width: 100%; font-size: 11px;"></td>
-      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
-      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
-      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
-      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
-    `;
+    let bidderCells = '';
+    for (let i = 0; i < count; i++) {
+      const bg = _absBgColorsCell[i % _absBgColorsCell.length];
+      bidderCells += '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;"></td>';
+    }
+    row.innerHTML =
+      '<td><input type="text" placeholder="Item/Service" style="width:100%;font-size:11px;"></td>' +
+      '<td><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;"></td>' +
+      bidderCells;
     tbody.appendChild(row);
   };
 
@@ -15884,7 +16381,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const w = window._coaWizard;
     if (!w.poId) { showNotification('No Purchase Order selected.', 'warning'); return; }
 
-    if (!confirm('Submit all 3 documents to COA?\n\n\u2022 Transmittal \u2013 PO\n\u2022 Notice of Inspection\n\u2022 Transmittal \u2013 IAR\n\nThis will create the COA submission record.')) return;
+    if (!confirm('Submit all 3 documents to COA?\n\n\u2022 Transmittal \u2013 PO\n\u2022 Notice of Inspection\n\u2022 Transmittal \u2013 IAR\n\nThis will create the COA submission record and open Gmail to send.')) return;
 
     const today = new Date().toISOString().split('T')[0];
     try {
@@ -15893,7 +16390,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         po_id: parseInt(w.poId) || null,
         iar_id: parseInt(w.iarId) || null,
         submission_date: w.dates.step1 || today,
-        status: 'submitted',
+        status: 'pending_email',
         documents_included: JSON.stringify({
           transmittal_po: { date: w.dates.step1 || today, supplier: w.poData?.supplier_name, purpose: w.poData?.purpose, location: w.poData?.place_of_delivery },
           notice_inspection: { date: w.dates.step2 || today, purpose: w.poData?.purpose, po_number: w.poData?.po_number, delivery_date: w.poData?.delivery_date },
@@ -15901,7 +16398,28 @@ Failure to submit the above requirements within the prescribed period shall cons
         })
       };
       await apiRequest('/coa-submissions', 'POST', payload);
-      showNotification('COA Submission created successfully!', 'success');
+
+      // Build Gmail compose URL with pre-filled template
+      const poNum = w.poData?.po_number || w.submissionNumber;
+      const supplier = w.poData?.supplier_name || '';
+      const purpose = w.poData?.purpose || '';
+      const subject = encodeURIComponent('COA Submission — ' + poNum + (supplier ? ' — ' + supplier : ''));
+      const body = encodeURIComponent(
+        'Good day,\n\n' +
+        'Please find attached the following documents for COA submission:\n\n' +
+        '1. Transmittal – Purchase Order (' + poNum + ')\n' +
+        '2. Notice of Inspection\n' +
+        '3. Transmittal – IAR\n\n' +
+        'Supplier: ' + supplier + '\n' +
+        'Purpose: ' + purpose + '\n' +
+        'Submission No.: ' + w.submissionNumber + '\n\n' +
+        'Respectfully,\n' +
+        'DMW Procurement Unit'
+      );
+      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&su=' + subject + '&body=' + body;
+      window.open(gmailUrl, '_blank');
+
+      showNotification('COA Submission record created! Gmail opened for sending.', 'success');
       closeModal();
       loadCOA();
     } catch (err) {
@@ -17431,10 +17949,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         manual_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
         // For description: check plan_items first for detailed description, then plan.item_description
         item_description: (planItem ? planItem.item_description : '') || plan.item_description || plan.description || plan.manual_item_desc || plan.pap_item_desc || plan.specs || '',
-        // For unit: PRIORITIZE items table JOIN (plan.item_unit), then plan_items table
-        item_unit: plan.item_unit || (planItem ? planItem.unit : '') || plan.unit || plan.manual_item_unit || plan.pap_item_unit || plan.uom || 'pc',
-        // For unit_price: PRIORITIZE items table JOIN (plan.item_unit_price), then plan_items table
-        unit_price: parseFloat(plan.item_unit_price || (planItem ? planItem.unit_price : 0) || plan.unit_price || plan.manual_item_price || plan.pap_item_price || plan.price || 0) || 0,
+        // For unit: PRIORITIZE plan_items (user-entered), then items table JOIN
+        item_unit: (planItem ? planItem.unit : '') || plan.item_unit || plan.unit || plan.manual_item_unit || plan.pap_item_unit || plan.uom || 'pc',
+        // For unit_price: PRIORITIZE plan_items (user-entered), then items table JOIN
+        unit_price: parseFloat((planItem ? planItem.unit_price : 0) || plan.item_unit_price || plan.unit_price || plan.manual_item_price || plan.pap_item_price || plan.price || 0) || 0,
         // For quantity: check plan_items total_qty or individual quarters, then plan.quantity_size
         quantity_size: parseFloat((planItem ? (planItem.total_qty || planItem.q1_qty || planItem.quantity) : 0) || plan.quantity_size || plan.quantity || plan.manual_item_qty || plan.pap_item_qty || plan.qty || 1) || 1,
         // For total: check plan_items total_price, then plan.total_amount
@@ -17465,10 +17983,17 @@ Failure to submit the above requirements within the prescribed period shall cons
       console.log('[PPMP EDIT] Sections count:', cachedPPMPSections.length);
       console.log('[PPMP EDIT] Categories count:', cachedPPMPCategories.length);
 
-      // Build UOM options
-      const uomOptions = (uomList || []).map(u =>
+      // Build UOM options - ensure the current unit is always in the list
+      let uomOptionsRaw = (uomList || []).map(u =>
         `<option value="${escapeHtml(u.name || u)}">${escapeHtml(u.name || u)}</option>`
-      ).join('') || '<option value="pc">pc</option><option value="lot">lot</option><option value="set">set</option><option value="unit">unit</option>';
+      ).join('') || '<option value="lot">lot</option><option value="set">set</option><option value="unit">unit</option>';
+      // If current unit is not in the UOM list, add it as a custom option
+      const currentUnitVal = specificEntryData.item_unit || 'unit';
+      const uomNames = (uomList || []).map(u => (u.name || u || '').toLowerCase());
+      if (currentUnitVal && !uomNames.includes(currentUnitVal.toLowerCase())) {
+        uomOptionsRaw = `<option value="${escapeHtml(currentUnitVal)}">${escapeHtml(currentUnitVal)}</option>` + uomOptionsRaw;
+      }
+      const uomOptions = uomOptionsRaw;
 
       // Determine procurement source from DB (normalize for dropdown)
       const dbProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
@@ -17570,17 +18095,15 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
             </div>
             <div class="form-group">
-              <label>Procurement Source <span class="text-danger">*</span></label>
-              <select class="form-select" name="procurement_source" id="editPPMPProcSource" onchange="toggleEditPPMPSourceMode(this.value)">
+              <label>Procurement Source <span class="text-danger">*</span> <small style="color:#999;">(fixed at creation)</small></label>
+              <select class="form-select" id="editPPMPProcSource" disabled style="background:#f0f0f0;cursor:not-allowed;">
                 <option value="NON PS-DBM" ${dbProcSource==='NON PS-DBM'?'selected':''}>NON PS-DBM (Items Catalog)</option>
                 <option value="PS-DBM" ${dbProcSource==='PS-DBM'?'selected':''}>PS-DBM (Items Catalog)</option>
                 <option value="PAPs" ${dbProcSource==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
                 <option value="MANUAL-NON-PSDBM" ${dbProcSource==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
               </select>
+              <input type="hidden" name="procurement_source" value="${escapeHtml(dbProcSource)}">
             </div>
-          </div>
-
-          <div class="form-row">
             <div class="form-group">
               <label>Status <span class="text-danger">*</span></label>
               <select class="form-select" name="status" required>
@@ -17661,7 +18184,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Unit Price (₱) <span class="text-danger">*</span></label>
-                <input type="number" id="manualItemPrice" value="${unitPrice.toFixed(2)}" min="0" step="0.01" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+                <input type="text" inputmode="decimal" id="manualItemPrice" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditManualEstBudget()">
               </div>
               <div class="form-group">
                 <label>Quantity <span class="text-danger">*</span></label>
@@ -17713,7 +18236,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Unit Price (₱) <span class="text-danger">*</span></label>
-                <input type="number" id="papManualItemPrice" name="pap_manual_item_price" value="${unitPrice.toFixed(2)}" min="0" step="0.01" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
+                <input type="text" inputmode="decimal" id="papManualItemPrice" name="pap_manual_item_price" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
               </div>
               <div class="form-group">
                 <label>Quantity <span class="text-danger">*</span></label>
@@ -17729,10 +18252,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div id="editPpmpNonPAPDetails">
           <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
 
-          <div class="form-group">
-            <label>General Description & Objective</label>
-            <textarea name="description" rows="2" id="ppmpEditDescription" style="font-size:13px;" oninput="syncDescriptionWithPAPName(this.value)">${escapeHtml(plan.description || '')}</textarea>
-          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Type of Project <span class="text-danger">*</span></label>
@@ -17798,9 +18317,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div class="form-group">
             <label>Remarks</label>
-            <textarea id="ppmpRemarks" name="remarks" rows="2" placeholder="Additional remarks (optional)"></textarea>
+            <textarea id="ppmpRemarks" name="remarks" rows="2" placeholder="Additional remarks (optional)">${escapeHtml(plan.remarks || '')}</textarea>
           </div>
 
+          <input type="hidden" name="description" id="ppmpEditDescription" value="${escapeHtml(plan.description || '')}">
           <div class="form-row">
             <div class="form-group">
               <label>Quantity/Size</label>
@@ -17829,10 +18349,15 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Pre-check the currently linked item with its description (for catalog mode)
       if (plan.item_id && linkedItem && !isPAPs && !isManual) {
+        // Use plan_items unit/unit_price if available, else fall back to catalog item values
+        const storedUnit = (planItem ? planItem.unit : '') || linkedItem.unit || '';
+        const storedUnitPrice = parseFloat((planItem ? planItem.unit_price : 0) || linkedItem.unit_price || 0);
         window._ppmpEditCheckedItems[String(plan.item_id)] = {
           item_id: plan.item_id,
-          item: linkedItem,
+          item: { ...linkedItem, unit: storedUnit, unit_price: storedUnitPrice },
           description: plan.item_description || plan.description || '',
+          unit: storedUnit,
+          unit_price: storedUnitPrice,
           isOriginal: true
         };
       }
@@ -18208,15 +18733,24 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
 
+    const unitOpts = ['lot','set','unit','pcs','pax','ltrs','gal','box','ream','pack','roll','pad','cart','bottle','can','jar','pair','length','sheet','bundle'];
+
     const rows = checkedIds.map(id => {
       const c = checked[id];
       const item = c.item || {};
-      const price = parseFloat(item.unit_price || 0);
+      const currentUnit = (c.unit || item.unit || '').toLowerCase();
+      const price = parseFloat(c.unit_price !== undefined ? c.unit_price : (item.unit_price || 0));
+      const unitDropdown = unitOpts.map(u =>
+        '<option value="' + u + '"' + (u === currentUnit ? ' selected' : '') + '>' + u + '</option>'
+      ).join('');
+      // If stored unit isn't in standard list, add it
+      const extraOpt = (!unitOpts.includes(currentUnit) && currentUnit) ?
+        '<option value="' + escapeHtml(currentUnit) + '" selected>' + escapeHtml(currentUnit) + '</option>' : '';
       return '<tr>' +
         '<td style="font-weight:600;white-space:nowrap;">' + escapeHtml(item.code || '') + '</td>' +
         '<td>' + escapeHtml(item.name || '') + (c.isOriginal ? ' <span style="background:#38a169;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;">current</span>' : '') + '</td>' +
-        '<td>' + (item.unit || '') + '</td>' +
-        '<td style="text-align:right;white-space:nowrap;">\u20b1' + price.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td><select class="form-select" style="width:70px;font-size:11px;" onchange="updateEditPPMPItemUnit(\'' + id + '\', this.value)">' + extraOpt + unitDropdown + '</select></td>' +
+        '<td style="text-align:right;white-space:nowrap;"><input type="number" step="0.01" min="0" style="width:90px;font-size:11px;text-align:right;" value="' + price.toFixed(2) + '" onchange="updateEditPPMPItemPrice(\'' + id + '\', this.value)"></td>' +
         '<td><textarea rows="1" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;resize:vertical;" placeholder="Item description..." oninput="updateEditPPMPItemDesc(\'' + id + '\', this.value)">' + escapeHtml(c.description || '') + '</textarea></td>' +
         '<td style="text-align:center;"><button type="button" onclick="toggleEditPPMPItem(\'' + id + '\', false)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:14px;" title="Remove"><i class="fas fa-times-circle"></i></button></td>' +
       '</tr>';
@@ -18243,6 +18777,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         item_id: parseInt(itemId),
         item: item,
         description: buildItemDescription(item),
+        unit: item.unit || '',
+        unit_price: parseFloat(item.unit_price || 0),
         isOriginal: false
       };
       const sectionField = document.getElementById('ppmpSection');
@@ -18262,6 +18798,25 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.updateEditPPMPItemDesc = function(itemId, value) {
     if (window._ppmpEditCheckedItems[itemId]) {
       window._ppmpEditCheckedItems[itemId].description = value;
+    }
+  };
+
+  window.updateEditPPMPItemUnit = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      window._ppmpEditCheckedItems[itemId].unit = value;
+      if (window._ppmpEditCheckedItems[itemId].item) {
+        window._ppmpEditCheckedItems[itemId].item.unit = value;
+      }
+    }
+  };
+
+  window.updateEditPPMPItemPrice = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      const price = parseFloat(value) || 0;
+      window._ppmpEditCheckedItems[itemId].unit_price = price;
+      if (window._ppmpEditCheckedItems[itemId].item) {
+        window._ppmpEditCheckedItems[itemId].item.unit_price = price;
+      }
     }
   };
 
@@ -18570,33 +19125,66 @@ Failure to submit the above requirements within the prescribed period shall cons
             ...commonData,
             ppmp_no: form.ppmp_no?.value || undefined,
             item_id: window._ppmpEditPlan?.item_id || null,
-            item_description: window._ppmpEditPlan?.item_description || null
+            item_description: window._ppmpEditPlan?.item_description || null,
+            // Preserve plan_items with current unit/price from the edit form
+            items: [{
+              item_code: '',
+              item_name: commonData.description || '',
+              item_description: window._ppmpEditPlan?.item_description || '',
+              unit: window._ppmpEditSpecificEntryData?.item_unit || 'pc',
+              unit_price: window._ppmpEditSpecificEntryData?.unit_price || 0,
+              category: commonData.category || '',
+              q1_qty: parseInt(commonData.quantity_size) || 1,
+              q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+            }]
           };
           await apiRequest('/plans/' + planId, 'PUT', data);
           savedCount = 1;
         } else {
           // 1. Update the original PPMP entry
           if (originalEntry) {
+            const origItem = checked[originalEntry].item || {};
             const origDesc = checked[originalEntry].description || null;
             const origData = {
               ...commonData,
               ppmp_no: form.ppmp_no?.value || undefined,
               item_id: parseInt(originalEntry),
-              category: checked[originalEntry].item?.category || commonData.category,
-              item_description: origDesc
+              category: origItem.category || commonData.category,
+              item_description: origDesc,
+              items: [{
+                item_code: origItem.code || '',
+                item_name: origItem.name || commonData.description || '',
+                item_description: origDesc || '',
+                unit: origItem.unit || window._ppmpEditSpecificEntryData?.item_unit || 'pc',
+                unit_price: parseFloat(origItem.unit_price || commonData.total_amount / (parseFloat(commonData.quantity_size) || 1)) || 0,
+                category: origItem.category || commonData.category || '',
+                q1_qty: parseInt(commonData.quantity_size) || 1,
+                q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+              }]
             };
             await apiRequest('/plans/' + planId, 'PUT', origData);
             savedCount++;
           } else if (checkedIds.length > 0) {
             // No original item — update with the first checked item
             const firstId = checkedIds[0];
+            const firstItem = checked[firstId].item || {};
             const firstDesc = checked[firstId].description || null;
             const firstData = {
               ...commonData,
               ppmp_no: form.ppmp_no?.value || undefined,
               item_id: parseInt(firstId),
-              category: checked[firstId].item?.category || commonData.category,
-              item_description: firstDesc
+              category: firstItem.category || commonData.category,
+              item_description: firstDesc,
+              items: [{
+                item_code: firstItem.code || '',
+                item_name: firstItem.name || commonData.description || '',
+                item_description: firstDesc || '',
+                unit: firstItem.unit || 'pc',
+                unit_price: parseFloat(firstItem.unit_price || 0),
+                category: firstItem.category || commonData.category || '',
+                q1_qty: parseInt(commonData.quantity_size) || 1,
+                q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+              }]
             };
             await apiRequest('/plans/' + planId, 'PUT', firstData);
             savedCount++;
@@ -18618,7 +19206,17 @@ Failure to submit the above requirements within the prescribed period shall cons
                 category: c.item?.category || commonData.category,
                 item_description: c.description || null,
                 description: c.description || commonData.description,
-                total_amount: itemTotal
+                total_amount: itemTotal,
+                items: [{
+                  item_code: c.item?.code || '',
+                  item_name: c.item?.name || c.description || '',
+                  item_description: c.description || '',
+                  unit: c.item?.unit || 'pc',
+                  unit_price: itemPrice,
+                  category: c.item?.category || commonData.category || '',
+                  q1_qty: parseInt(commonData.quantity_size) || 1,
+                  q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+                }]
               };
             });
 
@@ -19217,44 +19815,28 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal('Submit to APP', html, { preventOutsideClose: true });
   };
 
-  // Create PR from APP Modal
+  // Create PR from APP Modal — Redirects to PR page with pre-populated data
   window.showCreatePRFromAPPModal = function(itemId) {
     const items = window._appItems || [];
     const item = items.find(i => i.id === itemId);
     if (!item) { alert('APP item not found'); return; }
 
-    const unitPrice = parseFloat(item.unit_price || 0);
-    const totalQty = parseInt(item.total_qty || 0);
-    const totalPrice = parseFloat(item.total_price || (unitPrice * totalQty));
+    // Store the APP item data for pre-population in the PR form
+    window._prFromAPPItem = item;
 
-    const html = `
-      <form id="createPRFromAPPForm">
-        <div class="info-banner" style="margin-bottom: 15px;">
-          <i class="fas fa-file-signature"></i>
-          Create a new Purchase Request based on this APP item.
-        </div>
-        <div class="view-details">
-          <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
-          <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
-          <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-          <div class="detail-row"><label>Total Qty:</label><span>${totalQty} ${item.unit || ''}</span></div>
-          <div class="detail-row"><label>Total ABC:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-        </div>
-        <div class="form-group" style="margin-top: 15px;">
-          <label>PR Amount <span class="text-danger">*</span></label>
-          <input type="number" step="0.01" value="${unitPrice.toFixed(2)}" required placeholder="Amount for this PR">
-        </div>
-        <div class="form-group">
-          <label>Specific Purpose <span class="text-danger">*</span></label>
-          <input type="text" value="${item.item_name || ''}" required placeholder="e.g., Security Services - Q1">
-        </div>
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create PR</button>
-        </div>
-      </form>
-    `;
-    openModal('Create PR from APP', html, { preventOutsideClose: true });
+    // Navigate to PR page
+    if (typeof navigateTo === 'function') {
+      navigateTo('purchase-requests');
+    } else {
+      // Fallback: click the PR nav link
+      const prNav = document.querySelector('[data-page="purchase-requests"]');
+      if (prNav) prNav.click();
+    }
+
+    // Open New PR modal after navigation with a small delay
+    setTimeout(() => {
+      showNewPRModal();
+    }, 300);
   };
 
   // Approve PR Modal
@@ -24753,7 +25335,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       applyALFilters();
     } catch (err) {
       console.error('Failed to load activity logs:', err);
-      document.getElementById('alTableBody').innerHTML = '<tr><td colspan="10" class="text-center" style="padding:30px;color:#e53e3e;">Failed to load activity logs.</td></tr>';
+      document.getElementById('alTableBody').innerHTML = '<tr><td colspan="9" class="text-center" style="padding:30px;color:#e53e3e;">Failed to load activity logs.</td></tr>';
     }
   };
 
@@ -24819,7 +25401,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   function renderALTable(logs) {
     const tbody = document.getElementById('alTableBody');
     if (!logs.length) {
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding:30px;color:#636e78;">No activity logs found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding:30px;color:#636e78;">No activity logs found.</td></tr>';
       return;
     }
     const actionColors = { CREATE: '#276749', UPDATE: '#1e40af', DELETE: '#b91c1c', POST: '#6b21a8', UNPOST: '#92400e', LOGIN: '#b45309', LOGOUT: '#6b7280' };
@@ -24833,7 +25415,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       return `<tr>
         <td style="white-space:nowrap;font-size:12px;">${dateStr}</td>
         <td>${log.full_name || log.username || ''}</td>
-        <td style="font-size:11px;">${(log.user_role || '').replace(/_/g,' ')}</td>
         <td style="font-size:11px;">${log.department || ''}</td>
         <td>${actionBadge}</td>
         <td style="font-size:12px;">${moduleName}</td>
@@ -24869,10 +25450,10 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.exportActivityLogs = function() {
     const data = alFilteredData.length ? alFilteredData : alAllData;
     if (!data.length) { showToast('No data to export', 'warning'); return; }
-    const headers = ['Date & Time','User','Role','Department','Action','Module','Reference','Description','IP Address'];
+    const headers = ['Date & Time','User','Department','Action','Module','Reference','Description','IP Address'];
     const rows = data.map(log => {
       const dt = log.created_at ? new Date(log.created_at).toLocaleString('en-PH') : '';
-      return [dt, log.full_name || log.username || '', log.user_role || '', log.department || '', log.action || '', (log.table_name || '').replace(/_/g,' '), log.reference || '', log.description || '', log.ip_address || ''];
+      return [dt, log.full_name || log.username || '', log.department || '', log.action || '', (log.table_name || '').replace(/_/g,' '), log.reference || '', log.description || '', log.ip_address || ''];
     });
     let csv = '\uFEFF' + headers.join(',') + '\n';
     rows.forEach(r => { csv += r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n'; });
@@ -25051,7 +25632,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div style="display:grid;grid-template-columns:130px 1fr;gap:6px 12px;margin-bottom:4px;font-size:13px;">
         <strong>Date & Time:</strong><span>${dt}</span>
         <strong>User:</strong><span>${log.full_name || log.username || ''}</span>
-        <strong>Role:</strong><span>${(log.user_role || '').replace(/_/g,' ')}</span>
         <strong>Department:</strong><span>${log.department || ''}</span>
         <strong>Action:</strong><span style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;color:#fff;background:${actionColor};">${log.action || ''}</span>
         <strong>Module:</strong><span>${(log.table_name || '').replace(/_/g,' ')}</span>
