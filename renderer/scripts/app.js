@@ -1532,16 +1532,58 @@ async function initPPMPFilters() {
 
 async function loadAPP() {
   try {
-    const fy = getCurrentFiscalYear();
+    const fy = window._appFilterYear || getCurrentFiscalYear();
     const [items, appStatus, budgetSummary] = await Promise.all([
-      apiRequest('/plan-items'),
+      apiRequest('/plan-items?fiscal_year=' + fy),
       loadAPPStatus(fy),
       apiRequest('/app-budget-summary?fiscal_year=' + fy)
     ]);
-    renderAPPTable(items, appStatus);
-    updateAPPSummary(items, budgetSummary);
+
+    // Check if consolidation has been done
+    const isConsolidated = appStatus && appStatus.consolidated_at;
+
+    // Check for new unconsolidated entries (approved after last consolidation)
+    let newUnconsolidatedCount = 0;
+    if (isConsolidated) {
+      const consolidatedAt = new Date(appStatus.consolidated_at);
+      newUnconsolidatedCount = items.filter(item => {
+        const approvedAt = item.updated_at ? new Date(item.updated_at) : null;
+        return approvedAt && approvedAt > consolidatedAt;
+      }).length;
+    }
+
+    // Update consolidate button with badge for new entries
+    const consolidateBtn = document.querySelector('[data-action="consolidate-app"]');
+    if (consolidateBtn) {
+      // Remove old badge if any
+      const oldBadge = consolidateBtn.querySelector('.consolidate-badge');
+      if (oldBadge) oldBadge.remove();
+
+      if (!isConsolidated) {
+        consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff5722;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">Not yet consolidated</span>';
+      } else if (newUnconsolidatedCount > 0) {
+        consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff9800;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">' + newUnconsolidatedCount + ' new</span>';
+      } else {
+        consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP';
+      }
+    }
+
+    // Only show items if consolidated, otherwise show message
+    if (isConsolidated) {
+      renderAPPTable(items, appStatus);
+      updateAPPSummary(items, budgetSummary);
+    } else {
+      renderAPPTable([], appStatus);
+      updateAPPSummary([], budgetSummary);
+      // Show notice
+      const tableBody = document.querySelector('#appTableBody, #app-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#666;font-size:14px;"><i class="fas fa-info-circle" style="font-size:24px;color:#2196f3;margin-bottom:8px;display:block;"></i>No APP entries yet. Click <strong>"Consolidate from PPMP"</strong> to import approved PPMP entries into the Annual Procurement Plan.<br><small style="color:#999;">There are <strong>' + items.length + '</strong> approved PPMP entries ready for consolidation.</small></td></tr>';
+      }
+    }
+
     updateAPPVersionBanner(appStatus);
-    return items;
+    return isConsolidated ? items : [];
   } catch (err) {
     console.log('Using demo APP data');
     return [];
@@ -3133,7 +3175,7 @@ function renderAPPTable(items, appStatus) {
   }
 
   if (!displayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
     return;
   }
 
@@ -3165,7 +3207,6 @@ function renderAPPTable(items, appStatus) {
       <td>${item.item_name || '-'}</td>
       <td>${deptCode}</td>
       <td>${item.item_description || '-'}</td>
-      <td>${projectType}</td>
       <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
       <td>No</td>
       <td>LCRB</td>
@@ -3175,19 +3216,21 @@ function renderAPPTable(items, appStatus) {
       <td>₱${estBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td>-</td>
       <td class="app-version-col">${versionTag}</td>
-      <td>-</td>
+      <td>${item.remarks || '-'}</td>
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewAPPModal(${item.id})"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" data-action="edit-app" title="Edit" onclick="showEditAPPModal(${item.id})" style="color:#2196f3;"><i class="fas fa-edit"></i></button>
           <button class="btn-icon" title="Adjust Budget" onclick="showAdjustAPPBudgetModal(${item.id})" style="color:#d69e2e;"><i class="fas fa-coins"></i></button>
           <button class="btn-icon" title="Create PR" onclick="showCreatePRFromAPPModal(${item.id})"><i class="fas fa-file-signature"></i></button>
+          <button class="btn-icon" data-action="delete-app" title="Delete" onclick="deleteAPPEntry(${item.id})" style="color:#e53e3e;"><i class="fas fa-trash"></i></button>
         </div>
       </td>
     </tr>
   `;
   }).join('') + `
     <tr style="background:#f0f4f8;font-weight:bold;border-top:2px solid #1a365d;">
-      <td colspan="11" style="text-align:right;padding-right:15px;">${shouldFilter ? (chiefRole === 'chief_fad' ? 'FAD & Others ' : (chiefRole === 'chief_wrsd' ? 'WRSD ' : userDivCode + ' ')) : ''}Total (${appTotalCount} items):</td>
+      <td colspan="10" style="text-align:right;padding-right:15px;">${shouldFilter ? (chiefRole === 'chief_fad' ? 'FAD & Others ' : (chiefRole === 'chief_wrsd' ? 'WRSD ' : userDivCode + ' ')) : ''}Total (${appTotalCount} items):</td>
       <td>₱${appTotalBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td colspan="4"></td>
     </tr>
@@ -3215,6 +3258,128 @@ window.filterAPPTable = function(searchText) {
     const text = row.textContent.toLowerCase();
     row.style.display = text.includes(query) ? '' : 'none';
   });
+};
+
+/** APP FY filter change handler */
+window.onAPPFYChange = function() {
+  const sel = document.getElementById('appFYFilter');
+  if (sel) {
+    // Extract year from the selected option text (e.g., "FY 2026" -> 2026)
+    const text = sel.options[sel.selectedIndex]?.text || '';
+    const match = text.match(/(\d{4})/);
+    if (match) window._appFilterYear = parseInt(match[1]);
+  }
+  loadAPP();
+};
+
+/** Edit APP Modal */
+window.showEditAPPModal = async function(planId) {
+  try {
+    const plan = await apiRequest('/plans/' + planId);
+    if (!plan) { showNotification('APP entry not found', 'error'); return; }
+    const procModes = await apiRequest('/procurement-modes').catch(() => []);
+    const procModeOpts = procModes.map(m => `<option value="${m.name || m}" ${(plan.procurement_mode || '') === (m.name || m) ? 'selected' : ''}>${m.name || m}</option>`).join('');
+
+    const html = `
+      <form id="editAPPForm" onsubmit="submitEditAPP(event, ${planId})">
+        <div class="info-banner" style="margin-bottom:10px;background:#e3f2fd;">
+          <i class="fas fa-edit"></i> <strong>Edit APP Entry</strong> — ${plan.ppmp_no ? plan.ppmp_no.replace('PPMP-', 'APP-') : ''}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>APP Code</label>
+            <input type="text" value="${(plan.ppmp_no || '').replace('PPMP-', 'APP-')}" readonly style="background:#f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Project Title / Description</label>
+            <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mode of Procurement</label>
+            <select class="form-select" id="editAppProcMode">
+              <option value="">-- Select --</option>
+              ${procModeOpts}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Source of Funds</label>
+            <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start of Procurement</label>
+            <input type="month" id="editAppStartDate" value="${plan.start_date || ''}">
+          </div>
+          <div class="form-group">
+            <label>End of Procurement</label>
+            <input type="month" id="editAppEndDate" value="${plan.end_date || ''}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Estimated Budget (ABC)</label>
+            <input type="number" id="editAppBudget" value="${parseFloat(plan.total_amount || 0).toFixed(2)}" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Remarks</label>
+            <input type="text" id="editAppRemarks" value="${escapeHtml(plan.remarks || '')}">
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#2196f3;border-color:#2196f3;"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit APP Entry', html, { preventOutsideClose: true });
+  } catch (err) {
+    showNotification('Error loading APP entry: ' + err.message, 'error');
+  }
+};
+
+window.submitEditAPP = async function(e, planId) {
+  e.preventDefault();
+  if (!confirm('Save changes to this APP entry?')) return;
+  try {
+    await apiRequest('/plan-items/' + planId + '/adjust-budget', 'PUT', {
+      total_amount: parseFloat(document.getElementById('editAppBudget')?.value) || 0
+    });
+    // Update other fields via plans endpoint
+    await apiRequest('/plans/' + planId, 'PUT', {
+      description: document.getElementById('editAppDescription')?.value || '',
+      procurement_mode: document.getElementById('editAppProcMode')?.value || '',
+      fund_source: document.getElementById('editAppFundSource')?.value || '',
+      start_date: document.getElementById('editAppStartDate')?.value || null,
+      end_date: document.getElementById('editAppEndDate')?.value || null,
+      remarks: document.getElementById('editAppRemarks')?.value || ''
+    });
+    showNotification('APP entry updated successfully!', 'success');
+    closeModal();
+    loadAPP();
+  } catch (err) {
+    showNotification('Error updating APP entry: ' + err.message, 'error');
+  }
+};
+
+/** Delete APP Entry (soft-delete by marking as deleted) */
+window.deleteAPPEntry = async function(planId) {
+  const confirmed = await govConfirm({
+    title: 'Delete APP Entry',
+    bodyHtml: '<p style="color:#c53030;">Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will also mark the corresponding PPMP entry as deleted.</p>',
+    confirmText: 'Delete',
+    cancelText: 'Cancel'
+  });
+  if (!confirmed) return;
+  try {
+    await apiRequest('/plans/' + planId, 'PUT', { is_deleted: true });
+    showNotification('APP entry deleted successfully', 'success');
+    loadAPP();
+  } catch (err) {
+    showNotification('Error deleting APP entry: ' + err.message, 'error');
+  }
 };
 
 function updateAPPSummary(items, budgetSummary) {
@@ -3612,7 +3777,7 @@ function renderAbstractTable(abstract) {
       <td>${a.rfq_number || ''}</td>
       <td>${a.purpose || ''}</td>
       <td>${itemSpecHtml}</td>
-      <td>-</td>
+      <td>${a.num_bidders || 0}</td>
       <td>${a.recommended_supplier_name || ''}</td>
       <td>₱${parseFloat(a.recommended_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
       <td>${statusBadge(statusLabel, statusClass)}</td>
@@ -5165,7 +5330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     admin: {
       // Admin can do everything
       canCreatePPMP: true, canEditPPMP: true, canApprovePPMP: true, canViewPPMP: true,
-      canCreateAPP: true, canApproveAPP: true, canConsolidateAPP: true, canViewAPP: true,
+      canCreateAPP: true, canApproveAPP: true, canConsolidateAPP: true, canEditAPP: true, canDeleteAPP: true, canViewAPP: true,
       canCreatePR: true, canEditPR: true, canApprovePR: true, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: true, canViewAbstract: true,
@@ -5261,7 +5426,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hope: {
       // HoPE: Approvals for NOA, PO, final oversight
       canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: true, canViewPPMP: true,
-      canCreateAPP: false, canApproveAPP: true, canConsolidateAPP: false, canViewAPP: true,
+      canCreateAPP: false, canApproveAPP: true, canConsolidateAPP: false, canEditAPP: true, canDeleteAPP: true, canViewAPP: true,
       canCreatePR: false, canEditPR: false, canApprovePR: true, canViewPR: true,
       canCreateRFQ: false, canSendRFQ: false, canViewRFQ: true,
       canCreateAbstract: false, canApproveAbstract: false, canViewAbstract: true,
@@ -5299,7 +5464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bac_secretariat: {
       // BAC Secretariat: Creates RFQ, Abstract, BAC Res, NOA, prepares documents
       canCreatePPMP: false, canEditPPMP: false, canApprovePPMP: false, canViewPPMP: true,
-      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: true, canViewAPP: true,
+      canCreateAPP: false, canApproveAPP: false, canConsolidateAPP: true, canEditAPP: true, canDeleteAPP: true, canViewAPP: true,
       canCreatePR: false, canEditPR: false, canApprovePR: false, canViewPR: true,
       canCreateRFQ: true, canSendRFQ: true, canViewRFQ: true,
       canCreateAbstract: true, canApproveAbstract: false, canViewAbstract: true,
@@ -5693,6 +5858,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // APP
       canCreateAPP: ['[data-action="create-app"]'],
       canConsolidateAPP: ['[data-action="consolidate-app"]', '.btn-consolidate-app'],
+      canEditAPP: ['[data-action="edit-app"]'],
+      canDeleteAPP: ['[data-action="delete-app"]'],
       canApproveAPP: ['[data-action="approve-app"]'],
       // PR
       canCreatePR: ['[data-action="create-pr"]', '.btn-create-pr'],
@@ -7499,7 +7666,9 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
           <select class="form-select" id="rfqSupplierId" onchange="rfqFillSupplierDetails()" required>
             <option value="">-- Select Supplier --</option>
             ${supplierOpts}
+            <option value="__manual__">— Enter Supplier Details Manually —</option>
           </select>
+          <input type="text" id="rfqManualSupplierName" placeholder="Enter company name" style="display:none;">
         </div>
         <div class="form-group">
           <label>Company Address</label>
@@ -7528,6 +7697,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Items</div>
         <div class="form-items-section">
         ${buildCatalogItemsTableHTML('rfq', true)}
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line = one bullet)</label>
+          <textarea rows="4" id="rfqItemSpecs" placeholder="Auto-filled from linked PR specifications..."></textarea>
+          <small style="color:#888;">Each line will appear as a bullet point in the RFQ table and print.</small>
         </div>
 
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
@@ -7572,12 +7748,27 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     const sel = document.getElementById('rfqSupplierId');
     const addrField = document.getElementById('rfqCompanyAddress');
     const tinField = document.getElementById('rfqTIN');
+    const manualInput = document.getElementById('rfqManualSupplierName');
     if (!sel) return;
-    const suppId = parseInt(sel.value);
-    const suppliers = window._rfqSuppliers || [];
-    const found = suppliers.find(s => s.id === suppId);
-    if (addrField) addrField.value = found ? (found.address || '') : '';
-    if (tinField) tinField.value = found ? (found.tin || '') : '';
+
+    if (sel.value === '__manual__') {
+      // Manual entry mode
+      if (manualInput) { manualInput.style.display = 'block'; manualInput.setAttribute('required', 'true'); }
+      if (addrField) { addrField.readOnly = false; addrField.style.background = '#fff'; addrField.placeholder = 'Enter company address'; addrField.value = ''; }
+      if (tinField) { tinField.readOnly = false; tinField.style.background = '#fff'; tinField.placeholder = 'Enter TIN'; tinField.value = ''; }
+      sel.removeAttribute('required');
+    } else {
+      // Dropdown selection mode
+      if (manualInput) { manualInput.style.display = 'none'; manualInput.removeAttribute('required'); manualInput.value = ''; }
+      if (addrField) { addrField.readOnly = true; addrField.style.background = '#f5f5f5'; addrField.placeholder = 'Auto-filled from supplier'; }
+      if (tinField) { tinField.readOnly = true; tinField.style.background = '#f5f5f5'; tinField.placeholder = 'Auto-filled from supplier'; }
+      sel.setAttribute('required', 'true');
+      const suppId = parseInt(sel.value);
+      const suppliers = window._rfqSuppliers || [];
+      const found = suppliers.find(s => s.id === suppId);
+      if (addrField) addrField.value = found ? (found.address || '') : '';
+      if (tinField) tinField.value = found ? (found.tin || '') : '';
+    }
   };
 
   // When user selects a PR in the RFQ form, auto-fill items from that PR
@@ -7607,6 +7798,11 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         });
       }
       renderDocItemsList('rfq');
+      // Auto-fill item specifications from PR
+      if (pr.item_specifications) {
+        const specsField = document.getElementById('rfqItemSpecs');
+        if (specsField) specsField.value = pr.item_specifications;
+      }
     } catch(e) { console.error('Error loading PR items for RFQ:', e); }
   };
 
@@ -7640,6 +7836,10 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     const prId = document.getElementById('rfqLinkedPR')?.value || '';
     const deadline = document.getElementById('rfqDeadline')?.value || '';
     const supplierId = document.getElementById('rfqSupplierId')?.value || '';
+    const isManualSupplier = document.getElementById('rfqSupplierId')?.value === '__manual__';
+    const manualSupplierName = document.getElementById('rfqManualSupplierName')?.value?.trim() || '';
+    const manualSupplierAddress = document.getElementById('rfqCompanyAddress')?.value?.trim() || '';
+    const manualSupplierTin = document.getElementById('rfqTIN')?.value?.trim() || '';
     const selectedItems = window._docSelectedItems['rfq'] || [];
     const items = selectedItems.map((si, idx) => ({
       item_id: si.item_id, item_code: si.item_code || 'RFQ-ITEM-' + (idx + 1),
@@ -7651,8 +7851,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       const data = {
         rfq_number: rfqNumber, pr_id: prId ? parseInt(prId) : null,
         date_prepared: rfqDate || null, submission_deadline: deadline || null,
-        abc_amount: abcAmount, status: 'on_going', items: items,
-        suppliers: supplierId ? [{ supplier_id: parseInt(supplierId) }] : []
+        abc_amount: abcAmount, status: 'on_going',
+        item_specifications: document.getElementById('rfqItemSpecs')?.value.trim() || null,
+        items: items,
+        suppliers: !isManualSupplier && supplierId ? [{ supplier_id: parseInt(supplierId) }] : [],
+        manual_supplier_name: isManualSupplier ? manualSupplierName : null,
+        manual_supplier_address: isManualSupplier ? manualSupplierAddress : null,
+        manual_supplier_tin: isManualSupplier ? manualSupplierTin : null
       };
       const result = await apiRequest('/rfqs', 'POST', data);
       const rfqId = result.id || result.rfq_id;
@@ -7672,6 +7877,18 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
   window.showNewAbstractModal = async function() {
     // Ensure RFQ data is loaded
     if (!cachedRFQ || cachedRFQ.length === 0) { try { cachedRFQ = await apiRequest('/rfq'); } catch(e) {} }
+    // Load UOMs from database
+    let uomList = [];
+    try { uomList = await apiRequest('/uoms'); } catch(e) {}
+    window._aoqUomList = uomList;
+    const uomOptionsHtml = uomList.map(u => `<option value="${u.name || u}">${u.name || u}</option>`).join('') || '<option value="Lot">Lot</option><option value="Pcs">Pcs</option><option value="Unit">Unit</option>';
+    window._aoqUomOptionsHtml = uomOptionsHtml;
+    // Load employees for BAC member dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    const empOptions = employees.filter(e => e.status === 'active' || !e.status).map(e => `<option value="${e.id}">${e.full_name}${e.designation_name ? ' — ' + e.designation_name : ''}</option>`).join('');
+    // Load items catalog for picker
+    await ensureItemsCatalogLoaded();
     // Build RFQ options sorted by rfq_number
     const sortedRFQs = [...(cachedRFQ || [])].sort((a, b) => (a.rfq_number || '').localeCompare(b.rfq_number || ''));
     const rfqOptions = sortedRFQs.map(r => {
@@ -7706,6 +7923,9 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         </div>
         <div class="form-section-header section-items"><i class="fas fa-table"></i> Particulars & Supplier Quotations</div>
         <div class="form-items-section">
+        <div style="margin-bottom:10px;">
+          <button type="button" class="btn btn-sm btn-primary" onclick="showAbstractCatalogItemModal()"><i class="fas fa-search"></i> Select Items from Catalog</button>
+        </div>
         <div style="overflow-x: auto;">
           <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 900px;">
             <thead>
@@ -7744,22 +7964,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
               </tr>
             </tbody>
             <tbody id="abstractItemsBody">
-              <tr>
-                <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
-                <td>
-                  <select class="form-select" style="width: 50px; font-size: 11px;">
-                    <option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option>
-                  </select>
-                </td>
-                <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
-                <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
-                <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-                <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-                <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-                <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-                <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-                <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -7776,6 +7980,74 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         <div class="form-group">
           <label>Specifications (one per line)</label>
           <textarea rows="4" id="abstractItemSpecs" placeholder="Auto-filled from RFQ specifications when RFQ is selected..."></textarea>
+        </div>
+
+        <div class="form-section-header section-signatories"><i class="fas fa-users"></i> BAC Members (Signatories)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">BAC Vice-Chairperson</label>
+              <select id="absViceChairpersonId" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">BAC Member</label>
+              <select id="absBacMember1Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">BAC Member</label>
+              <select id="absBacMember2Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">BAC Member</label>
+              <select id="absBacMember3Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat</label>
+              <select id="absBacSecretariatId" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">BAC Chairperson</label>
+              <select id="absBacChairpersonId" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Regional Director</label>
+              <select id="absRegionalDirectorId" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat (2)</label>
+              <select id="absBacSecretariat2Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
         </div>
 
         <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
@@ -7839,14 +8111,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       if (tbody && rfq.items && rfq.items.length > 0) {
         tbody.innerHTML = '';
         rfq.items.forEach(item => {
+          const curUnit = item.unit || 'Lot';
+          // Show unit as read-only text from the source item (PPMP/RFQ)
+          const unitCell = '<span style="font-size:11px;font-weight:500;">' + curUnit + '</span><input type="hidden" value="' + curUnit + '">';
           const row = document.createElement('tr');
           row.innerHTML = `
             <td><input type="number" value="${item.quantity || 0}" style="width: 45px; font-size: 11px;" min="0"></td>
-            <td>
-              <select class="form-select" style="width: 50px; font-size: 11px;">
-                ${['Lot','Pax','Pcs','Unit','Ltrs','Gal','Set','Box','Ream'].map(u => `<option value="${u}" ${(item.unit||'').toLowerCase() === u.toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}
-              </select>
-            </td>
+            <td>${unitCell}</td>
             <td><input type="text" value="${item.item_description || item.item_name || ''}" style="width: 100%; font-size: 11px;"></td>
             <td><input type="number" value="${parseFloat(item.abc_total_cost || item.abc_unit_cost || 0).toFixed(2)}" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
             <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
@@ -7876,7 +8147,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
     row.innerHTML =
       '<td><input type="number" placeholder="0" style="width:45px;font-size:11px;" min="0"></td>' +
-      '<td><select class="form-select" style="width:50px;font-size:11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>' +
+      '<td><input type="text" placeholder="Unit" style="width:60px;font-size:11px;"></td>' +
       '<td><input type="text" placeholder="Item description..." style="width:100%;font-size:11px;"></td>' +
       '<td><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;" min="0"></td>' +
       bidderCells;
@@ -7971,6 +8242,95 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     const headerEl = document.getElementById('editAbsSupplier' + slotNum + 'Header');
     if (!headerEl) return;
     headerEl.textContent = inputEl.value.trim() || 'Supplier ' + slotNum;
+  };
+
+  /** Open a catalog item modal for Abstract of Quotations - select items from catalog */
+  window.showAbstractCatalogItemModal = function() {
+    const allItems = window._ppmpItemsCache || [];
+    const uomOpts = window._aoqUomOptionsHtml || '<option>Lot</option><option>Pcs</option><option>Unit</option>';
+    const itemRows = allItems.map(item => {
+      const id = 'abs-cat-' + item.id;
+      return '<tr data-item-id="' + item.id + '" style="cursor:pointer;" onclick="addAbstractCatalogItem(' + item.id + ', this)">' +
+        '<td style="font-size:11px;">' + escapeHtml(item.code || '') + '</td>' +
+        '<td style="font-size:11px;font-weight:600;">' + escapeHtml(item.name || '') + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(item.category || '') + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="font-size:11px;text-align:right;">' + parseFloat(item.unit_price || 0).toFixed(2) + '</td>' +
+        '<td style="text-align:center;font-size:11px;"><i class="fas fa-plus-circle" style="color:#2b6cb0;"></i></td>' +
+      '</tr>';
+    }).join('');
+    const overlay = document.createElement('div');
+    overlay.id = 'absCatalogOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:white;border-radius:10px;width:95%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
+        <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;font-size:15px;"><i class="fas fa-search"></i> Select Items from Catalog</span>
+          <button onclick="document.getElementById('absCatalogOverlay')?.remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:10px 20px;">
+          <input type="text" id="absCatalogSearch" placeholder="Search by item code, name, category..." oninput="filterAbstractCatalogItems()" style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="flex:1;overflow:auto;padding:0 20px;">
+          <table class="data-table" style="font-size:12px;width:100%;">
+            <thead><tr>
+              <th>Code</th><th>Item Name</th><th>Category</th><th>Unit</th><th>Price</th><th style="width:50px;">Add</th>
+            </tr></thead>
+            <tbody id="absCatalogBody">${itemRows}</tbody>
+          </table>
+        </div>
+        <div style="padding:12px 20px;border-top:1px solid #eee;text-align:right;">
+          <button type="button" onclick="document.getElementById('absCatalogOverlay')?.remove()" class="btn btn-primary" style="padding:8px 24px;"><i class="fas fa-check"></i> Done</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items in abstract catalog modal */
+  window.filterAbstractCatalogItems = function() {
+    const tbody = document.getElementById('absCatalogBody');
+    if (!tbody) return;
+    const search = (document.getElementById('absCatalogSearch')?.value || '').toLowerCase();
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Add a selected catalog item as a row in the abstract items table */
+  window.addAbstractCatalogItem = function(itemId, rowEl) {
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) return;
+    const curUnit = item.unit || 'Lot';
+    // Show unit from the item as read-only (fetched from PPMP/catalog)
+    const unitCell = '<span style="font-size:11px;font-weight:500;">' + curUnit + '</span><input type="hidden" value="' + curUnit + '">';
+    const count = window._abstractBidderCount || 3;
+    let bidderCells = '';
+    for (let i = 0; i < count; i++) {
+      const bg = _absBgColorsCell[i % _absBgColorsCell.length];
+      bidderCells +=
+        '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" min="0" onchange="calcAbstractTotal(this)"></td>' +
+        '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:80px;font-size:11px;" readonly></td>';
+    }
+    const tbody = document.getElementById('abstractItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><input type="number" value="1" style="width:45px;font-size:11px;" min="0"></td>' +
+      '<td>' + unitCell + '</td>' +
+      '<td><input type="text" value="' + escapeHtml(item.description || item.name || '') + '" style="width:100%;font-size:11px;"></td>' +
+      '<td><input type="number" value="' + parseFloat(item.unit_price || 0).toFixed(2) + '" step="0.01" style="width:90px;font-size:11px;" min="0"></td>' +
+      bidderCells;
+    tbody.appendChild(row);
+    // Mark the catalog row as added
+    if (rowEl) {
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
   };
 
   window.showNewNOAModal = async function() {
@@ -8147,8 +8507,24 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (abstract) {
           const supplierField = document.getElementById('noaSupplierName');
           const amountField = document.getElementById('noaContractAmount');
+          const addressField = document.getElementById('noaAddress');
           if (supplierField && abstract.recommended_supplier_name) {
             supplierField.value = abstract.recommended_supplier_name;
+            // Try to fetch supplier address from suppliers list
+            if (addressField) {
+              const suppliers = window._noaSuppliers || [];
+              const matchedSupplier = suppliers.find(s =>
+                (s.name || '').toLowerCase().trim() === abstract.recommended_supplier_name.toLowerCase().trim()
+              );
+              if (matchedSupplier && matchedSupplier.address) {
+                addressField.value = matchedSupplier.address;
+              } else if (abstract.recommended_supplier_id) {
+                try {
+                  const sup = await apiRequest('/suppliers/' + abstract.recommended_supplier_id);
+                  if (sup && sup.address) addressField.value = sup.address;
+                } catch(e) {}
+              }
+            }
           }
           if (amountField && abstract.recommended_amount) {
             amountField.value = abstract.recommended_amount;
@@ -8334,7 +8710,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Auto-fill PO supplier from linked NOA's supplier name
-  window.poAutoFillFromNOA = function(noaId) {
+  window.poAutoFillFromNOA = async function(noaId) {
     if (!noaId || !window._poNOAList) return;
     const noa = window._poNOAList.find(n => String(n.id) === String(noaId));
     if (!noa) return;
@@ -8360,6 +8736,69 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (amountField && noa.contract_amount) {
       amountField.value = parseFloat(noa.contract_amount).toFixed(2);
     }
+    // Auto-fill purpose and items by tracing: NOA -> BAC Res -> Abstract -> RFQ -> PR
+    try {
+      if (noa.bac_resolution_id) {
+        const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
+        if (bacRes && bacRes.abstract_id) {
+          const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+          if (abstract) {
+            // Fill purpose from abstract or PR
+            const purposeField = document.getElementById('poPurpose');
+            if (purposeField && !purposeField.value) {
+              let purpose = abstract.purpose || '';
+              if (!purpose && abstract.rfq_id) {
+                try {
+                  const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
+                  if (rfq && rfq.pr_id) {
+                    const pr = await apiRequest('/purchase-requests/' + rfq.pr_id);
+                    if (pr && pr.purpose) purpose = pr.purpose;
+                  }
+                } catch(e) {}
+              }
+              if (purpose) purposeField.value = purpose;
+            }
+            // Fill procurement mode
+            const procModeField = document.getElementById('poProcMode');
+            if (procModeField && abstract.procurement_mode) {
+              for (const opt of procModeField.options) {
+                if (opt.value === abstract.procurement_mode || opt.textContent.includes(abstract.procurement_mode)) {
+                  procModeField.value = opt.value;
+                  break;
+                }
+              }
+            }
+            // Fill items from abstract quotations (winning bidder items)
+            const quotations = abstract.quotations || [];
+            const winningQuot = quotations.find(q =>
+              q.supplier_name && abstract.recommended_supplier_name &&
+              q.supplier_name.toLowerCase() === abstract.recommended_supplier_name.toLowerCase()
+            ) || quotations[0];
+            if (winningQuot && winningQuot.items && winningQuot.items.length > 0) {
+              const tbody = document.getElementById('poItemsBody');
+              if (tbody) {
+                tbody.innerHTML = '';
+                winningQuot.items.forEach((item, idx) => {
+                  const qty = parseFloat(item.quantity || item.qty || 1);
+                  const unitPrice = parseFloat(item.unit_price || item.bid_price || 0);
+                  const amount = qty * unitPrice;
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+                    <td><input type="text" value="${idx + 1}" style="width: 50px; text-align: center;"></td>
+                    <td><select class="form-select" style="width: 60px;"><option ${(item.unit||'Lot')==='Lot'?'selected':''}>Lot</option><option ${(item.unit||'')==='Pax'?'selected':''}>Pax</option><option ${(item.unit||'')==='Pcs'?'selected':''}>Pcs</option><option ${(item.unit||'')==='Unit'?'selected':''}>Unit</option><option ${(item.unit||'')==='Box'?'selected':''}>Box</option><option ${(item.unit||'')==='Ream'?'selected':''}>Ream</option><option ${(item.unit||'')==='Set'?'selected':''}>Set</option></select></td>
+                    <td><textarea rows="2" style="width: 100%;">${item.item_name || item.description || ''}</textarea></td>
+                    <td><input type="number" value="${qty}" style="width: 60px;" min="0" onchange="calcPOItemTotal(this)"></td>
+                    <td><input type="number" value="${unitPrice.toFixed(2)}" step="0.01" style="width: 90px;" min="0" onchange="calcPOItemTotal(this)"></td>
+                    <td><input type="number" value="${amount.toFixed(2)}" step="0.01" style="width: 90px;" readonly></td>
+                  `;
+                  tbody.appendChild(row);
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch(e) { console.warn('[PO] Could not auto-fill from NOA chain:', e); }
   };
 
   window.addPOItemRow = function() {
@@ -12672,6 +13111,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (prefix === 'pr') {
       const prTotal = document.getElementById('prTotalAmount');
       if (prTotal) prTotal.textContent = '\u20b1' + grandTotal.toLocaleString('en-PH', {minimumFractionDigits:2});
+      // Auto-populate item specifications from catalog item descriptions
+      const prItemSpecs = document.getElementById('prItemSpecs');
+      if (prItemSpecs && items.length > 0) {
+        const specsLines = items.map(it => it.item_description || it.description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0 && !prItemSpecs.value.trim()) {
+          prItemSpecs.value = specsLines.join('\n');
+        }
+      }
     } else if (prefix === 'po') {
       const poTotal = document.getElementById('poTotalAmount');
       if (poTotal) poTotal.value = grandTotal.toFixed(2);
@@ -12787,6 +13234,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const prId = document.getElementById('rfqLinkedPR')?.value || '';
     const deadline = document.getElementById('rfqDeadline')?.value || '';
     const supplierId = document.getElementById('rfqSupplierId')?.value || '';
+    const isManualSupplier = document.getElementById('rfqSupplierId')?.value === '__manual__';
+    const manualSupplierName = document.getElementById('rfqManualSupplierName')?.value?.trim() || '';
+    const manualSupplierAddress = document.getElementById('rfqCompanyAddress')?.value?.trim() || '';
+    const manualSupplierTin = document.getElementById('rfqTIN')?.value?.trim() || '';
 
     // Read items from catalog selection
     const selectedItems = window._docSelectedItems['rfq'] || [];
@@ -12811,8 +13262,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
         status: 'draft',
+        item_specifications: document.getElementById('rfqItemSpecs')?.value.trim() || null,
         items: items,
-        suppliers: supplierId ? [{ supplier_id: parseInt(supplierId) }] : []
+        suppliers: !isManualSupplier && supplierId ? [{ supplier_id: parseInt(supplierId) }] : [],
+        manual_supplier_name: isManualSupplier ? manualSupplierName : null,
+        manual_supplier_address: isManualSupplier ? manualSupplierAddress : null,
+        manual_supplier_tin: isManualSupplier ? manualSupplierTin : null
       };
       const result = await apiRequest('/rfqs', 'POST', data);
       const rfqId = result.id || result.rfq_id;
@@ -12919,6 +13374,14 @@ Failure to submit the above requirements within the prescribed period shall cons
         item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
         recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
         recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+        vice_chairperson_id: document.getElementById('absViceChairpersonId')?.value || null,
+        bac_member1_id: document.getElementById('absBacMember1Id')?.value || null,
+        bac_member2_id: document.getElementById('absBacMember2Id')?.value || null,
+        bac_member3_id: document.getElementById('absBacMember3Id')?.value || null,
+        bac_secretariat_id: document.getElementById('absBacSecretariatId')?.value || null,
+        bac_chairperson_id: document.getElementById('absBacChairpersonId')?.value || null,
+        regional_director_id: document.getElementById('absRegionalDirectorId')?.value || null,
+        bac_secretariat2_id: document.getElementById('absBacSecretariat2Id')?.value || null,
         quotations: sortedQuotations
       };
       const result = await apiRequest('/abstracts', 'POST', data);
@@ -12948,6 +13411,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
     const rfqId = document.getElementById('noaRFQRef')?.value || '';
     const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
+    const supplierAddress = document.getElementById('noaAddress')?.value.trim() || '';
     const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
 
     if (!confirm('Save this Notice of Award as draft?')) return;
@@ -12958,6 +13422,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         bac_resolution_id: bacResId ? parseInt(bacResId) : null,
         rfq_id: rfqId ? parseInt(rfqId) : null,
         supplier_name: supplierName,
+        address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
         status: 'draft'
@@ -13107,6 +13572,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const resNumber = document.getElementById('bacResNumber')?.value || '';
     const series = document.getElementById('bacResSeries')?.value || String(getCurrentFiscalYear());
     const subject = document.getElementById('bacResSubject')?.value || '';
+    const description = document.getElementById('bacResDescription')?.value || '';
     const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
@@ -13123,16 +13589,37 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (!subject) { alert('Please enter the resolution subject.'); return; }
     if (!confirm('Save this BAC Resolution as draft?')) return;
 
+    // Collect bidders from the table
+    const bidderRows = document.querySelectorAll('#bacBiddersBody tr');
+    const bidders = [];
+    bidderRows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || '';
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || '';
+        if (name) bidders.push({ name, amount, remarks });
+      }
+    });
+
+    // Get recommended awardee from linked abstract
+    const linkedAbstract = window._bacLinkedAbstract || null;
+    const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
+
     try {
       const data = {
         resolution_number: resNumber,
         abstract_id: abstractId ? parseInt(abstractId) : null,
         resolution_date: new Date().toISOString().split('T')[0],
-        procurement_mode: 'SVP',
+        procurement_mode: linkedAbstract?.procurement_mode || 'Small Value Procurement',
         abc_amount: abcAmount,
         bid_amount: contractPrice,
         bidder_type: bidderType,
         status: 'draft',
+        subject: subject,
+        description: description,
+        recommended_awardee_name: recommendedAwardeeName,
+        bidders: bidders,
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
         bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
@@ -13269,6 +13756,14 @@ Failure to submit the above requirements within the prescribed period shall cons
         item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
         recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
         recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+        vice_chairperson_id: document.getElementById('absViceChairpersonId')?.value || null,
+        bac_member1_id: document.getElementById('absBacMember1Id')?.value || null,
+        bac_member2_id: document.getElementById('absBacMember2Id')?.value || null,
+        bac_member3_id: document.getElementById('absBacMember3Id')?.value || null,
+        bac_secretariat_id: document.getElementById('absBacSecretariatId')?.value || null,
+        bac_chairperson_id: document.getElementById('absBacChairpersonId')?.value || null,
+        regional_director_id: document.getElementById('absRegionalDirectorId')?.value || null,
+        bac_secretariat2_id: document.getElementById('absBacSecretariat2Id')?.value || null,
         quotations: sortedQuotations
       };
       const result = await apiRequest('/abstracts', 'POST', data);
@@ -13292,12 +13787,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
     const rfqId = document.getElementById('noaRFQRef')?.value || '';
     const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
+    const supplierAddress = document.getElementById('noaAddress')?.value.trim() || '';
     const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
     if (!confirm('Are you sure you want to issue this Notice of Award?')) return;
     try {
       const data = {
         noa_number: noaNumber, bac_resolution_id: bacResId ? parseInt(bacResId) : null,
         rfq_id: rfqId ? parseInt(rfqId) : null, supplier_name: supplierName,
+        address: supplierAddress,
         contract_amount: contractAmount, date_issued: noaDate || null, status: 'issued'
       };
       const result = await apiRequest('/notices-of-award', 'POST', data);
@@ -13318,6 +13815,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const resNumber = document.getElementById('bacResNumber')?.value || '';
     const series = document.getElementById('bacResSeries')?.value || String(getCurrentFiscalYear());
     const subject = document.getElementById('bacResSubject')?.value || '';
+    const description = document.getElementById('bacResDescription')?.value || '';
     const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
@@ -13330,11 +13828,30 @@ Failure to submit the above requirements within the prescribed period shall cons
     const hopeId = document.getElementById('bacHopeId')?.value || null;
     if (!subject) { alert('Please enter the resolution subject.'); return; }
     if (!confirm('Are you sure you want to submit this BAC Resolution?')) return;
+
+    // Collect bidders from the table
+    const bidderRows = document.querySelectorAll('#bacBiddersBody tr');
+    const bidders = [];
+    bidderRows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || '';
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || '';
+        if (name) bidders.push({ name, amount, remarks });
+      }
+    });
+
+    const linkedAbstract = window._bacLinkedAbstract || null;
+    const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
+
     try {
       const data = {
         resolution_number: resNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
-        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: 'SVP',
+        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: linkedAbstract?.procurement_mode || 'Small Value Procurement',
         abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
+        subject: subject, description: description,
+        recommended_awardee_name: recommendedAwardeeName, bidders: bidders,
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
         bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
@@ -15633,11 +16150,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group">
           <label>Subject / Title</label>
-          <textarea rows="2" id="bacResSubject" placeholder="e.g., RESOLUTION DECLARING [Supplier Name] AS THE LOWEST CALCULATED AND RESPONSIVE BIDDER FOR THE PROCUREMENT OF [Item Description]" required></textarea>
+          <textarea rows="2" id="bacResSubject" placeholder="Auto-generated when bidder type and abstract are selected..." required></textarea>
         </div>
         <div class="form-group">
           <label>Linked Abstract of Quotation</label>
-          <select class="form-select" id="bacResLinkedAbstract" required>
+          <select class="form-select" id="bacResLinkedAbstract" required onchange="onBACLinkedAbstractChange(this.value)">
             <option value="">-- Select Abstract of Quotation --</option>
             ${abstractOptions}
           </select>
@@ -15694,7 +16211,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-section-header section-items"><i class="fas fa-award"></i> Award Details</div>
         <div class="form-group">
           <label>Bidder Type Classification</label>
-          <select class="form-select" id="bacResBidderType" required>
+          <select class="form-select" id="bacResBidderType" required onchange="updateBACResSubject()">
             <option value="LOWEST CALCULATED AND RESPONSIVE (LCRB)">LOWEST CALCULATED AND RESPONSIVE (LCRB)</option>
             <option value="HIGHEST RATED AND RESPONSIVE (HRRB)">HIGHEST RATED AND RESPONSIVE (HRRB)</option>
             <option value="MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)">MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)</option>
@@ -15845,6 +16362,64 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
+  /** Auto-fill BAC Resolution from linked Abstract data (bidders, ABC, supplier, description) */
+  window.onBACLinkedAbstractChange = async function(abstractId) {
+    if (!abstractId) return;
+    try {
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) return;
+      // Auto-fill ABC amount from abstract's recommended amount or total
+      const abcField = document.getElementById('bacResABC');
+      if (abcField && abs.recommended_amount) abcField.value = parseFloat(abs.recommended_amount).toFixed(2);
+      // Auto-fill contract price from recommended supplier's bid
+      const contractField = document.getElementById('bacResContractPrice');
+      if (contractField && abs.recommended_amount) contractField.value = parseFloat(abs.recommended_amount).toFixed(2);
+      // Auto-fill description from purpose
+      const descField = document.getElementById('bacResDescription');
+      if (descField && abs.purpose) descField.value = abs.purpose;
+      // Auto-fill bidders from abstract quotations
+      const quotations = abs.quotations || [];
+      if (quotations.length > 0) {
+        const tbody = document.getElementById('bacBiddersBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          quotations.forEach((q, idx) => {
+            const row = document.createElement('tr');
+            const bidAmount = parseFloat(q.bid_amount || 0);
+            const isRecommended = abs.recommended_supplier_name && q.supplier_name === abs.recommended_supplier_name;
+            row.innerHTML = `
+              <td><input type="text" value="${idx + 1}" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" value="${escapeHtml(q.supplier_name || '')}" style="width: 100%;"></td>
+              <td><input type="number" value="${bidAmount.toFixed(2)}" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" value="${isRecommended ? 'LCRB / Responsive' : 'Responsive'}" style="width: 100%;"></td>
+            `;
+            tbody.appendChild(row);
+          });
+        }
+      }
+      // Store abstract data for subject generation
+      window._bacLinkedAbstract = abs;
+      // Toggle PhilGEPS if ABC was set
+      togglePhilGEPSFields();
+      // Update subject
+      updateBACResSubject();
+    } catch(e) { console.error('Error loading abstract for BAC:', e); }
+  };
+
+  /** Update BAC Resolution subject based on bidder type and linked abstract */
+  window.updateBACResSubject = function() {
+    const bidderType = document.getElementById('bacResBidderType')?.value || '';
+    const abs = window._bacLinkedAbstract;
+    const subjectField = document.getElementById('bacResSubject');
+    if (!subjectField) return;
+    const supplierName = abs ? (abs.recommended_supplier_name || '') : '';
+    const description = document.getElementById('bacResDescription')?.value || (abs ? abs.purpose || '' : '');
+    if (bidderType && (supplierName || description)) {
+      const bidderLabel = bidderType.split('(')[0].trim();
+      subjectField.value = `RESOLUTION DECLARING ${supplierName ? supplierName.toUpperCase() + ' AS THE ' : ''}${bidderLabel} BIDDER FOR ${description.toUpperCase()}`;
+    }
+  };
+
   // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = async function() {
     // Load employees from DB for TWG member dropdowns
@@ -15891,7 +16466,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div class="form-group">
             <label>Linked Abstract</label>
-            <select class="form-select" id="postQualLinkedAbstract" required>
+            <select class="form-select" id="postQualLinkedAbstract" required onchange="onPostQualLinkedAbstractChange(this.value)">
               <option value="">-- Select Abstract --</option>
               ${abstractOptions}
             </select>
@@ -16137,6 +16712,46 @@ Failure to submit the above requirements within the prescribed period shall cons
       '<td><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;"></td>' +
       bidderCells;
     tbody.appendChild(row);
+  };
+
+  /** Auto-fill post-qual form when linked abstract is selected */
+  window.onPostQualLinkedAbstractChange = async function(abstractId) {
+    if (!abstractId) return;
+    try {
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) return;
+
+      // Auto-fill subject
+      const subjectField = document.getElementById('postQualSubject');
+      if (subjectField && abs.purpose) subjectField.value = abs.purpose;
+
+      // Auto-fill bidder names from abstract quotations
+      const quotations = abs.quotations || [];
+      quotations.forEach((q, i) => {
+        const bidderInput = document.getElementById('twgBidder' + (i + 1));
+        if (bidderInput && q.supplier_name) bidderInput.value = q.supplier_name;
+      });
+
+      // Auto-fill price comparison - first row Particulars and ABC
+      const priceBody = document.getElementById('twgPriceBody');
+      if (priceBody && priceBody.rows.length > 0) {
+        const firstRow = priceBody.rows[0];
+        const inputs = firstRow.querySelectorAll('input');
+        // Particulars (first input)
+        if (inputs[0] && abs.purpose) inputs[0].value = abs.purpose;
+        // ABC (second input)
+        if (inputs[1] && abs.recommended_amount) inputs[1].value = abs.recommended_amount;
+        // Bidder amounts
+        quotations.forEach((q, i) => {
+          if (inputs[i + 2] && q.bid_amount) inputs[i + 2].value = q.bid_amount;
+        });
+      }
+
+      // Store for later use
+      window._postQualLinkedAbstract = abs;
+    } catch (e) {
+      console.warn('Error loading abstract for post-qual:', e);
+    }
   };
 
   // =====================================================
@@ -16758,39 +17373,205 @@ Failure to submit the above requirements within the prescribed period shall cons
       const totalAmt = parseFloat(plan.total_amount || 0);
       const statusClass = plan.status === 'approved' ? 'approved' : plan.status === 'submitted' ? 'submitted' : 'draft';
       const items = plan.items || [];
-      const itemsHtml = items.length > 0 ? '<div style="margin-top:15px;"><h4 style="margin-bottom:8px;">Plan Items (' + items.length + ')</h4><table class="data-table full-width" style="font-size:12px;"><thead><tr><th>Code</th><th>Item Name</th><th>Unit</th><th>Unit Price</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Total Qty</th><th>Category</th></tr></thead><tbody>' + items.map(it => '<tr><td>' + (it.item_code||'-') + '</td><td>' + (it.item_name||'-') + '</td><td>' + (it.unit||'-') + '</td><td>₱' + parseFloat(it.unit_price||0).toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td><td>' + (it.q1_qty||0) + '</td><td>' + (it.q2_qty||0) + '</td><td>' + (it.q3_qty||0) + '</td><td>' + (it.q4_qty||0) + '</td><td>' + (it.total_qty||0) + '</td><td>' + (it.category||'-') + '</td></tr>').join('') + '</tbody></table></div>' : '';
+      const procSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
+      const sourceBadgeClass = procSource === 'PS-DBM' ? 'psdbm' : procSource === 'PAPs' ? 'paps' : 'non-psdbm';
+      const isAdmin = userHasRole('admin');
+
+      // Build items table
+      let itemsHtml = '';
+      if (items.length > 0) {
+        itemsHtml = `
+          <div class="form-section-header"><i class="fas fa-layer-group"></i> Plan Items (${items.length})</div>
+          <div style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px;">
+            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+              <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Item Name</th>
+                <th>Description</th>
+                <th style="width:60px;">Unit</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:50px;">Q1</th>
+                <th style="width:50px;">Q2</th>
+                <th style="width:50px;">Q3</th>
+                <th style="width:50px;">Q4</th>
+                <th style="width:60px;">Total Qty</th>
+                <th style="width:90px;">Category</th>
+              </tr></thead>
+              <tbody>
+                ${items.map((it, idx) => `<tr>
+                  <td>${idx+1}</td>
+                  <td>${it.item_name||'-'}</td>
+                  <td>${it.item_description||it.description||'-'}</td>
+                  <td>${it.unit||'-'}</td>
+                  <td style="text-align:right;">₱${parseFloat(it.unit_price||0).toLocaleString('en-PH',{minimumFractionDigits:2})}</td>
+                  <td style="text-align:center;">${it.q1_qty||0}</td>
+                  <td style="text-align:center;">${it.q2_qty||0}</td>
+                  <td style="text-align:center;">${it.q3_qty||0}</td>
+                  <td style="text-align:center;">${it.q4_qty||0}</td>
+                  <td style="text-align:center;">${it.total_qty||0}</td>
+                  <td>${it.category||'-'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }
 
       const html = `
-        <div class="view-details">
-          <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo}</span></div>
-          <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
-          <div class="detail-row"><label>Fiscal Year:</label><span>${plan.fiscal_year}</span></div>
-          <div class="detail-row"><label>Section:</label><span style="font-weight:700; color:#b8860b; text-transform:uppercase;">${plan.section || '-'}</span></div>
-          <div class="detail-row"><label>Category:</label><span style="font-weight:600; color:#1565c0;">${plan.item_category || plan.category || '-'}</span></div>
-          <div class="detail-row"><label>Procurement Source:</label><span><span class="source-badge ${(plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PS-DBM' ? 'psdbm' : (plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PAPs' ? 'paps' : 'non-psdbm'}" style="font-size:11px;padding:2px 10px;border-radius:10px;">${plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM'}</span></span></div>
-          ${plan.item_name ? `<div class="detail-row"><label>Linked Item:</label><span style="font-weight:600;">${plan.item_name} <span style="color:#4a5568;">(${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</span></span></div>` : ''}
-          ${plan.item_description ? `<div class="detail-row"><label>Item Description:</label><span style="white-space:pre-line;">${plan.item_description}</span></div>` : ''}
-          <div class="detail-row"><label>General Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
-          <div class="detail-row"><label>Project Type:</label><span>${plan.project_type || 'Goods'}</span></div>
-          <div class="detail-row"><label>Quantity/Size:</label><span>${plan.quantity_size || '-'}</span></div>
-          <div class="detail-row"><label>Mode of Procurement:</label><span>${plan.procurement_mode || 'Small Value Procurement'}</span></div>
-          <div class="detail-row"><label>Pre-Procurement:</label><span>${plan.pre_procurement || 'NO'}</span></div>
-          <div class="detail-row"><label>Start Date:</label><span>${formatMonthYear(plan.start_date, true)}</span></div>
-          <div class="detail-row"><label>End Date:</label><span>${formatMonthYear(plan.end_date, true)}</span></div>
-          <div class="detail-row"><label>Delivery Period:</label><span>${formatMonthYear(plan.delivery_period, true)}</span></div>
-          <div class="detail-row"><label>Source of Funds:</label><span>${plan.fund_source || 'GAA'}</span></div>
-          <div class="detail-row"><label>Total ABC:</label><span>₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-          <div class="detail-row"><label>Status:</label><span><span class="status-badge ${statusClass}">${plan.status}</span></span></div>
-          <div class="detail-row"><label>Remarks:</label><span>${plan.remarks || '-'}</span></div>
-          <div class="detail-row"><label>Date Created:</label><span>${plan.created_at ? new Date(plan.created_at).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}) : '-'}</span></div>
-        </div>
-        ${itemsHtml}
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-          <button type="button" class="btn btn-primary" onclick="closeModal(); showEditPPMPModal(${planId});"><i class="fas fa-edit"></i> Edit</button>
+        <div style="padding:0;">
+          <div class="info-banner" style="margin-bottom: 16px; background: #ebf5fb; border-left: 4px solid #1a365d; padding: 10px 14px;">
+            <i class="fas fa-info-circle" style="color: #1a365d;"></i>
+            <strong>PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</strong><br>
+            <small style="color: #555;">Per NGPA Form — RA 12009 IRR Section 7.7.2</small>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>PPMP No.</label>
+              <input type="text" value="${ppmpNo}" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+            </div>
+            <div class="form-group">
+              <label>Fiscal Year</label>
+              <input type="text" value="${plan.fiscal_year || '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>End-User / Division</label>
+              <input type="text" value="${deptCode} - ${plan.department_name || ''}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Plan Type</label>
+              <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555;">
+                  <input type="checkbox" disabled ${(plan.plan_type||'').toLowerCase().includes('indicative') ? 'checked' : ''}> INDICATIVE
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555;">
+                  <input type="checkbox" disabled ${(plan.plan_type||'').toLowerCase().includes('final') ? 'checked' : ''}> FINAL
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Procurement Source</label>
+              <div style="padding:6px 0;">
+                <span class="source-badge ${sourceBadgeClass}" style="font-size:12px;padding:3px 12px;border-radius:10px;font-weight:600;">${procSource}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Details</div>
+
+          ${plan.item_name ? `
+          <div class="form-row">
+            <div class="form-group">
+              <label>Linked Item</label>
+              <input type="text" value="${plan.item_name} (${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+            </div>
+          </div>` : ''}
+
+          ${plan.item_description ? `
+          <div class="form-row">
+            <div class="form-group">
+              <label>Item Description</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.item_description}</textarea>
+            </div>
+          </div>` : ''}
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Section</label>
+              <input type="text" value="${plan.section || '-'}" readonly style="background:#f0f0f0; color:#b8860b; font-weight:700; text-transform:uppercase;">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" value="${plan.item_category || plan.category || '-'}" readonly style="background:#f0f0f0; color:#1565c0; font-weight:600;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>General Description</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.description || plan.remarks || '-'}</textarea>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type of Project</label>
+              <input type="text" value="${plan.project_type || 'Goods'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Quantity / Size</label>
+              <input type="text" value="${plan.quantity_size || '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mode of Procurement</label>
+              <input type="text" value="${plan.procurement_mode || 'Small Value Procurement'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Pre-Procurement Conference</label>
+              <input type="text" value="${plan.pre_procurement || 'NO'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Source of Funds</label>
+              <input type="text" value="${plan.fund_source || 'GAA'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Start of Procurement</label>
+              <input type="text" value="${formatMonthYear(plan.start_date, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>End of Procurement</label>
+              <input type="text" value="${formatMonthYear(plan.end_date, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery</label>
+              <input type="text" value="${formatMonthYear(plan.delivery_period, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          ${itemsHtml}
+
+          <div class="form-section-header"><i class="fas fa-info-circle"></i> Status & Summary</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Total ABC</label>
+              <input type="text" value="₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}" readonly style="background:#f0f0f0; color:#1a365d; font-weight:700; font-size:14px;">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <div style="padding:6px 0;"><span class="status-badge ${statusClass}">${plan.status}</span></div>
+            </div>
+            <div class="form-group">
+              <label>Date Created</label>
+              <input type="text" value="${plan.created_at ? new Date(plan.created_at).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}) : '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Remarks</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.remarks || '-'}</textarea>
+            </div>
+          </div>
+
+          <div class="form-group" style="text-align: right; margin-top: 20px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            ${isAdmin ? `<button type="button" class="btn btn-primary" onclick="closeModal(); showEditPPMPModal(${planId});"><i class="fas fa-edit"></i> Edit</button>` : ''}
+          </div>
         </div>
       `;
-      openModal('View PPMP Details', html);
+      openModal('View PPMP Details', html, { preventOutsideClose: false });
     } catch (err) {
       alert('Failed to load PPMP details: ' + err.message);
     }
@@ -17193,6 +17974,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>ABC Amount:</label><span>${viewCurrency(r.abc_amount)}</span></div>
         <div class="detail-row"><label>Quantity:</label><span>${prQty}</span></div>
         <div class="detail-row"><label>Unit:</label><span>${prUnit}</span></div>
+        ${r.manual_supplier_name ? `
+        <div class="detail-row"><label>Supplier (Manual):</label><span><strong>${r.manual_supplier_name}</strong></span></div>
+        <div class="detail-row"><label>Company Address:</label><span>${r.manual_supplier_address || '-'}</span></div>
+        <div class="detail-row"><label>TIN:</label><span>${r.manual_supplier_tin || '-'}</span></div>
+        ` : ''}
         <div class="detail-row"><label>PhilGEPS Required:</label><span>${r.philgeps_required ? '<i class="fas fa-check text-success"></i> Yes' : 'No'}</span></div>
         <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(r.status)}</span></div>
         <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
@@ -18030,10 +18816,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       console.log('[PPMP EDIT] Category dropdown built with current category:', currentCategory);
 
       // Determine which section to show based on procurement source
+      // NON PS-DBM items with a linked item_id are catalog items, not manual
       const isPAPs = dbProcSource === 'PAPs';
-      const isManual = dbProcSource === 'MANUAL-NON-PSDBM' || dbProcSource === 'NON PS-DBM';
-      const showCatalogSection = !isPAPs && !isManual;
-      const showManualSection = isManual;
+      const isManualCreated = dbProcSource === 'MANUAL-NON-PSDBM';
+      const isNonPSDBMFromCatalog = dbProcSource === 'NON PS-DBM' && plan.item_id;
+      const isNonPSDBMManual = dbProcSource === 'NON PS-DBM' && !plan.item_id;
+      const showCatalogSection = dbProcSource === 'PS-DBM' || isNonPSDBMFromCatalog;
+      const showManualSection = isManualCreated || isNonPSDBMManual;
       const showPAPsSection = isPAPs;
 
       // Populate item details using specificEntryData (with HTML escaping)
@@ -18052,7 +18841,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const manualNameValue = escapeHtml(plan.description || (planItem ? planItem.item_name : '') || '');
       const manualDescValue = escapeHtml(plan.item_description || (planItem ? planItem.item_description : '') || '');
 
-      console.log('[PPMP EDIT] Section determination - isPAPs:', isPAPs, 'isManual:', isManual, 'showCatalog:', showCatalogSection);
+      console.log('[PPMP EDIT] Section determination - isPAPs:', isPAPs, 'isManualCreated:', isManualCreated, 'isNonPSDBMManual:', isNonPSDBMManual, 'showCatalog:', showCatalogSection);
 
       // Determine plan type checkboxes
       const isIndicative = plan.plan_type === 'INDICATIVE' || (plan.plan_type || '').includes('INDICATIVE');
@@ -18117,7 +18906,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
 
           <!-- ===== CATALOG ITEMS SECTION (PS-DBM / NON PS-DBM) ===== -->
-          <div id="editPPMPCatalogSection" style="display:${showCatalogSection && !showManualSection && !showPAPsSection ? 'block' : 'none'};">
+          <div id="editPPMPCatalogSection" style="display:${showCatalogSection ? 'block' : 'none'};">
             <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
             <div class="form-row-3">
               <div class="form-group">
@@ -19016,7 +19805,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           return;
         }
 
-        if (!confirm('Save PPMP changes (Manual NON-PS-DBM item)?')) return;
+        const manualConfirmed = await govConfirm({
+          title: 'Save PPMP Changes',
+          bodyHtml: `<p>Save PPMP changes with <strong>Manual NON-PS-DBM</strong> item?</p>
+            <div class="item-summary"><div class="item-line">1. ${itemName} <span style="float:right;">₱${(itemPrice * (parseFloat(itemQty) || 1)).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div></div>`,
+          confirmText: 'Save Changes',
+          cancelText: 'Cancel'
+        });
+        if (!manualConfirmed) return;
 
         const data = {
           ...commonData,
@@ -19045,7 +19841,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         };
 
         await apiRequest('/plans/' + planId, 'PUT', data);
-        alert('PPMP entry saved successfully!');
+        showNotification('PPMP entry saved successfully!', 'success');
 
       } else if (procSource === 'PAPs') {
         // PAPs mode - get data from correct form field IDs
@@ -19064,7 +19860,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           return;
         }
 
-        if (!confirm('Save PPMP changes (PAP entry)?')) return;
+        const papConfirmed = await govConfirm({
+          title: 'Save PPMP Changes',
+          bodyHtml: `<p>Save PPMP changes with <strong>PAP</strong> entry?</p>
+            <div class="item-summary"><div class="item-line">1. ${papName} <span style="float:right;">₱${(papPrice * (parseFloat(papQty) || 1)).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div></div>`,
+          confirmText: 'Save Changes',
+          cancelText: 'Cancel'
+        });
+        if (!papConfirmed) return;
 
         const data = {
           ...commonData,
@@ -19094,7 +19897,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         };
 
         await apiRequest('/plans/' + planId, 'PUT', data);
-        alert('PPMP entry saved successfully!');
+        showNotification('PPMP entry saved successfully!', 'success');
 
       } else {
         // Catalog mode (PS-DBM / NON PS-DBM)
@@ -19106,16 +19909,30 @@ Failure to submit the above requirements within the prescribed period shall cons
         const newEntries = checkedIds.filter(id => !checked[id].isOriginal);
 
         // Build confirmation message
+        let catalogConfirmed = false;
         if (checkedIds.length === 0) {
-          if (!confirm('Save PPMP changes? (No items linked)')) return;
+          catalogConfirmed = await govConfirm({
+            title: 'Save PPMP Changes',
+            bodyHtml: '<p>Save PPMP changes? <strong>No items linked.</strong></p>',
+            confirmText: 'Save Changes',
+            cancelText: 'Cancel'
+          });
         } else {
           const totalItems = checkedIds.length;
-          const itemSummary = checkedIds.map((id, i) => {
+          const itemLines = checkedIds.map((id, i) => {
             const c = checked[id];
-            return '  ' + (i+1) + '. ' + (c.item?.name || 'Item #' + id) + (c.isOriginal ? ' (current)' : ' (NEW)');
-          }).join('\n');
-          if (!confirm('Save changes for ' + totalItems + ' item(s)?\n\n' + itemSummary + '\n\n' + (newEntries.length > 0 ? newEntries.length + ' new PPMP entries will be created.' : 'Updating existing entry.'))) return;
+            return `<div class="item-line">${i+1}. ${c.item?.name || 'Item #' + id} ${c.isOriginal ? '<span style="color:#999;">(current)</span>' : '<span style="color:#2196f3;font-weight:600;">(NEW)</span>'}</div>`;
+          }).join('');
+          catalogConfirmed = await govConfirm({
+            title: 'Save PPMP Changes',
+            bodyHtml: `<p>Save changes for <strong>${totalItems} item(s)</strong>?</p>
+              <div class="item-summary">${itemLines}</div>
+              ${newEntries.length > 0 ? '<p style="color:#1565c0;font-weight:600;margin-top:8px;">' + newEntries.length + ' new PPMP entries will be created.</p>' : '<p style="color:#555;margin-top:8px;">Updating existing entry.</p>'}`,
+            confirmText: 'Save Changes',
+            cancelText: 'Cancel'
+          });
         }
+        if (!catalogConfirmed) return;
 
         let savedCount = 0;
 
@@ -19235,7 +20052,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           }
         }
 
-        alert('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!');
+        showNotification('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!', 'success');
       }
 
       closeModal();
@@ -20781,23 +21598,23 @@ Failure to submit the above requirements within the prescribed period shall cons
 
           <!-- Date Inspected | Date Received -->
           <tr>
-            <td colspan="2" style="font-size:9px; border-bottom:none;">
+            <td colspan="2" style="font-size:9px; border-bottom:none; height:22px;">
               <strong>Date Inspected:</strong> ${fmtDate(iar.date_inspected || iar.inspection_date)}
             </td>
-            <td colspan="2" style="font-size:9px; border-bottom:none;">
+            <td colspan="2" style="font-size:9px; border-bottom:none; height:22px;">
               <strong>Date Received:</strong> ${fmtDate(iar.date_received || iar.delivery_date)}
             </td>
           </tr>
 
-          <!-- Inspection checkbox + Acceptance checkboxes -->
+          <!-- Inspection checkbox + Acceptance checkboxes (equal height) -->
           <tr>
-            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; min-height:60px;">
+            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; height:70px;">
               <div style="margin-bottom:6px;">
                 <input type="checkbox" class="iar-check" ${inspChecked}>
                 <span class="iar-label">Inspected, verified and found in order<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;as to quantity and specifications</span>
               </div>
             </td>
-            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; min-height:60px;">
+            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; height:70px;">
               <div style="margin-bottom:6px;">
                 <input type="checkbox" class="iar-check" ${accComplete}>
                 <span class="iar-label">Complete</span>
@@ -20810,15 +21627,15 @@ Failure to submit the above requirements within the prescribed period shall cons
             </td>
           </tr>
 
-          <!-- Signature section -->
+          <!-- Signature section (equal height) -->
           <tr>
-            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:50px;">
+            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
                 <strong>${iar.inspected_by_name || ''}</strong>
               </div>
               <div style="font-size:8px; margin-top:2px;">Inspection Officer/Inspection Committee</div>
             </td>
-            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:50px;">
+            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
                 <strong>${iar.received_by_name || ''}</strong>
               </div>
@@ -21147,24 +21964,33 @@ Failure to submit the above requirements within the prescribed period shall cons
         } catch (e) { console.warn('Could not load abstract:', e); }
       }
 
-      // BAC members (fetched from API, with hardcoded defaults)
-      let bacChairName = 'REGIENALD S. ESPALDON', bacChairDesignation = 'Chairperson';
-      let bacSecName = 'GIOVANNI S. PAREDES', bacSecTitle = 'BAC-Secretariat';
+      // BAC members and TWG members from employee records
+      let employees = [];
+      try { employees = await apiRequest('/employees'); } catch(e) {}
+
+      const getEmpName = (empId) => {
+        if (!empId) return '_______________';
+        const emp = employees.find(e => e.id === parseInt(empId));
+        return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+      };
+
+      let bacChairName = '_______________', bacChairDesignation = 'Chairperson';
+      let bacSecName = '_______________', bacSecTitle = 'BAC-Secretariat';
       try {
-        const [allUsers, allEmployees] = await Promise.all([apiRequest('/users'), apiRequest('/employees')]);
+        const allUsers = await apiRequest('/users');
         const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
         if (bacChairUser) bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
         const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
         if (bacSecUser) bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
       } catch(e) {}
 
-      // TWG members (hardcoded per official template)
-      const twgHead = 'ANNE JANE M. HALLASGO';
+      // TWG members from DB selections (not hardcoded)
+      const twgHead = getEmpName(pq.twg_head_id);
       const twgMembers = [
-        'EDDIE PARAGUYA',
-        'APPLE MAE C. TANDOY',
-        'JOHN LOUIE A. MEDILLO',
-        'MARK E. MARASIGAN'
+        getEmpName(pq.twg_member1_id),
+        getEmpName(pq.twg_member2_id),
+        getEmpName(pq.twg_member3_id),
+        getEmpName(pq.twg_member4_id)
       ];
 
       const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase() : '_______________';
@@ -21486,8 +22312,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       showNotification('Loading Notice of Award data for print...', 'info');
 
-      // Find NOA record
-      let noa = cachedNOA.find(x => x.id === noaId);
+      // Find NOA record - fetch full details from API for supplier_address
+      let noa = null;
+      try { noa = await apiRequest('/notices-of-award/' + noaId); } catch(e) {}
+      if (!noa) { noa = cachedNOA.find(x => x.id === noaId); }
       if (!noa) { showNotification('NOA not found', 'error'); return; }
 
       // Fetch supplier details for address/contact
@@ -21556,7 +22384,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       const supplierName = (noa.supplier_name || supplier?.name || '_______________').toUpperCase();
       const contactPerson = supplier?.contact_person || '';
-      const supplierAddress = supplier?.address || '_______________';
+      const supplierAddress = noa.supplier_address || supplier?.address || '_______________';
       const subjectText = purpose || 'Procurement Activity';
       const rfqRef = rfqNumber ? `(${rfqNumber})` : '(RFQ No. _______________)';
 
@@ -21778,18 +22606,18 @@ Failure to submit the above requirements within the prescribed period shall cons
       const philgepsStartDate = bacRes.philgeps_posted_from || options.philgepsStartDate || null;
       const philgepsEndDate = bacRes.philgeps_posted_until || options.philgepsEndDate || null;
 
-      // BAC Members
-      const chairpersonName = getEmployeeName(bacRes.chairperson_id);
-      const chairpersonDesig = getEmployeeDesignation(bacRes.chairperson_id) || 'Chairperson';
-      const viceChairName = getEmployeeName(bacRes.vice_chairperson_id);
-      const viceChairDesig = getEmployeeDesignation(bacRes.vice_chairperson_id) || 'Vice-Chairperson';
-      const member1Name = getEmployeeName(bacRes.member1_id);
-      const member1Desig = getEmployeeDesignation(bacRes.member1_id) || 'Member';
-      const member2Name = getEmployeeName(bacRes.member2_id);
-      const member2Desig = getEmployeeDesignation(bacRes.member2_id) || 'Member';
-      const member3Name = getEmployeeName(bacRes.member3_id);
-      const member3Desig = getEmployeeDesignation(bacRes.member3_id) || 'Member';
-      const hopeName = getEmployeeName(bacRes.hope_id);
+      // BAC Members - use JOINed names from API, fallback to employee lookup with correct DB field names
+      const chairpersonName = bacRes.chairperson_name ? bacRes.chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_chairperson_id);
+      const chairpersonDesig = getEmployeeDesignation(bacRes.bac_chairperson_id) || 'Chairperson';
+      const viceChairName = bacRes.vice_chairperson_name ? bacRes.vice_chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_vice_chairperson_id);
+      const viceChairDesig = getEmployeeDesignation(bacRes.bac_vice_chairperson_id) || 'Vice-Chairperson';
+      const member1Name = bacRes.member1_name ? bacRes.member1_name.toUpperCase() : getEmployeeName(bacRes.bac_member1_id);
+      const member1Desig = getEmployeeDesignation(bacRes.bac_member1_id) || 'Member';
+      const member2Name = bacRes.member2_name ? bacRes.member2_name.toUpperCase() : getEmployeeName(bacRes.bac_member2_id);
+      const member2Desig = getEmployeeDesignation(bacRes.bac_member2_id) || 'Member';
+      const member3Name = bacRes.member3_name ? bacRes.member3_name.toUpperCase() : getEmployeeName(bacRes.bac_member3_id);
+      const member3Desig = getEmployeeDesignation(bacRes.bac_member3_id) || 'Member';
+      const hopeName = bacRes.hope_name ? bacRes.hope_name.toUpperCase() : getEmployeeName(bacRes.hope_id);
       const hopeDesig = getEmployeeDesignation(bacRes.hope_id) || 'Regional Director';
 
       // Build posting-specific WHEREAS clause based on PDF templates
@@ -22970,9 +23798,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </div>
 
-        <div class="rfq-info-row"><span class="rfq-label">Company Name:</span> ___________________________________</div>
-        <div class="rfq-info-row"><span class="rfq-label">Company Address:</span> ___________________________________</div>
-        <div class="rfq-info-row"><span class="rfq-label">TIN:</span> ___________________________________</div>
+        <div class="rfq-info-row"><span class="rfq-label">Company Name:</span> ${rfq.manual_supplier_name ? '<u>' + rfq.manual_supplier_name + '</u>' : '___________________________________'}</div>
+        <div class="rfq-info-row"><span class="rfq-label">Company Address:</span> ${rfq.manual_supplier_address ? '<u>' + rfq.manual_supplier_address + '</u>' : '___________________________________'}</div>
+        <div class="rfq-info-row"><span class="rfq-label">TIN:</span> ${rfq.manual_supplier_tin ? '<u>' + rfq.manual_supplier_tin + '</u>' : '___________________________________'}</div>
 
         <div style="margin-top:10px;">
           <div class="rfq-body-text" style="text-align:left;">Sir/Madam:</div>
@@ -23097,22 +23925,38 @@ Failure to submit the above requirements within the prescribed period shall cons
         } catch(e) { console.warn('Could not fetch RFQ data:', e); }
       }
 
-      // BAC members (from Excel template)
-      let bacChairName = 'REGIENALD S. ESPALDON', bacChairDesignation = 'BAC Chairperson';
-      let bacViceChairName = 'EVAL B. MAKINANO', bacViceChairDesignation = 'BAC Vice-Chairperson';
+      // BAC members — use signatories saved on the abstract record
+      let bacChairName = '_______________', bacChairDesignation = 'BAC Chairperson';
+      let bacViceChairName = '_______________', bacViceChairDesignation = 'BAC Vice-Chairperson';
       let bacMembers = [
-        { name: 'REYNON E. ARLAN', title: 'BAC Member' },
-        { name: 'MARISSA A. GARAY', title: 'BAC Member' },
-        { name: 'GARY P. SALADORES', title: 'BAC Member' }
+        { name: '_______________', title: 'BAC Member' },
+        { name: '_______________', title: 'BAC Member' },
+        { name: '_______________', title: 'BAC Member' }
       ];
-      let bacSecName = 'GIOVANNI S. PAREDES', bacSecTitle = 'Chairperson, BAC Secretariat';
-      let rdName = 'RITCHEL M. BUTAO', rdTitle = 'Regional Director';
+      let bacSecName = '_______________', bacSecTitle = 'Chairperson, BAC Secretariat';
+      let bacSec2Name = '';
+      let rdName = '_______________', rdTitle = 'Regional Director';
       try {
-        const [allUsers, allEmployees] = await Promise.all([apiRequest('/users'), apiRequest('/employees')]);
-        const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
-        if (bacChairUser) bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
-        const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
-        if (bacSecUser) bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
+        const allEmployees = await apiRequest('/employees');
+        const getEmpNameUpper = (empId) => {
+          if (!empId) return '_______________';
+          const emp = allEmployees.find(e => e.id === parseInt(empId));
+          return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+        };
+        const getEmpDesig = (empId, fallback) => {
+          if (!empId) return fallback;
+          const emp = allEmployees.find(e => e.id === parseInt(empId));
+          return emp && emp.designation_name ? emp.designation_name : fallback;
+        };
+        // Use saved signatory IDs from the abstract record
+        if (abs.bac_chairperson_id) bacChairName = getEmpNameUpper(abs.bac_chairperson_id);
+        if (abs.vice_chairperson_id) bacViceChairName = getEmpNameUpper(abs.vice_chairperson_id);
+        if (abs.bac_member1_id) bacMembers[0].name = getEmpNameUpper(abs.bac_member1_id);
+        if (abs.bac_member2_id) bacMembers[1].name = getEmpNameUpper(abs.bac_member2_id);
+        if (abs.bac_member3_id) bacMembers[2].name = getEmpNameUpper(abs.bac_member3_id);
+        if (abs.bac_secretariat_id) bacSecName = getEmpNameUpper(abs.bac_secretariat_id);
+        if (abs.bac_secretariat2_id) bacSec2Name = getEmpNameUpper(abs.bac_secretariat2_id);
+        if (abs.regional_director_id) rdName = getEmpNameUpper(abs.regional_director_id);
       } catch(e) {}
 
       const fmtDate = (d) => {

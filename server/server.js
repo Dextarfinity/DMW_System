@@ -2164,6 +2164,13 @@ app.put('/api/plans/:id/resubmit', authenticateToken, async (req, res) => {
 // Returns PPMP entries from procurementplans directly, with codes transformed to APP codes
 app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
+    const fiscalYear = req.query.fiscal_year;
+    let whereClause = `WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
+    const params = [];
+    if (fiscalYear) {
+      params.push(parseInt(fiscalYear));
+      whereClause += ` AND pp.fiscal_year = $${params.length}`;
+    }
     const result = await pool.query(
       `SELECT pp.id, pp.ppmp_no,
               REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
@@ -2186,8 +2193,9 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
               d.code as department_code
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'
-       ORDER BY pp.id`
+       ${whereClause}
+       ORDER BY pp.id`,
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2295,14 +2303,14 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
 });
 
 // POST consolidate PPMP into APP
-// This just returns summary since APP now reads directly from procurementplans
+// Records consolidation timestamp and returns summary
 app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
-    
+
     // Get all active (non-deleted) PPMP entries for this fiscal year
     const result = await pool.query(
-      `SELECT COUNT(*) as item_count, 
+      `SELECT COUNT(*) as item_count,
               COALESCE(SUM(pp.total_amount), 0) as total_abc
        FROM procurementplans pp
        WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
@@ -2319,7 +2327,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
 
     // Get breakdown by department
     const deptBreakdown = await pool.query(
-      `SELECT d.name as department_name, COUNT(*) as count, 
+      `SELECT d.name as department_name, COUNT(*) as count,
               COALESCE(SUM(pp.total_amount), 0) as total
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
@@ -2327,6 +2335,17 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          AND pp.status = 'approved'
        GROUP BY d.name ORDER BY d.name`,
       [fiscalYear]
+    );
+
+    // Record consolidation timestamp in app_settings
+    await pool.query(
+      `INSERT INTO app_settings (fiscal_year, app_type, consolidated_at, consolidated_count, set_by, set_at)
+       VALUES ($1, 'indicative', CURRENT_TIMESTAMP, 1, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (fiscal_year) DO UPDATE SET
+         consolidated_at = CURRENT_TIMESTAMP,
+         consolidated_count = COALESCE(app_settings.consolidated_count, 0) + 1,
+         set_at = CURRENT_TIMESTAMP`,
+      [fiscalYear, req.user.id]
     );
 
     res.json({
@@ -2958,11 +2977,11 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers } = req.body;
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers, manual_supplier_name, manual_supplier_address, manual_supplier_tin } = req.body;
     const rfqResult = await client.query(
-      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null]
+      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications, manual_supplier_name, manual_supplier_address, manual_supplier_tin)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null]
     );
     const rfq = rfqResult.rows[0];
     if (items) for (const it of items) {
@@ -2988,11 +3007,11 @@ app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items } = req.body;
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, manual_supplier_name, manual_supplier_address, manual_supplier_tin } = req.body;
     const result = await client.query(
-      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$9 RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications||null, req.params.id]
+      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, item_specifications=$8, manual_supplier_name=$9, manual_supplier_address=$10, manual_supplier_tin=$11, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$12 RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications||null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null, req.params.id]
     );
     // Update rfq_items if items array is provided
     if (items && Array.isArray(items)) {
@@ -3050,7 +3069,8 @@ app.get('/api/abstracts', authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       `SELECT a.*, r.rfq_number, COALESCE(a.recommended_supplier_name, s.name) as recommended_supplier_name, u.username as created_by_name,
-              pr.dept_id as pr_dept_id, dept.code as department_code
+              pr.dept_id as pr_dept_id, dept.code as department_code,
+              (SELECT COUNT(*) FROM abstract_quotations WHERE abstract_id = a.id) as num_bidders
        FROM abstracts a LEFT JOIN rfqs r ON a.rfq_id = r.id
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
        LEFT JOIN departments dept ON pr.dept_id = dept.id
@@ -3084,11 +3104,11 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
     const absResult = await client.query(
-      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount||0, req.user.id, item_specifications || null]
+      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, created_by, item_specifications, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount||0, req.user.id, item_specifications || null, vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, bac_secretariat_id||null, bac_chairperson_id||null, regional_director_id||null, bac_secretariat2_id||null]
     );
     const abs = absResult.rows[0];
     if (quotations) for (const q of quotations) {
@@ -3113,11 +3133,11 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
     const result = await client.query(
-      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_supplier_name=$7, recommended_amount=$8, item_specifications=$9, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$10 RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount, item_specifications || null, req.params.id]
+      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_supplier_name=$7, recommended_amount=$8, item_specifications=$9, vice_chairperson_id=$10, bac_member1_id=$11, bac_member2_id=$12, bac_member3_id=$13, bac_secretariat_id=$14, bac_chairperson_id=$15, regional_director_id=$16, bac_secretariat2_id=$17, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$18 RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount, item_specifications || null, vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, bac_secretariat_id||null, bac_chairperson_id||null, regional_director_id||null, bac_secretariat2_id||null, req.params.id]
     );
     // If quotations are provided, replace existing ones
     if (quotations) {
@@ -3336,11 +3356,11 @@ app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
     const result = await pool.query(
-      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null]
+      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3348,11 +3368,11 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
     const result = await pool.query(
-      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$17 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, req.params.id]
+      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, subject=$17, description=$18, bidders=$19, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$20 RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
