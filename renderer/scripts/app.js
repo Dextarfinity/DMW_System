@@ -8736,66 +8736,67 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (amountField && noa.contract_amount) {
       amountField.value = parseFloat(noa.contract_amount).toFixed(2);
     }
-    // Auto-fill purpose and items by tracing: NOA -> BAC Res -> Abstract -> RFQ -> PR
+    // Auto-fill purpose, procurement mode, and items by tracing: NOA -> RFQ -> PR -> pr_items
     try {
-      if (noa.bac_resolution_id) {
-        const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
-        if (bacRes && bacRes.abstract_id) {
-          const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
-          if (abstract) {
-            // Fill purpose from abstract or PR
-            const purposeField = document.getElementById('poPurpose');
-            if (purposeField && !purposeField.value) {
-              let purpose = abstract.purpose || '';
-              if (!purpose && abstract.rfq_id) {
-                try {
-                  const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
-                  if (rfq && rfq.pr_id) {
-                    const pr = await apiRequest('/purchase-requests/' + rfq.pr_id);
-                    if (pr && pr.purpose) purpose = pr.purpose;
+      let prData = null;
+      // First try direct path: NOA.rfq_id -> RFQ.pr_id -> PR (with items)
+      if (noa.rfq_id) {
+        try {
+          const rfq = await apiRequest('/rfqs/' + noa.rfq_id);
+          if (rfq && rfq.pr_id) {
+            prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+          }
+        } catch(e) { console.warn('[PO] Direct RFQ path failed:', e); }
+      }
+      // Fallback: NOA -> BAC Res -> Abstract -> RFQ -> PR
+      if (!prData && noa.bac_resolution_id) {
+        try {
+          const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
+          if (bacRes && bacRes.abstract_id) {
+            const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+            if (abstract) {
+              // Fill procurement mode from abstract
+              const procModeField = document.getElementById('poProcMode');
+              if (procModeField && abstract.procurement_mode) {
+                for (const opt of procModeField.options) {
+                  if (opt.value === abstract.procurement_mode || opt.textContent.includes(abstract.procurement_mode)) {
+                    procModeField.value = opt.value;
+                    break;
                   }
-                } catch(e) {}
+                }
               }
-              if (purpose) purposeField.value = purpose;
-            }
-            // Fill procurement mode
-            const procModeField = document.getElementById('poProcMode');
-            if (procModeField && abstract.procurement_mode) {
-              for (const opt of procModeField.options) {
-                if (opt.value === abstract.procurement_mode || opt.textContent.includes(abstract.procurement_mode)) {
-                  procModeField.value = opt.value;
-                  break;
+              if (abstract.rfq_id) {
+                const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
+                if (rfq && rfq.pr_id) {
+                  prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
                 }
               }
             }
-            // Fill items from abstract quotations (winning bidder items)
-            const quotations = abstract.quotations || [];
-            const winningQuot = quotations.find(q =>
-              q.supplier_name && abstract.recommended_supplier_name &&
-              q.supplier_name.toLowerCase() === abstract.recommended_supplier_name.toLowerCase()
-            ) || quotations[0];
-            if (winningQuot && winningQuot.items && winningQuot.items.length > 0) {
-              const tbody = document.getElementById('poItemsBody');
-              if (tbody) {
-                tbody.innerHTML = '';
-                winningQuot.items.forEach((item, idx) => {
-                  const qty = parseFloat(item.quantity || item.qty || 1);
-                  const unitPrice = parseFloat(item.unit_price || item.bid_price || 0);
-                  const amount = qty * unitPrice;
-                  const row = document.createElement('tr');
-                  row.innerHTML = `
-                    <td><input type="text" value="${idx + 1}" style="width: 50px; text-align: center;"></td>
-                    <td><select class="form-select" style="width: 60px;"><option ${(item.unit||'Lot')==='Lot'?'selected':''}>Lot</option><option ${(item.unit||'')==='Pax'?'selected':''}>Pax</option><option ${(item.unit||'')==='Pcs'?'selected':''}>Pcs</option><option ${(item.unit||'')==='Unit'?'selected':''}>Unit</option><option ${(item.unit||'')==='Box'?'selected':''}>Box</option><option ${(item.unit||'')==='Ream'?'selected':''}>Ream</option><option ${(item.unit||'')==='Set'?'selected':''}>Set</option></select></td>
-                    <td><textarea rows="2" style="width: 100%;">${item.item_name || item.description || ''}</textarea></td>
-                    <td><input type="number" value="${qty}" style="width: 60px;" min="0" onchange="calcPOItemTotal(this)"></td>
-                    <td><input type="number" value="${unitPrice.toFixed(2)}" step="0.01" style="width: 90px;" min="0" onchange="calcPOItemTotal(this)"></td>
-                    <td><input type="number" value="${amount.toFixed(2)}" step="0.01" style="width: 90px;" readonly></td>
-                  `;
-                  tbody.appendChild(row);
-                });
-              }
-            }
           }
+        } catch(e) { console.warn('[PO] BAC Res path failed:', e); }
+      }
+      // Auto-fill from PR data
+      if (prData) {
+        // Fill purpose
+        const purposeField = document.getElementById('poPurpose');
+        if (purposeField && !purposeField.value && prData.purpose) {
+          purposeField.value = prData.purpose;
+        }
+        // Fill items from PR items into the catalog picker system
+        if (prData.items && prData.items.length > 0) {
+          window._docSelectedItems['po'] = prData.items.map(item => ({
+            item_id: item.item_id || null,
+            item_name: item.item_name || '',
+            item_code: item.item_code || '',
+            item_unit: item.unit || '',
+            item_category: item.category || '',
+            item_description: item.item_description || '',
+            description: item.item_description || item.item_name || '',
+            unit_price: parseFloat(item.unit_price || 0),
+            quantity: parseInt(item.quantity || 1),
+            total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+          }));
+          renderDocItemsList('po');
         }
       }
     } catch(e) { console.warn('[PO] Could not auto-fill from NOA chain:', e); }
@@ -10540,7 +10541,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-section-header section-inspection"><i class="fas fa-search"></i> Inspection</div>
         <div style="background: #d0e8ff; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:end;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:start;">
             <div class="form-group" style="margin-bottom: 0;">
               <label style="font-size: 11px;">Date Inspected</label>
               <input type="date" id="iarInspectionDate" required style="font-size:12px;">
@@ -10549,28 +10550,31 @@ Failure to submit the above requirements within the prescribed period shall cons
               <label style="font-size: 11px;">Inspection Officer / Property Custodian</label>
               <input type="text" id="iarInspector" placeholder="Name of Inspector" required style="font-size:12px;">
             </div>
-            <div class="form-group" style="margin-bottom: 0; display:flex; align-items:center; padding-top:18px;">
-              <label style="font-size: 11px;"><input type="checkbox" checked> I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</label>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px; display:flex; align-items:flex-start; gap:4px; line-height:1.3; margin-top:2px;">
+                <input type="checkbox" checked style="margin-top:2px; flex-shrink:0;">
+                <span>I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</span>
+              </label>
             </div>
           </div>
         </div>
         <div class="form-section-header section-acceptance"><i class="fas fa-check-circle"></i> Acceptance</div>
         <div style="background: #e3f2fd; padding: 12px; border-radius: 6px;">
-          <div class="form-row">
-            <div class="form-group" style="margin-bottom: 5px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:start;">
+            <div class="form-group" style="margin-bottom: 0;">
               <label style="font-size: 12px;">Date Received</label>
-              <input type="date" required>
+              <input type="date" id="iarDateReceived" required style="font-size:12px;">
             </div>
-            <div class="form-group" style="margin-bottom: 5px;">
+            <div class="form-group" style="margin-bottom: 0;">
               <label style="font-size: 12px;">Supply and/or Property Custodian</label>
-              <input type="text" placeholder="Name of Receiver" required>
+              <input type="text" id="iarPropertyCustodian" placeholder="Name of Receiver" required style="font-size:12px;">
             </div>
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label style="font-size: 12px;">Acceptance Type</label>
-            <div style="display: flex; gap: 20px; margin-top: 5px;">
-              <label><input type="radio" name="acceptanceType" value="complete" checked> Complete</label>
-              <label><input type="radio" name="acceptanceType" value="partial"> Partial (Pls. specify quantity in the above table)</label>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Acceptance Type</label>
+              <div style="display: flex; gap: 12px; margin-top: 5px;">
+                <label style="font-size: 12px;"><input type="radio" name="acceptanceType" value="complete" checked> Complete</label>
+                <label style="font-size: 12px;"><input type="radio" name="acceptanceType" value="partial"> Partial</label>
+              </div>
             </div>
           </div>
         </div>
@@ -10637,15 +10641,104 @@ Failure to submit the above requirements within the prescribed period shall cons
     })();
   };
 
-  // Auto-fill IAR supplier name from linked PO
-  window.iarAutoFillFromPO = function(poId) {
+  // Auto-fill IAR fields from linked PO (supplier, dept, items, item specs)
+  window.iarAutoFillFromPO = async function(poId) {
     if (!poId || !window._iarPOList) return;
     const po = window._iarPOList.find(p => String(p.id) === String(poId));
     if (!po) return;
+    // Auto-fill supplier name
     const supplierField = document.getElementById('iarSupplier');
     if (supplierField && po.supplier_name) {
       supplierField.value = po.supplier_name;
     }
+    // Auto-fill PO date
+    const poDateField = document.getElementById('iarPODate');
+    if (poDateField && po.po_date) {
+      poDateField.value = po.po_date.split('T')[0];
+    }
+    // Fetch the full PO detail to get items
+    try {
+      const poDetail = await apiRequest('/purchase-orders/' + poId);
+      // Trace PO -> PR to get department and PPMP items
+      let prData = null;
+      if (poDetail.pr_id) {
+        prData = await apiRequest('/purchase-requests/' + poDetail.pr_id);
+      } else if (poDetail.noa_id) {
+        // Trace NOA -> RFQ -> PR
+        try {
+          const noaList = cachedNOA.length ? cachedNOA : await apiRequest('/noa');
+          const noa = noaList.find(n => String(n.id) === String(poDetail.noa_id));
+          if (noa && noa.rfq_id) {
+            const rfq = await apiRequest('/rfqs/' + noa.rfq_id);
+            if (rfq && rfq.pr_id) {
+              prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+            }
+          } else if (noa && noa.bac_resolution_id) {
+            const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
+            if (bacRes && bacRes.abstract_id) {
+              const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+              if (abstract && abstract.rfq_id) {
+                const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
+                if (rfq && rfq.pr_id) {
+                  prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+                }
+              }
+            }
+          }
+        } catch(e) { console.warn('[IAR] NOA trace failed:', e); }
+      }
+      // Auto-fill requisitioning office/dept from PR department
+      if (prData) {
+        const reqOfficeField = document.getElementById('iarReqOffice');
+        if (reqOfficeField && prData.department_code) {
+          reqOfficeField.value = prData.department_code;
+        } else if (reqOfficeField && prData.department_name) {
+          reqOfficeField.value = prData.department_name;
+        }
+      }
+      // Auto-fill items from PO items (which came from PR/PPMP catalog)
+      if (poDetail.items && poDetail.items.length > 0) {
+        window._docSelectedItems['iar'] = poDetail.items.map(item => ({
+          item_id: item.item_id || null,
+          item_name: item.item_name || '',
+          item_code: item.item_code || '',
+          item_unit: item.unit || '',
+          item_category: item.category || item.item_category || '',
+          item_description: item.item_description || '',
+          description: item.item_description || item.item_name || '',
+          unit_price: parseFloat(item.unit_price || 0),
+          quantity: parseInt(item.quantity || 1),
+          total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+        }));
+        renderDocItemsList('iar');
+      } else if (prData && prData.items && prData.items.length > 0) {
+        // Fallback: use PR items if PO has no items
+        window._docSelectedItems['iar'] = prData.items.map(item => ({
+          item_id: item.item_id || null,
+          item_name: item.item_name || '',
+          item_code: item.item_code || '',
+          item_unit: item.unit || '',
+          item_category: item.category || '',
+          item_description: item.item_description || '',
+          description: item.item_description || item.item_name || '',
+          unit_price: parseFloat(item.unit_price || 0),
+          quantity: parseInt(item.quantity || 1),
+          total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+        }));
+        renderDocItemsList('iar');
+      }
+      // Auto-fill item specifications from item descriptions
+      const itemSpecsField = document.getElementById('iarItemSpecs');
+      const currentItems = window._docSelectedItems['iar'] || [];
+      if (itemSpecsField && currentItems.length > 0 && !itemSpecsField.value.trim()) {
+        const specsLines = currentItems
+          .map(it => it.item_description || it.description || it.item_name || '')
+          .filter(s => s.trim());
+        if (specsLines.length > 0) {
+          itemSpecsField.value = specsLines.join('\n');
+        }
+      }
+    } catch(e) { console.warn('[IAR] Could not auto-fill from PO:', e); }
   };
 
   window.addIARItemRow = function() {
@@ -13122,6 +13215,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     } else if (prefix === 'po') {
       const poTotal = document.getElementById('poTotalAmount');
       if (poTotal) poTotal.value = grandTotal.toFixed(2);
+    } else if (prefix === 'iar') {
+      // Auto-populate IAR item specifications from catalog item descriptions
+      const iarItemSpecs = document.getElementById('iarItemSpecs');
+      if (iarItemSpecs && items.length > 0) {
+        const specsLines = items.map(it => it.item_description || it.description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0 && !iarItemSpecs.value.trim()) {
+          iarItemSpecs.value = specsLines.join('\n');
+        }
+      }
     }
   };
   // =====================================================
@@ -13519,6 +13621,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const invoiceNo = document.getElementById('iarInvoiceNo')?.value || '';
     const inspectionDate = document.getElementById('iarInspectionDate')?.value || '';
     const acceptance = document.querySelector('input[name="acceptanceType"]:checked')?.value || 'complete';
+    const reqOffice = document.getElementById('iarReqOffice')?.value || '';
+    const dateReceived = document.getElementById('iarDateReceived')?.value || '';
+    const propertyCustodian = document.getElementById('iarPropertyCustodian')?.value || '';
+    const inspector = document.getElementById('iarInspector')?.value || '';
 
     // Read items from catalog selection
     const selectedItems = window._docSelectedItems['iar'] || [];
@@ -13541,8 +13647,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         po_id: poId ? parseInt(poId) : null,
         inspection_date: inspectionDate || null,
         delivery_date: iarDate || null,
+        date_received: dateReceived || null,
         invoice_number: invoiceNo,
         acceptance: acceptance,
+        requisitioning_office: reqOffice || null,
+        property_custodian: propertyCustodian || null,
+        inspector_name: inspector || null,
         item_specifications: document.getElementById('iarItemSpecs')?.value.trim() || null,
         items: items
       };

@@ -1,0 +1,4 @@
+id,item_id,generated_item_id,item_description,inventory_no,ics_no,ppe_no,serial_no,issued_to,issued_to_employee_id,brand,model,status,created_at,updated_at
+1,33,3,WHITEBOARD - 4x8 ft.,5020-05-0002,2025-05-003,2025-05-02-0002,N/A,MARK E. MARASIGAN,,N/A,N/A,Issued,Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time),Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time)
+2,46,9,CELLPHONE,5070-05-0001,2025-05-001,2025-05-07-0001,1264570512019860,REGIE B. LAGRAMADA,,Infinix Smart 9,X6532,Issued,Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time),Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time)
+3,25,2,CORKBOARD - 4x8 ft.,5020-05-0001,2025-05-002,2025-05-02-0001,N/A,MARK E. MARASIGAN,,N/A,N/A,Issued,Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time),Mon Feb 16 2026 11:14:17 GMT+0800 (Philippine Standard Time)

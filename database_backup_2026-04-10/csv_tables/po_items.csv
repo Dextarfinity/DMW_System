@@ -1,0 +1,5 @@
+id,po_id,item_id,item_code,item_name,item_description,unit,uom,category,quantity,unit_price,total_price,remarks,created_at,procurement_source
+318,23,709,PAP-A-1775636779371,PRE-MIGRATION ORIENTATION SEMINAR AND FINANCIAL PLANNING - TRAINING OF TRAINERS,"PRE-MIGRATION ORIENTATION SEMINAR AND FINANCIAL PLANNING
+   TRAINING OF TRAINERS
+   MEALS: AM Snacks, Lunch, PM Snacks with Free Use of Venue
+   Unit: PCS",PCS,,,1,280000.00,280000.00,,Fri Apr 10 2026 16:00:25 GMT+0800 (Philippine Standard Time),

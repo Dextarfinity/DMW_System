@@ -1,0 +1,6 @@
+id,name,description,display_order,is_active,created_at,updated_at
+18,OFFICE OPERATION,"Office supplies, stationery, and operational expenses",1,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+19,SEMI-FURNITURE & FIXTURES,"Semi-furniture, fixtures, and office equipment",2,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+20,MOOE,Maintenance and Other Operating Expenses,3,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+21,SPECIAL PROCUREMENT,"Representation, printing, and specialized procurement",4,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+26,TRAINING AND ACTIVITIES,"Training programs, seminars, conferences, and related activities",5,true,Thu Mar 19 2026 10:20:36 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 10:20:36 GMT+0800 (Philippine Standard Time)

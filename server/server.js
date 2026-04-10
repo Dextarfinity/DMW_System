@@ -3752,13 +3752,16 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications,
+            requisitioning_office, property_custodian, inspector_name, date_received, items } = req.body;
     const iarResult = await client.query(
       `INSERT INTO iars (iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by, item_specifications,
+       requisitioning_office, property_custodian, inspector_name, date_received)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
       [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id, item_specifications || null]
+       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id, item_specifications || null,
+       requisitioning_office || null, property_custodian || null, inspector_name || null, date_received || null]
     );
     const iar = iarResult.rows[0];
     if (items && items.length > 0) {
@@ -3795,11 +3798,15 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications,
+            requisitioning_office, property_custodian, inspector_name, date_received, items } = req.body;
     const result = await client.query(
       `UPDATE iars SET iar_number=$1, po_id=$2, inspection_date=$3, delivery_date=$4, invoice_number=$5, invoice_date=$6,
-       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, item_specifications=$12, updated_at=CURRENT_TIMESTAMP WHERE id=$13 RETURNING *`,
-      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications || null, req.params.id]
+       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, item_specifications=$12,
+       requisitioning_office=$14, property_custodian=$15, inspector_name=$16, date_received=$17,
+       updated_at=CURRENT_TIMESTAMP WHERE id=$13 RETURNING *`,
+      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications || null, req.params.id,
+       requisitioning_office || null, property_custodian || null, inspector_name || null, date_received || null]
     );
     if (items) {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);
@@ -5797,6 +5804,10 @@ async function runMigrations() {
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder1_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder2_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder3_name TEXT`,
+    // IAR new fields for requisitioning office, property custodian, inspector name
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS requisitioning_office TEXT`,
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS property_custodian TEXT`,
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS inspector_name TEXT`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); } catch (e) { /* column may already exist */ }

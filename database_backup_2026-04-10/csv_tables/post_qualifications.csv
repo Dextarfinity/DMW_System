@@ -1,0 +1,2 @@
+id,postqual_number,abstract_id,bidder_name,documents_verified,technical_compliance,financial_validation,twg_result,findings,status,created_by,created_at,updated_at,twg_head_id,twg_member1_id,twg_member2_id,twg_member3_id,twg_member4_id,bidder1_supplier_id,bidder2_supplier_id,bidder3_supplier_id,bidder1_name,bidder2_name,bidder3_name
+22,TWG-2026-1936,25,Testing,[object Object],{},{},,,on_going,3,Wed Apr 08 2026 16:50:35 GMT+0800 (Philippine Standard Time),Wed Apr 08 2026 16:50:35 GMT+0800 (Philippine Standard Time),13,25,19,20,2,,,,Testing,TESTING,
