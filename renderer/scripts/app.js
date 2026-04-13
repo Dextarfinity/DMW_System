@@ -22858,16 +22858,22 @@ Failure to submit the above requirements within the prescribed period shall cons
         mergedBidders.forEach((b, idx) => {
           const isBold = idx === 0;
           const st = isBold ? 'font-weight:bold;' : '';
+          const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:6px 8px;border:1px solid #000;width:8%;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:6px 8px;border:1px solid #000;width:35%;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:6px 8px;border:1px solid #000;width:22%;' + st + '">\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
-            '<td style="padding:6px 8px;border:1px solid #000;width:35%;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
+            '<td style="text-align:center;padding:8px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:8px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
+            '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
             '</tr>';
         });
       } else {
         for (let i = 1; i <= 3; i++) {
-          biddersTableRows += '<tr><td style="text-align:center;padding:6px 8px;border:1px solid #000;width:8%;">' + i + '</td><td style="padding:6px 8px;border:1px solid #000;width:35%;" contenteditable="true"></td><td style="text-align:right;padding:6px 8px;border:1px solid #000;width:22%;" contenteditable="true"></td><td style="padding:6px 8px;border:1px solid #000;width:35%;" contenteditable="true"></td></tr>';
+          biddersTableRows += '<tr>' +
+            '<td style="text-align:center;padding:8px;border:1px solid #000;">' + i + '</td>' +
+            '<td style="padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="text-align:right;padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
+            '</tr>';
         }
       }
       const bidderCount = mergedBidders.length || bidders.length;
@@ -23004,13 +23010,19 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
 
           <!-- Bidders Table -->
-          <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:11pt;">
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:10px 0;font-size:11pt;">
+            <colgroup>
+              <col style="width:8%;">
+              <col style="width:35%;">
+              <col style="width:22%;">
+              <col style="width:35%;">
+            </colgroup>
             <thead>
               <tr>
-                <th style="border:1px solid #000;padding:6px;width:8%;font-weight:bold;">No.</th>
-                <th style="border:1px solid #000;padding:6px;width:35%;font-weight:bold;">Name of the Bidder</th>
-                <th style="border:1px solid #000;padding:6px;width:22%;font-weight:bold;">Total Bid Amount</th>
-                <th style="border:1px solid #000;padding:6px;width:35%;font-weight:bold;">Remarks</th>
+                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">No.</th>
+                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Name of the Bidder</th>
+                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Total Bid Amount</th>
+                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Remarks</th>
               </tr>
             </thead>
             <tbody>${biddersTableRows}</tbody>
