@@ -22829,17 +22829,22 @@ Failure to submit the above requirements within the prescribed period shall cons
       const hopeName = bacRes.hope_name ? bacRes.hope_name.toUpperCase() : getEmployeeName(bacRes.hope_id);
 
       // Bidders table
-      const bidders = bacRes.bidders || [];
+      let bidders = bacRes.bidders || [];
+      // Parse if string (TEXT column vs JSONB)
+      if (typeof bidders === 'string') { try { bidders = JSON.parse(bidders); } catch(e) { bidders = []; } }
       let biddersTableRows = '';
       if (bidders.length > 0) {
         bidders.forEach((b, idx) => {
           const isBold = idx === 0;
+          const bidderName = b.name || b.supplier_name || b.bidder_name || '';
+          const bidderAmount = parseFloat(b.amount || b.bid_amount || b.total_bid_amount || 0);
+          const bidderRemarks = b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive');
           const st = isBold ? 'font-weight:bold;' : '';
           biddersTableRows += '<tr>' +
             '<td style="text-align:center;padding:6px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:6px;border:1px solid #000;' + st + '" contenteditable="true">\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
-            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')) + '</td>' +
+            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + bidderName + '</td>' +
+            '<td style="text-align:right;padding:6px;border:1px solid #000;' + st + '" contenteditable="true">\u20b1 ' + bidderAmount.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + bidderRemarks + '</td>' +
             '</tr>';
         });
       } else {
@@ -22908,26 +22913,26 @@ Failure to submit the above requirements within the prescribed period shall cons
           <p style="margin:0;font-weight:bold;font-style:italic;">Bids and Awards Committee</p>
         </div>
         <div style="text-align:center;margin:30px 0 15px 0;">
-          <p style="margin:0;font-weight:bold;" contenteditable="true">${chairpersonName}</p>
+          <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${chairpersonName}</p>
           <p style="margin:0;">BAC Chairperson</p>
         </div>
         <div style="display:flex;justify-content:space-between;margin:25px 0;">
           <div style="text-align:left;width:45%;">
-            <p style="margin:0;font-weight:bold;" contenteditable="true">${viceChairName}</p>
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${viceChairName}</p>
             <p style="margin:0;">BAC Vice-Chairperson</p>
           </div>
           <div style="text-align:right;width:45%;">
-            <p style="margin:0;font-weight:bold;" contenteditable="true">${member1Name}</p>
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member1Name}</p>
             <p style="margin:0;">BAC Member</p>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;margin:25px 0;">
           <div style="text-align:left;width:45%;">
-            <p style="margin:0;font-weight:bold;" contenteditable="true">${member2Name}</p>
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member2Name}</p>
             <p style="margin:0;">BAC Member</p>
           </div>
           <div style="text-align:right;width:45%;">
-            <p style="margin:0;font-weight:bold;" contenteditable="true">${member3Name}</p>
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member3Name}</p>
             <p style="margin:0;">BAC Member</p>
           </div>
         </div>
@@ -22935,7 +22940,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <p style="margin:0;font-weight:bold;font-style:italic;">Approved by:</p>
         </div>
         <div style="text-align:center;margin:25px 0;">
-          <p style="margin:0;font-weight:bold;" contenteditable="true">${hopeName}</p>
+          <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${hopeName}</p>
           <p style="margin:0;">Head of Procuring Entity</p>
         </div>`;
 
