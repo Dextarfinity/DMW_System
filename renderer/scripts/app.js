@@ -22828,30 +22828,49 @@ Failure to submit the above requirements within the prescribed period shall cons
       const member3Name = bacRes.member3_name ? bacRes.member3_name.toUpperCase() : getEmployeeName(bacRes.bac_member3_id);
       const hopeName = bacRes.hope_name ? bacRes.hope_name.toUpperCase() : getEmployeeName(bacRes.hope_id);
 
-      // Bidders table
+      // Bidders table — prefer abstract quotations for names/amounts
       let bidders = bacRes.bidders || [];
-      // Parse if string (TEXT column vs JSONB)
       if (typeof bidders === 'string') { try { bidders = JSON.parse(bidders); } catch(e) { bidders = []; } }
-      let biddersTableRows = '';
-      if (bidders.length > 0) {
+      const quotations = (abstract && abstract.quotations) ? abstract.quotations : [];
+      let mergedBidders = [];
+      if (quotations.length > 0) {
+        quotations.forEach((q, idx) => {
+          const fb = bidders[idx] || {};
+          mergedBidders.push({
+            name: q.supplier_name || fb.name || fb.supplier_name || '',
+            amount: parseFloat(q.bid_amount || q.total_price || fb.amount || fb.bid_amount || 0),
+            remarks: fb.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')
+          });
+        });
+      } else if (bidders.length > 0) {
         bidders.forEach((b, idx) => {
+          const nm = b.name || b.supplier_name || b.bidder_name || '';
+          const isNumeric = /^\d+$/.test(String(nm).trim());
+          mergedBidders.push({
+            name: isNumeric ? '' : nm,
+            amount: parseFloat(b.amount || b.bid_amount || b.total_bid_amount || 0),
+            remarks: b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')
+          });
+        });
+      }
+      let biddersTableRows = '';
+      if (mergedBidders.length > 0) {
+        mergedBidders.forEach((b, idx) => {
           const isBold = idx === 0;
-          const bidderName = b.name || b.supplier_name || b.bidder_name || '';
-          const bidderAmount = parseFloat(b.amount || b.bid_amount || b.total_bid_amount || 0);
-          const bidderRemarks = b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive');
           const st = isBold ? 'font-weight:bold;' : '';
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:6px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + bidderName + '</td>' +
-            '<td style="text-align:right;padding:6px;border:1px solid #000;' + st + '" contenteditable="true">\u20b1 ' + bidderAmount.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
-            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + bidderRemarks + '</td>' +
+            '<td style="text-align:center;padding:6px 8px;border:1px solid #000;width:8%;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:6px 8px;border:1px solid #000;width:35%;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:6px 8px;border:1px solid #000;width:22%;' + st + '">\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td style="padding:6px 8px;border:1px solid #000;width:35%;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
             '</tr>';
         });
       } else {
         for (let i = 1; i <= 3; i++) {
-          biddersTableRows += '<tr><td style="text-align:center;padding:6px;border:1px solid #000;">' + i + '</td><td style="padding:6px;border:1px solid #000;" contenteditable="true"></td><td style="text-align:right;padding:6px;border:1px solid #000;" contenteditable="true"></td><td style="padding:6px;border:1px solid #000;" contenteditable="true"></td></tr>';
+          biddersTableRows += '<tr><td style="text-align:center;padding:6px 8px;border:1px solid #000;width:8%;">' + i + '</td><td style="padding:6px 8px;border:1px solid #000;width:35%;" contenteditable="true"></td><td style="text-align:right;padding:6px 8px;border:1px solid #000;width:22%;" contenteditable="true"></td><td style="padding:6px 8px;border:1px solid #000;width:35%;" contenteditable="true"></td></tr>';
         }
       }
+      const bidderCount = mergedBidders.length || bidders.length;
 
       // ABC / Contract Price detail table
       let detailTableRows = '';
@@ -22860,8 +22879,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           const qty = parseFloat(item.quantity || 0);
           const abcUnitCost = parseFloat(item.abc_unit_cost || item.unit_price || 0);
           const abcTotalCost = qty > 0 ? qty * abcUnitCost : abcAmount;
-          const contractUnitCost = bidders.length > 0 ? parseFloat(bidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
-          const contractTotalCost = bidders.length > 0 ? parseFloat(bidders[0].amount || bidAmount) : bidAmount;
+          const contractUnitCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
+          const contractTotalCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) : bidAmount;
           detailTableRows += '<tr>' +
             '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcUnitCost) + '</td>' +
             '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcTotalCost) + '</td>' +
@@ -22885,7 +22904,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Number of bidders in words
-      const bidderCountWords = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'][Math.min(bidders.length, 10)] || bidders.length;
+      const bidderCountWords = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'][Math.min(bidderCount, 10)] || bidderCount;
 
       // Build posting-specific WHEREAS clause
       let postingClause = '';
@@ -22980,7 +22999,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             ${postingClause}
 
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
-              <strong>WHEREAS,</strong> in response to the RFQ, <strong>${bidderCountWords} (${bidders.length})</strong> bidders submitted a quotation, namely:
+              <strong>WHEREAS,</strong> in response to the RFQ, <strong>${bidderCountWords} (${bidderCount})</strong> bidders submitted a quotation, namely:
             </p>
           </div>
 
