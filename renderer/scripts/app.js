@@ -22715,17 +22715,37 @@ Failure to submit the above requirements within the prescribed period shall cons
       let employees = [];
       try { employees = await apiRequest('/employees'); } catch(e) {}
 
-      // Helper functions
+      // Fetch RFQ items for detail table
+      let rfqItems = [];
+      const rfqId = bacRes.rfq_id || abstract?.rfq_id;
+      if (rfqId) {
+        try {
+          const rfq = await apiRequest('/rfqs/' + rfqId);
+          if (rfq && rfq.items) rfqItems = rfq.items;
+        } catch(e) {}
+      }
+
+      // Helper: format currency
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return '\u20b1' + num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Helper: ordinal date "6th day of March 2026"
+      const fmtOrdinalDate = (d) => {
+        if (!d) return '______ day of __________ ______';
+        const dt = new Date(d);
+        const day = dt.getDate();
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const suffix = (day === 1 || day === 21 || day === 31) ? 'st' : (day === 2 || day === 22) ? 'nd' : (day === 3 || day === 23) ? 'rd' : 'th';
+        return day + '<sup>' + suffix + '</sup> day of ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+      };
+
       const fmtDate = (d) => {
         if (!d) return '_______________';
         const dt = new Date(d);
         const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
-      };
-
-      const fmtCurrency = (v) => {
-        const num = parseFloat(v || 0);
-        return '₱' + num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       };
 
       // Number to words helper
@@ -22736,7 +22756,6 @@ Failure to submit the above requirements within the prescribed period shall cons
                       'Seventeen','Eighteen','Nineteen'];
         const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
         const scales = ['','Thousand','Million','Billion'];
-
         function convertGroup(n) {
           let str = '';
           if (n >= 100) { str += ones[Math.floor(n/100)] + ' Hundred '; n %= 100; }
@@ -22744,12 +22763,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           if (n > 0) { str += ones[n] + ' '; }
           return str.trim();
         }
-
         const wholePart = Math.floor(Math.abs(num));
         const centsPart = Math.round((Math.abs(num) - wholePart) * 100);
-
-        if (wholePart === 0) return 'Zero Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
-
+        if (wholePart === 0) return 'Zero Pesos Only (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
         let words = '';
         let tempNum = wholePart;
         let scaleIdx = 0;
@@ -22762,7 +22778,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           tempNum = Math.floor(tempNum / 1000);
           scaleIdx++;
         }
-        return words.trim() + ' Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
+        if (centsPart > 0) {
+          return words.trim() + ' Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100 (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
+        }
+        return words.trim() + ' Pesos Only (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
       }
 
       // Get employee details
@@ -22772,17 +22791,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         return emp ? (emp.full_name || '').toUpperCase() : '_______________';
       };
 
-      const getEmployeeDesignation = (empId) => {
-        if (!empId) return '';
-        const emp = employees.find(e => e.id === parseInt(empId));
-        return emp ? (emp.designation_name || '') : '';
-      };
-
-      // Determine if posting is required (ABC > 200,000)
+      // Core data
       const abcAmount = parseFloat(bacRes.abc_amount || 0);
       const requiresPosting = abcAmount > 200000;
-
-      // Get bidder type (default to LOWEST CALCULATED AND RESPONSIVE)
       const bidderTypeOptions = [
         'LOWEST CALCULATED AND RESPONSIVE (LCRB)',
         'HIGHEST RATED AND RESPONSIVE (HRRB)',
@@ -22790,484 +22801,321 @@ Failure to submit the above requirements within the prescribed period shall cons
         'MOST ADVANTAGEOUS AND RESPONSIVE (MARB)'
       ];
       const selectedBidderType = bacRes.bidder_type || options.bidderType || bidderTypeOptions[0];
-
-      // Parse bidder type into name and abbreviation parts
-      // e.g., "LOWEST CALCULATED AND RESPONSIVE (LCRB)" -> { name: "LOWEST CALCULATED AND RESPONSIVE", abbrev: "LCRB" }
       const parseBidderType = (fullType) => {
         const match = fullType.match(/^(.+?)\s*\(([A-Z]+)\)$/);
-        if (match) {
-          return { name: match[1].trim(), abbrev: match[2] };
-        }
-        return { name: fullType, abbrev: '' };
+        return match ? { name: match[1].trim(), abbrev: match[2] } : { name: fullType, abbrev: '' };
       };
-
       const bidderTypeParts = parseBidderType(selectedBidderType);
-      // For title: "LOWEST CALCULATED AND RESPONSIVE" (uppercase, no abbrev)
-      const bidderTypeForTitle = bidderTypeParts.name.toUpperCase();
-      // For resolve section: "Lowest Calculated and Responsive Bidder (LCRB)" (title case with abbrev)
       const toTitleCase = (str) => str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-      const bidderTypeForResolve = toTitleCase(bidderTypeParts.name) + ' Bidder' + (bidderTypeParts.abbrev ? ` (${bidderTypeParts.abbrev})` : '');
-      // For quotation text: "Lowest Calculated and Responsive" (title case, no abbrev, no "Bidder")
-      const bidderTypeForQuotation = toTitleCase(bidderTypeParts.name);
+      const bidderTypeForTitle = bidderTypeParts.name.toUpperCase();
+      const bidderTypeForResolve = toTitleCase(bidderTypeParts.name) + ' Bidder' + (bidderTypeParts.abbrev ? ' (' + bidderTypeParts.abbrev + ')' : '');
 
-      // Get data from resolution or abstract
-      const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________').toUpperCase();
+      const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________');
       const bidAmount = parseFloat(bacRes.bid_amount || bacRes.contract_price || abstract?.recommended_amount || 0);
-      const prNumber = bacRes.pr_number || abstract?.pr_number || '_______________';
-      const rfqNumber = bacRes.rfq_number || abstract?.rfq_number || '_______________';
-      const procurementDescription = bacRes.description || bacRes.subject || abstract?.description || 'Various office supplies and equipment';
-      const procurementMode = bacRes.procurement_mode || abstract?.procurement_mode || 'Small Value Procurement';
+      const procurementDescription = bacRes.description || bacRes.subject || abstract?.description || '';
+      const procurementMode = bacRes.procurement_mode || abstract?.procurement_mode || 'SVP';
+      const procModeFullName = {'SVP': 'Small Value Procurement', 'SVPDC': 'Small Value Procurement / Direct Contracting', 'DC_SHOPPING': 'Shopping', 'OTHERS': 'Competitive Bidding'}[procurementMode] || 'Small Value Procurement';
       const resolutionDate = bacRes.resolution_date || bacRes.date_prepared || new Date();
       const seriesYear = bacRes.series_year || new Date(resolutionDate).getFullYear();
-
-      // PhilGEPS posting dates (for >200k) - using correct DB field names
       const philgepsStartDate = bacRes.philgeps_posted_from || options.philgepsStartDate || null;
       const philgepsEndDate = bacRes.philgeps_posted_until || options.philgepsEndDate || null;
 
-      // BAC Members - use JOINed names from API, fallback to employee lookup with correct DB field names
+      // BAC Members
       const chairpersonName = bacRes.chairperson_name ? bacRes.chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_chairperson_id);
-      const chairpersonDesig = getEmployeeDesignation(bacRes.bac_chairperson_id) || 'Chairperson';
       const viceChairName = bacRes.vice_chairperson_name ? bacRes.vice_chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_vice_chairperson_id);
-      const viceChairDesig = getEmployeeDesignation(bacRes.bac_vice_chairperson_id) || 'Vice-Chairperson';
       const member1Name = bacRes.member1_name ? bacRes.member1_name.toUpperCase() : getEmployeeName(bacRes.bac_member1_id);
-      const member1Desig = getEmployeeDesignation(bacRes.bac_member1_id) || 'Member';
       const member2Name = bacRes.member2_name ? bacRes.member2_name.toUpperCase() : getEmployeeName(bacRes.bac_member2_id);
-      const member2Desig = getEmployeeDesignation(bacRes.bac_member2_id) || 'Member';
       const member3Name = bacRes.member3_name ? bacRes.member3_name.toUpperCase() : getEmployeeName(bacRes.bac_member3_id);
-      const member3Desig = getEmployeeDesignation(bacRes.bac_member3_id) || 'Member';
       const hopeName = bacRes.hope_name ? bacRes.hope_name.toUpperCase() : getEmployeeName(bacRes.hope_id);
-      const hopeDesig = getEmployeeDesignation(bacRes.hope_id) || 'Regional Director';
 
-      // Build posting-specific WHEREAS clause based on PDF templates
-      let postingClause = '';
-      if (requiresPosting) {
-        // For ABCs above ₱200,000 - requires PhilGEPS posting for 3 calendar days
-        postingClause = `
-          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
-            Republic Act No. 12009, the RFQ shall be posted for a period of three (3) calendar days on the PhilGEPS website,
-            the website of the Procuring Entity, if available, and at any conspicuous place reserved for this purpose within
-            the premises of the Procuring Entity;
-          </p>
-          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC posted the RFQ on the PhilGEPS
-            website, starting <span class="editable-field" contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span>
-            until <span class="editable-field" contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span>;
-          </p>
-        `;
-      } else {
-        // For ABCs of ₱200,000.00 and below - no mandatory posting required
-        postingClause = `
-          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of
-            Republic Act No. 12009, procurement projects with ABCs of ₱200,000.00 and below are not subject to mandatory posting
-            requirements;
-          </p>
-          <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers
-            of known qualifications;
-          </p>
-        `;
-      }
-
-      // Build bidders comparison table
-      let biddersTableRows = '';
+      // Bidders table
       const bidders = bacRes.bidders || [];
+      let biddersTableRows = '';
       if (bidders.length > 0) {
         bidders.forEach((b, idx) => {
-          biddersTableRows += `
-            <tr>
-              <td style="text-align: center; padding: 6px; border: 1px solid #000;">${idx + 1}</td>
-              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true">${b.name || ''}</td>
-              <td style="text-align: right; padding: 6px; border: 1px solid #000;" contenteditable="true">${fmtCurrency(b.amount)}</td>
-              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true">${b.remarks || ''}</td>
-            </tr>
-          `;
+          const isBold = idx === 0;
+          const st = isBold ? 'font-weight:bold;' : '';
+          biddersTableRows += '<tr>' +
+            '<td style="text-align:center;padding:6px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:6px;border:1px solid #000;' + st + '" contenteditable="true">\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td style="padding:6px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')) + '</td>' +
+            '</tr>';
         });
       } else {
-        // Default 3 empty rows
         for (let i = 1; i <= 3; i++) {
-          biddersTableRows += `
-            <tr>
-              <td style="text-align: center; padding: 6px; border: 1px solid #000;">${i}</td>
-              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
-              <td style="text-align: right; padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
-              <td style="padding: 6px; border: 1px solid #000;" contenteditable="true"></td>
-            </tr>
-          `;
+          biddersTableRows += '<tr><td style="text-align:center;padding:6px;border:1px solid #000;">' + i + '</td><td style="padding:6px;border:1px solid #000;" contenteditable="true"></td><td style="text-align:right;padding:6px;border:1px solid #000;" contenteditable="true"></td><td style="padding:6px;border:1px solid #000;" contenteditable="true"></td></tr>';
         }
       }
 
+      // ABC / Contract Price detail table
+      let detailTableRows = '';
+      if (rfqItems.length > 0) {
+        rfqItems.forEach(item => {
+          const qty = parseFloat(item.quantity || 0);
+          const abcUnitCost = parseFloat(item.abc_unit_cost || item.unit_price || 0);
+          const abcTotalCost = qty > 0 ? qty * abcUnitCost : abcAmount;
+          const contractUnitCost = bidders.length > 0 ? parseFloat(bidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
+          const contractTotalCost = bidders.length > 0 ? parseFloat(bidders[0].amount || bidAmount) : bidAmount;
+          detailTableRows += '<tr>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcTotalCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' + qty + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' + (item.unit || '') + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;font-size:10pt;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(contractUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(contractTotalCost) + '</td>' +
+            '</tr>';
+        });
+      } else {
+        detailTableRows = '<tr>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">Lot</td>' +
+          '<td style="border:1px solid #000;padding:4px;font-size:10pt;" contenteditable="true">' + procurementDescription + '</td>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '</tr>';
+      }
+
+      // Number of bidders in words
+      const bidderCountWords = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'][Math.min(bidders.length, 10)] || bidders.length;
+
+      // Build posting-specific WHEREAS clause
+      let postingClause = '';
+      if (requiresPosting) {
+        postingClause = `
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be <strong>posted for a period of three (3) calendar days</strong> on the <strong>PhilGEPS website</strong>, the <strong>website of the Procuring Entity</strong>, if available, and at any conspicuous place reserved for this purpose within the premises of the Procuring Entity;
+          </p>
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC <strong>posted the RFQ on the PhilGEPS website,</strong> starting <strong><span contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span></strong> until <strong><span contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span></strong>;
+          </p>`;
+      } else {
+        postingClause = `
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, procurement projects with ABCs of \u20b1200,000.00 and below are not subject to mandatory posting requirements;
+          </p>
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of known qualifications, in accordance with the IRR;
+          </p>`;
+      }
+
+      // SIGNATURE BLOCK (shared across pages)
+      const signaturesHTML = `
+        <div style="text-align:center;margin-top:30px;">
+          <p style="margin:0;font-weight:bold;font-style:italic;">Bids and Awards Committee</p>
+        </div>
+        <div style="text-align:center;margin:30px 0 15px 0;">
+          <p style="margin:0;font-weight:bold;" contenteditable="true">${chairpersonName}</p>
+          <p style="margin:0;">BAC Chairperson</p>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin:25px 0;">
+          <div style="text-align:left;width:45%;">
+            <p style="margin:0;font-weight:bold;" contenteditable="true">${viceChairName}</p>
+            <p style="margin:0;">BAC Vice-Chairperson</p>
+          </div>
+          <div style="text-align:right;width:45%;">
+            <p style="margin:0;font-weight:bold;" contenteditable="true">${member1Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin:25px 0;">
+          <div style="text-align:left;width:45%;">
+            <p style="margin:0;font-weight:bold;" contenteditable="true">${member2Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+          <div style="text-align:right;width:45%;">
+            <p style="margin:0;font-weight:bold;" contenteditable="true">${member3Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+        </div>
+        <div style="text-align:center;margin:30px 0 10px 0;">
+          <p style="margin:0;font-weight:bold;font-style:italic;">Approved by:</p>
+        </div>
+        <div style="text-align:center;margin:25px 0;">
+          <p style="margin:0;font-weight:bold;" contenteditable="true">${hopeName}</p>
+          <p style="margin:0;">Head of Procuring Entity</p>
+        </div>`;
+
       // ========== PAGE 1-2: BAC RESOLUTION DECLARING WINNER ==========
       const declaringWinnerHTML = `
-        <div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
-          <!-- Header -->
-          <div style="text-align: center; margin-bottom: 20px;">
-            <p style="margin: 0; font-weight: bold;">Republic of the Philippines</p>
-            <p style="margin: 0; font-weight: bold;">Department of Migrant Workers</p>
-            <p style="margin: 0;">REGIONAL OFFICE NO. XIII (Caraga)</p>
-            <p style="margin: 0; font-size: 10pt;">J.P. Rosales Avenue, Butuan City</p>
-            <p style="margin: 0; font-size: 10pt;">Telephone No.: (085) 342-8833</p>
+        <div style="font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;padding:0 10px;">
+          <div style="text-align:center;margin-bottom:15px;">
+            <p style="margin:0;font-weight:bold;font-size:13pt;">BIDS AND AWARDS COMMITTEE</p>
           </div>
-
-          <div style="text-align: center; margin: 25px 0;">
-            <p style="margin: 0; font-weight: bold; font-size: 14pt;">BIDS AND AWARDS COMMITTEE</p>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;">BAC RESOLUTION</p>
+            <p style="margin:0;">No. <u><span contenteditable="true">${bacRes.resolution_number || '___'}</span></u>, Series of ${seriesYear}</p>
           </div>
-
-          <!-- Resolution Number -->
-          <div style="margin: 20px 0;">
-            <p style="margin: 0;"><strong>RESOLUTION NO. <span contenteditable="true">${bacRes.resolution_number || '___'}</span></strong></p>
-            <p style="margin: 0;">Series of <span contenteditable="true">${seriesYear}</span></p>
-          </div>
-
-          <!-- Subject/Title with Dropdown -->
-          <div style="margin: 20px 0; text-align: center;">
-            <p style="margin: 0; font-weight: bold; text-transform: uppercase;">
-              A RESOLUTION DECLARING THE <select id="bidderTypeSelect" class="bidder-type-dropdown" style="font-weight: bold; font-size: 12pt; color: #0066cc; border: 1px solid #0066cc; padding: 2px 5px; background: #e6f3ff; text-transform: uppercase;">
-                ${bidderTypeOptions.map(opt => {
-                  const parts = parseBidderType(opt);
-                  return `<option value="${opt}" ${opt === selectedBidderType ? 'selected' : ''}>${parts.name}</option>`;
-                }).join('')}
-              </select> BIDDER FOR THE PROCUREMENT OF
-              <span contenteditable="true" style="color: #0066cc;">${procurementDescription.toUpperCase()}</span>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;text-transform:uppercase;">
+              A RESOLUTION DECLARING THE <span style="background:#ffff00;">${bidderTypeForTitle}</span> BIDDER FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
             </p>
           </div>
 
-          <!-- WHEREAS Clauses -->
-          <div style="margin: 20px 0;">
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> a requirement was submitted to the BAC for the procurement of
-              <span contenteditable="true">${procurementDescription}</span> through <span contenteditable="true">${procurementMode}</span>,
-              with an Approved Budget for the Contract (ABC) of <strong>${fmtCurrency(abcAmount)}</strong>
-              (<span contenteditable="true">${numberToWords(abcAmount)}</span>), inclusive of all government taxes and fees;
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> Section 26.1, Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, otherwise known as the <em>New Government Procurement Act</em>, provides that the Procuring Entity shall adopt a fit-for-purpose approach in selecting the appropriate procurement modality, ensuring responsiveness to the nature, complexity, and funding of the requirement, and consistent with the principles of economy, efficiency, and value for money, in accordance with the conditions and thresholds prescribed under the Act;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> Section 34, Rule IV of the IRR authorizes the use of <em>${procModeFullName}</em> (${procurementMode}) for goods, infrastructure projects, and consulting services not available in the Procurement Service\u2013DBM, where the amount involved does not exceed Two Million Pesos (\u20b12,000,000.00), subject to prescribed conditions;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure <strong><u contenteditable="true">${procurementDescription}</u></strong> with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
             </p>
 
             ${postingClause}
 
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> after the deadline for submission, the BAC opened and evaluated the quotations received;
-            </p>
-
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> based on the Abstract of Quotation, below are the results of the price evaluation:
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> in response to the RFQ, <strong>${bidderCountWords} (${bidders.length})</strong> bidders submitted a quotation, namely:
             </p>
           </div>
 
           <!-- Bidders Table -->
-          <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11pt;">
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:11pt;">
             <thead>
-              <tr style="background: #f0f0f0;">
-                <th style="border: 1px solid #000; padding: 8px; width: 8%;">No.</th>
-                <th style="border: 1px solid #000; padding: 8px; width: 35%;">Name of Bidder</th>
-                <th style="border: 1px solid #000; padding: 8px; width: 25%;">Total Bid Amount</th>
-                <th style="border: 1px solid #000; padding: 8px; width: 32%;">Remarks</th>
+              <tr>
+                <th style="border:1px solid #000;padding:6px;width:8%;font-weight:bold;">No.</th>
+                <th style="border:1px solid #000;padding:6px;width:35%;font-weight:bold;">Name of the Bidder</th>
+                <th style="border:1px solid #000;padding:6px;width:22%;font-weight:bold;">Total Bid Amount</th>
+                <th style="border:1px solid #000;padding:6px;width:35%;font-weight:bold;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>${biddersTableRows}</tbody>
+          </table>
+
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC through the Technical Working Group, conducted a formal evaluation of the submitted quotation in accordance with Section 34.3, Rule IV of the IRR of RA 12009, ensuring compliance with the legal, technical, and financial requirements, and determined that the bid of <strong>${supplierName}</strong> was responsive and aligned with the end-user\u2019s specifications with details as follows:
+            </p>
+          </div>
+
+          <!-- ABC / Contract Price Detail Table -->
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;">
+            <thead>
+              <tr>
+                <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">ABC</th>
+                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Qty.</th>
+                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit</th>
+                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Description</th>
+                <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Contract Price</th>
+              </tr>
+              <tr>
+                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Total Cost</th>
+                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Total Cost</th>
               </tr>
             </thead>
             <tbody>
-              ${biddersTableRows}
+              ${detailTableRows}
+              <tr>
+                <td colspan="5" style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">Total Contract Price</td>
+                <td style="border:1px solid #000;padding:4px;"></td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
+              </tr>
             </tbody>
           </table>
 
-          <!-- Continuation WHEREAS -->
-          <div style="margin: 20px 0;">
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> after thorough evaluation, the BAC found that <strong><span contenteditable="true">${supplierName}</span></strong>
-              submitted the <span id="bidderTypeText" style="color: #0066cc; font-weight: bold;">${bidderTypeForQuotation}</span> quotation with a total bid amount of
-              <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>),
-              which is within the ABC and compliant with the technical specifications and other requirements;
+          <!-- NOW THEREFORE / RESOLVE -->
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing, <strong>WE,</strong> the Members of the Bids and Awards Committee, hereby RESOLVE, as it is RESOLVED:
             </p>
-
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> the BAC conducted post-qualification and verified that the said bidder has the legal, technical,
-              and financial capability to undertake the obligations of the proposed contract;
-            </p>
-          </div>
-
-          <!-- NOW THEREFORE -->
-          <div style="margin: 20px 0;">
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing premises, the BAC hereby
-              <strong>RESOLVES</strong> to:
-            </p>
-            <ol style="margin: 10px 0 10px 60px;">
-              <li style="margin: 8px 0; text-align: justify;">
-                <strong>DECLARE <span contenteditable="true">${supplierName}</span></strong> as the
-                <span id="bidderTypeText2" style="color: #0066cc; font-weight: bold;">${bidderTypeForResolve}</span> for the procurement of
-                <span contenteditable="true">${procurementDescription}</span>, with a total contract price of
-                <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>);
+            <ol style="margin:10px 0 10px 40px;">
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
               </li>
-              <li style="margin: 8px 0; text-align: justify;">
-                <strong>RECOMMEND</strong> the award of contract to the said bidder, subject to the approval of the
-                Head of the Procuring Entity (HoPE);
-              </li>
-              <li style="margin: 8px 0; text-align: justify;">
-                <strong>DIRECT</strong> the BAC Secretariat to prepare the necessary documents for the issuance of the
-                Notice of Award (NOA) and other pertinent documents.
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong><span style="background:#ffff00;">${bidderTypeForResolve}</span></strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
               </li>
             </ol>
           </div>
 
-          <p style="text-align: justify; text-indent: 40px; margin: 15px 0;">
-            <strong>APPROVED</strong> this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.
+          <p style="text-align:justify;text-indent:40px;margin:15px 0;">
+            <strong>RESOLVED</strong>, at the 3rd Floor, Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City, Agusan del Norte, this <strong><u>${fmtOrdinalDate(resolutionDate)}</u></strong>.
           </p>
 
-          <!-- BAC Members Signatures -->
-          <div style="margin-top: 40px;">
-            <p style="text-align: center; font-weight: bold; margin-bottom: 25px;">BIDS AND AWARDS COMMITTEE</p>
-
-            <!-- First row: Chairperson -->
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="margin: 0; font-weight: bold;" contenteditable="true">${chairpersonName}</p>
-              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">Chairperson</p>
-            </div>
-
-            <!-- Second row: Vice-Chair and Member -->
-            <div style="display: flex; justify-content: space-around; margin: 30px 0;">
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${viceChairName}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Vice-Chairperson</p>
-              </div>
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member1Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-            </div>
-
-            <!-- Third row: Two more Members -->
-            <div style="display: flex; justify-content: space-around; margin: 30px 0;">
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member2Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member3Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-            </div>
-          </div>
+          ${signaturesHTML}
         </div>
       `;
 
-      // ========== PAGE 3: BAC RESOLUTION RECOMMENDING APPROVAL AND APPROVAL ==========
-      // Based on new PDF template: "BAC Reso Recommending Approval and Approval - sample.pdf"
+      // ========== PAGE 2: BAC RESOLUTION RECOMMENDING APPROVAL ==========
       const recommendingApprovalHTML = `
-        <div style="page-break-before: always; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
-          <!-- Header -->
-          <div style="text-align: center; margin-bottom: 20px;">
-            <p style="margin: 0; font-weight: bold;">Republic of the Philippines</p>
-            <p style="margin: 0; font-weight: bold;">Department of Migrant Workers</p>
-            <p style="margin: 0;">REGIONAL OFFICE NO. XIII (Caraga)</p>
-            <p style="margin: 0; font-size: 10pt;">J.P. Rosales Avenue, Butuan City</p>
-            <p style="margin: 0; font-size: 10pt;">Telephone No.: (085) 342-8833</p>
+        <div style="page-break-before:always;font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;padding:0 10px;">
+          <div style="text-align:center;margin-bottom:15px;">
+            <p style="margin:0;font-weight:bold;font-size:13pt;">BIDS AND AWARDS COMMITTEE</p>
           </div>
-
-          <div style="text-align: center; margin: 25px 0;">
-            <p style="margin: 0; font-weight: bold; font-size: 14pt;">BIDS AND AWARDS COMMITTEE</p>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;">BAC RESOLUTION</p>
+            <p style="margin:0;">No. <u><span contenteditable="true">${bacRes.resolution_number || '___'}-A</span></u>, Series of ${seriesYear}</p>
           </div>
-
-          <!-- Resolution Number -->
-          <div style="margin: 20px 0;">
-            <p style="margin: 0;"><strong>RESOLUTION NO. <span contenteditable="true">${bacRes.resolution_number || '___'}</span>-A</strong></p>
-            <p style="margin: 0;">Series of <span contenteditable="true">${seriesYear}</span></p>
-          </div>
-
-          <!-- Subject/Title -->
-          <div style="margin: 20px 0; text-align: center;">
-            <p style="margin: 0; font-weight: bold; text-transform: uppercase;">
-              RESOLUTION RECOMMENDING TO THE HEAD OF THE PROCURING ENTITY (HoPE) THE APPROVAL
-              OF THE AWARD OF CONTRACT TO <span contenteditable="true" style="color: #0066cc;">${supplierName}</span>
-              FOR THE PROCUREMENT OF <span contenteditable="true" style="color: #0066cc;">${procurementDescription.toUpperCase()}</span>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;text-transform:uppercase;">
+              A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
             </p>
           </div>
 
-          <!-- WHEREAS Clauses -->
-          <div style="margin: 20px 0;">
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC), in its Resolution No.
-              <span contenteditable="true">${bacRes.resolution_number || '___'}</span>, Series of <span contenteditable="true">${seriesYear}</span>,
-              declared <strong><span contenteditable="true">${supplierName}</span></strong> as the <span id="bidderTypeText3" style="color: #0066cc; font-weight: bold;">${bidderTypeForResolve}</span>
-              for the procurement of <span contenteditable="true">${procurementDescription}</span>;
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
             </p>
-
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> the said procurement has a total contract price of <strong>${fmtCurrency(bidAmount)}</strong>
-              (<span contenteditable="true">${numberToWords(bidAmount)}</span>), which is within the Approved Budget for the
-              Contract (ABC) of <strong>${fmtCurrency(abcAmount)}</strong>;
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC, after conducting the procurement process in accordance with Section 34.3, Rule IV of the IRR of RA 12009, evaluated the quotation submitted and determined that <strong><u>${supplierName}</u></strong> offered the <strong><u>${bidderTypeForResolve}</u></strong> in the amount of <strong><u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges;
             </p>
-
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>WHEREAS,</strong> the BAC has verified that the winning bidder has the legal, technical, and
-              financial capability to undertake the obligations of the proposed contract;
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC finds the quotation of <strong><u>${supplierName}</u></strong> to be compliant with all the legal, technical, and financial requirements set forth in the procurement documents and the provisions of RA 12009 and its IRR;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC, after due deliberation, resolved to recommend to the Head of the Procuring Entity (HoPE) the award of contract to <strong><u>${supplierName}</u></strong> for the above-mentioned project;
             </p>
           </div>
 
-          <!-- NOW THEREFORE -->
-          <div style="margin: 20px 0;">
-            <p style="text-align: justify; text-indent: 40px; margin: 8px 0;">
-              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing premises, the BAC hereby
-              <strong>RESOLVES</strong> to:
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing, <strong>WE,</strong> the Members of the Bids and Awards Committee, hereby RESOLVE, as it is hereby RESOLVED:
             </p>
-            <ol style="margin: 10px 0 10px 60px;">
-              <li style="margin: 8px 0; text-align: justify;">
-                <strong>RECOMMEND</strong> to the Head of the Procuring Entity (HoPE) the approval of the Award of
-                Contract to <strong><span contenteditable="true">${supplierName}</span></strong> for the procurement of
-                <span contenteditable="true">${procurementDescription}</span>, with a total contract price of
-                <strong>${fmtCurrency(bidAmount)}</strong> (<span contenteditable="true">${numberToWords(bidAmount)}</span>);
+            <ol style="margin:10px 0 10px 40px;">
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
               </li>
-              <li style="margin: 8px 0; text-align: justify;">
-                <strong>AUTHORIZE</strong> the issuance of the corresponding Notice of Award (NOA) upon approval of
-                the Head of the Procuring Entity (HoPE).
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To authorize</strong> the issuance of the corresponding Notice of Award to the said supplier.
               </li>
             </ol>
           </div>
 
-          <p style="text-align: justify; text-indent: 40px; margin: 15px 0;">
-            <strong>APPROVED</strong> this <span contenteditable="true">${fmtDate(resolutionDate)}</span>.
+          <p style="text-align:justify;text-indent:40px;margin:15px 0;">
+            <strong>RESOLVED</strong>, at the 3rd Floor, Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City, Agusan del Norte, this <strong><u>${fmtOrdinalDate(resolutionDate)}</u></strong>.
           </p>
+
+          ${signaturesHTML}
         </div>
       `;
 
-      // ========== PAGE 3: SIGNATURE PAGE FOR RECOMMENDING APPROVAL ==========
-      // Based on sample PDF: "BAC Reso Recommending Approval and Approval - sample.pdf" (Page 2)
-      const dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
-      const signaturePageHTML = `
-        <div style="page-break-before: always; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; padding: 0 20px;">
-          <!-- DMW Logo Header -->
-          <div style="text-align: center; margin-bottom: 30px; margin-top: 20px;">
-            ${dmwLogo ? `<img src="${dmwLogo}" style="width: 80px; height: 80px;" alt="DMW Logo">` : ''}
-          </div>
+      const fullContent = declaringWinnerHTML + recommendingApprovalHTML;
 
-          <!-- Bids and Awards Committee Title -->
-          <div style="text-align: center; margin: 30px 0 50px 0;">
-            <p style="margin: 0; font-weight: bold; font-size: 14pt; text-decoration: underline;">Bids and Awards Committee</p>
-          </div>
-
-          <!-- BAC Members Signatures -->
-          <div style="margin-top: 50px;">
-            <!-- First row: Chairperson -->
-            <div style="text-align: center; margin: 40px 0;">
-              <p style="margin: 0; font-weight: bold;" contenteditable="true">${chairpersonName}</p>
-              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">Chairperson</p>
-            </div>
-
-            <!-- Second row: Vice-Chair and Member -->
-            <div style="display: flex; justify-content: space-around; margin: 40px 0;">
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${viceChairName}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Vice-Chairperson</p>
-              </div>
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member1Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-            </div>
-
-            <!-- Third row: Two more Members -->
-            <div style="display: flex; justify-content: space-around; margin: 40px 0;">
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member2Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-              <div style="text-align: center; width: 45%;">
-                <p style="margin: 0; font-weight: bold;" contenteditable="true">${member3Name}</p>
-                <p style="margin: 0; border-top: 1px solid #000; padding-top: 3px;">Member</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- APPROVED BY HoPE Section -->
-          <div style="margin-top: 60px; border-top: 2px solid #000; padding-top: 25px;">
-            <p style="text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 13pt;">APPROVED BY:</p>
-
-            <div style="text-align: center; margin-top: 40px;">
-              <p style="margin: 0; font-weight: bold;" contenteditable="true">${hopeName}</p>
-              <p style="margin: 0; border-top: 1px solid #000; display: inline-block; padding-top: 3px;">${hopeDesig}</p>
-              <p style="margin: 0; font-size: 10pt; font-style: italic;">Head of Procuring Entity (HoPE)</p>
-            </div>
-
-            <p style="text-align: right; margin-top: 30px;">
-              Date: <span contenteditable="true" style="border-bottom: 1px solid #000; padding: 0 40px;">_______________</span>
-            </p>
-          </div>
-        </div>
-      `;
-
-      // Combine all pages: Page 1 (Declaring Winner) + Page 2 (Recommending Approval) + Page 3 (Signature Page)
-      const fullContent = declaringWinnerHTML + recommendingApprovalHTML + signaturePageHTML;
-
-      // Add dropdown change handler script
-      const dropdownScript = `
-        <script>
-          document.addEventListener('DOMContentLoaded', function() {
-            const select = document.getElementById('bidderTypeSelect');
-            if (select) {
-              select.addEventListener('change', function() {
-                const fullVal = this.value;
-                // Parse the bidder type: "LOWEST CALCULATED AND RESPONSIVE (LCRB)" -> { name, abbrev }
-                const match = fullVal.match(/^(.+?)\\s*\\(([A-Z]+)\\)$/);
-                let name = fullVal, abbrev = '';
-                if (match) {
-                  name = match[1].trim();
-                  abbrev = match[2];
-                }
-                // Title case helper
-                const toTitleCase = (str) => str.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());
-                // For quotation: "Lowest Calculated and Responsive"
-                const forQuotation = toTitleCase(name);
-                // For resolve: "Lowest Calculated and Responsive Bidder (LCRB)"
-                const forResolve = toTitleCase(name) + ' Bidder' + (abbrev ? ' (' + abbrev + ')' : '');
-
-                const text1 = document.getElementById('bidderTypeText');
-                const text2 = document.getElementById('bidderTypeText2');
-                const text3 = document.getElementById('bidderTypeText3');
-                if (text1) text1.textContent = forQuotation;
-                if (text2) text2.textContent = forResolve;
-                if (text3) text3.textContent = forResolve;
-              });
-            }
-          });
-        </script>
-      `;
-
-      // Add styles for editable fields and dropdown
       const customStyles = `
         <style>
-          .editable-field, [contenteditable="true"] {
-            background: #fffde7;
-            padding: 1px 4px;
-            border-radius: 2px;
-            min-width: 50px;
-            display: inline-block;
-          }
-          .editable-field:hover, [contenteditable="true"]:hover {
-            background: #fff9c4;
-          }
-          .editable-field:focus, [contenteditable="true"]:focus {
-            background: #fff59d;
-            outline: 2px solid #ffc107;
-          }
-          .bidder-type-dropdown {
-            font-family: 'Times New Roman', Times, serif;
-            cursor: pointer;
-          }
-          .bidder-type-dropdown:hover {
-            background: #cce5ff !important;
-          }
+          @page { size: A4 portrait; margin: 15mm 20mm; }
+          [contenteditable="true"] { background: #fffde7; padding: 1px 4px; border-radius: 2px; min-width: 50px; display: inline-block; }
+          [contenteditable="true"]:hover { background: #fff9c4; }
+          [contenteditable="true"]:focus { background: #fff59d; outline: 2px solid #ffc107; }
           @media print {
-            .bidder-type-dropdown {
-              border: none !important;
-              background: transparent !important;
-              -webkit-appearance: none;
-              appearance: none;
-            }
-            [contenteditable="true"] {
-              background: transparent !important;
-            }
+            [contenteditable="true"] { background: transparent !important; }
           }
         </style>
       `;
 
-      const html = buildPrintHTML('BAC Resolution - ' + (bacRes.resolution_number || ''), customStyles + fullContent + dropdownScript);
+      const html = buildPrintHTML('BAC Resolution - ' + (bacRes.resolution_number || ''), customStyles + fullContent);
       openPrintPreview(html, { title: toFilename('BAC_Resolution_' + (bacRes.resolution_number || '')), pageSize: 'A4', landscape: false, editable: true });
 
     } catch (err) {
