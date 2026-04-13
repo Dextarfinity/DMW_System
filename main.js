@@ -101,7 +101,7 @@ function checkServerIP(ip) {
 
 /**
  * Discover which server IP is reachable.
- * Tries all candidate IPs in parallel and returns the first one that responds.
+ * Tries localhost first; if unavailable, tries remote IPs in parallel.
  * Falls back to the first IP if none respond.
  */
 async function discoverServer() {
@@ -109,16 +109,21 @@ async function discoverServer() {
 
   console.log('[DISCOVERY] Checking server IPs:', SERVER_IPS.join(', '));
 
-  // Also try localhost for when running on the server PC itself
-  const candidates = [...SERVER_IPS, 'localhost'];
+  // Try localhost FIRST — if a local server is running, always use it
+  const localResult = await checkServerIP('localhost');
+  if (localResult) {
+    RESOLVED_SERVER_URL = localResult;
+    console.log(`[DISCOVERY] Local server found at localhost:${SERVER_PORT} — using local`);
+    return RESOLVED_SERVER_URL;
+  }
 
-  // Race all candidates - first one to respond wins
-  const results = await Promise.all(candidates.map(ip => checkServerIP(ip)));
+  // Localhost not available — try remote server IPs
+  const results = await Promise.all(SERVER_IPS.map(ip => checkServerIP(ip)));
 
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] Server found at ${candidates[i]}:${SERVER_PORT}`);
+      console.log(`[DISCOVERY] Server found at ${SERVER_IPS[i]}:${SERVER_PORT}`);
       return RESOLVED_SERVER_URL;
     }
   }

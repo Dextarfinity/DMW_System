@@ -3971,8 +3971,7 @@ function renderPOPacketTable(rows) {
     { key: 'abstract', entityType: 'abstract', idField: 'abstract_id', numField: 'abstract_number' },
     { key: 'rfq', entityType: 'rfq', idField: 'rfq_id', numField: 'rfq_number' },
     { key: 'pr', entityType: 'purchase_request', idField: 'pr_id', numField: 'pr_number' },
-    { key: 'iar', entityType: 'iar', idField: 'iar_id', numField: 'iar_number' },
-    { key: 'iar_supporting', entityType: 'iar_supporting', idField: 'iar_id', numField: 'iar_number' }
+    { key: 'iar', entityType: 'iar', idField: 'iar_id', numField: 'iar_number' }
   ];
 
   function overallStatus(r) {
@@ -3982,6 +3981,7 @@ function renderPOPacketTable(rows) {
     const has = [r.pr_id, r.rfq_id, r.abstract_id, r.bac_res_id, r.postqual_id, r.noa_id, r.po_id, r.iar_id].filter(Boolean).length;
     if (has >= 8) return '<span class="status-badge approved">Complete</span>';
     return '<span class="status-badge pending">Incomplete (' + has + '/8)</span>';
+    /* iar_supporting column removed — 8 doc columns remain */
   }
 
   tbody.innerHTML = rows.map((r, idx) => {
@@ -4006,7 +4006,7 @@ function renderPOPacketTable(rows) {
       <td class="pkt-td-ref"><strong>${r.pr_number || '-'}</strong></td>
       <td class="pkt-td-div">${officeDisplay}</td>
       ${docCells}
-      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 9</span></div></td>
+      <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 8</span></div></td>
       <td class="pkt-td-actions" style="text-align:center;vertical-align:middle;">
         <button class="btn btn-primary" onclick="pktConsolidateFiles('${rowId}')" title="Consolidate all attached files" style="padding:5px 10px;font-size:10px;white-space:nowrap;"><i class="fas fa-folder-open" style="margin-right:4px;"></i> Consolidate Files</button>
       </td>
@@ -7370,7 +7370,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
           </label>
           <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on. Items must exist in the approved APP before a PR can proceed.</p>
-          <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this);">
+          <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this); onPRAppItemChange(this.value);">
             <option value="">-- Select APP Item --</option>
             ${appOptions}
             <option value="not-in-app" style="color:#e53e3e;font-weight:600;">⚠ Item NOT in APP (Requires New PPMP)</option>
@@ -7457,12 +7457,9 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         if (appSelect && appItem.id) {
           appSelect.value = String(appItem.id);
           if (appSelect.value === String(appItem.id)) {
-            // Trigger validation and PR number generation
             validatePRAppItem(appSelect);
             generatePRNumber(appSelect);
-            // Pre-populate purpose
-            const purposeEl = document.getElementById('prPurpose');
-            if (purposeEl) purposeEl.value = appItem.item_name || appItem.description || '';
+            onPRAppItemChange(appItem.id);
           }
         }
       }, 100);
@@ -7560,6 +7557,69 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       validation.style.display = 'none';
       document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
     }
+  };
+
+  window.onPRAppItemChange = async function(planId) {
+    if (!planId || planId === 'not-in-app') {
+      window._docSelectedItems['pr'] = [];
+      renderDocItemsList('pr');
+      return;
+    }
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      if (!plan) return;
+      window._docSelectedItems['pr'] = [];
+      if (plan.items && plan.items.length > 0) {
+        plan.items.forEach(item => {
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const totalQty = parseFloat(item.total_qty || 0) || (parseFloat(item.q1_qty||0) + parseFloat(item.q2_qty||0) + parseFloat(item.q3_qty||0) + parseFloat(item.q4_qty||0));
+          const qty = totalQty || 1;
+          window._docSelectedItems['pr'].push({
+            item_id: item.id || 0,
+            item_name: item.item_name || item.item_description || '',
+            item_code: item.item_code || '',
+            item_unit: item.unit || 'Lot',
+            item_category: item.category || plan.project_type || '',
+            item_description: item.item_description || '',
+            description: item.item_description || item.item_name || '',
+            unit_price: unitPrice,
+            quantity: qty,
+            total: qty * unitPrice
+          });
+        });
+      } else {
+        const unitPrice = parseFloat(plan.total_amount || 0);
+        const qty = parseInt(plan.quantity_size || 1) || 1;
+        const perUnit = qty > 0 ? unitPrice / qty : unitPrice;
+        const desc = plan.description || plan.item_description || '';
+        window._docSelectedItems['pr'].push({
+          item_id: plan.item_id || 0,
+          item_name: (desc || '').split('\n')[0].trim() || 'Approved Item',
+          item_code: '',
+          item_unit: 'Lot',
+          item_category: plan.project_type || plan.category || '',
+          item_description: plan.item_description || desc || '',
+          description: plan.item_description || desc || '',
+          unit_price: perUnit,
+          quantity: qty,
+          total: unitPrice
+        });
+      }
+      renderDocItemsList('pr');
+      const purposeField = document.getElementById('prPurpose');
+      if (purposeField && !purposeField.value.trim() && plan.description) {
+        purposeField.value = plan.description;
+      }
+      const specsField = document.getElementById('prItemSpecs');
+      if (specsField && !specsField.value.trim()) {
+        const specsLines = (plan.items || []).map(it => it.item_description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0) {
+          specsField.value = specsLines.join('\n');
+        } else if (plan.item_description) {
+          specsField.value = plan.item_description;
+        }
+      }
+    } catch(e) { console.error('Error loading PPMP items for PR:', e); }
   };
 
   window.calculatePRItemTotal = function(el) {
@@ -9494,6 +9554,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
     const supplierOptions = suppliers.map(s => `<option value="${s.id}">${s.name || s.company_name || ''}</option>`).join('');
 
+    // Load employees for signatory dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    const buildEmpOpts = (selectedId) => {
+      return '<option value="">-- Select --</option>' + employees.map(emp =>
+        `<option value="${emp.id}" ${parseInt(selectedId) === emp.id ? 'selected' : ''}>${emp.full_name || ''} ${emp.designation_name ? '(' + emp.designation_name + ')' : ''}</option>`
+      ).join('');
+    };
+
     // Load existing quotations for this abstract
     let absDetail = null;
     try { absDetail = await apiRequest('/abstracts/' + id); } catch(e) {}
@@ -9623,6 +9692,25 @@ Failure to submit the above requirements within the prescribed period shall cons
           <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
           <textarea rows="4" id="editAbsItemSpecs" placeholder="Enter specifications, one per line...">${(a.item_specifications || '').replace(/</g, '&lt;')}</textarea>
         </div>
+
+        <div class="form-section-header"><i class="fas fa-user-tie"></i> BAC Signatories</div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Chairperson</label><select id="editAbsBacChair" class="form-select">${buildEmpOpts(a.bac_chairperson_id)}</select></div>
+          <div class="form-group"><label>Vice-Chairperson</label><select id="editAbsViceChair" class="form-select">${buildEmpOpts(a.vice_chairperson_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Member 1</label><select id="editAbsMember1" class="form-select">${buildEmpOpts(a.bac_member1_id)}</select></div>
+          <div class="form-group"><label>BAC Member 2</label><select id="editAbsMember2" class="form-select">${buildEmpOpts(a.bac_member2_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Member 3</label><select id="editAbsMember3" class="form-select">${buildEmpOpts(a.bac_member3_id)}</select></div>
+          <div class="form-group"><label>BAC Secretariat</label><select id="editAbsSecretariat" class="form-select">${buildEmpOpts(a.bac_secretariat_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Secretariat 2</label><select id="editAbsSecretariat2" class="form-select">${buildEmpOpts(a.bac_secretariat2_id)}</select></div>
+          <div class="form-group"><label>Regional Director / Head</label><select id="editAbsRD" class="form-select">${buildEmpOpts(a.regional_director_id)}</select></div>
+        </div>
+
         ${getEditAttachmentSectionHTML('abstract', id, 'editAbsAttachment')}
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -9730,6 +9818,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
       status: document.getElementById('editAbsStatus').value,
       item_specifications: document.getElementById('editAbsItemSpecs')?.value.trim() || null,
+      bac_chairperson_id: document.getElementById('editAbsBacChair')?.value || null,
+      vice_chairperson_id: document.getElementById('editAbsViceChair')?.value || null,
+      bac_member1_id: document.getElementById('editAbsMember1')?.value || null,
+      bac_member2_id: document.getElementById('editAbsMember2')?.value || null,
+      bac_member3_id: document.getElementById('editAbsMember3')?.value || null,
+      bac_secretariat_id: document.getElementById('editAbsSecretariat')?.value || null,
+      bac_secretariat2_id: document.getElementById('editAbsSecretariat2')?.value || null,
+      regional_director_id: document.getElementById('editAbsRD')?.value || null,
       quotations: sortedQuotations
     };
     try {
@@ -12991,6 +13087,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         '<td>' + escapeHtml(item.code || '') + '</td>' +
         '<td>' + escapeHtml(item.category || '') + '</td>' +
         '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td style="max-width:180px;font-size:11px;color:#4a5568;">' + escapeHtml(item.description || '') + '</td>' +
         '<td>' + escapeHtml(item.unit || '') + '</td>' +
         '<td style="text-align:right;">\u20b1' + parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
         '<td style="text-align:center;">' + parseInt(item.quantity || 0).toLocaleString() + '</td>' +
@@ -13002,7 +13099,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     overlay.id = 'docCatalogItemOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
-      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="background:#fff;border-radius:8px;width:920px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
           <h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Item from Catalog</h4>
           <button onclick="document.getElementById('docCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
@@ -13021,6 +13118,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <th>Item Code</th>
               <th>Category</th>
               <th>Name</th>
+              <th>Description</th>
               <th>Unit</th>
               <th>Unit Price</th>
               <th>Stock</th>
@@ -24231,25 +24329,23 @@ Failure to submit the above requirements within the prescribed period shall cons
 
           <div class="abs-sigs">
             <div class="abs-lbl">Recommended By:</div>
-            <div class="abs-sig-row">
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
+            <div style="text-align:center;margin-bottom:6px;">
+              <div class="abs-sn" style="text-decoration:underline;">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div>
             </div>
             <div class="abs-sig-row">
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacSecName}</div><div class="abs-st">${bacSecTitle}</div></div>
-              <div class="abs-sb"><div class="abs-sl"></div><div class="abs-sn">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div></div>
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
+            </div>
+            <div class="abs-sig-row">
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
             </div>
 
-            <div style="display:flex; justify-content:space-between; margin-top:4px;">
-              <div style="width:48%;">
-                <div class="abs-lbl">Approved By:</div>
-                <div style="text-align:center;"><div class="abs-sl" style="width:60%; margin:8px auto 1px auto;"></div><div class="abs-sn">${rdName}</div><div class="abs-st">${rdTitle}</div></div>
-              </div>
-              <div style="width:48%;">
-                <div class="abs-lbl">Prepared By:</div>
-                <div style="text-align:center;"><div class="abs-sl" style="width:60%; margin:8px auto 1px auto;"></div><div class="abs-sn">${bacSecName}</div><div class="abs-st">${bacSecTitle}</div></div>
+            <div style="margin-top:8px;">
+              <div class="abs-lbl">Approved By:</div>
+              <div style="text-align:center;">
+                <div class="abs-sn" style="text-decoration:underline;">${rdName}</div><div class="abs-st">${rdTitle}</div>
+                <div class="abs-st" style="font-style:italic;">Head of the Procuring Entity</div>
               </div>
             </div>
           </div>

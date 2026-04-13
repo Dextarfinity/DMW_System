@@ -2004,10 +2004,42 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
           const codePrefix = procSource === 'PAPs' ? 'PAP-A-' : 'NPD-A-';
           const itemCode = codePrefix + Date.now();
           const itemName = (up.description || '').split('\n')[0].trim() || 'Approved Item';
+
+          // Look up actual unit_price, quantity, and unit from plan_items
+          let catalogUnitPrice = up.total_amount || 0;
+          let catalogQuantity = 0;
+          let catalogUnit = up.quantity_size ? 'pc' : 'lot';
+          const planItemRows = await pool.query(
+            'SELECT unit, unit_price, q1_qty, q2_qty, q3_qty, q4_qty, total_qty FROM plan_items WHERE plan_id = $1 LIMIT 1',
+            [req.params.id]
+          );
+          if (planItemRows.rows.length > 0) {
+            const pi = planItemRows.rows[0];
+            if (pi.unit_price && parseFloat(pi.unit_price) > 0) {
+              catalogUnitPrice = parseFloat(pi.unit_price);
+            }
+            const totalQty = parseFloat(pi.total_qty || 0) || (parseFloat(pi.q1_qty||0) + parseFloat(pi.q2_qty||0) + parseFloat(pi.q3_qty||0) + parseFloat(pi.q4_qty||0));
+            if (totalQty > 0) {
+              catalogQuantity = totalQty;
+            }
+            if (pi.unit) {
+              catalogUnit = pi.unit;
+            }
+          } else if (up.quantity_size) {
+            // Fallback: derive from procurementplans fields
+            const parsedQty = parseInt(up.quantity_size) || 0;
+            if (parsedQty > 0) {
+              catalogQuantity = parsedQty;
+              if (up.total_amount && parsedQty > 0) {
+                catalogUnitPrice = parseFloat(up.total_amount) / parsedQty;
+              }
+            }
+          }
+
           const newItem = await pool.query(
             `INSERT INTO items (code, name, description, unit, unit_price, category, procurement_source, quantity, reorder_point, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, true) RETURNING id, code`,
-            [itemCode, itemName, up.item_description || up.description || '', up.quantity_size ? 'pc' : 'lot', up.total_amount || 0, up.category || '', procSource]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, true) RETURNING id, code`,
+            [itemCode, itemName, up.item_description || up.description || '', catalogUnit, catalogUnitPrice, up.category || '', procSource, catalogQuantity]
           );
           // Link the PPMP entry to the new catalog item
           await pool.query('UPDATE procurementplans SET item_id = $1 WHERE id = $2', [newItem.rows[0].id, req.params.id]);
@@ -3357,10 +3389,14 @@ app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
     const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    // Map full procurement mode names to short codes accepted by DB constraint
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawMode = (procurement_mode || 'SVP').trim();
+    const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
       `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]']
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3369,10 +3405,14 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
     const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    // Map full procurement mode names to short codes accepted by DB constraint
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawMode = (procurement_mode || 'SVP').trim();
+    const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
       `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, subject=$17, description=$18, bidders=$19, updated_at=CURRENT_TIMESTAMP
        WHERE id=$20 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', req.params.id]
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

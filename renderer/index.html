@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://192.168.100.235:3000 http://192.168.1.117:3000 http://localhost:3000; script-src 'self' 'unsafe-inline' http://192.168.100.235:3000 http://192.168.1.117:3000 http://localhost:3000; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com http://192.168.100.235:3000 http://192.168.1.117:3000 http://localhost:3000; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: http://192.168.100.235:3000 http://192.168.1.117:3000 http://localhost:3000; connect-src 'self' http://192.168.100.235:3000 http://192.168.1.117:3000 http://localhost:3000 ws://192.168.100.235:3000 ws://192.168.1.117:3000 ws://localhost:3000;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http: ; script-src 'self' 'unsafe-inline' http: ; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com http: ; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: http: ; connect-src 'self' http: ws: ;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procurement Plan System</title>
   <link rel="stylesheet" href="styles/main.css">
@@ -1207,7 +1207,7 @@
                 <tr>
                   <th rowspan="2" class="pkt-th-fixed">PR Number</th>
                   <th rowspan="2" class="pkt-th-fixed">Office/Section</th>
-                  <th colspan="9" class="text-center pkt-th-docs-header">Supporting Documents</th>
+                  <th colspan="8" class="text-center pkt-th-docs-header">Supporting Documents</th>
                   <th rowspan="2" class="pkt-th-fixed">Status</th>
                   <th rowspan="2" class="pkt-th-fixed">Actions</th>
                 </tr>
@@ -1220,11 +1220,10 @@
                   <th class="pkt-doc-col-header">RFQ</th>
                   <th class="pkt-doc-col-header">PR</th>
                   <th class="pkt-doc-col-header">IAR</th>
-                  <th class="pkt-doc-col-header">IAR SUPP. DOCS</th>
                 </tr>
               </thead>
               <tbody id="poPacketTableBody">
-                <tr><td colspan="13" class="text-center">Loading document monitoring data...</td></tr>
+                <tr><td colspan="12" class="text-center">Loading document monitoring data...</td></tr>
               </tbody>
             </table>
           </div>
