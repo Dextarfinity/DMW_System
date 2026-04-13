@@ -13814,12 +13814,17 @@ Failure to submit the above requirements within the prescribed period shall cons
     const linkedAbstract = window._bacLinkedAbstract || null;
     const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
 
+    // Map procurement mode to DB-compatible short codes
+    const rawPM = (linkedAbstract?.procurement_mode || 'SVP').trim();
+    const pmMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const draftProcMode = pmMap[rawPM.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawPM) ? rawPM : 'SVP');
+
     try {
       const data = {
         resolution_number: resNumber,
         abstract_id: abstractId ? parseInt(abstractId) : null,
         resolution_date: new Date().toISOString().split('T')[0],
-        procurement_mode: linkedAbstract?.procurement_mode || 'Small Value Procurement',
+        procurement_mode: draftProcMode,
         abc_amount: abcAmount,
         bid_amount: contractPrice,
         bidder_type: bidderType,
@@ -14053,10 +14058,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     const linkedAbstract = window._bacLinkedAbstract || null;
     const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
 
+    // Map procurement mode to short codes that the DB constraint expects
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawProcMode = (linkedAbstract?.procurement_mode || 'SVP').trim();
+    const mappedProcMode = procModeMap[rawProcMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawProcMode) ? rawProcMode : 'SVP');
+
     try {
       const data = {
         resolution_number: resNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
-        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: linkedAbstract?.procurement_mode || 'Small Value Procurement',
+        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: mappedProcMode,
         abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
         subject: subject, description: description,
         recommended_awardee_name: recommendedAwardeeName, bidders: bidders,
@@ -24022,15 +24032,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="rfq-two-col" style="margin-top:5px;">
             <div class="rfq-col-left">
               <div>Served by:</div>
-              <div class="rfq-sig-line"></div>
-              <div class="rfq-sig-label"><strong>${bacSecName.toUpperCase()}</strong></div>
+              <div class="rfq-sig-label" style="margin-top:15px;"><strong style="text-decoration:underline;">${bacSecName.toUpperCase()}</strong></div>
               <div class="rfq-sig-label">BAC Secretariat</div>
               <div style="margin-top:10px;">Date:________________________</div>
             </div>
             <div class="rfq-col-right">
               <div style="text-align:center;">Very truly yours,</div>
-              <div class="rfq-sig-line" style="margin:10px auto 3px auto;"></div>
-              <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase;">${bacChairName}</div>
+              <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase; margin-top:15px; text-decoration:underline;">${bacChairName}</div>
               <div style="font-size:9pt; color:#444;">${bacChairDesignation}</div>
               <div style="font-size:9pt; color:#444;">BAC Chairperson</div>
             </div>
@@ -24276,7 +24284,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           .abs-cert p { margin: 2px 0; }
           .abs-sigs { margin-top: 6px; font-size: 8pt; }
           .abs-sig-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
-          .abs-sb { display: inline-block; width: 30%; text-align: center; vertical-align: top; margin-bottom: 2px; }
+          .abs-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 2px; }
           .abs-sl { border-bottom: 1px solid #000; height: 18px; margin: 8px auto 1px auto; width: 80%; }
           .abs-sn { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
           .abs-st { font-size: 7pt; color: #333; }
