@@ -40,7 +40,7 @@ function shouldIgnore(filePath) {
 
 function runGit(cmd) {
   return new Promise((resolve, reject) => {
-    exec(`git ${cmd}`, { cwd: WATCH_DIR, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(`git ${cmd}`, { cwd: WATCH_DIR, maxBuffer: 10 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(`git ${cmd} failed: ${stderr || err.message}`));
       } else {
