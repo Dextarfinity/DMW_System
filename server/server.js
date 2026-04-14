@@ -1673,10 +1673,16 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
       conditions.push(`pp.procurement_mode = $${params.length}`);
     }
 
-    // Procurement source filter (PS-DBM, NON PS-DBM, PAPs)
+    // Procurement source filter (PS-DBM, NON PS-DBM, PAPs, MANUAL-NON-PSDBM)
     if (req.query.procurement_source) {
-      params.push(req.query.procurement_source);
-      conditions.push(`pp.procurement_source = $${params.length}`);
+      const srcVal = req.query.procurement_source;
+      if (srcVal === 'NON PS-DBM') {
+        // Include both catalog NON PS-DBM and manual NON-PSDBM entries
+        conditions.push(`(pp.procurement_source = 'NON PS-DBM' OR pp.procurement_source = 'MANUAL-NON-PSDBM')`);
+      } else {
+        params.push(srcVal);
+        conditions.push(`pp.procurement_source = $${params.length}`);
+      }
     }
 
     // Only return PPMP line items (with ppmp_no) unless explicitly requesting all
@@ -1705,6 +1711,7 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
       `SELECT pp.*, d.name as department_name, d.code as department_code,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
+              it.procurement_source as item_procurement_source,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
               bu.username as budget_approver_name,
@@ -1732,7 +1739,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1766,12 +1773,13 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
         ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-        category, item_id, section, item_description, procurement_source) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
+        category, item_id, section, item_description, procurement_source, unit, unit_price)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
        pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+       unit || null, unit_price || 0]
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1804,7 +1812,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const { dept_id, fiscal_year, status, remarks, total_amount,
               ppmp_no, description, project_type, quantity_size, procurement_mode,
               pre_procurement, start_date, end_date, delivery_period, fund_source,
-              category, item_id, section, item_description, procurement_source } = entry;
+              category, item_id, section, item_description, procurement_source, unit, unit_price } = entry;
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
@@ -1838,12 +1846,13 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const planResult = await client.query(
         `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
           ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-          category, item_id, section, item_description, procurement_source) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
+          category, item_id, section, item_description, procurement_source, unit, unit_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING id`,
         [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
          finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
          pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+         unit || null, unit_price || 0]
       );
       createdIds.push(planResult.rows[0].id);
     }
@@ -1861,18 +1870,20 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
         category=$17, item_id=$18, section=$19, item_description=$20, procurement_source=$21,
+        unit=$22, unit_price=$23,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
        pre_procurement, start_date, end_date, delivery_period, fund_source,
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+       unit || null, unit_price || 0]
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -1985,13 +1996,17 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
       if (!up.item_id) {
         try {
           const procSource = up.procurement_source || 'NON PS-DBM';
+          // For catalog items, normalize MANUAL-NON-PSDBM to NON PS-DBM
+          const catalogSource = procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource;
           const codePrefix = procSource === 'PAPs' ? 'PAP-A-' : 'NPD-A-';
           const itemCode = codePrefix + Date.now();
           const itemName = (up.description || '').split('\n')[0].trim() || 'Approved Item';
+          const itemUnit = up.unit || (up.quantity_size ? 'pc' : 'lot');
+          const itemUnitPrice = up.unit_price || up.total_amount || 0;
           const newItem = await pool.query(
             `INSERT INTO items (code, name, description, unit, unit_price, category, procurement_source, quantity, reorder_point, is_active)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, true) RETURNING id, code`,
-            [itemCode, itemName, up.item_description || up.description || '', up.quantity_size ? 'pc' : 'lot', up.total_amount || 0, up.category || '', procSource]
+            [itemCode, itemName, up.item_description || up.description || '', itemUnit, itemUnitPrice, up.category || '', catalogSource]
           );
           // Link the PPMP entry to the new catalog item
           await pool.query('UPDATE procurementplans SET item_id = $1 WHERE id = $2', [newItem.rows[0].id, req.params.id]);
@@ -5600,6 +5615,15 @@ app.get('/api/connected-clients', authenticateToken, (req, res) => {
 // ==============================================================================
 // START HTTP + WEBSOCKET SERVER
 // ==============================================================================
+
+// Auto-migration: add unit and unit_price columns to procurementplans if missing
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`);
+    await pool.query(`ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`);
+    console.log('[Migration] procurementplans.unit and unit_price columns ensured.');
+  } catch(e) { console.warn('[Migration] Could not add unit/unit_price columns:', e.message); }
+})();
 
 const server = httpServer.listen(PORT, HOST, () => {
   const allIPs = getAllLocalIPs();

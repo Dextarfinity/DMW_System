@@ -2712,7 +2712,8 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       // Procurement source badge
       const itemSource = p.procurement_source || p.item_procurement_source || 'NON PS-DBM';
       const sourceBadgeClass = itemSource === 'PS-DBM' ? 'source-badge psdbm' : itemSource === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
-      const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${itemSource}</span>`;
+      const sourceDisplayLabel = itemSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM (Manual)' : itemSource;
+      const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${sourceDisplayLabel}</span>`;
 
       let approvalInfo = '';
       if (p.status === 'pending') {
@@ -10308,10 +10309,12 @@ Failure to submit the above requirements within the prescribed period shall cons
       // (by Chief, Budget Consultant, and HOPE). For now, just save with item_id = null.
       const manualItemsInList = items.filter(it => it.is_manual);
       if (manualItemsInList.length > 0) {
-        const catalogSource = isPAPs ? 'PAPs' : 'NON PS-DBM';
         manualItemsInList.forEach(it => {
           it.item_id = null;
-          it.procurement_source = catalogSource;
+          // Preserve MANUAL-NON-PSDBM if that's the source; otherwise use PAPs or NON PS-DBM
+          if (!it.procurement_source) {
+            it.procurement_source = isPAPs ? 'PAPs' : (procSource === 'MANUAL-NON-PSDBM' ? 'MANUAL-NON-PSDBM' : 'NON PS-DBM');
+          }
         });
       }
 
@@ -10361,7 +10364,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           fund_source: fundSource,
           total_amount: it.budget,
           status: 'pending',
-          procurement_source: it.procurement_source || (procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource),
+          procurement_source: it.procurement_source || procSource,
+          unit: it.unit || it.uom || null,
+          unit_price: parseFloat(it.unit_price || 0),
           remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim()
         };
       });
@@ -11582,7 +11587,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const desc = document.getElementById('manualItemDesc')?.value?.trim() || '';
     const budgetOverride = parseFloat(document.getElementById('manualEstBudget')?.value);
     const budget = (!isNaN(budgetOverride) && budgetOverride > 0) ? budgetOverride : unitPrice * qty;
-    const actualSource = 'NON PS-DBM';
+    const currentSource = document.getElementById('ppmpProcurementSource')?.value || 'NON PS-DBM';
+    const actualSource = currentSource === 'MANUAL-NON-PSDBM' ? 'MANUAL-NON-PSDBM' : 'NON PS-DBM';
 
     const entry = {
       item_id: null,
@@ -15776,8 +15782,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div class="detail-row"><label>Fiscal Year:</label><span>${plan.fiscal_year}</span></div>
           <div class="detail-row"><label>Section:</label><span style="font-weight:700; color:#b8860b; text-transform:uppercase;">${plan.section || '-'}</span></div>
           <div class="detail-row"><label>Category:</label><span style="font-weight:600; color:#1565c0;">${plan.item_category || plan.category || '-'}</span></div>
-          <div class="detail-row"><label>Procurement Source:</label><span><span class="source-badge ${(plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PS-DBM' ? 'psdbm' : (plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PAPs' ? 'paps' : 'non-psdbm'}" style="font-size:11px;padding:2px 10px;border-radius:10px;">${plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM'}</span></span></div>
-          ${plan.item_name ? `<div class="detail-row"><label>Linked Item:</label><span style="font-weight:600;">${plan.item_name} <span style="color:#4a5568;">(${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</span></span></div>` : ''}
+          <div class="detail-row"><label>Procurement Source:</label><span><span class="source-badge ${(plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PS-DBM' ? 'psdbm' : (plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM') === 'PAPs' ? 'paps' : 'non-psdbm'}" style="font-size:11px;padding:2px 10px;border-radius:10px;">${({'NON PS-DBM':'NON PS-DBM (Items Catalog)','PS-DBM':'PS-DBM (Items Catalog)','PAPs':'PAPs (Programs, Activities & Projects)','MANUAL-NON-PSDBM':'Create NON-PS-DBM (Manually)'}[plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM']) || (plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM')}</span></span></div>
+          ${plan.item_name ? `<div class="detail-row"><label>Linked Item:</label><span style="font-weight:600;">${plan.item_name} <span style="color:#4a5568;">(${plan.unit || plan.item_unit || ''} @ ₱${parseFloat(plan.unit_price || plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})</span></span></div>` : ''}
           ${plan.item_description ? `<div class="detail-row"><label>Item Description:</label><span style="white-space:pre-line;">${plan.item_description}</span></div>` : ''}
           <div class="detail-row"><label>General Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
           <div class="detail-row"><label>Project Type:</label><span>${plan.project_type || 'Goods'}</span></div>
@@ -16970,6 +16976,20 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Item description: use item_description column, fallback to description
       const currentItemDesc = plan.item_description || plan.description || '';
 
+      // Resolve actual unit and unit_price: prefer plan-level columns, fallback to linked item
+      const actualUnit = plan.unit || plan.item_unit || (linkedItem ? linkedItem.unit : '') || '';
+      const actualUnitPrice = parseFloat(plan.unit_price || plan.item_unit_price || (linkedItem ? linkedItem.unit_price : 0) || 0);
+
+      // Resolve procurement source with proper display label
+      const actualProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
+      const procSourceLabels = {
+        'NON PS-DBM': 'NON PS-DBM (Items Catalog)',
+        'PS-DBM': 'PS-DBM (Items Catalog)',
+        'PAPs': 'PAPs (Programs, Activities & Projects)',
+        'MANUAL-NON-PSDBM': 'Create NON-PS-DBM (Manually)'
+      };
+      const procSourceLabel = procSourceLabels[actualProcSource] || actualProcSource;
+
       const html = `
         <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
           <div class="form-row">
@@ -17001,13 +17021,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Procurement Source</label>
-              <select class="form-select" name="procurement_source">
-                <option value="NON PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'NON PS-DBM')==='NON PS-DBM'?'selected':''}>NON PS-DBM</option>
-                <option value="PS-DBM" ${(plan.procurement_source||plan.item_procurement_source||'')==='PS-DBM'?'selected':''}>PS-DBM</option>
-                <option value="PAPs" ${(plan.procurement_source||plan.item_procurement_source||'')==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
-                <option value="MANUAL-NON-PSDBM" ${(plan.procurement_source||'')==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
-              </select>
+              <label>Procurement Source <small style="color:#999;">(fixed at creation)</small></label>
+              <input type="text" value="${procSourceLabel}" readonly disabled style="background: #f5f5f5; font-weight: 600;">
+              <input type="hidden" name="procurement_source" value="${actualProcSource}">
             </div>
           </div>
 
@@ -17016,12 +17032,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <div style="background:#e8f7ed; border:1px solid #c6f6d5; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
             <div style="font-size:12px; font-weight:600; color:#276749; margin-bottom:4px;"><i class="fas fa-link"></i> Currently Linked Item</div>
             <div style="font-size:13px; font-weight:700; color:#1a202c;">${escapeHtml(linkedItem.code || '')} — ${escapeHtml(linkedItem.name || '')}</div>
-            <div style="font-size:11px; color:#4a5568;">${linkedItem.unit || ''} @ ₱${parseFloat(linkedItem.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
+            <div style="font-size:11px; color:#4a5568;">${actualUnit} @ ₱${actualUnitPrice.toLocaleString('en-PH', {minimumFractionDigits:2})} · ${linkedItem.category || ''}</div>
             ${currentItemDesc ? `<div style="margin-top:6px; font-size:12px; color:#2d3748; white-space:pre-line; background:#fff; padding:6px 8px; border-radius:4px; border:1px solid #e2e8f0;"><strong>Item Description:</strong>\n${escapeHtml(currentItemDesc)}</div>` : ''}
           </div>` : (plan.item_description ? `
           <div style="background:#ebf8ff; border:1px solid #bee3f8; border-radius:6px; padding:10px 14px; margin-bottom:12px;">
             <div style="font-size:12px; font-weight:600; color:#2b6cb0; margin-bottom:4px;"><i class="fas fa-info-circle"></i> Current Item Description</div>
             <div style="font-size:12px; color:#2d3748; white-space:pre-line;">${escapeHtml(plan.item_description)}</div>
+            ${actualUnit || actualUnitPrice > 0 ? `<div style="font-size:11px; color:#4a5568; margin-top:4px;">${actualUnit} @ ₱${actualUnitPrice.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>` : ''}
           </div>` : '')}
           <div class="form-row">
             <div class="form-group">
@@ -17128,7 +17145,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (plan.item_id && linkedItem) {
         window._ppmpEditCheckedItems[String(plan.item_id)] = {
           item_id: plan.item_id,
-          item: linkedItem,
+          item: { ...linkedItem, unit: actualUnit, unit_price: actualUnitPrice },
           description: currentItemDesc,
           isOriginal: true
         };
@@ -17233,7 +17250,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const allItems = window._ppmpItemsCache || [];
     const checked = window._ppmpEditCheckedItems || {};
     const sourceSelect = document.querySelector('#editPPMPForm select[name="procurement_source"]');
-    let sourceFilter = sourceSelect ? sourceSelect.value : 'NON PS-DBM';
+    const sourceHidden = document.querySelector('#editPPMPForm input[name="procurement_source"]');
+    let sourceFilter = (sourceSelect ? sourceSelect.value : (sourceHidden ? sourceHidden.value : 'NON PS-DBM'));
     if (sourceFilter === 'MANUAL-NON-PSDBM') sourceFilter = 'NON PS-DBM';
 
     let filteredItems = allItems;
@@ -17394,7 +17412,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       total_amount: parseFloat(form.total_amount.value),
       fund_source: form.fund_source?.value || 'GAA',
       remarks: form.remarks.value,
-      procurement_source: (() => { const ps = form.procurement_source?.value || 'NON PS-DBM'; return ps === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : ps; })()
+      procurement_source: form.procurement_source?.value || 'NON PS-DBM'
     };
 
     // Separate: the original item (update existing plan) vs new items (batch create)
@@ -17423,7 +17441,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           ppmp_no: form.ppmp_no?.value || undefined,
           item_id: window._ppmpEditPlan?.item_id || null,
           category: window._ppmpEditPlan?.category || null,
-          item_description: window._ppmpEditPlan?.item_description || null
+          item_description: window._ppmpEditPlan?.item_description || null,
+          unit: window._ppmpEditPlan?.unit || window._ppmpEditPlan?.item_unit || null,
+          unit_price: parseFloat(window._ppmpEditPlan?.unit_price || window._ppmpEditPlan?.item_unit_price || 0)
         };
         await apiRequest('/plans/' + planId, 'PUT', data);
         savedCount = 1;
@@ -17436,7 +17456,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           ppmp_no: form.ppmp_no?.value || undefined,
           item_id: parseInt(originalEntry),
           category: checked[originalEntry].item?.category || null,
-          item_description: origDesc
+          item_description: origDesc,
+          unit: checked[originalEntry].item?.unit || null,
+          unit_price: parseFloat(checked[originalEntry].item?.unit_price || 0)
         };
         await apiRequest('/plans/' + planId, 'PUT', origData);
         savedCount++;
@@ -17449,7 +17471,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           ppmp_no: form.ppmp_no?.value || undefined,
           item_id: parseInt(firstId),
           category: checked[firstId].item?.category || null,
-          item_description: firstDesc
+          item_description: firstDesc,
+          unit: checked[firstId].item?.unit || null,
+          unit_price: parseFloat(checked[firstId].item?.unit_price || 0)
         };
         await apiRequest('/plans/' + planId, 'PUT', firstData);
         savedCount++;
@@ -17471,7 +17495,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             category: c.item?.category || null,
             item_description: c.description || null,
             description: c.description || commonData.description,
-            total_amount: itemTotal
+            total_amount: itemTotal,
+            unit: c.item?.unit || null,
+            unit_price: itemPrice
           };
         });
 

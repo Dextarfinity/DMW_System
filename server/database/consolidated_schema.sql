@@ -263,6 +263,8 @@ CREATE TABLE IF NOT EXISTS procurementplans (
     item_id          INT REFERENCES items(id) ON DELETE SET NULL,
     section          VARCHAR(100) DEFAULT 'GENERAL PROCUREMENT',
     item_description TEXT,
+    unit             VARCHAR(50),
+    unit_price       DECIMAL(12,2) DEFAULT 0,
     quantity_size    VARCHAR(100),
     procurement_mode VARCHAR(100),
     pre_procurement  VARCHAR(10),
