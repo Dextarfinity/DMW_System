@@ -19196,31 +19196,31 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group">
                 <label>Item Name <span class="text-danger">*</span></label>
-                <input type="text" id="manualItemName" value="${manualNameValue}" placeholder="e.g., Ballpen, Black" style="font-size:13px;" oninput="syncManualNameWithDescription(this.value)">
+                <input type="text" id="editManualItemName" value="${manualNameValue}" placeholder="e.g., Ballpen, Black" style="font-size:13px;" oninput="syncManualNameWithDescription(this.value)">
               </div>
               <div class="form-group">
                 <label>Description</label>
-                <input type="text" id="manualItemDesc" value="${manualDescValue}" placeholder="Specs, size, color..." style="font-size:13px;" oninput="syncManualDescWithGeneral(this.value)">
+                <input type="text" id="editManualItemDesc" value="${manualDescValue}" placeholder="Specs, size, color..." style="font-size:13px;" oninput="syncManualDescWithGeneral(this.value)">
               </div>
             </div>
             <div class="form-row" style="margin-bottom:8px;">
               <div class="form-group">
                 <label>Unit <span class="text-danger">*</span></label>
-                <select class="form-select" id="manualItemUnit" style="font-size:13px;">
+                <select class="form-select" id="editManualItemUnit" style="font-size:13px;">
                   ${uomOptions}
                 </select>
               </div>
               <div class="form-group">
                 <label>Unit Price (₱) <span class="text-danger">*</span></label>
-                <input type="text" inputmode="decimal" id="manualItemPrice" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+                <input type="text" inputmode="decimal" id="editManualItemPrice" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditManualEstBudget()">
               </div>
               <div class="form-group">
                 <label>Quantity <span class="text-danger">*</span></label>
-                <input type="number" id="manualItemQty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+                <input type="number" id="editManualItemQty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditManualEstBudget()">
               </div>
               <div class="form-group">
                 <label>Est. Budget</label>
-                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+                <input type="number" id="editManualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
               </div>
             </div>
           </div>
@@ -19415,14 +19415,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           console.log('[PPMP EDIT] Populating manual item fields with specificEntryData:', specificEntryData);
 
           // Populate Item Name (uses same source as General Description & Objective)
-          const manualItemNameEl = document.getElementById('manualItemName');
+          const manualItemNameEl = document.getElementById('editManualItemName');
           if (manualItemNameEl) {
             manualItemNameEl.value = specificEntryData.manual_name;
             console.log('[PPMP EDIT] Manual Item Name populated (from description):', specificEntryData.manual_name);
           }
 
           // Populate Description
-          const manualItemDescEl = document.getElementById('manualItemDesc');
+          const manualItemDescEl = document.getElementById('editManualItemDesc');
           if (manualItemDescEl) {
             manualItemDescEl.value = specificEntryData.item_description;
             console.log('[PPMP EDIT] Manual Item Desc populated:', specificEntryData.item_description);
@@ -19436,7 +19436,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           }
 
           // Populate Unit Dropdown - ensure proper selection
-          const manualItemUnitEl = document.getElementById('manualItemUnit');
+          const manualItemUnitEl = document.getElementById('editManualItemUnit');
           if (manualItemUnitEl) {
             const unitValue = specificEntryData.item_unit;
             manualItemUnitEl.value = unitValue;
@@ -19453,21 +19453,21 @@ Failure to submit the above requirements within the prescribed period shall cons
           }
 
           // Populate Unit Price
-          const manualItemPriceEl = document.getElementById('manualItemPrice');
+          const manualItemPriceEl = document.getElementById('editManualItemPrice');
           if (manualItemPriceEl) {
             manualItemPriceEl.value = specificEntryData.unit_price.toFixed(2);
             console.log('[PPMP EDIT] Manual Item Price populated:', specificEntryData.unit_price.toFixed(2));
           }
 
           // Populate Quantity
-          const manualItemQtyEl = document.getElementById('manualItemQty');
+          const manualItemQtyEl = document.getElementById('editManualItemQty');
           if (manualItemQtyEl) {
             manualItemQtyEl.value = specificEntryData.quantity_size.toString();
             console.log('[PPMP EDIT] Manual Item Qty populated:', specificEntryData.quantity_size);
           }
 
           // Populate Estimated Budget
-          const manualEstBudgetEl = document.getElementById('manualEstBudget');
+          const manualEstBudgetEl = document.getElementById('editManualEstBudget');
           if (manualEstBudgetEl) {
             manualEstBudgetEl.value = specificEntryData.total_amount.toFixed(2);
             console.log('[PPMP EDIT] Manual Est Budget populated:', specificEntryData.total_amount.toFixed(2));
@@ -19586,11 +19586,11 @@ Failure to submit the above requirements within the prescribed period shall cons
    * Calculate estimated budget for manual item entry in Edit modal
    */
   window.calcEditManualEstBudget = function() {
-    const price = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
-    const qtyStr = document.getElementById('manualItemQty')?.value || '1';
+    const price = parseFloat(document.getElementById('editManualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('editManualItemQty')?.value || '1';
     const qty = parseFloat(qtyStr) || 1;
     const estBudget = isNaN(price) ? 0 : price * qty;
-    const budgetField = document.getElementById('manualEstBudget');
+    const budgetField = document.getElementById('editManualEstBudget');
     const totalField = document.getElementById('ppmpEditBudget');
     if (budgetField) budgetField.value = estBudget.toFixed(2);
     if (totalField) totalField.value = estBudget.toFixed(2);
@@ -19659,7 +19659,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Only sync when in MANUAL-NON-PSDBM mode
     if (procSource === 'MANUAL-NON-PSDBM') {
       const descField = document.getElementById('ppmpEditDescription');
-      const manualDescField = document.getElementById('manualItemDesc');
+      const manualDescField = document.getElementById('editManualItemDesc');
       if (descField) {
         // Combine Manual Item Name + Manual Description for General Description
         const manualDesc = manualDescField?.value?.trim() || '';
@@ -19679,7 +19679,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Only sync when in MANUAL-NON-PSDBM mode
     if (procSource === 'MANUAL-NON-PSDBM') {
       const descField = document.getElementById('ppmpEditDescription');
-      const manualNameField = document.getElementById('manualItemName');
+      const manualNameField = document.getElementById('editManualItemName');
       if (descField) {
         // Combine Manual Item Name + Manual Description for General Description
         const manualName = manualNameField?.value?.trim() || '';
@@ -20033,11 +20033,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Handle different procurement source modes
       if (isManualMode) {
         // Manual item entry mode - get data from correct form field IDs
-        const itemName = document.getElementById('manualItemName')?.value?.trim() || '';
-        const itemDesc = document.getElementById('manualItemDesc')?.value?.trim() || '';
-        const itemUnit = document.getElementById('manualItemUnit')?.value || 'pc';
-        const itemPrice = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
-        const itemQty = document.getElementById('manualItemQty')?.value || '1';
+        const itemName = document.getElementById('editManualItemName')?.value?.trim() || '';
+        const itemDesc = document.getElementById('editManualItemDesc')?.value?.trim() || '';
+        const itemUnit = document.getElementById('editManualItemUnit')?.value || 'pc';
+        const itemPrice = parseFloat(document.getElementById('editManualItemPrice')?.value || 0);
+        const itemQty = document.getElementById('editManualItemQty')?.value || '1';
         const manualSection = document.getElementById('manualSection')?.value || commonData.section;
         const manualCategory = document.getElementById('manualCategory')?.value || commonData.category;
 
