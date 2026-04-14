@@ -19009,8 +19009,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (currentUnitVal && !uomNames.includes(currentUnitVal.toLowerCase())) {
         uomOptionsRaw = `<option value="${escapeHtml(currentUnitVal)}">${escapeHtml(currentUnitVal)}</option>` + uomOptionsRaw;
       }
-      // Add placeholder if no unit is set
-      if (!currentUnitVal) {
+      // Mark the current unit as selected (case-insensitive match)
+      if (currentUnitVal) {
+        const lowerUnit = currentUnitVal.toLowerCase();
+        uomOptionsRaw = uomOptionsRaw.replace(/<option value="([^"]*)">/gi, (match, val) => {
+          return val.toLowerCase() === lowerUnit ? `<option value="${val}" selected>` : match;
+        });
+      } else {
         uomOptionsRaw = '<option value="" disabled selected>-- Select Unit --</option>' + uomOptionsRaw;
       }
       const uomOptions = uomOptionsRaw;
@@ -19202,7 +19207,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <div class="form-group">
                 <label>Unit <span class="text-danger">*</span></label>
                 <select class="form-select" id="manualItemUnit" style="font-size:13px;">
-                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                  ${uomOptions}
                 </select>
               </div>
               <div class="form-group">
@@ -19254,7 +19259,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <div class="form-group">
                 <label>Unit <span class="text-danger">*</span></label>
                 <select class="form-select" id="papManualItemUnit" name="pap_manual_item_unit" style="font-size:13px;">
-                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                  ${uomOptions}
                 </select>
               </div>
               <div class="form-group">
