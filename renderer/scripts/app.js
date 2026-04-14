@@ -5011,41 +5011,76 @@ function filterTripTickets(status) {
   });
 }
 
+// Page content loading overlay — simple blue spinner on white
+function showPageLoader() {
+  let overlay = document.getElementById('pageLoadingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'pageLoadingOverlay';
+    overlay.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:36px;height:36px;border:4px solid #e2e8f0;border-top:4px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <div style="margin-top:12px;color:#2b6cb0;font-size:13px;font-weight:500;">Loading...</div>
+      </div>`;
+    Object.assign(overlay.style, {
+      position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
+      background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: '100', borderRadius: '8px'
+    });
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.style.position = 'relative';
+      mainContent.appendChild(overlay);
+    }
+  }
+  overlay.style.display = 'flex';
+}
+
+function hidePageLoader() {
+  const overlay = document.getElementById('pageLoadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
-  switch(pageId) {
-    case 'dashboard': await loadDashboardStats(); break;
-    case 'items': await loadItems(); if (!cachedUOMs.length) await loadUOMs(); break;
-    case 'suppliers': await loadSuppliers(); break;
-    case 'users': await loadUsers(); break;
-    case 'ppmp': await initPPMPFilters(); await loadPPMP(); break;
-    case 'app': await loadAPP(); break;
-    case 'purchase-requests': await loadPR(); break;
-    case 'rfq': await loadRFQ(); break;
-    case 'abstract': await loadAbstract(); break;
-    case 'post-qual': await loadPostQual(); break;
-    case 'bac-resolution': await loadBACResolution(); break;
-    case 'noa': await loadNOA(); break;
-    case 'purchase-orders': await loadPO(); break;
-    case 'iar': await loadIAR(); break;
-    case 'po-packet': await loadPOPacket(); break;
-    case 'coa': await loadCOA(); break;
-    case 'stock-cards': await loadStockCards(); break;
-    case 'property-cards': await loadPropertyCards(); break;
-    case 'ics': await loadICS(); break;
-    case 'employees': await loadEmployees(); break;
-    case 'ris': await loadRIS(); break;
-    case 'supplies-ledger': await loadSuppliesLedger(); break;
-    case 'trip-tickets': await loadTripTickets(); break;
-    case 'designations': await loadDesignations(); break;
-    case 'divisions': await loadDivisions(); break;
-    case 'fund-clusters': await loadFundClusters(); break;
-    case 'procurement-modes': await loadProcurementModes(); break;
-    case 'uacs-codes': await loadUACSCodes(); break;
-    case 'uoms': await loadUOMs(); break;
-    case 'settings': await loadSettings(); break;
-    case 'activity-logs': await loadActivityLogs(); break;
-    case 'reports': /* Static page with report generators */ break;
+  showPageLoader();
+  try {
+    switch(pageId) {
+      case 'dashboard': await loadDashboardStats(); break;
+      case 'items': await loadItems(); if (!cachedUOMs.length) await loadUOMs(); break;
+      case 'suppliers': await loadSuppliers(); break;
+      case 'users': await loadUsers(); break;
+      case 'ppmp': await initPPMPFilters(); await loadPPMP(); break;
+      case 'app': await loadAPP(); break;
+      case 'purchase-requests': await loadPR(); break;
+      case 'rfq': await loadRFQ(); break;
+      case 'abstract': await loadAbstract(); break;
+      case 'post-qual': await loadPostQual(); break;
+      case 'bac-resolution': await loadBACResolution(); break;
+      case 'noa': await loadNOA(); break;
+      case 'purchase-orders': await loadPO(); break;
+      case 'iar': await loadIAR(); break;
+      case 'po-packet': await loadPOPacket(); break;
+      case 'coa': await loadCOA(); break;
+      case 'stock-cards': await loadStockCards(); break;
+      case 'property-cards': await loadPropertyCards(); break;
+      case 'ics': await loadICS(); break;
+      case 'employees': await loadEmployees(); break;
+      case 'ris': await loadRIS(); break;
+      case 'supplies-ledger': await loadSuppliesLedger(); break;
+      case 'trip-tickets': await loadTripTickets(); break;
+      case 'designations': await loadDesignations(); break;
+      case 'divisions': await loadDivisions(); break;
+      case 'fund-clusters': await loadFundClusters(); break;
+      case 'procurement-modes': await loadProcurementModes(); break;
+      case 'uacs-codes': await loadUACSCodes(); break;
+      case 'uoms': await loadUOMs(); break;
+      case 'settings': await loadSettings(); break;
+      case 'activity-logs': await loadActivityLogs(); break;
+      case 'reports': /* Static page with report generators */ break;
+    }
+  } finally {
+    hidePageLoader();
   }
   // Apply action permissions AFTER data has fully loaded into the DOM
   applyActionPermissions();
