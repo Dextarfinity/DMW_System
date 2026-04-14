@@ -11394,7 +11394,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             item_code: it.item_code || '',
             item_name: it.item_name || '',
             item_description: it.item_description || it.description || '',
-            unit: it.item_unit || it.unit || 'pc',
+            unit: it.item_unit || it.unit || '',
             unit_price: parseFloat(it.unit_price || 0),
             category: it.item_category || it.category || '',
             q1_qty: it.quantity || 0,
@@ -20035,7 +20035,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         // Manual item entry mode - get data from correct form field IDs
         const itemName = document.getElementById('editManualItemName')?.value?.trim() || '';
         const itemDesc = document.getElementById('editManualItemDesc')?.value?.trim() || '';
-        const itemUnit = document.getElementById('editManualItemUnit')?.value || 'pc';
+        const itemUnit = document.getElementById('editManualItemUnit')?.value || '';
         const itemPrice = parseFloat(document.getElementById('editManualItemPrice')?.value || 0);
         const itemQty = document.getElementById('editManualItemQty')?.value || '1';
         const manualSection = document.getElementById('manualSection')?.value || commonData.section;
@@ -20045,6 +20045,10 @@ Failure to submit the above requirements within the prescribed period shall cons
 
         if (!itemName) {
           alert('Please enter an Item Name for manual entry.');
+          return;
+        }
+        if (!itemUnit) {
+          alert('Please select a Unit of Measure.');
           return;
         }
 
