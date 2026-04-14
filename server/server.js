@@ -5865,6 +5865,17 @@ async function runMigrations() {
     try { await pool.query(sql); } catch (e) { /* column may already exist */ }
   }
   console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+
+  // Migrate all NON PS-DBM procurement plans to MANUAL-NON-PSDBM
+  // All NON-PSDBM entries in PPMP are created manually, not from catalog
+  try {
+    const result = await pool.query(
+      `UPDATE procurementplans SET procurement_source = 'MANUAL-NON-PSDBM' WHERE procurement_source = 'NON PS-DBM'`
+    );
+    if (result.rowCount > 0) {
+      console.log(`[MIGRATION] Updated ${result.rowCount} NON PS-DBM entries to MANUAL-NON-PSDBM`);
+    }
+  } catch (e) { console.error('[MIGRATION] NON PS-DBM migration error:', e.message); }
 }
 
 runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));
