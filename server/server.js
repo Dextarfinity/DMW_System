@@ -1743,7 +1743,28 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
         planData.unit_price = items.rows[0].unit_price || 0;
       }
     }
+    // DEBUG: Log what unit data is being sent to the frontend
+    console.log(`[DEBUG] GET /api/plans/${req.params.id} => unit="${planData.unit}", unit_price="${planData.unit_price}", item_unit="${planData.item_unit}", plan_items[0].unit="${items.rows.length > 0 ? items.rows[0].unit : 'NO_ITEMS'}"`);
     res.json(planData);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DEBUG ENDPOINT: Check unit/unit_price data in procurementplans table
+app.get('/api/debug/plans-unit-data', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT pp.id, pp.description, pp.procurement_source, pp.unit, pp.unit_price, pp.item_id,
+             pi.unit as plan_item_unit, pi.unit_price as plan_item_unit_price,
+             it.unit as items_table_unit, it.unit_price as items_table_unit_price
+      FROM procurementplans pp
+      LEFT JOIN plan_items pi ON pi.plan_id = pp.id
+      LEFT JOIN items it ON pp.item_id = it.id
+      WHERE pp.is_deleted = false
+      ORDER BY pp.id DESC
+      LIMIT 20
+    `);
+    console.log('[DEBUG] Plans unit data:', JSON.stringify(result.rows, null, 2));
+    res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5906,6 +5927,31 @@ async function runMigrations() {
       console.log(`[MIGRATION] Backfilled unit/unit_price for ${result.rowCount} entries from plan_items`);
     }
   } catch (e) { console.error('[MIGRATION] unit/price backfill error:', e.message); }
+
+  // Backfill unit from item_description for entries that still have no unit
+  // item_description often contains "Unit: Bottle" or "Unit: book" etc.
+  try {
+    const noUnitRows = await pool.query(
+      `SELECT id, item_description FROM procurementplans
+       WHERE (unit IS NULL OR unit = '')
+         AND item_description IS NOT NULL AND item_description != ''`
+    );
+    let backfilledCount = 0;
+    for (const row of noUnitRows.rows) {
+      const match = row.item_description.match(/Unit:\s*([^;,\n]+)/i);
+      if (match) {
+        const parsedUnit = match[1].trim().split(/\s+/)[0]; // First word after "Unit:" e.g. "Bottle" from "Bottle, 65ml"
+        if (parsedUnit) {
+          await pool.query('UPDATE procurementplans SET unit = $1 WHERE id = $2', [parsedUnit, row.id]);
+          backfilledCount++;
+          console.log(`[MIGRATION] Backfilled unit="${parsedUnit}" for plan id=${row.id} from item_description`);
+        }
+      }
+    }
+    if (backfilledCount > 0) {
+      console.log(`[MIGRATION] Backfilled unit for ${backfilledCount} entries from item_description`);
+    }
+  } catch (e) { console.error('[MIGRATION] item_description unit backfill error:', e.message); }
 }
 
 runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));
