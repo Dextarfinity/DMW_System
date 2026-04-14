@@ -5011,7 +5011,7 @@ function filterTripTickets(status) {
   });
 }
 
-// Page content loading overlay — simple blue spinner on white
+// Page content loading overlay — simple spinner on blurry white
 function showPageLoader() {
   let overlay = document.getElementById('pageLoadingOverlay');
   if (!overlay) {
@@ -5019,12 +5019,13 @@ function showPageLoader() {
     overlay.id = 'pageLoadingOverlay';
     overlay.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;">
-        <div style="width:36px;height:36px;border:4px solid #e2e8f0;border-top:4px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-        <div style="margin-top:12px;color:#2b6cb0;font-size:13px;font-weight:500;">Loading...</div>
+        <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <div style="margin-top:12px;color:#718096;font-size:13px;">Loading...</div>
       </div>`;
     Object.assign(overlay.style, {
       position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
-      background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center',
+      background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(2px)',
+      WebkitBackdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', zIndex: '100', borderRadius: '8px'
     });
     const mainContent = document.querySelector('.main-content');
