@@ -11386,6 +11386,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           total_amount: it.budget,
           status: 'pending',
           procurement_source: it.procurement_source || procSource,
+          unit: it.item_unit || it.unit || '',
+          unit_price: parseFloat(it.unit_price || 0),
           remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim(),
           // Persist unit/price data to plan_items so Edit modal can retrieve them
           items: [{
@@ -18959,15 +18961,19 @@ Failure to submit the above requirements within the prescribed period shall cons
         manual_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
         // For description: check plan_items first for detailed description, then plan.item_description
         item_description: (planItem ? planItem.item_description : '') || plan.item_description || plan.description || plan.manual_item_desc || plan.pap_item_desc || plan.specs || '',
-        // For unit: PRIORITIZE plan_items (user-entered), then items table JOIN
-        item_unit: (planItem ? planItem.unit : '') || plan.item_unit || plan.unit || plan.manual_item_unit || plan.pap_item_unit || plan.uom || 'pc',
-        // For unit_price: PRIORITIZE plan_items (user-entered), then items table JOIN
-        unit_price: parseFloat((planItem ? planItem.unit_price : 0) || plan.item_unit_price || plan.unit_price || plan.manual_item_price || plan.pap_item_price || plan.price || 0) || 0,
+        // For unit: PRIORITIZE plan_items (user-entered), then procurementplans.unit, then items table JOIN
+        item_unit: (planItem ? planItem.unit : '') || plan.unit || plan.item_unit || '',
+        // For unit_price: PRIORITIZE plan_items (user-entered), then procurementplans.unit_price, then items table JOIN, then compute from total/qty
+        unit_price: parseFloat((planItem ? planItem.unit_price : 0) || plan.unit_price || plan.item_unit_price || 0) || 0,
         // For quantity: check plan_items total_qty or individual quarters, then plan.quantity_size
         quantity_size: parseFloat((planItem ? (planItem.total_qty || planItem.q1_qty || planItem.quantity) : 0) || plan.quantity_size || plan.quantity || plan.manual_item_qty || plan.pap_item_qty || plan.qty || 1) || 1,
         // For total: check plan_items total_price, then plan.total_amount
         total_amount: parseFloat((planItem ? planItem.total_price : 0) || plan.total_amount || plan.estimated_budget || plan.manual_est_budget || plan.pap_est_budget || plan.budget || plan.amount || 0) || 0
       };
+      // Fallback: compute unit_price from total_amount / quantity if not available
+      if (!specificEntryData.unit_price && specificEntryData.total_amount > 0 && specificEntryData.quantity_size > 0) {
+        specificEntryData.unit_price = specificEntryData.total_amount / specificEntryData.quantity_size;
+      }
       console.log('[PPMP EDIT] Structured entry data created:', specificEntryData);
       console.log('[PPMP EDIT] Item Name:', specificEntryData.item_name);
       console.log('[PPMP EDIT] PAP Name:', specificEntryData.pap_name);
@@ -18998,10 +19004,14 @@ Failure to submit the above requirements within the prescribed period shall cons
         `<option value="${escapeHtml(u.name || u)}">${escapeHtml(u.name || u)}</option>`
       ).join('') || '<option value="lot">lot</option><option value="set">set</option><option value="unit">unit</option>';
       // If current unit is not in the UOM list, add it as a custom option
-      const currentUnitVal = specificEntryData.item_unit || 'unit';
+      const currentUnitVal = specificEntryData.item_unit || '';
       const uomNames = (uomList || []).map(u => (u.name || u || '').toLowerCase());
       if (currentUnitVal && !uomNames.includes(currentUnitVal.toLowerCase())) {
         uomOptionsRaw = `<option value="${escapeHtml(currentUnitVal)}">${escapeHtml(currentUnitVal)}</option>` + uomOptionsRaw;
+      }
+      // Add placeholder if no unit is set
+      if (!currentUnitVal) {
+        uomOptionsRaw = '<option value="" disabled selected>-- Select Unit --</option>' + uomOptionsRaw;
       }
       const uomOptions = uomOptionsRaw;
 
@@ -20052,6 +20062,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           section: manualSection,
           category: manualCategory,
           procurement_source: 'MANUAL-NON-PSDBM', // Ensure manual entries are always marked
+          unit: itemUnit,
+          unit_price: itemPrice,
           total_amount: itemPrice * (parseFloat(itemQty) || 1),
           // Include items array for plan_items table storage
           items: [{
