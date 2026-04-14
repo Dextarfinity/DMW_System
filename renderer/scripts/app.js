@@ -2787,12 +2787,10 @@ function formatQuantitySize(p) {
   const qty = parseInt(p.quantity_size) || 0;
   const unit = p.unit || p.item_unit || '';
   const price = parseFloat(p.unit_price || p.item_unit_price || 0);
-  if (!qty && !unit && !price) return '-';
+  if (!qty && !unit) return p.quantity_size || '-';
   const unitLower = unit.toLowerCase();
   const priceStr = '₱' + price.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-  if (qty && unit && price) return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
-  if (qty && unit) return `${qty} ${unitLower}`;
-  if (qty && price) return `${qty} @ ${priceStr}`;
+  if (qty && unit) return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
   return p.quantity_size || '-';
 }
 
@@ -5243,6 +5241,12 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionStorage.removeItem('dmw_user');
       sessionStorage.removeItem('dmw_token');
     }
+    // No valid session — show login screen and hide loader
+    if (loginOverlay) {
+      loginOverlay.classList.add('visible');
+    }
+    const appLoader = document.getElementById('appLoader');
+    if (appLoader) appLoader.style.display = 'none';
     console.log('No saved session - showing login screen');
   }
 
@@ -5260,8 +5264,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function showApp() {
     console.log('Showing main app');
     if (loginOverlay) {
-      loginOverlay.style.display = 'none';
-      loginOverlay.classList.add('hidden');
+      loginOverlay.classList.remove('visible');
+      loginOverlay.style.display = '';
     }
 
     // Ensure no stale modal overlay is blocking the UI
@@ -5309,6 +5313,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Navigate to saved page or dashboard
     const savedPage = localStorage.getItem('dmw_current_page');
     navigateTo(savedPage || 'dashboard');
+
+    // Hide the fullscreen loader (session restored successfully)
+    const appLoader = document.getElementById('appLoader');
+    if (appLoader) appLoader.style.display = 'none';
   }
 
   // Format role for display (As-Is Roles)
@@ -6370,8 +6378,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show login overlay
     if (loginOverlay) {
-      loginOverlay.style.display = 'flex';
-      loginOverlay.classList.remove('hidden');
+      loginOverlay.classList.add('visible');
+      loginOverlay.style.display = '';
     }
     // Reset form
     if (loginForm) {
@@ -11786,7 +11794,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <td>${p.ppmp_no || '-'}</td>
           <td>${formatPPMPDescription(p)}</td>
           <td>${p.project_type || 'Goods'}</td>
-          <td>${p.quantity_size || '-'}</td>
+          <td>${formatQuantitySize(p)}</td>
           <td>${p.procurement_mode || 'Small Value Procurement'}</td>
           <td>${p.fund_source || 'GAA'}</td>
           <td class="text-right">₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
@@ -17743,7 +17751,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             </div>
             <div class="form-group">
               <label>Quantity / Size</label>
-              <input type="text" value="${plan.quantity_size || '-'}" readonly style="background:#f0f0f0; color:#555;">
+              <input type="text" value="${formatQuantitySize(plan)}" readonly style="background:#f0f0f0; color:#555;">
             </div>
           </div>
 

@@ -3535,7 +3535,7 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: #0c1929;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 3000;
@@ -3558,7 +3558,7 @@ body {
   pointer-events: none;
 }
 
-.login-overlay.hidden { display: none; }
+.login-overlay.visible { display: flex; }
 
 /* Password Strength Meter */
 .pwd-strength-container {
@@ -3615,7 +3615,7 @@ body {
 }
 
 /* Hide body scrollbar when login overlay is visible */
-body:has(.login-overlay:not(.hidden)) {
+body:has(.login-overlay.visible) {
   overflow: hidden;
 }
 

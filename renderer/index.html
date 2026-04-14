@@ -9,6 +9,14 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
+  <!-- Fullscreen loader shown during session restore (prevents login flash on refresh) -->
+  <div id="appLoader" style="display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:#0c1929;z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
+    <img src="assets/dmw_logo_login.png" alt="DMW" style="width:80px;height:80px;margin-bottom:18px;opacity:0.9;">
+    <div style="color:#fff;font-size:15px;font-weight:600;letter-spacing:0.5px;margin-bottom:12px;">DMW Procurement System</div>
+    <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.7);font-size:13px;">
+      <i class="fas fa-spinner fa-spin"></i> Loading, please wait...
+    </div>
+  </div>
   <div class="app-container">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
