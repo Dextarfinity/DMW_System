@@ -2976,8 +2976,9 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       
       // Procurement source badge
       const itemSource = p.procurement_source || p.item_procurement_source || 'NON PS-DBM';
+      const isManualEntry = itemSource === 'MANUAL-NON-PSDBM' || (itemSource === 'NON PS-DBM' && !p.item_id);
       const sourceBadgeClass = itemSource === 'PS-DBM' ? 'source-badge psdbm' : itemSource === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
-      const sourceLabel = itemSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM (Manual)' : itemSource;
+      const sourceLabel = isManualEntry ? 'NON PS-DBM (Manual)' : itemSource;
       const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${sourceLabel}</span>`;
 
       let approvalInfo = '';
@@ -17597,7 +17598,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const items = plan.items || [];
       const procSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
       const sourceBadgeClass = procSource === 'PS-DBM' ? 'psdbm' : procSource === 'PAPs' ? 'paps' : 'non-psdbm';
-      const procSourceDisplay = procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM (Manual)' : procSource;
+      const procSourceDisplay = (procSource === 'MANUAL-NON-PSDBM' || (procSource === 'NON PS-DBM' && !plan.item_id)) ? 'NON PS-DBM (Manual)' : procSource;
       const isAdmin = userHasRole('admin');
 
       // Build items table

@@ -1679,8 +1679,11 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
     if (req.query.procurement_source) {
       const srcVal = req.query.procurement_source;
       if (srcVal === 'NON PS-DBM') {
-        // Include both catalog NON PS-DBM and manual NON-PSDBM entries
-        conditions.push(`(pp.procurement_source = 'NON PS-DBM' OR pp.procurement_source = 'MANUAL-NON-PSDBM')`);
+        // Catalog-only: NON PS-DBM entries that have a linked item_id
+        conditions.push(`pp.procurement_source = 'NON PS-DBM' AND pp.item_id IS NOT NULL`);
+      } else if (srcVal === 'MANUAL-NON-PSDBM') {
+        // Manual entries: explicitly tagged MANUAL-NON-PSDBM, OR old NON PS-DBM entries with no item_id
+        conditions.push(`(pp.procurement_source = 'MANUAL-NON-PSDBM' OR (pp.procurement_source = 'NON PS-DBM' AND pp.item_id IS NULL))`);
       } else {
         params.push(srcVal);
         conditions.push(`pp.procurement_source = $${params.length}`);
