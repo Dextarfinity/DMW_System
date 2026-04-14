@@ -1735,7 +1735,15 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
     );
     if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
     const items = await pool.query('SELECT * FROM plan_items WHERE plan_id = $1 ORDER BY id', [req.params.id]);
-    res.json({ ...plan.rows[0], items: items.rows });
+    const planData = { ...plan.rows[0], items: items.rows };
+    // Ensure unit and unit_price are always available from plan_items if not on procurementplans
+    if (items.rows.length > 0) {
+      if (!planData.unit) planData.unit = items.rows[0].unit || null;
+      if (!planData.unit_price || parseFloat(planData.unit_price) === 0) {
+        planData.unit_price = items.rows[0].unit_price || 0;
+      }
+    }
+    res.json(planData);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5864,6 +5872,9 @@ async function runMigrations() {
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS requisitioning_office TEXT`,
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS property_custodian TEXT`,
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS inspector_name TEXT`,
+    // Ensure unit and unit_price columns exist on procurementplans
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`,
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); } catch (e) { /* column may already exist */ }

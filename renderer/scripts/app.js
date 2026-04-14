@@ -18961,10 +18961,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         manual_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
         // For description: check plan_items first for detailed description, then plan.item_description
         item_description: (planItem ? planItem.item_description : '') || plan.item_description || plan.description || plan.manual_item_desc || plan.pap_item_desc || plan.specs || '',
-        // For unit: PRIORITIZE plan_items (user-entered), then procurementplans.unit, then items table JOIN
-        item_unit: (planItem ? planItem.unit : '') || plan.unit || plan.item_unit || '',
-        // For unit_price: PRIORITIZE plan_items (user-entered), then procurementplans.unit_price, then items table JOIN, then compute from total/qty
-        unit_price: parseFloat((planItem ? planItem.unit_price : 0) || plan.unit_price || plan.item_unit_price || 0) || 0,
+        // For unit: server merges plan_items unit into plan.unit, so plan.unit is the primary source
+        item_unit: plan.unit || (planItem ? planItem.unit : '') || plan.item_unit || '',
+        // For unit_price: server merges plan_items unit_price into plan.unit_price
+        unit_price: parseFloat(plan.unit_price || (planItem ? planItem.unit_price : 0) || plan.item_unit_price || 0) || 0,
         // For quantity: check plan_items total_qty or individual quarters, then plan.quantity_size
         quantity_size: parseFloat((planItem ? (planItem.total_qty || planItem.q1_qty || planItem.quantity) : 0) || plan.quantity_size || plan.quantity || plan.manual_item_qty || plan.pap_item_qty || plan.qty || 1) || 1,
         // For total: check plan_items total_price, then plan.total_amount
