@@ -2977,7 +2977,8 @@ function renderPPMPTable(ppmp, allPPMPItems) {
       // Procurement source badge
       const itemSource = p.procurement_source || p.item_procurement_source || 'NON PS-DBM';
       const sourceBadgeClass = itemSource === 'PS-DBM' ? 'source-badge psdbm' : itemSource === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
-      const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${itemSource}</span>`;
+      const sourceLabel = itemSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM (Manual)' : itemSource;
+      const sourceBadge = `<span class="${sourceBadgeClass}" style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${sourceLabel}</span>`;
 
       let approvalInfo = '';
       if (p.status === 'pending') {
@@ -17596,6 +17597,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const items = plan.items || [];
       const procSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
       const sourceBadgeClass = procSource === 'PS-DBM' ? 'psdbm' : procSource === 'PAPs' ? 'paps' : 'non-psdbm';
+      const procSourceDisplay = procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM (Manual)' : procSource;
       const isAdmin = userHasRole('admin');
 
       // Build items table
@@ -17675,7 +17677,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="form-group">
               <label>Procurement Source</label>
               <div style="padding:6px 0;">
-                <span class="source-badge ${sourceBadgeClass}" style="font-size:12px;padding:3px 12px;border-radius:10px;font-weight:600;">${procSource}</span>
+                <span class="source-badge ${sourceBadgeClass}" style="font-size:12px;padding:3px 12px;border-radius:10px;font-weight:600;">${procSourceDisplay}</span>
               </div>
             </div>
           </div>
@@ -19358,7 +19360,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       window._ppmpEditCheckedItems = {};
 
       // Pre-check the currently linked item with its description (for catalog mode)
-      if (plan.item_id && linkedItem && !isPAPs && !isManual) {
+      if (plan.item_id && linkedItem && !isPAPs && !showManualSection) {
         // Use plan_items unit/unit_price if available, else fall back to catalog item values
         const storedUnit = (planItem ? planItem.unit : '') || linkedItem.unit || '';
         const storedUnitPrice = parseFloat((planItem ? planItem.unit_price : 0) || linkedItem.unit_price || 0);
@@ -19393,7 +19395,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         }
 
         // 2. POPULATE MANUAL ITEM FIELDS (if applicable)
-        if (isManual) {
+        if (showManualSection) {
           console.log('[PPMP EDIT] Populating manual item fields with specificEntryData:', specificEntryData);
 
           // Populate Item Name (uses same source as General Description & Objective)
@@ -20008,8 +20010,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     };
 
     try {
+      // Detect if manual section is active (for old NON PS-DBM entries without item_id)
+      const manualSectionEl = document.getElementById('editPPMPManualSection');
+      const isManualMode = procSource === 'MANUAL-NON-PSDBM' || (manualSectionEl && manualSectionEl.style.display !== 'none');
+
       // Handle different procurement source modes
-      if (procSource === 'MANUAL-NON-PSDBM') {
+      if (isManualMode) {
         // Manual item entry mode - get data from correct form field IDs
         const itemName = document.getElementById('manualItemName')?.value?.trim() || '';
         const itemDesc = document.getElementById('manualItemDesc')?.value?.trim() || '';
@@ -20044,6 +20050,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           quantity_size: itemQty,
           section: manualSection,
           category: manualCategory,
+          procurement_source: 'MANUAL-NON-PSDBM', // Ensure manual entries are always marked
           total_amount: itemPrice * (parseFloat(itemQty) || 1),
           // Include items array for plan_items table storage
           items: [{
