@@ -2783,6 +2783,19 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function formatQuantitySize(p) {
+  const qty = parseInt(p.quantity_size) || 0;
+  const unit = p.unit || p.item_unit || '';
+  const price = parseFloat(p.unit_price || p.item_unit_price || 0);
+  if (!qty && !unit && !price) return '-';
+  const unitLower = unit.toLowerCase();
+  const priceStr = '₱' + price.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+  if (qty && unit && price) return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
+  if (qty && unit) return `${qty} ${unitLower}`;
+  if (qty && price) return `${qty} @ ${priceStr}`;
+  return p.quantity_size || '-';
+}
+
 function renderPPMPTable(ppmp, allPPMPItems) {
   const tbody = document.getElementById('ppmpTableBody');
   if (!tbody) return;
@@ -3030,7 +3043,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
         <td class="ppmp-no-cell">${ppmpNo}</td>
         <td class="ppmp-desc-cell">${formatPPMPDescription(p)}<div style="margin-top:3px;">${sourceBadge}</div></td>
         <td>${p.project_type || 'Goods'}</td>
-        <td>${p.quantity_size || '-'}</td>
+        <td>${formatQuantitySize(p)}</td>
         <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
         <td>${p.pre_procurement || 'NO'}</td>
         <td>${p.start_date || '-'}</td>
@@ -11301,6 +11314,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const remarks = document.getElementById('ppmpRemarks')?.value || '';
     const isIndicative = document.getElementById('ppmpIndicative')?.checked || false;
     const isFinal = document.getElementById('ppmpFinal')?.checked || false;
+    const planType = isFinal ? 'FINAL' : 'INDICATIVE';
 
     if (!division) { alert('Please select a division.'); return; }
 
@@ -11388,7 +11402,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           procurement_source: it.procurement_source || procSource,
           unit: it.item_unit || it.unit || '',
           unit_price: parseFloat(it.unit_price || 0),
-          remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim(),
+          remarks: remarks,
+          plan_type: planType,
           // Persist unit/price data to plan_items so Edit modal can retrieve them
           items: [{
             item_code: it.item_code || '',

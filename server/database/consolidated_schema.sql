@@ -266,6 +266,7 @@ CREATE TABLE IF NOT EXISTS procurementplans (
     item_description TEXT,
     unit             VARCHAR(50),
     unit_price       DECIMAL(12,2) DEFAULT 0,
+    plan_type        VARCHAR(20) DEFAULT 'INDICATIVE',
     quantity_size    VARCHAR(100),
     procurement_mode VARCHAR(100),
     pre_procurement  VARCHAR(10),

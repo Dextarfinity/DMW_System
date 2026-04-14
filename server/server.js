@@ -1775,7 +1775,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1809,13 +1809,13 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
         ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-        category, item_id, section, item_description, procurement_source, unit, unit_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+        category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
        pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
        category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-       unit || null, unit_price || 0]
+       unit || null, unit_price || 0, plan_type || 'INDICATIVE']
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1848,7 +1848,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const { dept_id, fiscal_year, status, remarks, total_amount,
               ppmp_no, description, project_type, quantity_size, procurement_mode,
               pre_procurement, start_date, end_date, delivery_period, fund_source,
-              category, item_id, section, item_description, procurement_source, unit, unit_price } = entry;
+              category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = entry;
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
@@ -1882,13 +1882,13 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const planResult = await client.query(
         `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
           ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-          category, item_id, section, item_description, procurement_source, unit, unit_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING id`,
+          category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING id`,
         [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
          finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
          pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
          category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-         unit || null, unit_price || 0]
+         unit || null, unit_price || 0, plan_type || 'INDICATIVE']
       );
       const planId = planResult.rows[0].id;
       createdIds.push(planId);
@@ -1918,20 +1918,20 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
         category=$17, item_id=$18, section=$19, item_description=$20, procurement_source=$21,
-        unit=$22, unit_price=$23,
+        unit=$22, unit_price=$23, plan_type=$24,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
        pre_procurement, start_date, end_date, delivery_period, fund_source,
        category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-       unit || null, unit_price || 0]
+       unit || null, unit_price || 0, plan_type || 'INDICATIVE']
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -5896,6 +5896,8 @@ async function runMigrations() {
     // Ensure unit and unit_price columns exist on procurementplans
     `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`,
     `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`,
+    // Ensure plan_type column exists on procurementplans (INDICATIVE / FINAL)
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS plan_type VARCHAR(20) DEFAULT 'INDICATIVE'`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }
