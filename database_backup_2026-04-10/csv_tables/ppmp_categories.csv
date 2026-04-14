@@ -1,0 +1,10 @@
+id,name,section_id,description,display_order,is_active,created_at,updated_at
+28,ICT OFFICE SUPPLIES EXPENSES,18,IT and office supplies expenses,1,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+29,OFFICE SUPPLIES EXPENSES,18,General office supplies and materials,2,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+30,SEMI-ICT EQUIPMENT,18,Semi-finished IT equipment and accessories,3,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+31,"PRINTING, PUBLICATION AND BINDING EXPENSES",18,"Printing, publication, and binding services",4,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+32,SEMI-OFFICE EQUIPMENT,19,Semi-finished office equipment and machinery,5,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+33,SEMI-FURNITURE & FIXTURES,19,"Furniture, fixtures, and related items",6,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+34,OTHER SUPPLIES AND MATERIALS,20,Miscellaneous supplies and materials,7,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+35,OTHER MOOE,20,Other maintenance and operating expenses,8,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)
+36,REPRESENTATION EXPENSES,21,Representation and hospitality expenses,9,true,Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time),Thu Mar 19 2026 08:34:14 GMT+0800 (Philippine Standard Time)

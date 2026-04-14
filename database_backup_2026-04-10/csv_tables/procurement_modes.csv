@@ -1,0 +1,12 @@
+id,code,name,description,created_at,updated_at
+1,CB,Competitive Bidding,Open competitive bidding process per RA 9184 (Sec. 10),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+2,LSB,Limited Source Bidding,Bidding limited to pre-selected list of suppliers (Sec. 49),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+3,CD,Competitive Dialogue,Dialogue-based procurement for complex requirements,Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+4,UO-BM,Unsolicited Offer with Bid Matching,Unsolicited proposals matched through competitive process,Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+5,DC,Direct Contracting,Single source procurement without bidding (Sec. 50),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+6,DA,Direct Acquisition,Direct acquisition of goods or services,Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+7,RO,Repeat Order,Re-order from previous winning bidder within threshold (Sec. 51),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+8,SVP,Small Value Procurement,Procurement not exceeding the SVP threshold (Sec. 53.9),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+9,NP,Negotiated Procurement,Negotiated procurement under allowed circumstances (Sec. 53),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+10,DS,Direct Sales,Direct sales procurement from authorized dealers,Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)
+11,STI,"Direct Procurement for Science, Technology and Innovation",Direct procurement for STI per RA 11293,Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time),Tue Feb 24 2026 13:38:22 GMT+0800 (Philippine Standard Time)

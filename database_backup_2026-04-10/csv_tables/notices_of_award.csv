@@ -1,0 +1,2 @@
+id,noa_number,bac_resolution_id,supplier_id,contract_amount,date_issued,bidder_receipt_date,status,created_by,approved_by,created_at,updated_at,rfq_id,supplier_name
+22,NOA-2026-1207,23,10,280000.00,Wed Apr 08 2026 00:00:00 GMT+0800 (Philippine Standard Time),,issued,3,,Wed Apr 08 2026 16:52:47 GMT+0800 (Philippine Standard Time),Wed Apr 08 2026 16:52:47 GMT+0800 (Philippine Standard Time),29,Testing

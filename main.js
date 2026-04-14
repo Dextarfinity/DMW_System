@@ -1,22 +1,76 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
 
 let mainWindow;
 
 // =====================================================
-// DUAL-NETWORK SERVER DISCOVERY
-// The server PC has two WiFi adapters. Clients on either
-// network can reach it via whichever IP is on their subnet.
+// EXTERNAL CONFIG - Server IPs loaded from userData
+// This allows updating server IPs without rebuilding the app.
+// Config file: %APPDATA%/procurement-plan-system/server-config.json
 // =====================================================
-const SERVER_PORT = 3000;
-const SERVER_IPS = [
-  '192.168.100.235',   // WiFi Network 1
-  '192.168.1.117'      // WiFi Network 2
+const DEFAULT_SERVER_IPS = [
+  '192.168.1.117',     // WiFi Network 
+  '192.168.100.235'    // WiFi Network 
 ];
+const SERVER_PORT = 3000;
+
+// Will be populated from external config or defaults
+let SERVER_IPS = [...DEFAULT_SERVER_IPS];
 
 // Resolved at startup — set by discoverServer()
 let RESOLVED_SERVER_URL = null;
+
+/**
+ * Get the path to the external config file in userData.
+ */
+function getConfigPath() {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'server-config.json');
+}
+
+/**
+ * Load server IPs from external config file.
+ * Creates the file with defaults if it doesn't exist.
+ */
+function loadServerConfig() {
+  const configPath = getConfigPath();
+
+  try {
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(data);
+      if (Array.isArray(config.serverIPs) && config.serverIPs.length > 0) {
+        SERVER_IPS = config.serverIPs;
+        console.log('[CONFIG] Loaded server IPs from external config:', SERVER_IPS);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('[CONFIG] Error reading config file:', err.message);
+  }
+
+  // Create default config file
+  try {
+    const defaultConfig = {
+      serverIPs: DEFAULT_SERVER_IPS,
+      port: SERVER_PORT,
+      _comment: 'Edit serverIPs array to add/change server addresses. Changes take effect on app restart.'
+    };
+    // Ensure the directory exists
+    const configDir = path.dirname(configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+    console.log('[CONFIG] Created default config at:', configPath);
+  } catch (err) {
+    console.warn('[CONFIG] Could not create config file:', err.message);
+  }
+
+  SERVER_IPS = [...DEFAULT_SERVER_IPS];
+}
 
 function getAppIconPath() {
   if (process.platform === 'win32') {
@@ -47,7 +101,7 @@ function checkServerIP(ip) {
 
 /**
  * Discover which server IP is reachable.
- * Tries all candidate IPs in parallel and returns the first one that responds.
+ * Tries localhost first; if unavailable, tries remote IPs in parallel.
  * Falls back to the first IP if none respond.
  */
 async function discoverServer() {
@@ -55,16 +109,21 @@ async function discoverServer() {
 
   console.log('[DISCOVERY] Checking server IPs:', SERVER_IPS.join(', '));
 
-  // Also try localhost for when running on the server PC itself
-  const candidates = [...SERVER_IPS, 'localhost'];
+  // Try localhost FIRST — if a local server is running, always use it
+  const localResult = await checkServerIP('localhost');
+  if (localResult) {
+    RESOLVED_SERVER_URL = localResult;
+    console.log(`[DISCOVERY] Local server found at localhost:${SERVER_PORT} — using local`);
+    return RESOLVED_SERVER_URL;
+  }
 
-  // Race all candidates - first one to respond wins
-  const results = await Promise.all(candidates.map(ip => checkServerIP(ip)));
+  // Localhost not available — try remote server IPs
+  const results = await Promise.all(SERVER_IPS.map(ip => checkServerIP(ip)));
 
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] Server found at ${candidates[i]}:${SERVER_PORT}`);
+      console.log(`[DISCOVERY] Server found at ${SERVER_IPS[i]}:${SERVER_PORT}`);
       return RESOLVED_SERVER_URL;
     }
   }
@@ -207,7 +266,10 @@ async function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  loadServerConfig();  // Load external config before creating window
+  createWindow();
+});
 
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.dmwfad.procurement');

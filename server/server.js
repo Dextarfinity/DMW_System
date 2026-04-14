@@ -980,16 +980,16 @@ app.get('/api/divisions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/divisions', authenticateToken, async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const result = await pool.query('INSERT INTO divisions (name, description) VALUES ($1, $2) RETURNING *', [name, description]);
+    const { name, abbreviation, description } = req.body;
+    const result = await pool.query('INSERT INTO divisions (name, abbreviation, description) VALUES ($1, $2, $3) RETURNING *', [name, abbreviation, description]);
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/divisions/:id', authenticateToken, async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const result = await pool.query('UPDATE divisions SET name=$1, description=$2 WHERE id=$3 RETURNING *', [name, description, req.params.id]);
+    const { name, abbreviation, description } = req.body;
+    const result = await pool.query('UPDATE divisions SET name=$1, abbreviation=$2, description=$3 WHERE id=$4 RETURNING *', [name, abbreviation, description, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1634,6 +1634,7 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
               it.procurement_source as item_procurement_source,
+              pap.pap_name as pap_pap_name,
               pp.item_description, pp.section as section
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
@@ -1643,7 +1644,8 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id
        LEFT JOIN users du ON pp.declined_by = du.id
-       LEFT JOIN items it ON pp.item_id = it.id`;
+       LEFT JOIN items it ON pp.item_id = it.id
+       LEFT JOIN paps pap ON pp.pap_id = pap.id`;
     const params = [];
     const conditions = [];
     
@@ -1712,13 +1714,15 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
               it.procurement_source as item_procurement_source,
+              pap.pap_name as pap_pap_name,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
               bu.username as budget_approver_name,
               du.username as declined_by_name
-       FROM procurementplans pp 
-       LEFT JOIN departments d ON pp.dept_id = d.id 
+       FROM procurementplans pp
+       LEFT JOIN departments d ON pp.dept_id = d.id
        LEFT JOIN items it ON pp.item_id = it.id
+       LEFT JOIN paps pap ON pp.pap_id = pap.id
        LEFT JOIN users cu ON pp.approved_by_chief = cu.id
        LEFT JOIN users hu ON pp.approved_by_hope = hu.id
        LEFT JOIN users bu ON pp.approved_by_budget = bu.id
@@ -1739,7 +1743,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
+            category, item_id, section, item_description, procurement_source } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1773,13 +1777,12 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
         ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-        category, item_id, section, item_description, procurement_source, unit, unit_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+        category, item_id, section, item_description, procurement_source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
        pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-       unit || null, unit_price || 0]
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1812,7 +1815,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const { dept_id, fiscal_year, status, remarks, total_amount,
               ppmp_no, description, project_type, quantity_size, procurement_mode,
               pre_procurement, start_date, end_date, delivery_period, fund_source,
-              category, item_id, section, item_description, procurement_source, unit, unit_price } = entry;
+              category, item_id, section, item_description, procurement_source } = entry;
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
@@ -1846,15 +1849,26 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const planResult = await client.query(
         `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
           ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-          category, item_id, section, item_description, procurement_source, unit, unit_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING id`,
+          category, item_id, section, item_description, procurement_source) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
         [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
          finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
          pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-         unit || null, unit_price || 0]
+         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
       );
-      createdIds.push(planResult.rows[0].id);
+      const planId = planResult.rows[0].id;
+      createdIds.push(planId);
+
+      // Insert plan_items if included (preserves unit/price for edit modal)
+      if (entry.items && Array.isArray(entry.items) && entry.items.length > 0) {
+        for (const item of entry.items) {
+          await client.query(
+            `INSERT INTO plan_items (plan_id, item_code, item_name, item_description, unit, unit_price, category, q1_qty, q2_qty, q3_qty, q4_qty, remarks)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            [planId, item.item_code, item.item_name, item.item_description, item.unit, item.unit_price||0, item.category, item.q1_qty||0, item.q2_qty||0, item.q3_qty||0, item.q4_qty||0, item.remarks]
+          );
+        }
+      }
     }
 
     await client.query('COMMIT');
@@ -1870,20 +1884,18 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source, unit, unit_price } = req.body;
+            category, item_id, section, item_description, procurement_source } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
         category=$17, item_id=$18, section=$19, item_description=$20, procurement_source=$21,
-        unit=$22, unit_price=$23,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
        pre_procurement, start_date, end_date, delivery_period, fund_source,
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
-       unit || null, unit_price || 0]
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -2001,12 +2013,42 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
           const codePrefix = procSource === 'PAPs' ? 'PAP-A-' : 'NPD-A-';
           const itemCode = codePrefix + Date.now();
           const itemName = (up.description || '').split('\n')[0].trim() || 'Approved Item';
-          const itemUnit = up.unit || (up.quantity_size ? 'pc' : 'lot');
-          const itemUnitPrice = up.unit_price || up.total_amount || 0;
+
+          // Look up actual unit_price, quantity, and unit from plan_items
+          let catalogUnitPrice = up.total_amount || 0;
+          let catalogQuantity = 0;
+          let catalogUnit = up.quantity_size ? 'pc' : 'lot';
+          const planItemRows = await pool.query(
+            'SELECT unit, unit_price, q1_qty, q2_qty, q3_qty, q4_qty, total_qty FROM plan_items WHERE plan_id = $1 LIMIT 1',
+            [req.params.id]
+          );
+          if (planItemRows.rows.length > 0) {
+            const pi = planItemRows.rows[0];
+            if (pi.unit_price && parseFloat(pi.unit_price) > 0) {
+              catalogUnitPrice = parseFloat(pi.unit_price);
+            }
+            const totalQty = parseFloat(pi.total_qty || 0) || (parseFloat(pi.q1_qty||0) + parseFloat(pi.q2_qty||0) + parseFloat(pi.q3_qty||0) + parseFloat(pi.q4_qty||0));
+            if (totalQty > 0) {
+              catalogQuantity = totalQty;
+            }
+            if (pi.unit) {
+              catalogUnit = pi.unit;
+            }
+          } else if (up.quantity_size) {
+            // Fallback: derive from procurementplans fields
+            const parsedQty = parseInt(up.quantity_size) || 0;
+            if (parsedQty > 0) {
+              catalogQuantity = parsedQty;
+              if (up.total_amount && parsedQty > 0) {
+                catalogUnitPrice = parseFloat(up.total_amount) / parsedQty;
+              }
+            }
+          }
+
           const newItem = await pool.query(
             `INSERT INTO items (code, name, description, unit, unit_price, category, procurement_source, quantity, reorder_point, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, true) RETURNING id, code`,
-            [itemCode, itemName, up.item_description || up.description || '', itemUnit, itemUnitPrice, up.category || '', catalogSource]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, true) RETURNING id, code`,
+            [itemCode, itemName, up.item_description || up.description || '', catalogUnit, catalogUnitPrice, up.category || '', catalogSource, catalogQuantity]
           );
           // Link the PPMP entry to the new catalog item
           await pool.query('UPDATE procurementplans SET item_id = $1 WHERE id = $2', [newItem.rows[0].id, req.params.id]);
@@ -2163,6 +2205,13 @@ app.put('/api/plans/:id/resubmit', authenticateToken, async (req, res) => {
 // Returns PPMP entries from procurementplans directly, with codes transformed to APP codes
 app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
+    const fiscalYear = req.query.fiscal_year;
+    let whereClause = `WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
+    const params = [];
+    if (fiscalYear) {
+      params.push(parseInt(fiscalYear));
+      whereClause += ` AND pp.fiscal_year = $${params.length}`;
+    }
     const result = await pool.query(
       `SELECT pp.id, pp.ppmp_no,
               REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
@@ -2185,8 +2234,9 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
               d.code as department_code
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'
-       ORDER BY pp.id`
+       ${whereClause}
+       ORDER BY pp.id`,
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2294,14 +2344,14 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
 });
 
 // POST consolidate PPMP into APP
-// This just returns summary since APP now reads directly from procurementplans
+// Records consolidation timestamp and returns summary
 app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
-    
+
     // Get all active (non-deleted) PPMP entries for this fiscal year
     const result = await pool.query(
-      `SELECT COUNT(*) as item_count, 
+      `SELECT COUNT(*) as item_count,
               COALESCE(SUM(pp.total_amount), 0) as total_abc
        FROM procurementplans pp
        WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
@@ -2318,7 +2368,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
 
     // Get breakdown by department
     const deptBreakdown = await pool.query(
-      `SELECT d.name as department_name, COUNT(*) as count, 
+      `SELECT d.name as department_name, COUNT(*) as count,
               COALESCE(SUM(pp.total_amount), 0) as total
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
@@ -2326,6 +2376,17 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          AND pp.status = 'approved'
        GROUP BY d.name ORDER BY d.name`,
       [fiscalYear]
+    );
+
+    // Record consolidation timestamp in app_settings
+    await pool.query(
+      `INSERT INTO app_settings (fiscal_year, app_type, consolidated_at, consolidated_count, set_by, set_at)
+       VALUES ($1, 'indicative', CURRENT_TIMESTAMP, 1, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (fiscal_year) DO UPDATE SET
+         consolidated_at = CURRENT_TIMESTAMP,
+         consolidated_count = COALESCE(app_settings.consolidated_count, 0) + 1,
+         set_at = CURRENT_TIMESTAMP`,
+      [fiscalYear, req.user.id]
     );
 
     res.json({
@@ -2675,6 +2736,20 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees their own division (dept_id = 4)
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT pr.*, d.name as department_name, d.code as department_code, u.username as requested_by_name,
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
@@ -2684,9 +2759,9 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)
+       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY pr.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2895,6 +2970,19 @@ app.get('/api/rfqs', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT r.*, pr.pr_number, u.username as created_by_name,
               pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name,
@@ -2903,9 +2991,9 @@ app.get('/api/rfqs', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON r.created_by = u.id
        LEFT JOIN LATERAL (SELECT quantity, unit, item_name FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (r.status != 'draft' OR r.created_by = $1 OR $2 = true)
+       WHERE (r.status != 'draft' OR r.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY r.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2930,11 +3018,11 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers } = req.body;
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers, manual_supplier_name, manual_supplier_address, manual_supplier_tin } = req.body;
     const rfqResult = await client.query(
-      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null]
+      `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications, manual_supplier_name, manual_supplier_address, manual_supplier_tin)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null]
     );
     const rfq = rfqResult.rows[0];
     if (items) for (const it of items) {
@@ -2960,11 +3048,11 @@ app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items } = req.body;
+    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, manual_supplier_name, manual_supplier_address, manual_supplier_tin } = req.body;
     const result = await client.query(
-      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$9 RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications||null, req.params.id]
+      `UPDATE rfqs SET rfq_number=$1, pr_id=$2, date_prepared=$3, submission_deadline=$4, abc_amount=$5, philgeps_required=$6, status=$7, item_specifications=$8, manual_supplier_name=$9, manual_supplier_address=$10, manual_supplier_tin=$11, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$12 RETURNING *`,
+      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications||null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null, req.params.id]
     );
     // Update rfq_items if items array is provided
     if (items && Array.isArray(items)) {
@@ -3007,17 +3095,31 @@ app.get('/api/abstracts', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
-      `SELECT a.*, r.rfq_number, s.name as recommended_supplier_name, u.username as created_by_name,
-              pr.dept_id as pr_dept_id, dept.code as department_code
+      `SELECT a.*, r.rfq_number, COALESCE(a.recommended_supplier_name, s.name) as recommended_supplier_name, u.username as created_by_name,
+              pr.dept_id as pr_dept_id, dept.code as department_code,
+              (SELECT COUNT(*) FROM abstract_quotations WHERE abstract_id = a.id) as num_bidders
        FROM abstracts a LEFT JOIN rfqs r ON a.rfq_id = r.id
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
        LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN suppliers s ON a.recommended_supplier_id = s.id
        LEFT JOIN users u ON a.created_by = u.id
-       WHERE (a.status != 'draft' OR a.created_by = $1 OR $2 = true)
+       WHERE (a.status != 'draft' OR a.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY a.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3028,7 +3130,7 @@ app.get('/api/abstracts/:id', authenticateToken, async (req, res) => {
     const abstract = await pool.query('SELECT * FROM abstracts WHERE id = $1', [req.params.id]);
     if (abstract.rows.length === 0) return res.status(404).json({ error: 'Abstract not found' });
     const quotations = await pool.query(
-      `SELECT aq.*, s.name as supplier_name FROM abstract_quotations aq LEFT JOIN suppliers s ON aq.supplier_id = s.id WHERE aq.abstract_id = $1 ORDER BY aq.rank_no`,
+      `SELECT aq.*, COALESCE(aq.supplier_name, s.name) as supplier_name FROM abstract_quotations aq LEFT JOIN suppliers s ON aq.supplier_id = s.id WHERE aq.abstract_id = $1 ORDER BY aq.rank_no`,
       [req.params.id]
     );
     for (const q of quotations.rows) {
@@ -3043,17 +3145,17 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications, quotations } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
     const absResult = await client.query(
-      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id, recommended_amount||0, req.user.id, item_specifications || null]
+      `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, created_by, item_specifications, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status||'on_going', recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount||0, req.user.id, item_specifications || null, vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, bac_secretariat_id||null, bac_chairperson_id||null, regional_director_id||null, bac_secretariat2_id||null]
     );
     const abs = absResult.rows[0];
     if (quotations) for (const q of quotations) {
       const qResult = await client.query(
-        `INSERT INTO abstract_quotations (abstract_id, supplier_id, bid_amount, is_compliant, remarks, rank_no) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [abs.id, q.supplier_id, q.bid_amount||0, q.is_compliant||false, q.remarks, q.rank_no]
+        `INSERT INTO abstract_quotations (abstract_id, supplier_id, supplier_name, bid_amount, is_compliant, remarks, rank_no) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [abs.id, q.supplier_id||null, q.supplier_name||null, q.bid_amount||0, q.is_compliant||false, q.remarks, q.rank_no]
       );
       if (q.items) for (const it of q.items) {
         await client.query(
@@ -3072,11 +3174,11 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications, quotations } = req.body;
+    const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
     const result = await client.query(
-      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_amount=$7, item_specifications=$8, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$9 RETURNING *`,
-      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_amount, item_specifications || null, req.params.id]
+      `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_supplier_name=$7, recommended_amount=$8, item_specifications=$9, vice_chairperson_id=$10, bac_member1_id=$11, bac_member2_id=$12, bac_member3_id=$13, bac_secretariat_id=$14, bac_chairperson_id=$15, regional_director_id=$16, bac_secretariat2_id=$17, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$18 RETURNING *`,
+      [abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id||null, recommended_supplier_name||null, recommended_amount, item_specifications || null, vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, bac_secretariat_id||null, bac_chairperson_id||null, regional_director_id||null, bac_secretariat2_id||null, req.params.id]
     );
     // If quotations are provided, replace existing ones
     if (quotations) {
@@ -3089,8 +3191,8 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
       // Insert new quotations
       for (const q of quotations) {
         const qResult = await client.query(
-          `INSERT INTO abstract_quotations (abstract_id, supplier_id, bid_amount, is_compliant, remarks, rank_no) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-          [req.params.id, q.supplier_id, q.bid_amount||0, q.is_compliant||false, q.remarks, q.rank_no]
+          `INSERT INTO abstract_quotations (abstract_id, supplier_id, supplier_name, bid_amount, is_compliant, remarks, rank_no) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+          [req.params.id, q.supplier_id||null, q.supplier_name||null, q.bid_amount||0, q.is_compliant||false, q.remarks, q.rank_no]
         );
         if (q.items) for (const it of q.items) {
           await client.query(
@@ -3130,6 +3232,19 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT pq.*,
         a.abstract_number,
@@ -3138,9 +3253,9 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
         em2.full_name as twg_member2_name,
         em3.full_name as twg_member3_name,
         em4.full_name as twg_member4_name,
-        s1.name as bidder1_name,
-        s2.name as bidder2_name,
-        s3.name as bidder3_name,
+        COALESCE(pq.bidder1_name, s1.name) as bidder1_name,
+        COALESCE(pq.bidder2_name, s2.name) as bidder2_name,
+        COALESCE(pq.bidder3_name, s3.name) as bidder3_name,
         pr.dept_id as pr_dept_id, dept.code as department_code
        FROM post_qualifications pq
        LEFT JOIN abstracts a ON pq.abstract_id = a.id
@@ -3155,9 +3270,9 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
        LEFT JOIN suppliers s1 ON pq.bidder1_supplier_id = s1.id
        LEFT JOIN suppliers s2 ON pq.bidder2_supplier_id = s2.id
        LEFT JOIN suppliers s3 ON pq.bidder3_supplier_id = s3.id
-       WHERE (pq.status != 'draft' OR pq.created_by = $1 OR $2 = true)
+       WHERE (pq.status != 'draft' OR pq.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY pq.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3173,11 +3288,11 @@ app.get('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
   try {
-    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id } = req.body;
+    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id, bidder1_name, bidder2_name, bidder3_name } = req.body;
     const result = await pool.query(
-      `INSERT INTO post_qualifications (postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, created_by, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
-      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null]
+      `INSERT INTO post_qualifications (postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, created_by, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id, bidder1_name, bidder2_name, bidder3_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
+      [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, bidder1_name||null, bidder2_name||null, bidder3_name||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3185,11 +3300,11 @@ app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
 
 app.put('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
   try {
-    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id } = req.body;
+    const { postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id, twg_member1_id, twg_member2_id, twg_member3_id, twg_member4_id, bidder1_supplier_id, bidder2_supplier_id, bidder3_supplier_id, bidder1_name, bidder2_name, bidder3_name } = req.body;
     const result = await pool.query(
-      `UPDATE post_qualifications SET postqual_number=$1, abstract_id=$2, bidder_name=$3, documents_verified=$4, technical_compliance=$5, financial_validation=$6, twg_result=$7, findings=$8, status=$9, twg_head_id=$10, twg_member1_id=$11, twg_member2_id=$12, twg_member3_id=$13, twg_member4_id=$14, bidder1_supplier_id=$15, bidder2_supplier_id=$16, bidder3_supplier_id=$17, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$18 RETURNING *`,
-      [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, req.params.id]
+      `UPDATE post_qualifications SET postqual_number=$1, abstract_id=$2, bidder_name=$3, documents_verified=$4, technical_compliance=$5, financial_validation=$6, twg_result=$7, findings=$8, status=$9, twg_head_id=$10, twg_member1_id=$11, twg_member2_id=$12, twg_member3_id=$13, twg_member4_id=$14, bidder1_supplier_id=$15, bidder2_supplier_id=$16, bidder3_supplier_id=$17, bidder1_name=$18, bidder2_name=$19, bidder3_name=$20, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$21 RETURNING *`,
+      [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, bidder1_name||null, bidder2_name||null, bidder3_name||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3220,6 +3335,19 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT br.*, a.abstract_number, s.name as supplier_name,
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
@@ -3237,9 +3365,9 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
        LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
        LEFT JOIN employees eh ON br.hope_id = eh.id
-       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)
+       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY br.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3269,11 +3397,15 @@ app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    // Map full procurement mode names to short codes accepted by DB constraint
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawMode = (procurement_mode || 'SVP').trim();
+    const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
-      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode||'SVP', abc_amount||0, recommended_supplier_id, recommended_awardee_name, bid_amount||0, status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null]
+      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3281,11 +3413,15 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    // Map full procurement mode names to short codes accepted by DB constraint
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawMode = (procurement_mode || 'SVP').trim();
+    const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
-      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, status=$9, bac_chairperson_id=$10, bac_vice_chairperson_id=$11, bac_member1_id=$12, bac_member2_id=$13, bac_member3_id=$14, hope_id=$15, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$16 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, req.params.id]
+      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, subject=$17, description=$18, bidders=$19, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$20 RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3325,8 +3461,21 @@ app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
-      `SELECT n.*, br.resolution_number, s.name as supplier_name, pq.postqual_number,
+      `SELECT n.*, br.resolution_number, COALESCE(n.supplier_name, s.name) as supplier_name, pq.postqual_number,
               r.rfq_number,
               pr.dept_id as pr_dept_id, dept.code as department_code
        FROM notices_of_award n LEFT JOIN bac_resolutions br ON n.bac_resolution_id = br.id
@@ -3336,9 +3485,9 @@ app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
        LEFT JOIN departments dept ON pr.dept_id = dept.id
        LEFT JOIN post_qualifications pq ON pq.abstract_id = a.id
-       WHERE (n.status != 'draft' OR n.created_by = $1 OR $2 = true)
+       WHERE (n.status != 'draft' OR n.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY n.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3347,7 +3496,7 @@ app.get('/api/notices-of-award', authenticateToken, async (req, res) => {
 app.get('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT n.*, br.resolution_number, s.name as supplier_name, s.address as supplier_address,
+      `SELECT n.*, br.resolution_number, COALESCE(n.supplier_name, s.name) as supplier_name, s.address as supplier_address,
               r.rfq_number
        FROM notices_of_award n LEFT JOIN bac_resolutions br ON n.bac_resolution_id = br.id
        LEFT JOIN suppliers s ON n.supplier_id = s.id
@@ -3361,11 +3510,25 @@ app.get('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
   try {
-    const { noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, company_name, address, status } = req.body;
+    const { noa_number, bac_resolution_id, supplier_id, supplier_name, rfq_id, contract_amount, date_issued, company_name, address, status } = req.body;
+    // Auto-create supplier from bidder name if supplier_name is provided and no supplier_id
+    let resolvedSupplierId = supplier_id || null;
+    if (!resolvedSupplierId && supplier_name) {
+      const existing = await pool.query('SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1) LIMIT 1', [supplier_name.trim()]);
+      if (existing.rows.length > 0) {
+        resolvedSupplierId = existing.rows[0].id;
+      } else {
+        const newSupplier = await pool.query(
+          'INSERT INTO suppliers (name, address) VALUES ($1, $2) RETURNING id',
+          [supplier_name.trim(), address || null]
+        );
+        resolvedSupplierId = newSupplier.rows[0].id;
+      }
+    }
     const result = await pool.query(
-      `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount||0, date_issued, status||'issued', req.user.id]
+      `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, supplier_name, rfq_id, contract_amount, date_issued, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount||0, date_issued, status||'issued', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3373,11 +3536,25 @@ app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
 
 app.put('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
   try {
-    const { noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, bidder_receipt_date, status } = req.body;
+    const { noa_number, bac_resolution_id, supplier_id, supplier_name, rfq_id, contract_amount, date_issued, bidder_receipt_date, status } = req.body;
+    // Auto-create supplier from bidder name if supplier_name is provided and no supplier_id
+    let resolvedSupplierId = supplier_id || null;
+    if (!resolvedSupplierId && supplier_name) {
+      const existing = await pool.query('SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1) LIMIT 1', [supplier_name.trim()]);
+      if (existing.rows.length > 0) {
+        resolvedSupplierId = existing.rows[0].id;
+      } else {
+        const newSupplier = await pool.query(
+          'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+          [supplier_name.trim()]
+        );
+        resolvedSupplierId = newSupplier.rows[0].id;
+      }
+    }
     const result = await pool.query(
-      `UPDATE notices_of_award SET noa_number=$1, bac_resolution_id=$2, supplier_id=$3, rfq_id=$4, contract_amount=$5, date_issued=$6, bidder_receipt_date=$7, status=$8, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$9 RETURNING *`,
-      [noa_number, bac_resolution_id, supplier_id, rfq_id, contract_amount, date_issued, bidder_receipt_date, status, req.params.id]
+      `UPDATE notices_of_award SET noa_number=$1, bac_resolution_id=$2, supplier_id=$3, supplier_name=$4, rfq_id=$5, contract_amount=$6, date_issued=$7, bidder_receipt_date=$8, status=$9, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$10 RETURNING *`,
+      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount, date_issued, bidder_receipt_date, status, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3408,6 +3585,20 @@ app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
   try {
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data (via PR → dept_id)
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    let divisionCondition = '';
+    const params = [req.user.id, canSeeAllDrafts];
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees POs linked to their division through PR
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT po.*, s.name as supplier_name, s.address as supplier_address, s.tin as supplier_tin,
               u.username as created_by_name, pr.pr_number, noa.noa_number,
@@ -3418,9 +3609,9 @@ app.get('/api/purchase-orders', authenticateToken, async (req, res) => {
        LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN notices_of_award noa ON po.noa_id = noa.id
-       WHERE (po.status != 'draft' OR po.created_by = $1 OR $2 = true)
+       WHERE (po.status != 'draft' OR po.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY po.created_at DESC`,
-      [req.user.id, canSeeAllDrafts]
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3551,15 +3742,34 @@ app.put('/api/purchase-orders/:id/set-status', authenticateToken, async (req, re
 
 app.get('/api/iars', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const canSeeAllDrafts = userRoles.some(r => ['admin', 'hope'].includes(r));
+
+    // Division filtering: chief_wrsd only sees WRSD division data (via PO → PR → dept_id)
+    const isChiefWRSD = userRoles.includes('chief_wrsd');
+    const canSeeAllDivisions = userRoles.some(r => ['admin', 'hope', 'chief_fad', 'supply_officer'].includes(r));
+
+    const params = [req.user.id, canSeeAllDrafts];
+    let divisionCondition = '';
+
+    if (isChiefWRSD && !canSeeAllDivisions) {
+      // chief_wrsd only sees IARs linked to their division through PO → PR
+      params.push(req.user.dept_id || 4);
+      divisionCondition = ` AND pr.dept_id = $${params.length}`;
+    }
+
     const result = await pool.query(
       `SELECT iar.*, po.po_number, s.name as supplier_name,
               u1.username as inspected_by_name, u2.username as received_by_name
        FROM iars iar
        LEFT JOIN purchaseorders po ON iar.po_id = po.id
+       LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u1 ON iar.inspected_by = u1.id
        LEFT JOIN users u2 ON iar.received_by = u2.id
-       ORDER BY iar.created_at DESC`
+       WHERE (iar.status != 'draft' OR iar.created_by = $1 OR $2 = true)${divisionCondition}
+       ORDER BY iar.created_at DESC`,
+      params
     );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3591,13 +3801,16 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications,
+            requisitioning_office, property_custodian, inspector_name, date_received, items } = req.body;
     const iarResult = await client.query(
       `INSERT INTO iars (iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by, item_specifications)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+       delivery_receipt_number, inspection_result, findings, purpose, acceptance, created_by, item_specifications,
+       requisitioning_office, property_custodian, inspector_name, date_received)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
       [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id, item_specifications || null]
+       delivery_receipt_number, inspection_result||'on_going', findings, purpose, acceptance||'to_be_checked', req.user.id, item_specifications || null,
+       requisitioning_office || null, property_custodian || null, inspector_name || null, date_received || null]
     );
     const iar = iarResult.rows[0];
     if (items && items.length > 0) {
@@ -3634,11 +3847,15 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date,
-            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications, items } = req.body;
+            delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications,
+            requisitioning_office, property_custodian, inspector_name, date_received, items } = req.body;
     const result = await client.query(
       `UPDATE iars SET iar_number=$1, po_id=$2, inspection_date=$3, delivery_date=$4, invoice_number=$5, invoice_date=$6,
-       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, item_specifications=$12, updated_at=CURRENT_TIMESTAMP WHERE id=$13 RETURNING *`,
-      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications || null, req.params.id]
+       delivery_receipt_number=$7, inspection_result=$8, findings=$9, purpose=$10, acceptance=$11, item_specifications=$12,
+       requisitioning_office=$14, property_custodian=$15, inspector_name=$16, date_received=$17,
+       updated_at=CURRENT_TIMESTAMP WHERE id=$13 RETURNING *`,
+      [iar_number, po_id, inspection_date, delivery_date, invoice_number, invoice_date, delivery_receipt_number, inspection_result, findings, purpose, acceptance, item_specifications || null, req.params.id,
+       requisitioning_office || null, property_custodian || null, inspector_name || null, date_received || null]
     );
     if (items) {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);
@@ -5132,7 +5349,7 @@ app.get('/api/activity-logs', authenticateToken, authorizeRoles('admin', 'hope')
 app.get('/api/activity-logs/live', authenticateToken, authorizeRoles('admin', 'hope'), async (req, res) => {
   try {
     const { table_name, action, user_id, limit: lim } = req.query;
-    let query = `SELECT al.*, u.full_name, COALESCE(u.role,'unknown') as user_role, u.secondary_role as user_secondary_role, COALESCE(d.name,'') as department
+    let query = `SELECT al.*, COALESCE(u.full_name, al.username, 'System') as full_name, COALESCE(u.role,'system') as user_role, u.secondary_role as user_secondary_role, COALESCE(d.name,'') as department
                  FROM activity_logs al LEFT JOIN users u ON al.user_id = u.id LEFT JOIN departments d ON u.dept_id = d.id WHERE 1=1`;
     const params = [];
     if (table_name) { params.push(table_name); query += ` AND al.table_name = $${params.length}`; }
@@ -5220,7 +5437,7 @@ app.get('/api/health', async (req, res) => {
 
 // Upload files and link to an entity (POST /api/attachments/upload)
 // multipart form fields: entity_type, entity_id, description (optional), files[]
-app.post('/api/attachments/upload', upload.array('files', 10), async (req, res) => {
+app.post('/api/attachments/upload', authenticateToken, upload.array('files', 10), async (req, res) => {
   try {
     const { entity_type, entity_id, description } = req.body;
     if (!entity_type || !entity_id) {
@@ -5253,6 +5470,18 @@ app.post('/api/attachments/upload', upload.array('files', 10), async (req, res) 
 
       results.push(attachment);
     }
+
+    // Log activity with authenticated user info (fixes "unknown user" in activity logs)
+    logActivity(pool, {
+      userId: req.user.id,
+      username: req.user.username || req.user.full_name,
+      action: 'CREATE',
+      tableName: 'attachments',
+      recordId: results.length > 0 ? results[0].id : null,
+      reference: entity_type + '/' + entity_id,
+      description: `Uploaded ${results.length} file(s) for ${entity_type} #${entity_id}`,
+      ipAddress: req.ip
+    });
 
     res.json({ message: `${results.length} file(s) uploaded successfully`, attachments: results });
   } catch (err) {
@@ -5613,17 +5842,33 @@ app.get('/api/connected-clients', authenticateToken, (req, res) => {
 });
 
 // ==============================================================================
-// START HTTP + WEBSOCKET SERVER
+// AUTO-MIGRATION: Add text-based supplier/bidder name columns
 // ==============================================================================
 
-// Auto-migration: add unit and unit_price columns to procurementplans if missing
-(async () => {
-  try {
-    await pool.query(`ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`);
-    await pool.query(`ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`);
-    console.log('[Migration] procurementplans.unit and unit_price columns ensured.');
-  } catch(e) { console.warn('[Migration] Could not add unit/unit_price columns:', e.message); }
-})();
+async function runMigrations() {
+  const migrations = [
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
+    `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder1_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder2_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder3_name TEXT`,
+    // IAR new fields for requisitioning office, property custodian, inspector name
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS requisitioning_office TEXT`,
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS property_custodian TEXT`,
+    `ALTER TABLE iars ADD COLUMN IF NOT EXISTS inspector_name TEXT`,
+  ];
+  for (const sql of migrations) {
+    try { await pool.query(sql); } catch (e) { /* column may already exist */ }
+  }
+  console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+}
+
+runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));
+
+// ==============================================================================
+// START HTTP + WEBSOCKET SERVER
+// ==============================================================================
 
 const server = httpServer.listen(PORT, HOST, () => {
   const allIPs = getAllLocalIPs();

@@ -149,10 +149,11 @@ CREATE TABLE IF NOT EXISTS uoms (
 -- 9. DIVISIONS (separate from departments for inventory use)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS divisions (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(255) NOT NULL,
+    abbreviation VARCHAR(20),
+    description  TEXT,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
@@ -506,6 +507,7 @@ CREATE TABLE IF NOT EXISTS bac_resolutions (
     recommended_supplier_id   INT REFERENCES suppliers(id) ON DELETE SET NULL,
     recommended_awardee_name  VARCHAR(255),
     bid_amount                DECIMAL(12,2) DEFAULT 0,
+    bidder_type               VARCHAR(100) DEFAULT 'LOWEST CALCULATED AND RESPONSIVE (LCRB)',
     philgeps_required         BOOLEAN DEFAULT FALSE,
     philgeps_posted_from      DATE,
     philgeps_posted_until     DATE,
