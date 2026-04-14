@@ -5898,9 +5898,27 @@ async function runMigrations() {
     `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`,
   ];
   for (const sql of migrations) {
-    try { await pool.query(sql); } catch (e) { /* column may already exist */ }
+    try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }
   }
   console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+
+  // CRITICAL: Ensure unit and unit_price columns exist - explicit check and create
+  try {
+    const colCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'procurementplans' AND column_name IN ('unit', 'unit_price')
+    `);
+    const existingCols = colCheck.rows.map(r => r.column_name);
+    console.log('[MIGRATION] procurementplans existing unit columns:', existingCols);
+    if (!existingCols.includes('unit')) {
+      await pool.query('ALTER TABLE procurementplans ADD COLUMN unit VARCHAR(50)');
+      console.log('[MIGRATION] Created unit column on procurementplans');
+    }
+    if (!existingCols.includes('unit_price')) {
+      await pool.query('ALTER TABLE procurementplans ADD COLUMN unit_price DECIMAL(12,2) DEFAULT 0');
+      console.log('[MIGRATION] Created unit_price column on procurementplans');
+    }
+  } catch (e) { console.error('[MIGRATION] CRITICAL unit column creation error:', e.message); }
 
   // Migrate all NON PS-DBM procurement plans to MANUAL-NON-PSDBM
   // All NON-PSDBM entries in PPMP are created manually, not from catalog
