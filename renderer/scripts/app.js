@@ -3398,101 +3398,147 @@ window.showEditAPPModal = async function(planId) {
     const deptName = plan.department_name || '-';
     const deptCode = plan.department_code || '';
     const endUser = deptCode ? (deptCode + ' - ' + deptName) : deptName;
-    const category = (plan.project_type || plan.category || 'EXPENDABLE').toUpperCase();
-    let projectType = 'Goods';
-    if (category === 'SERVICES') projectType = 'Services';
-    else if (category === 'CAPITAL OUTLAY') projectType = 'Capital Outlay';
     const estBudget = parseFloat(plan.total_amount || 0).toFixed(2);
-    const genDesc = (plan.item_description && plan.item_description !== plan.description) ? plan.item_description : summarizeProjectTitle(plan.description || '');
+
+    // General Description: use DB value, fallback to summarize only if empty
+    const dbGenDesc = plan.item_description || '';
+    const genDesc = (dbGenDesc && dbGenDesc !== plan.description) ? dbGenDesc : summarizeProjectTitle(plan.description || '');
+
+    // Format dates: DB may store as ISO "2026-03-15T00:00:00.000Z" or "2026-03" — convert to YYYY-MM for month input
+    const toMonthValue = (d) => {
+      if (!d) return '';
+      const s = String(d);
+      // Already YYYY-MM
+      if (/^\d{4}-\d{2}$/.test(s)) return s;
+      // ISO date or YYYY-MM-DD
+      const m = s.match(/^(\d{4})-(\d{2})/);
+      return m ? m[1] + '-' + m[2] : '';
+    };
+    const startDateVal = toMonthValue(plan.start_date);
+    const endDateVal = toMonthValue(plan.end_date);
+
+    // Format display dates for readonly display
+    const formatDateDisplay = (d) => {
+      if (!d) return 'Not set';
+      const s = String(d);
+      const m = s.match(/^(\d{4})-(\d{2})/);
+      if (m) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return months[parseInt(m[2])-1] + ' ' + m[1];
+      }
+      return s;
+    };
 
     const html = `
       <form id="editAPPForm" onsubmit="submitEditAPP(event, ${planId})">
-        <div class="info-banner" style="margin-bottom:10px;background:#e3f2fd;">
-          <i class="fas fa-edit"></i> <strong>Edit APP Entry</strong> — ${appCode}
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>APP Code</label>
-            <input type="text" value="${appCode}" readonly style="background:#f5f5f5;">
-          </div>
-          <div class="form-group" style="flex:2;">
-            <label>Project Title</label>
-            <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
+        <div style="background:linear-gradient(135deg,#1a365d,#2c5282);color:#fff;padding:12px 18px;border-radius:6px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-edit" style="font-size:18px;"></i>
+          <div>
+            <div style="font-weight:700;font-size:15px;">Edit APP Entry</div>
+            <div style="font-size:12px;opacity:0.85;">${appCode} &mdash; ${escapeHtml(deptName)}</div>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>End-User / Implementing Unit</label>
-            <input type="text" value="${escapeHtml(endUser)}" readonly style="background:#f5f5f5;">
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>General Description of the Project <small style="color:#888;">(auto-summarized)</small></label>
-            <input type="text" id="editAppGenDesc" value="${escapeHtml(genDesc)}" readonly style="background:#f0f4f8;">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Mode of Procurement</label>
-            <select class="form-select" id="editAppProcMode">
-              <option value="">-- Select --</option>
-              ${procModeOpts}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Early Procurement Activity?</label>
-            <select class="form-select" id="editAppEarlyProcurement">
-              <option value="No" ${(plan.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
-              <option value="Yes" ${(plan.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Criteria for Bid Evaluation</label>
-            <input type="text" id="editAppBidCriteria" value="${escapeHtml(plan.bid_criteria || 'LCRB')}">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Start of Procurement Activity</label>
-            <input type="month" id="editAppStartDate" value="${plan.start_date || ''}">
-          </div>
-          <div class="form-group">
-            <label>End of Procurement Activity</label>
-            <input type="month" id="editAppEndDate" value="${plan.end_date || ''}">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Source of Fund</label>
-            <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}">
-          </div>
-          <div class="form-group">
-            <label>Estimated Budget / ABC (₱)</label>
-            <input type="number" id="editAppBudget" value="${estBudget}" step="0.01" min="0" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Procurement Strategy or Tools</label>
-            <input type="text" id="editAppProcStrategy" value="${escapeHtml(plan.procurement_source || '-')}">
-          </div>
-          <div class="form-group">
-            <label>APP Version</label>
-            <select class="form-select" id="editAppVersion">
-              <option value="indicative" ${(plan.plan_type || '') === 'indicative' || !(plan.plan_type) ? 'selected' : ''}>Indicative</option>
-              <option value="final" ${(plan.plan_type || '') === 'final' ? 'selected' : ''}>Final</option>
-              <option value="updated" ${(plan.plan_type || '') === 'updated' ? 'selected' : ''}>Updated</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="flex:1;">
-            <label>Remarks</label>
-            <textarea id="editAppRemarks" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:4px;">${escapeHtml(plan.remarks || '')}</textarea>
-          </div>
-        </div>
-        <div style="text-align:right;margin-top:15px;">
+
+        <table style="width:100%;border-collapse:collapse;font-size:13px;" class="app-edit-table">
+          <tbody>
+            <!-- Row 1: APP Code + Project Title -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;width:180px;text-transform:uppercase;font-size:11px;">APP Code</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" value="${appCode}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;width:100%;padding:6px 10px;border-radius:4px;color:#4a5568;">
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;width:180px;text-transform:uppercase;font-size:11px;">Project Title</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;" oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
+              </td>
+            </tr>
+            <!-- Row 2: End-User + General Description -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">End-User / Implementing Unit</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" value="${escapeHtml(endUser)}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;width:100%;padding:6px 10px;border-radius:4px;color:#4a5568;">
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">General Description of the Project</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" id="editAppGenDesc" value="${escapeHtml(genDesc)}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;background:#f0f7ff;">
+              </td>
+            </tr>
+            <!-- Row 3: Mode of Procurement + Early Procurement -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Mode of Procurement</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <select class="form-select" id="editAppProcMode" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                  <option value="">-- Select --</option>
+                  ${procModeOpts}
+                </select>
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Early Procurement Activity?</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <select class="form-select" id="editAppEarlyProcurement" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                  <option value="No" ${(plan.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
+                  <option value="Yes" ${(plan.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
+                </select>
+              </td>
+            </tr>
+            <!-- Row 4: Criteria for Bid Evaluation (full width) -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Criteria for Bid Evaluation</td>
+              <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" id="editAppBidCriteria" value="${escapeHtml(plan.bid_criteria || 'LCRB')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+              </td>
+            </tr>
+            <!-- Row 5: Start + End of Procurement -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Start of Procurement Activity</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="month" id="editAppStartDate" value="${startDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                ${startDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(plan.start_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">End of Procurement Activity</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="month" id="editAppEndDate" value="${endDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                ${endDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(plan.end_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
+              </td>
+            </tr>
+            <!-- Row 6: Source of Fund + Budget -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Source of Fund</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Estimated Budget / ABC (₱)</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="number" id="editAppBudget" value="${estBudget}" step="0.01" min="0" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;font-weight:600;">
+              </td>
+            </tr>
+            <!-- Row 7: Procurement Strategy + APP Version -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Procurement Strategy or Tools</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <input type="text" id="editAppProcStrategy" value="${escapeHtml(plan.procurement_source || '-')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+              </td>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">APP Version</td>
+              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <select class="form-select" id="editAppVersion" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                  <option value="indicative" ${(plan.plan_type || '') === 'indicative' || !(plan.plan_type) ? 'selected' : ''}>Indicative</option>
+                  <option value="final" ${(plan.plan_type || '') === 'final' ? 'selected' : ''}>Final</option>
+                  <option value="updated" ${(plan.plan_type || '') === 'updated' ? 'selected' : ''}>Updated</option>
+                </select>
+              </td>
+            </tr>
+            <!-- Row 8: Remarks (full width) -->
+            <tr>
+              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Remarks</td>
+              <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
+                <textarea id="editAppRemarks" rows="2" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;resize:vertical;font-family:inherit;">${escapeHtml(plan.remarks || '')}</textarea>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+          <button type="submit" class="btn btn-primary" style="background:#1a365d;border-color:#1a365d;"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>
     `;
