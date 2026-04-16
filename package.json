@@ -38,6 +38,7 @@
     "to-ico": "^1.1.5"
   },
   "dependencies": {
+    "compromise": "^14.15.0",
     "socket.io-client": "^4.8.3",
     "xlsx": "^0.18.5"
   }

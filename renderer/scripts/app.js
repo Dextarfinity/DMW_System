@@ -13,6 +13,7 @@ const { io: ioConnect } = require('socket.io-client');
 // =====================================================
 const fs = require('fs');
 const path = require('path');
+const nlp = require('compromise');
 
 const DEFAULT_SERVER_IPS = [
   '192.168.1.117',     // WiFi Network 2 (primary)
@@ -3087,9 +3088,14 @@ function renderPPMPTable(ppmp, allPPMPItems) {
 function summarizeProjectTitle(title) {
   if (!title) return '-';
   let desc = title.trim();
-  // Remove common prefixes to create a concise general description
+
+  // === PASS 0: Short-circuit if already short (<=5 words or <=35 chars) ===
+  const wordCount = desc.split(/\s+/).length;
+  if (wordCount <= 5 || desc.length <= 35) return desc;
+
+  // === PASS 1: Rule-based prefix stripping (proven procurement patterns) ===
   const prefixes = [
-    /^Provision\s+of\s+/i,
+    /^Provision\s+of\s+(Repairs\s+and\s+Maintenance\s+for\s+)?/i,
     /^Procurement\s+of\s+/i,
     /^Supply\s+and\s+Delivery\s+of\s+/i,
     /^Purchase\s+of\s+/i,
@@ -3097,24 +3103,101 @@ function summarizeProjectTitle(title) {
     /^Hiring\s+of\s+/i,
     /^Engagement\s+of\s+/i,
     /^Availment\s+of\s+/i,
+    /^Hosting\s+of\s+/i,
+    /^Conduct(ing)?\s+of\s+/i,
     /^Payment\s+for\s+(the\s+)?/i,
     /^Subscription\s+(to|of|for)\s+/i,
     /^Renewal\s+of\s+/i,
     /^Lease\s+of\s+/i,
     /^Contracting\s+of\s+/i,
+    /^Orientation\s+on\s+/i,
+    /^Lecture\s+on\s+/i,
+    /^Training\s+on\s+/i,
+    /^Seminar\s+on\s+/i,
   ];
   let stripped = desc;
   for (const prefix of prefixes) {
     stripped = stripped.replace(prefix, '');
   }
-  // Remove trailing fiscal year references like "FY 2026", "for FY 2026", "CY 2026"
+
+  // === PASS 2: Strip trailing fiscal year references ===
   stripped = stripped.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '');
-  // Capitalize first letter
-  stripped = stripped.charAt(0).toUpperCase() + stripped.slice(1);
-  // If nothing was stripped (no prefix found), generate a short form using dash notation
-  // e.g. "Mental Health Awareness & Stress Management Seminar" stays as-is since it's already concise
-  // But for entries like "Repairs and Maintenance for Motor Vehicle", convert "for" to " - "
+  stripped = stripped.trim();
+
+  // === PASS 3: Handle law references "R.A. XXXX: long title" ===
+  const lawMatch = stripped.match(/^(R\.?A\.?\s*\d+)\s*[:]\s*(.+)$/i);
+  if (lawMatch) {
+    const doc = nlp(lawMatch[2]);
+    const nouns = doc.nouns().toTitleCase().out('array');
+    if (nouns.length >= 2) {
+      return nouns.slice(0, 2).join(' & ');
+    }
+    // Fallback: truncate to first 8 words of the title after colon
+    return lawMatch[2].split(/\s+/).slice(0, 8).join(' ');
+  }
+
+  // === PASS 4: Handle parenthetical content "Main Part (details, list)" ===
+  const parenMatch = stripped.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (parenMatch) {
+    const mainPart = parenMatch[1].trim();
+    const parenContent = parenMatch[2].trim();
+    const mainWords = mainPart.split(/\s+/);
+
+    // If main part is a multi-word title, try to generate acronym
+    if (mainWords.length >= 3) {
+      const skipWords = new Set(['of', 'and', 'the', 'for', 'in', 'on', 'to', 'a', 'an']);
+      const acronym = mainWords
+        .filter(w => !skipWords.has(w.toLowerCase()) && w.length > 1)
+        .map(w => w[0].toUpperCase())
+        .join('');
+      if (acronym.length >= 2 && acronym.length <= 7) {
+        // Truncate paren content: take first 2 items if comma-separated
+        const parenItems = parenContent.split(/,\s*/);
+        const shortParen = parenItems.slice(0, 2).join(', ');
+        return acronym + ' - ' + shortParen;
+      }
+    }
+
+    // Otherwise: "Main Part - first 2 paren items"
+    const parenItems = parenContent.split(/,\s*/);
+    const shortParen = parenItems.slice(0, 2).join(', ');
+    return mainPart + ' - ' + shortParen;
+  }
+
+  // === PASS 5: NLP-based summarization for remaining long titles ===
+  const remainingWords = stripped.split(/\s+/);
+  if (remainingWords.length > 7) {
+    const doc = nlp(stripped);
+
+    // Strategy A: Extract topics (proper nouns, organizations)
+    const topics = doc.topics().out('array');
+    const nouns = doc.nouns().out('array');
+
+    if (topics.length > 0 && nouns.length > 0) {
+      const combined = [...new Set([...topics, ...nouns.slice(0, 2)])];
+      const result = combined.slice(0, 3).join(' - ');
+      if (result.length >= 10) return result;
+    }
+
+    // Strategy B: Extract noun phrases
+    if (nouns.length >= 2) {
+      return nouns.slice(0, 2).join(' - ');
+    }
+
+    // Strategy C: Handle "X for Y" patterns
+    const parts = stripped.split(/\s+for\s+/i);
+    if (parts.length === 2) {
+      return parts[0] + ' - ' + parts[1];
+    }
+
+    // Strategy D: Truncate to 7 words
+    return remainingWords.slice(0, 7).join(' ');
+  }
+
+  // === PASS 6: Minor cleanup for medium-length titles ===
   stripped = stripped.replace(/\s+for\s+/gi, ' - ');
+  stripped = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+
   return stripped;
 }
 
