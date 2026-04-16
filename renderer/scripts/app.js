@@ -3334,7 +3334,7 @@ function renderAPPTable(items, appStatus) {
       <td>
         <div class="action-buttons">
           <button class="btn-icon" title="View" onclick="showViewAPPModal(${item.id})"><i class="fas fa-eye"></i></button>
-          <button class="btn-icon" data-action="edit-app" title="Edit" onclick="showEditAPPModal(${item.id})" style="color:#2196f3;"><i class="fas fa-edit"></i></button>
+          <button class="btn-icon" data-action="edit-app" title="Edit" onclick="showEditAPPModal(${item.id})"><i class="fas fa-edit"></i></button>
           <button class="btn-icon" title="Adjust Budget" onclick="showAdjustAPPBudgetModal(${item.id})" style="color:#d69e2e;"><i class="fas fa-coins"></i></button>
           <button class="btn-icon" title="Create PR" onclick="showCreatePRFromAPPModal(${item.id})"><i class="fas fa-file-signature"></i></button>
           <button class="btn-icon" data-action="delete-app" title="Delete" onclick="deleteAPPEntry(${item.id})" style="color:#e53e3e;"><i class="fas fa-trash"></i></button>
@@ -3394,25 +3394,40 @@ window.showEditAPPModal = async function(planId) {
     const procModes = await apiRequest('/procurement-modes').catch(() => []);
     const procModeOpts = procModes.map(m => `<option value="${m.name || m}" ${(plan.procurement_mode || '') === (m.name || m) ? 'selected' : ''}>${m.name || m}</option>`).join('');
 
+    const appCode = (plan.ppmp_no || '').replace('PPMP-', 'APP-');
+    const deptName = plan.department_name || '-';
+    const deptCode = plan.department_code || '';
+    const endUser = deptCode ? (deptCode + ' - ' + deptName) : deptName;
+    const category = (plan.project_type || plan.category || 'EXPENDABLE').toUpperCase();
+    let projectType = 'Goods';
+    if (category === 'SERVICES') projectType = 'Services';
+    else if (category === 'CAPITAL OUTLAY') projectType = 'Capital Outlay';
+    const estBudget = parseFloat(plan.total_amount || 0).toFixed(2);
+    const genDesc = (plan.item_description && plan.item_description !== plan.description) ? plan.item_description : summarizeProjectTitle(plan.description || '');
+
     const html = `
       <form id="editAPPForm" onsubmit="submitEditAPP(event, ${planId})">
         <div class="info-banner" style="margin-bottom:10px;background:#e3f2fd;">
-          <i class="fas fa-edit"></i> <strong>Edit APP Entry</strong> — ${plan.ppmp_no ? plan.ppmp_no.replace('PPMP-', 'APP-') : ''}
+          <i class="fas fa-edit"></i> <strong>Edit APP Entry</strong> — ${appCode}
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>APP Code</label>
-            <input type="text" value="${(plan.ppmp_no || '').replace('PPMP-', 'APP-')}" readonly style="background:#f5f5f5;">
+            <input type="text" value="${appCode}" readonly style="background:#f5f5f5;">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="flex:2;">
             <label>Project Title</label>
             <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
           </div>
         </div>
         <div class="form-row">
+          <div class="form-group">
+            <label>End-User / Implementing Unit</label>
+            <input type="text" value="${escapeHtml(endUser)}" readonly style="background:#f5f5f5;">
+          </div>
           <div class="form-group" style="flex:1;">
-            <label>General Description of the Project <small style="color:#888;">(auto-summarized from Project Title)</small></label>
-            <input type="text" id="editAppGenDesc" value="${escapeHtml((plan.item_description && plan.item_description !== plan.description) ? plan.item_description : summarizeProjectTitle(plan.description || ''))}" readonly style="background:#f0f4f8;">
+            <label>General Description of the Project <small style="color:#888;">(auto-summarized)</small></label>
+            <input type="text" id="editAppGenDesc" value="${escapeHtml(genDesc)}" readonly style="background:#f0f4f8;">
           </div>
         </div>
         <div class="form-row">
@@ -3424,33 +3439,60 @@ window.showEditAPPModal = async function(planId) {
             </select>
           </div>
           <div class="form-group">
-            <label>Source of Funds</label>
-            <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}">
+            <label>Early Procurement Activity?</label>
+            <select class="form-select" id="editAppEarlyProcurement">
+              <option value="No" ${(plan.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
+              <option value="Yes" ${(plan.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Criteria for Bid Evaluation</label>
+            <input type="text" id="editAppBidCriteria" value="${escapeHtml(plan.bid_criteria || 'LCRB')}">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Start of Procurement</label>
+            <label>Start of Procurement Activity</label>
             <input type="month" id="editAppStartDate" value="${plan.start_date || ''}">
           </div>
           <div class="form-group">
-            <label>End of Procurement</label>
+            <label>End of Procurement Activity</label>
             <input type="month" id="editAppEndDate" value="${plan.end_date || ''}">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Estimated Budget (ABC)</label>
-            <input type="number" id="editAppBudget" value="${parseFloat(plan.total_amount || 0).toFixed(2)}" step="0.01" min="0" required>
+            <label>Source of Fund</label>
+            <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}">
           </div>
           <div class="form-group">
+            <label>Estimated Budget / ABC (₱)</label>
+            <input type="number" id="editAppBudget" value="${estBudget}" step="0.01" min="0" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Procurement Strategy or Tools</label>
+            <input type="text" id="editAppProcStrategy" value="${escapeHtml(plan.procurement_source || '-')}">
+          </div>
+          <div class="form-group">
+            <label>APP Version</label>
+            <select class="form-select" id="editAppVersion">
+              <option value="indicative" ${(plan.plan_type || '') === 'indicative' || !(plan.plan_type) ? 'selected' : ''}>Indicative</option>
+              <option value="final" ${(plan.plan_type || '') === 'final' ? 'selected' : ''}>Final</option>
+              <option value="updated" ${(plan.plan_type || '') === 'updated' ? 'selected' : ''}>Updated</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
             <label>Remarks</label>
-            <input type="text" id="editAppRemarks" value="${escapeHtml(plan.remarks || '')}">
+            <textarea id="editAppRemarks" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:4px;">${escapeHtml(plan.remarks || '')}</textarea>
           </div>
         </div>
         <div style="text-align:right;margin-top:15px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" style="background:#2196f3;border-color:#2196f3;"><i class="fas fa-save"></i> Save Changes</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>
     `;
@@ -3479,10 +3521,12 @@ window.submitEditAPP = async function(e, planId) {
       description: descValue,
       item_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(descValue),
       procurement_mode: document.getElementById('editAppProcMode')?.value || '',
+      procurement_source: document.getElementById('editAppProcStrategy')?.value || '',
       fund_source: document.getElementById('editAppFundSource')?.value || '',
       start_date: document.getElementById('editAppStartDate')?.value || null,
       end_date: document.getElementById('editAppEndDate')?.value || null,
-      remarks: document.getElementById('editAppRemarks')?.value || ''
+      remarks: document.getElementById('editAppRemarks')?.value || '',
+      plan_type: document.getElementById('editAppVersion')?.value || 'indicative'
     });
     showNotification('APP entry updated successfully!', 'success');
     closeModal();
