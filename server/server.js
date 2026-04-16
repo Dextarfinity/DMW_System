@@ -2384,6 +2384,26 @@ app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
   }
 });
 
+// Soft-delete APP entry only (does NOT delete the PPMP)
+app.put('/api/app-entries/:planId/delete', authenticateToken, async (req, res) => {
+  try {
+    const { planId } = req.params;
+    const result = await pool.query(
+      `UPDATE app_entries SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
+       WHERE plan_id = $1 RETURNING *`,
+      [planId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'APP entry not found' });
+    }
+    io.emit('data_changed', { type: 'plan-items', action: 'app_entry_deleted', plan_id: planId });
+    res.json({ message: 'APP entry deleted successfully' });
+  } catch (err) {
+    console.error('APP entry delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET APP budget summary (total allocated, active, available)
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
   try {

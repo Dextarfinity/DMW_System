@@ -3596,13 +3596,13 @@ window.submitEditAPP = async function(e, planId) {
 window.deleteAPPEntry = async function(planId) {
   const confirmed = await govConfirm({
     title: 'Delete APP Entry',
-    bodyHtml: '<p style="color:#c53030;">Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will also mark the corresponding PPMP entry as deleted.</p>',
+    bodyHtml: '<p style="color:#c53030;">Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will only remove the entry from the APP. The original PPMP will not be affected.</p>',
     confirmText: 'Delete',
     cancelText: 'Cancel'
   });
   if (!confirmed) return;
   try {
-    await apiRequest('/plans/' + planId, 'PUT', { is_deleted: true });
+    await apiRequest('/app-entries/' + planId + '/delete', 'PUT');
     showNotification('APP entry deleted successfully', 'success');
     loadAPP();
   } catch (err) {
