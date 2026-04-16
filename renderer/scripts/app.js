@@ -3084,6 +3084,33 @@ function renderPPMPTable(ppmp, allPPMPItems) {
   if (ppmpCard) initStickyTopScrollbar(ppmpCard);
 }
 
+function summarizeProjectTitle(title) {
+  if (!title) return '-';
+  // Remove common prefixes to create a concise general description
+  let desc = title;
+  const prefixes = [
+    /^Provision\s+of\s+/i,
+    /^Procurement\s+of\s+/i,
+    /^Supply\s+and\s+Delivery\s+of\s+/i,
+    /^Purchase\s+of\s+/i,
+    /^Acquisition\s+of\s+/i,
+    /^Hiring\s+of\s+/i,
+    /^Engagement\s+of\s+/i,
+    /^Availment\s+of\s+/i,
+    /^Payment\s+for\s+(the\s+)?/i,
+    /^Subscription\s+(to|of|for)\s+/i,
+    /^Renewal\s+of\s+/i,
+    /^Lease\s+of\s+/i,
+    /^Contracting\s+of\s+/i,
+  ];
+  for (const prefix of prefixes) {
+    desc = desc.replace(prefix, '');
+  }
+  // Capitalize first letter
+  desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+  return desc;
+}
+
 function renderAPPTable(items, appStatus) {
   const tbody = document.getElementById('appTableBody');
   if (!tbody) return;
@@ -3217,9 +3244,9 @@ function renderAPPTable(items, appStatus) {
     return `
     <tr>
       <td>${item.item_code || '-'}</td>
-      <td>${item.item_name || '-'}</td>
+      <td style="min-width:320px;">${item.item_name || '-'}</td>
       <td>${deptCode}</td>
-      <td>${item.item_description || '-'}</td>
+      <td>${summarizeProjectTitle(item.item_name)}</td>
       <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
       <td>No</td>
       <td>LCRB</td>
