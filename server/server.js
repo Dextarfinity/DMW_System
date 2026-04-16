@@ -2242,36 +2242,41 @@ app.put('/api/plans/:id/resubmit', authenticateToken, async (req, res) => {
 app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.query.fiscal_year;
-    let whereClause = `WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
+    let whereClause = `WHERE ae.id IS NOT NULL AND (ae.is_deleted = false OR ae.is_deleted IS NULL)
+      AND pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
     const params = [];
     if (fiscalYear) {
       params.push(parseInt(fiscalYear));
-      whereClause += ` AND pp.fiscal_year = $${params.length}`;
+      whereClause += ` AND ae.fiscal_year = $${params.length}`;
     }
     const result = await pool.query(
       `SELECT pp.id, pp.ppmp_no,
-              REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
-              pp.description as item_name,
-              COALESCE(NULLIF(pp.item_description, ''), pp.description) as item_description,
-              'lot' as unit,
-              pp.total_amount as unit_price,
-              pp.total_amount as total_price,
-              1 as total_qty,
+              ae.id as app_entry_id,
+              ae.app_code as item_code,
+              ae.project_title as item_name,
+              ae.general_description as item_description,
+              ae.procurement_mode,
+              ae.early_procurement,
+              ae.bid_criteria,
+              ae.start_date, ae.end_date,
+              ae.fund_source,
+              ae.estimated_budget as total_price,
+              ae.estimated_budget as unit_price,
+              ae.procurement_strategy,
+              ae.app_version,
+              ae.remarks,
+              ae.fiscal_year,
               pp.project_type as category,
-              pp.procurement_mode,
               pp.procurement_source,
-              pp.fund_source,
-              pp.fiscal_year,
               pp.status as plan_status,
               pp.dept_id,
-              pp.remarks,
-              pp.start_date, pp.end_date,
               d.name as department_name,
               d.code as department_code
        FROM procurementplans pp
+       INNER JOIN app_entries ae ON ae.plan_id = pp.id
        LEFT JOIN departments d ON pp.dept_id = d.id
        ${whereClause}
-       ORDER BY pp.id`,
+       ORDER BY ae.id`,
       params
     );
     res.json(result.rows);
@@ -2307,6 +2312,76 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
     io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id) });
     res.json({ message: 'Budget adjusted successfully', old_amount: oldAmount, new_amount: newAmount, plan: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT update APP entry (app_entries table) — handles all APP-specific edits
+app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const allowedRoles = ['admin', 'hope', 'bac_secretariat', 'encoder', 'budget_consultant'];
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    if (!userRoles.some(r => allowedRoles.includes(r) || chiefRoles.includes(r))) {
+      return res.status(403).json({ error: 'Not authorized to edit APP entries' });
+    }
+
+    const {
+      project_title, general_description, procurement_mode, early_procurement,
+      bid_criteria, start_date, end_date, fund_source, estimated_budget,
+      procurement_strategy, app_version, remarks
+    } = req.body;
+
+    // Ensure app_entries row exists
+    const existing = await pool.query('SELECT id FROM app_entries WHERE plan_id = $1', [req.params.planId]);
+    let appEntryId;
+    if (!existing.rows.length) {
+      const ppmp = await pool.query('SELECT fiscal_year FROM procurementplans WHERE id = $1', [req.params.planId]);
+      if (!ppmp.rows.length) return res.status(404).json({ error: 'PPMP not found' });
+      const insert = await pool.query(
+        `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
+          procurement_mode, early_procurement, bid_criteria, start_date, end_date,
+          fund_source, estimated_budget, procurement_strategy, app_version, remarks)
+        VALUES ($1, $2, REPLACE((SELECT ppmp_no FROM procurementplans WHERE id=$1), 'PPMP-', 'APP-'),
+          $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id`,
+        [req.params.planId, ppmp.rows[0].fiscal_year, project_title, general_description,
+         procurement_mode, early_procurement || 'No', bid_criteria || 'LCRB',
+         start_date, end_date, fund_source, estimated_budget || 0,
+         procurement_strategy || '-', app_version || 'indicative', remarks]
+      );
+      appEntryId = insert.rows[0].id;
+    } else {
+      appEntryId = existing.rows[0].id;
+    }
+
+    // Update app_entries row
+    const result = await pool.query(
+      `UPDATE app_entries SET
+         project_title = COALESCE($1, project_title),
+         general_description = COALESCE($2, general_description),
+         procurement_mode = COALESCE($3, procurement_mode),
+         early_procurement = COALESCE($4, early_procurement),
+         bid_criteria = COALESCE($5, bid_criteria),
+         start_date = COALESCE($6, start_date),
+         end_date = COALESCE($7, end_date),
+         fund_source = COALESCE($8, fund_source),
+         estimated_budget = COALESCE($9::NUMERIC, estimated_budget),
+         procurement_strategy = COALESCE($10, procurement_strategy),
+         app_version = COALESCE($11, app_version),
+         remarks = COALESCE($12, remarks),
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $13
+       RETURNING *`,
+      [project_title, general_description, procurement_mode, early_procurement,
+       bid_criteria, start_date, end_date, fund_source, estimated_budget,
+       procurement_strategy, app_version, remarks, appEntryId]
+    );
+
+    io.emit('data_changed', { type: 'plan-items', action: 'app_entry_updated', app_entry_id: appEntryId });
+    res.json({ message: 'APP entry updated successfully', app_entry: result.rows[0] });
+  } catch (err) {
+    console.error('APP entry update error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET APP budget summary (total allocated, active, available)
@@ -2436,9 +2511,26 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       [fiscalYear]
     );
 
+    // Create app_entries for each approved PPMP (idempotent — won't overwrite existing edits)
+    const appInsert = await pool.query(
+      `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
+        procurement_mode, early_procurement, bid_criteria, start_date, end_date,
+        fund_source, estimated_budget, procurement_strategy, app_version, remarks)
+      SELECT pp.id, pp.fiscal_year, REPLACE(pp.ppmp_no, 'PPMP-', 'APP-'),
+             pp.description, COALESCE(NULLIF(pp.item_description, ''), pp.description),
+             pp.procurement_mode, 'No', 'LCRB', pp.start_date, pp.end_date,
+             pp.fund_source, pp.total_amount, COALESCE(pp.procurement_source, '-'),
+             'indicative', pp.remarks
+      FROM procurementplans pp
+      WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
+        AND pp.status = 'approved' AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+      ON CONFLICT (plan_id) DO NOTHING`,
+      [fiscalYear]
+    );
+
     res.json({
-      message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}.`,
-      created: 0,
+      message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}. ${appInsert.rowCount} new APP entries created.`,
+      created: appInsert.rowCount,
       total_items: parseInt(result.rows[0].item_count),
       total_abc: parseFloat(result.rows[0].total_abc),
       total_approved: parseFloat(totalResult.rows[0].total_approved),
@@ -5983,6 +6075,37 @@ async function runMigrations() {
       console.log(`[MIGRATION] Backfilled unit for ${backfilledCount} entries from item_description`);
     }
   } catch (e) { console.error('[MIGRATION] item_description unit backfill error:', e.message); }
+
+  // ── Create app_entries table ──
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_entries (
+        id                    SERIAL PRIMARY KEY,
+        plan_id               INTEGER NOT NULL REFERENCES procurementplans(id) ON DELETE CASCADE,
+        fiscal_year           INTEGER NOT NULL,
+        app_code              VARCHAR(50),
+        project_title         TEXT,
+        general_description   TEXT,
+        procurement_mode      VARCHAR(255),
+        early_procurement     VARCHAR(5) DEFAULT 'No',
+        bid_criteria          VARCHAR(100) DEFAULT 'LCRB',
+        start_date            VARCHAR(20),
+        end_date              VARCHAR(20),
+        fund_source           VARCHAR(100),
+        estimated_budget      NUMERIC(15,2) DEFAULT 0,
+        procurement_strategy  VARCHAR(255) DEFAULT '-',
+        app_version           VARCHAR(20) DEFAULT 'indicative',
+        remarks               TEXT,
+        is_deleted            BOOLEAN DEFAULT false,
+        created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(plan_id)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_app_entries_plan_id ON app_entries(plan_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_app_entries_fiscal_year ON app_entries(fiscal_year)`);
+    console.log('[MIGRATION] app_entries table ensured');
+  } catch (e) { console.error('[MIGRATION] app_entries table error:', e.message); }
 }
 
 runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));

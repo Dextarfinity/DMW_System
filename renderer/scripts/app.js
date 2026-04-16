@@ -3315,6 +3315,17 @@ function renderAPPTable(items, appStatus) {
     else if (category === 'CAPITAL OUTLAY') projectType = 'Capital Outlay';
     const estBudget = parseFloat(item.total_price || item.unit_price || 0);
 
+    // Compute version tag per item from app_version field
+    let itemVersionTag = '';
+    const appVer = (item.app_version || 'indicative').toLowerCase();
+    if (appVer === 'indicative') {
+      itemVersionTag = '<span class="version-tag indicative">Indicative</span>';
+    } else if (appVer === 'final') {
+      itemVersionTag = '<span class="version-tag final">Final</span>';
+    } else if (appVer === 'updated') {
+      itemVersionTag = '<span class="version-tag updated">Updated</span>';
+    }
+
     return `
     <tr>
       <td>${item.item_code || '-'}</td>
@@ -3322,14 +3333,14 @@ function renderAPPTable(items, appStatus) {
       <td>${deptCode}</td>
       <td>${(item.item_description && item.item_description !== item.item_name) ? item.item_description : summarizeProjectTitle(item.item_name)}</td>
       <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
-      <td>No</td>
-      <td>LCRB</td>
+      <td>${item.early_procurement || 'No'}</td>
+      <td>${item.bid_criteria || 'LCRB'}</td>
       <td>${startDate}</td>
       <td>${endDate}</td>
-      <td>GAA ${item.fiscal_year || String(getCurrentFiscalYear())}</td>
+      <td>${item.fund_source || 'GAA'}</td>
       <td>₱${estBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-      <td>-</td>
-      <td class="app-version-col">${versionTag}</td>
+      <td>${item.procurement_strategy || '-'}</td>
+      <td class="app-version-col">${itemVersionTag}</td>
       <td>${item.remarks || '-'}</td>
       <td>
         <div class="action-buttons">
@@ -3389,33 +3400,32 @@ window.onAPPFYChange = function() {
 /** Edit APP Modal */
 window.showEditAPPModal = async function(planId) {
   try {
-    const plan = await apiRequest('/plans/' + planId);
-    if (!plan) { showNotification('APP entry not found', 'error'); return; }
+    // Get the app entry from cached items (loaded from /api/plan-items which now includes app_entries data)
+    const item = window._appItems && window._appItems.find(i => i.id === planId);
+    if (!item) { showNotification('APP entry not found', 'error'); return; }
+
     const procModes = await apiRequest('/procurement-modes').catch(() => []);
-    const procModeOpts = procModes.map(m => `<option value="${m.name || m}" ${(plan.procurement_mode || '') === (m.name || m) ? 'selected' : ''}>${m.name || m}</option>`).join('');
+    const procModeOpts = procModes.map(m => `<option value="${m.name || m}" ${(item.procurement_mode || '') === (m.name || m) ? 'selected' : ''}>${m.name || m}</option>`).join('');
 
-    const appCode = (plan.ppmp_no || '').replace('PPMP-', 'APP-');
-    const deptName = plan.department_name || '-';
-    const deptCode = plan.department_code || '';
+    const appCode = item.item_code || '-';
+    const deptName = item.department_name || '-';
+    const deptCode = item.department_code || '';
     const endUser = deptCode ? (deptCode + ' - ' + deptName) : deptName;
-    const estBudget = parseFloat(plan.total_amount || 0).toFixed(2);
+    const estBudget = parseFloat(item.total_price || item.unit_price || 0).toFixed(2);
 
-    // General Description: use DB value, fallback to summarize only if empty
-    const dbGenDesc = plan.item_description || '';
-    const genDesc = (dbGenDesc && dbGenDesc !== plan.description) ? dbGenDesc : summarizeProjectTitle(plan.description || '');
+    // General Description: already from app_entries in the API response
+    const genDesc = item.item_description || '-';
 
-    // Format dates: DB may store as ISO "2026-03-15T00:00:00.000Z" or "2026-03" — convert to YYYY-MM for month input
+    // Format dates: DB may store as ISO or YYYY-MM — convert to YYYY-MM for month input
     const toMonthValue = (d) => {
       if (!d) return '';
       const s = String(d);
-      // Already YYYY-MM
       if (/^\d{4}-\d{2}$/.test(s)) return s;
-      // ISO date or YYYY-MM-DD
       const m = s.match(/^(\d{4})-(\d{2})/);
       return m ? m[1] + '-' + m[2] : '';
     };
-    const startDateVal = toMonthValue(plan.start_date);
-    const endDateVal = toMonthValue(plan.end_date);
+    const startDateVal = toMonthValue(item.start_date);
+    const endDateVal = toMonthValue(item.end_date);
 
     // Format display dates for readonly display
     const formatDateDisplay = (d) => {
@@ -3449,7 +3459,7 @@ window.showEditAPPModal = async function(planId) {
               </td>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;width:180px;text-transform:uppercase;font-size:11px;">Project Title</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;" oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
+                <input type="text" id="editAppDescription" value="${escapeHtml(item.item_name || '')}" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;" oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
               </td>
             </tr>
             <!-- Row 2: End-User + General Description -->
@@ -3475,8 +3485,8 @@ window.showEditAPPModal = async function(planId) {
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Early Procurement Activity?</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
                 <select class="form-select" id="editAppEarlyProcurement" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                  <option value="No" ${(plan.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
-                  <option value="Yes" ${(plan.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
+                  <option value="No" ${(item.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
+                  <option value="Yes" ${(item.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
                 </select>
               </td>
             </tr>
@@ -3484,7 +3494,7 @@ window.showEditAPPModal = async function(planId) {
             <tr>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Criteria for Bid Evaluation</td>
               <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppBidCriteria" value="${escapeHtml(plan.bid_criteria || 'LCRB')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                <input type="text" id="editAppBidCriteria" value="${escapeHtml(item.bid_criteria || 'LCRB')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
               </td>
             </tr>
             <!-- Row 5: Start + End of Procurement -->
@@ -3492,19 +3502,19 @@ window.showEditAPPModal = async function(planId) {
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Start of Procurement Activity</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
                 <input type="month" id="editAppStartDate" value="${startDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                ${startDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(plan.start_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
+                ${startDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(item.start_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
               </td>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">End of Procurement Activity</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
                 <input type="month" id="editAppEndDate" value="${endDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                ${endDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(plan.end_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
+                ${endDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(item.end_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
               </td>
             </tr>
             <!-- Row 6: Source of Fund + Budget -->
             <tr>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Source of Fund</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppFundSource" value="${escapeHtml(plan.fund_source || 'GAA')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                <input type="text" id="editAppFundSource" value="${escapeHtml(item.fund_source || 'GAA')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
               </td>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Estimated Budget / ABC (₱)</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
@@ -3515,14 +3525,14 @@ window.showEditAPPModal = async function(planId) {
             <tr>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Procurement Strategy or Tools</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppProcStrategy" value="${escapeHtml(plan.procurement_source || '-')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
+                <input type="text" id="editAppProcStrategy" value="${escapeHtml(item.procurement_strategy || '-')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
               </td>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">APP Version</td>
               <td style="padding:8px 12px;border:1px solid #cbd5e0;">
                 <select class="form-select" id="editAppVersion" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                  <option value="indicative" ${(plan.plan_type || '') === 'indicative' || !(plan.plan_type) ? 'selected' : ''}>Indicative</option>
-                  <option value="final" ${(plan.plan_type || '') === 'final' ? 'selected' : ''}>Final</option>
-                  <option value="updated" ${(plan.plan_type || '') === 'updated' ? 'selected' : ''}>Updated</option>
+                  <option value="indicative" ${(item.app_version || '') === 'indicative' || !(item.app_version) ? 'selected' : ''}>Indicative</option>
+                  <option value="final" ${(item.app_version || '') === 'final' ? 'selected' : ''}>Final</option>
+                  <option value="updated" ${(item.app_version || '') === 'updated' ? 'selected' : ''}>Updated</option>
                 </select>
               </td>
             </tr>
@@ -3530,7 +3540,7 @@ window.showEditAPPModal = async function(planId) {
             <tr>
               <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Remarks</td>
               <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <textarea id="editAppRemarks" rows="2" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;resize:vertical;font-family:inherit;">${escapeHtml(plan.remarks || '')}</textarea>
+                <textarea id="editAppRemarks" rows="2" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;resize:vertical;font-family:inherit;">${escapeHtml(item.remarks || '')}</textarea>
               </td>
             </tr>
           </tbody>
@@ -3558,21 +3568,21 @@ window.submitEditAPP = async function(e, planId) {
   });
   if (!confirmed) return;
   try {
-    await apiRequest('/plan-items/' + planId + '/adjust-budget', 'PUT', {
-      total_amount: parseFloat(document.getElementById('editAppBudget')?.value) || 0
-    });
-    // Update other fields via plans endpoint
     const descValue = document.getElementById('editAppDescription')?.value || '';
-    await apiRequest('/plans/' + planId, 'PUT', {
-      description: descValue,
-      item_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(descValue),
+    // Single API call to app-entries endpoint (saves all APP-specific fields)
+    await apiRequest('/app-entries/' + planId, 'PUT', {
+      project_title: descValue,
+      general_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(descValue),
       procurement_mode: document.getElementById('editAppProcMode')?.value || '',
-      procurement_source: document.getElementById('editAppProcStrategy')?.value || '',
-      fund_source: document.getElementById('editAppFundSource')?.value || '',
+      early_procurement: document.getElementById('editAppEarlyProcurement')?.value || 'No',
+      bid_criteria: document.getElementById('editAppBidCriteria')?.value || 'LCRB',
       start_date: document.getElementById('editAppStartDate')?.value || null,
       end_date: document.getElementById('editAppEndDate')?.value || null,
-      remarks: document.getElementById('editAppRemarks')?.value || '',
-      plan_type: document.getElementById('editAppVersion')?.value || 'indicative'
+      fund_source: document.getElementById('editAppFundSource')?.value || '',
+      estimated_budget: parseFloat(document.getElementById('editAppBudget')?.value) || 0,
+      procurement_strategy: document.getElementById('editAppProcStrategy')?.value || '-',
+      app_version: document.getElementById('editAppVersion')?.value || 'indicative',
+      remarks: document.getElementById('editAppRemarks')?.value || ''
     });
     showNotification('APP entry updated successfully!', 'success');
     closeModal();
