@@ -14,32 +14,10 @@ const { io: ioConnect } = require('socket.io-client');
 const fs = require('fs');
 const path = require('path');
 
-// Ensure node_modules from the Electron app root is in the module search path
-// This is needed when the renderer loads from a remote server URL
-// Try multiple known paths since __dirname may not be correct when loaded remotely
-const candidatePaths = [
-  path.resolve(__dirname, '..', '..', 'node_modules'),        // local file: renderer/scripts -> root
-  path.join(process.cwd(), 'node_modules'),                    // Electron CWD
-  process.resourcesPath ? path.join(process.resourcesPath, 'app', 'node_modules') : null,  // packaged app
-  process.resourcesPath ? path.join(process.resourcesPath, 'app.asar', 'node_modules') : null, // asar packaged
-].filter(Boolean);
-
-for (const modPath of candidatePaths) {
-  if (module.paths && !module.paths.includes(modPath)) {
-    module.paths.unshift(modPath);
-  }
-}
-
-// Load compromise NLP library for project title summarization
-let nlp;
-try {
-  nlp = require('compromise');
-  console.log('[NLP] Compromise loaded successfully');
-} catch (e) {
-  console.warn('[NLP] Compromise not available, using basic summarization. Error:', e.message);
-  console.warn('[NLP] Module paths tried:', module.paths.slice(0, 5));
-  nlp = null;
-}
+// Compromise NLP is loaded via <script> tag (window.nlp)
+const nlp = window.nlp || null;
+if (nlp) console.log('[NLP] Compromise loaded successfully');
+else console.warn('[NLP] Compromise not available, using basic summarization');
 
 const DEFAULT_SERVER_IPS = [
   '192.168.1.117',     // WiFi Network 2 (primary)
