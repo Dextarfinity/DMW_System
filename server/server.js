@@ -2252,7 +2252,7 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
       `SELECT pp.id, pp.ppmp_no,
               REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
               pp.description as item_name,
-              pp.description as item_description,
+              COALESCE(NULLIF(pp.item_description, ''), pp.description) as item_description,
               'lot' as unit,
               pp.total_amount as unit_price,
               pp.total_amount as total_price,
@@ -2423,6 +2423,17 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          consolidated_count = COALESCE(app_settings.consolidated_count, 0) + 1,
          set_at = CURRENT_TIMESTAMP`,
       [fiscalYear, req.user.id]
+    );
+
+    // Auto-populate item_description from description for items that don't have one
+    // The client-side summarization will be used, but we store a server-side fallback
+    await pool.query(
+      `UPDATE procurementplans
+       SET item_description = description
+       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1
+         AND (is_deleted = false OR is_deleted IS NULL) AND status = 'approved'
+         AND (item_description IS NULL OR item_description = '')`,
+      [fiscalYear]
     );
 
     res.json({

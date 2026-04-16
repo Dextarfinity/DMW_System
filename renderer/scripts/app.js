@@ -14,10 +14,6 @@ const { io: ioConnect } = require('socket.io-client');
 const fs = require('fs');
 const path = require('path');
 
-// Compromise NLP is loaded via <script> tag (window.nlp)
-const nlp = window.nlp || null;
-if (nlp) console.log('[NLP] Compromise loaded successfully');
-else console.warn('[NLP] Compromise not available, using basic summarization');
 
 const DEFAULT_SERVER_IPS = [
   '192.168.1.117',     // WiFi Network 2 (primary)
@@ -3092,14 +3088,11 @@ function renderPPMPTable(ppmp, allPPMPItems) {
 function summarizeProjectTitle(title) {
   if (!title) return '-';
   let desc = title.trim();
+  const original = desc;
 
-  // === PASS 0: Short-circuit if already short (<=5 words or <=35 chars) ===
-  const wordCount = desc.split(/\s+/).length;
-  if (wordCount <= 5 || desc.length <= 35) return desc;
-
-  // === PASS 1: Rule-based prefix stripping (proven procurement patterns) ===
+  // === STEP 1: Strip common procurement prefixes ===
   const prefixes = [
-    /^Provision\s+of\s+(Repairs\s+and\s+Maintenance\s+for\s+)?/i,
+    /^Provision\s+of\s+(Repairs\s+and\s+Maintenance\s+(for|of)\s+)?/i,
     /^Procurement\s+of\s+/i,
     /^Supply\s+and\s+Delivery\s+of\s+/i,
     /^Purchase\s+of\s+/i,
@@ -3107,106 +3100,89 @@ function summarizeProjectTitle(title) {
     /^Hiring\s+of\s+/i,
     /^Engagement\s+of\s+/i,
     /^Availment\s+of\s+/i,
-    /^Hosting\s+of\s+/i,
-    /^Conduct(ing)?\s+of\s+/i,
+    /^Hosting\s+(of\s+)?/i,
+    /^Conduct(ing)?\s+of\s+(the\s+)?/i,
     /^Payment\s+for\s+(the\s+)?/i,
     /^Subscription\s+(to|of|for)\s+/i,
     /^Renewal\s+of\s+/i,
     /^Lease\s+of\s+/i,
     /^Contracting\s+of\s+/i,
-    /^Orientation\s+on\s+/i,
-    /^Lecture\s+on\s+/i,
-    /^Training\s+on\s+/i,
-    /^Seminar\s+on\s+/i,
+    /^Orientation\s+on\s+(the\s+)?/i,
+    /^Lecture\s+on\s+(the\s+)?/i,
+    /^Training\s+on\s+(the\s+)?/i,
+    /^Seminar\s+on\s+(the\s+)?/i,
+    /^Workshop\s+on\s+(the\s+)?/i,
+    /^Conference\s+on\s+(the\s+)?/i,
+    /^Facilitation\s+of\s+(the\s+)?/i,
+    /^Implementation\s+of\s+(the\s+)?/i,
+    /^Installation\s+of\s+/i,
+    /^Repair\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^Repairs\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^RM\s*[-–]\s*/i,
+    /^Maintenance\s+(of|for)\s+/i,
+    /^Development\s+of\s+/i,
+    /^Preparation\s+of\s+/i,
+    /^Reproduction\s+of\s+/i,
+    /^Printing\s+of\s+/i,
+    /^Publication\s+of\s+/i,
+    /^Production\s+of\s+/i,
   ];
-  let stripped = desc;
   for (const prefix of prefixes) {
-    stripped = stripped.replace(prefix, '');
+    desc = desc.replace(prefix, '');
   }
 
-  // === PASS 2: Strip trailing fiscal year references ===
-  stripped = stripped.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '');
-  stripped = stripped.trim();
+  // === STEP 2: Strip trailing fiscal year references ===
+  desc = desc.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '').trim();
 
-  // === PASS 3: Handle law references "R.A. XXXX: long title" ===
-  const lawMatch = stripped.match(/^(R\.?A\.?\s*\d+)\s*[:]\s*(.+)$/i);
+  // === STEP 3: Handle law references "R.A. XXXX: long title" ===
+  const lawMatch = desc.match(/^(R\.?A\.?\s*\d+)\s*[:]\s*(.+)$/i);
   if (lawMatch) {
-    if (nlp) {
-      const doc = nlp(lawMatch[2]);
-      const nouns = doc.nouns().toTitleCase().out('array');
-      if (nouns.length >= 2) {
-        return nouns.slice(0, 2).join(' & ');
-      }
-    }
-    // Fallback: truncate to first 8 words of the title after colon
-    return lawMatch[2].split(/\s+/).slice(0, 8).join(' ');
+    return lawMatch[2].split(/\s+/).slice(0, 6).join(' ');
   }
 
-  // === PASS 4: Handle parenthetical content "Main Part (details, list)" ===
-  const parenMatch = stripped.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  // === STEP 4: Handle parenthetical content "Main Part (details)" ===
+  const parenMatch = desc.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
   if (parenMatch) {
     const mainPart = parenMatch[1].trim();
     const parenContent = parenMatch[2].trim();
     const mainWords = mainPart.split(/\s+/);
-
-    // If main part is a multi-word title, try to generate acronym
+    // Generate acronym for multi-word main part
     if (mainWords.length >= 3) {
-      const skipWords = new Set(['of', 'and', 'the', 'for', 'in', 'on', 'to', 'a', 'an']);
+      const skipWords = new Set(['of', 'and', 'the', 'for', 'in', 'on', 'to', 'a', 'an', 'sa', 'ng', 'at']);
       const acronym = mainWords
         .filter(w => !skipWords.has(w.toLowerCase()) && w.length > 1)
         .map(w => w[0].toUpperCase())
         .join('');
       if (acronym.length >= 2 && acronym.length <= 7) {
-        // Truncate paren content: take first 2 items if comma-separated
         const parenItems = parenContent.split(/,\s*/);
-        const shortParen = parenItems.slice(0, 2).join(', ');
-        return acronym + ' - ' + shortParen;
+        return acronym + ' - ' + parenItems.slice(0, 2).join(', ');
       }
     }
-
-    // Otherwise: "Main Part - first 2 paren items"
     const parenItems = parenContent.split(/,\s*/);
-    const shortParen = parenItems.slice(0, 2).join(', ');
-    return mainPart + ' - ' + shortParen;
+    return mainPart + ' - ' + parenItems.slice(0, 2).join(', ');
   }
 
-  // === PASS 5: NLP-based summarization for remaining long titles ===
-  const remainingWords = stripped.split(/\s+/);
-  if (remainingWords.length > 7) {
-    if (nlp) {
-      const doc = nlp(stripped);
+  // === STEP 5: Convert "X for Y" or "X of Y" to "X - Y" for clarity ===
+  desc = desc.replace(/\s+for\s+the\s+/gi, ' - ');
+  desc = desc.replace(/\s+for\s+/gi, ' - ');
 
-      // Strategy A: Extract topics (proper nouns, organizations)
-      const topics = doc.topics().out('array');
-      const nouns = doc.nouns().out('array');
-
-      if (topics.length > 0 && nouns.length > 0) {
-        const combined = [...new Set([...topics, ...nouns.slice(0, 2)])];
-        const result = combined.slice(0, 3).join(' - ');
-        if (result.length >= 10) return result;
-      }
-
-      // Strategy B: Extract noun phrases
-      if (nouns.length >= 2) {
-        return nouns.slice(0, 2).join(' - ');
-      }
-    }
-
-    // Strategy C: Handle "X for Y" patterns
-    const parts = stripped.split(/\s+for\s+/i);
-    if (parts.length === 2) {
-      return parts[0] + ' - ' + parts[1];
-    }
-
-    // Strategy D: Truncate to 7 words
-    return remainingWords.slice(0, 7).join(' ');
+  // === STEP 6: Truncate if still long (>8 words) ===
+  const words = desc.split(/\s+/);
+  if (words.length > 8) {
+    desc = words.slice(0, 7).join(' ');
   }
 
-  // === PASS 6: Minor cleanup for medium-length titles ===
-  stripped = stripped.replace(/\s+for\s+/gi, ' - ');
-  stripped = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // === STEP 7: Ensure the result differs from input ===
+  desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+  if (desc === original && desc.length > 40) {
+    // Force abbreviation: take key content words
+    const stopWords = new Set(['of', 'and', 'the', 'for', 'in', 'on', 'to', 'a', 'an', 'with', 'by', 'sa', 'ng', 'at', 'para']);
+    const keyWords = desc.split(/\s+/).filter(w => !stopWords.has(w.toLowerCase()));
+    desc = keyWords.slice(0, 5).join(' ');
+  }
 
-  return stripped;
+  console.log('[Summarize]', original, '→', desc);
+  return desc || original;
 }
 
 function renderAPPTable(items, appStatus) {
@@ -3344,7 +3320,7 @@ function renderAPPTable(items, appStatus) {
       <td>${item.item_code || '-'}</td>
       <td style="min-width:320px;">${item.item_name || '-'}</td>
       <td>${deptCode}</td>
-      <td>${summarizeProjectTitle(item.item_name)}</td>
+      <td>${(item.item_description && item.item_description !== item.item_name) ? item.item_description : summarizeProjectTitle(item.item_name)}</td>
       <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
       <td>No</td>
       <td>LCRB</td>
@@ -3436,7 +3412,7 @@ window.showEditAPPModal = async function(planId) {
         <div class="form-row">
           <div class="form-group" style="flex:1;">
             <label>General Description of the Project <small style="color:#888;">(auto-summarized from Project Title)</small></label>
-            <input type="text" id="editAppGenDesc" value="${escapeHtml(summarizeProjectTitle(plan.description || ''))}" readonly style="background:#f0f4f8;">
+            <input type="text" id="editAppGenDesc" value="${escapeHtml((plan.item_description && plan.item_description !== plan.description) ? plan.item_description : summarizeProjectTitle(plan.description || ''))}" readonly style="background:#f0f4f8;">
           </div>
         </div>
         <div class="form-row">
@@ -3498,8 +3474,10 @@ window.submitEditAPP = async function(e, planId) {
       total_amount: parseFloat(document.getElementById('editAppBudget')?.value) || 0
     });
     // Update other fields via plans endpoint
+    const descValue = document.getElementById('editAppDescription')?.value || '';
     await apiRequest('/plans/' + planId, 'PUT', {
-      description: document.getElementById('editAppDescription')?.value || '',
+      description: descValue,
+      item_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(descValue),
       procurement_mode: document.getElementById('editAppProcMode')?.value || '',
       fund_source: document.getElementById('editAppFundSource')?.value || '',
       start_date: document.getElementById('editAppStartDate')?.value || null,
@@ -18360,7 +18338,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div class="view-details">
         <div class="detail-row"><label>APP Code:</label><span>${item.item_code || '-'}</span></div>
         <div class="detail-row"><label>Project Title:</label><span>${item.item_name || '-'}</span></div>
-        <div class="detail-row"><label>General Description:</label><span>${summarizeProjectTitle(item.item_name)}</span></div>
+        <div class="detail-row"><label>General Description:</label><span>${(item.item_description && item.item_description !== item.item_name) ? item.item_description : summarizeProjectTitle(item.item_name)}</span></div>
         <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
         <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
         <div class="detail-row"><label>Unit:</label><span>${item.unit || '-'}</span></div>
