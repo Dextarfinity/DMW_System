@@ -3086,8 +3086,8 @@ function renderPPMPTable(ppmp, allPPMPItems) {
 
 function summarizeProjectTitle(title) {
   if (!title) return '-';
+  let desc = title.trim();
   // Remove common prefixes to create a concise general description
-  let desc = title;
   const prefixes = [
     /^Provision\s+of\s+/i,
     /^Procurement\s+of\s+/i,
@@ -3103,12 +3103,19 @@ function summarizeProjectTitle(title) {
     /^Lease\s+of\s+/i,
     /^Contracting\s+of\s+/i,
   ];
+  let stripped = desc;
   for (const prefix of prefixes) {
-    desc = desc.replace(prefix, '');
+    stripped = stripped.replace(prefix, '');
   }
+  // Remove trailing fiscal year references like "FY 2026", "for FY 2026", "CY 2026"
+  stripped = stripped.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '');
   // Capitalize first letter
-  desc = desc.charAt(0).toUpperCase() + desc.slice(1);
-  return desc;
+  stripped = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // If nothing was stripped (no prefix found), generate a short form using dash notation
+  // e.g. "Mental Health Awareness & Stress Management Seminar" stays as-is since it's already concise
+  // But for entries like "Repairs and Maintenance for Motor Vehicle", convert "for" to " - "
+  stripped = stripped.replace(/\s+for\s+/gi, ' - ');
+  return stripped;
 }
 
 function renderAPPTable(items, appStatus) {
@@ -3388,7 +3395,13 @@ window.showEditAPPModal = async function(planId) {
 
 window.submitEditAPP = async function(e, planId) {
   e.preventDefault();
-  if (!confirm('Save changes to this APP entry?')) return;
+  const confirmed = await govConfirm({
+    title: 'Save APP Changes',
+    bodyHtml: '<p style="color:#2d3748;">Are you sure you want to save changes to this APP entry?</p>',
+    confirmText: 'Save Changes',
+    cancelText: 'Cancel'
+  });
+  if (!confirmed) return;
   try {
     await apiRequest('/plan-items/' + planId + '/adjust-budget', 'PUT', {
       total_amount: parseFloat(document.getElementById('editAppBudget')?.value) || 0
@@ -17576,36 +17589,175 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // APP Consolidation function
   window.consolidateAPP = async function() {
-    if (!confirm('Consolidate all PPMP entries into APP for FY ' + getCurrentFiscalYear() + '?\n\nThis will transform PPMP codes into APP codes and display all entries.')) return;
-    
+    const fy = getCurrentFiscalYear();
+
+    // Step 1: Show government-themed confirmation modal
+    const confirmed = await govConfirm({
+      title: 'Consolidate PPMP to APP',
+      bodyHtml: `
+        <div style="text-align:center;margin-bottom:15px;">
+          <i class="fas fa-layer-group" style="font-size:40px;color:#1a365d;margin-bottom:10px;"></i>
+        </div>
+        <div style="background:#e8f4fd;border-left:4px solid #1a365d;padding:12px 15px;border-radius:4px;margin-bottom:15px;">
+          <p style="margin:0 0 8px 0;font-weight:600;color:#1a365d;">
+            <i class="fas fa-info-circle"></i> Annual Procurement Plan Consolidation
+          </p>
+          <p style="margin:0;font-size:13px;color:#2d3748;">
+            This will consolidate all <strong>approved PPMP entries</strong> into the Annual Procurement Plan (APP) for <strong>FY ${fy}</strong>.
+          </p>
+        </div>
+        <div style="background:#fffbeb;border-left:4px solid #d69e2e;padding:10px 15px;border-radius:4px;margin-bottom:10px;">
+          <p style="margin:0;font-size:12px;color:#744210;">
+            <i class="fas fa-exclamation-triangle"></i> <strong>What will happen:</strong>
+          </p>
+          <ul style="margin:6px 0 0 0;padding-left:18px;font-size:12px;color:#744210;">
+            <li>PPMP codes will be transformed to APP codes</li>
+            <li>All approved entries will be displayed in the APP table</li>
+            <li>General Descriptions will be auto-summarized from Project Titles</li>
+          </ul>
+        </div>
+      `,
+      confirmText: 'Consolidate',
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+
+    // Step 2: Show loading state
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.className = 'gov-dialog-overlay';
+    loadingOverlay.id = 'consolidateLoadingOverlay';
+    loadingOverlay.innerHTML = `
+      <div class="gov-dialog" style="max-width:400px;text-align:center;">
+        <div class="gov-dialog-header confirm">
+          <i class="fas fa-cog fa-spin"></i>
+          <h4>Consolidating...</h4>
+        </div>
+        <div class="gov-dialog-body" style="padding:30px;">
+          <div style="margin-bottom:15px;">
+            <i class="fas fa-spinner fa-spin" style="font-size:36px;color:#1a365d;"></i>
+          </div>
+          <p style="margin:0;color:#4a5568;font-size:14px;">Processing approved PPMP entries for FY ${fy}...</p>
+          <p style="margin:8px 0 0 0;color:#a0aec0;font-size:12px;">Please wait while entries are being consolidated.</p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(loadingOverlay);
+
     try {
-      // Call server consolidation endpoint
-      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: getCurrentFiscalYear() });
-      
-      // Reload APP data to reflect current state
+      // Step 3: Call server consolidation endpoint
+      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
+
+      // Remove loading overlay
+      const loadEl = document.getElementById('consolidateLoadingOverlay');
+      if (loadEl) loadEl.remove();
+
+      // Step 4: Reload APP data to reflect current state
       await loadAPP();
-      
-      // Show summary using server-provided department breakdown
-      let summary = 'APP Consolidation Complete!\n\n';
-      summary += 'PPMP entries consolidated into APP with codes transformed (PPMP → APP).\n\n';
-      summary += 'Breakdown by Division:\n';
-      if (result.by_department) {
+
+      // Step 5: Show government-themed success summary modal
+      let deptRows = '';
+      if (result.by_department && result.by_department.length) {
         result.by_department.forEach(dept => {
           const name = dept.department_name || 'Unknown';
-          summary += '  ' + name + ': ' + dept.count + ' items — ₱' + parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n';
+          const count = dept.count || 0;
+          const total = parseFloat(dept.total || 0);
+          deptRows += `
+            <tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">${name}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:13px;font-weight:600;">${count}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:13px;">₱${total.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+            </tr>`;
         });
       }
-      summary += '\nTotal: ' + result.total_items + ' active items | Active ABC: ₱' + result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2});
-      if (result.available_budget > 0) {
-        summary += '\nAvailable Budget (from removed items): ₱' + result.available_budget.toLocaleString('en-PH', {minimumFractionDigits:2});
-        summary += '\nTotal Approved Budget: ₱' + result.total_approved.toLocaleString('en-PH', {minimumFractionDigits:2});
+
+      const totalABC = parseFloat(result.total_abc || 0);
+      const totalApproved = parseFloat(result.total_approved || 0);
+      const availableBudget = parseFloat(result.available_budget || 0);
+
+      let budgetExtra = '';
+      if (availableBudget > 0) {
+        budgetExtra = `
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#718096;">
+            <span>Available Budget (removed items):</span>
+            <span>₱${availableBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#718096;">
+            <span>Total Approved Budget:</span>
+            <span>₱${totalApproved.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
+          </div>`;
       }
-      alert(summary);
-      
+
+      await govAlert({
+        title: 'APP Consolidation Complete',
+        type: 'success',
+        bodyHtml: `
+          <div style="text-align:center;margin-bottom:15px;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#c6f6d5;margin-bottom:8px;">
+              <i class="fas fa-check-circle" style="font-size:28px;color:#276749;"></i>
+            </div>
+            <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
+            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — PPMP → APP</p>
+          </div>
+
+          <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:15px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#1a365d;">
+                  <th style="padding:8px 12px;text-align:left;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Division</th>
+                  <th style="padding:8px 12px;text-align:center;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Items</th>
+                  <th style="padding:8px 12px;text-align:right;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Total ABC</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${deptRows}
+              </tbody>
+              <tfoot>
+                <tr style="background:#edf2f7;font-weight:700;">
+                  <td style="padding:10px 12px;font-size:13px;border-top:2px solid #1a365d;">Total</td>
+                  <td style="padding:10px 12px;text-align:center;font-size:13px;border-top:2px solid #1a365d;">${result.total_items || 0}</td>
+                  <td style="padding:10px 12px;text-align:right;font-size:13px;border-top:2px solid #1a365d;">₱${totalABC.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          ${budgetExtra}
+
+          <div style="background:#ebf8ff;border-left:4px solid #3182ce;padding:10px 12px;border-radius:4px;margin-top:10px;">
+            <p style="margin:0;font-size:12px;color:#2b6cb0;">
+              <i class="fas fa-lightbulb"></i> All PPMP codes have been transformed to APP codes. General Descriptions have been auto-summarized from Project Titles.
+            </p>
+          </div>
+        `,
+        buttonText: 'View APP'
+      });
+
       // Navigate to APP page to show results
       if (typeof navigateTo === 'function') navigateTo('app');
     } catch (err) {
-      alert('Consolidation failed: ' + err.message);
+      // Remove loading overlay on error
+      const loadEl = document.getElementById('consolidateLoadingOverlay');
+      if (loadEl) loadEl.remove();
+
+      await govAlert({
+        title: 'Consolidation Failed',
+        type: 'error',
+        bodyHtml: `
+          <div style="text-align:center;margin-bottom:15px;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#fed7d7;margin-bottom:8px;">
+              <i class="fas fa-times-circle" style="font-size:28px;color:#c53030;"></i>
+            </div>
+            <p style="margin:0;color:#c53030;font-weight:600;font-size:15px;">Consolidation Failed</p>
+          </div>
+          <div style="background:#fff5f5;border-left:4px solid #c53030;padding:10px 15px;border-radius:4px;">
+            <p style="margin:0;font-size:13px;color:#742a2a;">
+              <i class="fas fa-exclamation-circle"></i> ${err.message || 'An unexpected error occurred during consolidation.'}
+            </p>
+          </div>
+          <p style="margin:10px 0 0 0;font-size:12px;color:#a0aec0;text-align:center;">Please try again or contact the system administrator.</p>
+        `,
+        buttonText: 'Close'
+      });
     }
   };
 
