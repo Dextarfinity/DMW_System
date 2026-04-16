@@ -13,7 +13,33 @@ const { io: ioConnect } = require('socket.io-client');
 // =====================================================
 const fs = require('fs');
 const path = require('path');
-const nlp = require('compromise');
+
+// Ensure node_modules from the Electron app root is in the module search path
+// This is needed when the renderer loads from a remote server URL
+// Try multiple known paths since __dirname may not be correct when loaded remotely
+const candidatePaths = [
+  path.resolve(__dirname, '..', '..', 'node_modules'),        // local file: renderer/scripts -> root
+  path.join(process.cwd(), 'node_modules'),                    // Electron CWD
+  process.resourcesPath ? path.join(process.resourcesPath, 'app', 'node_modules') : null,  // packaged app
+  process.resourcesPath ? path.join(process.resourcesPath, 'app.asar', 'node_modules') : null, // asar packaged
+].filter(Boolean);
+
+for (const modPath of candidatePaths) {
+  if (module.paths && !module.paths.includes(modPath)) {
+    module.paths.unshift(modPath);
+  }
+}
+
+// Load compromise NLP library for project title summarization
+let nlp;
+try {
+  nlp = require('compromise');
+  console.log('[NLP] Compromise loaded successfully');
+} catch (e) {
+  console.warn('[NLP] Compromise not available, using basic summarization. Error:', e.message);
+  console.warn('[NLP] Module paths tried:', module.paths.slice(0, 5));
+  nlp = null;
+}
 
 const DEFAULT_SERVER_IPS = [
   '192.168.1.117',     // WiFi Network 2 (primary)
@@ -3127,10 +3153,12 @@ function summarizeProjectTitle(title) {
   // === PASS 3: Handle law references "R.A. XXXX: long title" ===
   const lawMatch = stripped.match(/^(R\.?A\.?\s*\d+)\s*[:]\s*(.+)$/i);
   if (lawMatch) {
-    const doc = nlp(lawMatch[2]);
-    const nouns = doc.nouns().toTitleCase().out('array');
-    if (nouns.length >= 2) {
-      return nouns.slice(0, 2).join(' & ');
+    if (nlp) {
+      const doc = nlp(lawMatch[2]);
+      const nouns = doc.nouns().toTitleCase().out('array');
+      if (nouns.length >= 2) {
+        return nouns.slice(0, 2).join(' & ');
+      }
     }
     // Fallback: truncate to first 8 words of the title after colon
     return lawMatch[2].split(/\s+/).slice(0, 8).join(' ');
@@ -3167,21 +3195,23 @@ function summarizeProjectTitle(title) {
   // === PASS 5: NLP-based summarization for remaining long titles ===
   const remainingWords = stripped.split(/\s+/);
   if (remainingWords.length > 7) {
-    const doc = nlp(stripped);
+    if (nlp) {
+      const doc = nlp(stripped);
 
-    // Strategy A: Extract topics (proper nouns, organizations)
-    const topics = doc.topics().out('array');
-    const nouns = doc.nouns().out('array');
+      // Strategy A: Extract topics (proper nouns, organizations)
+      const topics = doc.topics().out('array');
+      const nouns = doc.nouns().out('array');
 
-    if (topics.length > 0 && nouns.length > 0) {
-      const combined = [...new Set([...topics, ...nouns.slice(0, 2)])];
-      const result = combined.slice(0, 3).join(' - ');
-      if (result.length >= 10) return result;
-    }
+      if (topics.length > 0 && nouns.length > 0) {
+        const combined = [...new Set([...topics, ...nouns.slice(0, 2)])];
+        const result = combined.slice(0, 3).join(' - ');
+        if (result.length >= 10) return result;
+      }
 
-    // Strategy B: Extract noun phrases
-    if (nouns.length >= 2) {
-      return nouns.slice(0, 2).join(' - ');
+      // Strategy B: Extract noun phrases
+      if (nouns.length >= 2) {
+        return nouns.slice(0, 2).join(' - ');
+      }
     }
 
     // Strategy C: Handle "X for Y" patterns
