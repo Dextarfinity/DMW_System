@@ -3331,8 +3331,14 @@ window.showEditAPPModal = async function(planId) {
             <input type="text" value="${(plan.ppmp_no || '').replace('PPMP-', 'APP-')}" readonly style="background:#f5f5f5;">
           </div>
           <div class="form-group">
-            <label>Project Title / Description</label>
-            <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required>
+            <label>Project Title</label>
+            <input type="text" id="editAppDescription" value="${escapeHtml(plan.description || '')}" required oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label>General Description of the Project <small style="color:#888;">(auto-summarized from Project Title)</small></label>
+            <input type="text" id="editAppGenDesc" value="${escapeHtml(summarizeProjectTitle(plan.description || ''))}" readonly style="background:#f0f4f8;">
           </div>
         </div>
         <div class="form-row">
@@ -18109,9 +18115,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const html = `
       <div class="view-details">
-        <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
-        <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
-        <div class="detail-row"><label>Description:</label><span>${item.item_description || '-'}</span></div>
+        <div class="detail-row"><label>APP Code:</label><span>${item.item_code || '-'}</span></div>
+        <div class="detail-row"><label>Project Title:</label><span>${item.item_name || '-'}</span></div>
+        <div class="detail-row"><label>General Description:</label><span>${summarizeProjectTitle(item.item_name)}</span></div>
         <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
         <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
         <div class="detail-row"><label>Unit:</label><span>${item.unit || '-'}</span></div>
