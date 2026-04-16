@@ -17823,6 +17823,22 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Step 4: Reload APP data to reflect current state
       await loadAPP();
 
+      // Step 4b: Auto-summarize general descriptions and save to DB
+      // The consolidation copies raw description — now summarize each one client-side and persist
+      const appItems = window._appItems || [];
+      for (const item of appItems) {
+        if (item.item_name && item.item_description === item.item_name) {
+          const summarized = summarizeProjectTitle(item.item_name);
+          if (summarized && summarized !== item.item_name) {
+            try {
+              await apiRequest('/app-entries/' + item.id, 'PUT', { general_description: summarized });
+            } catch (e) { console.warn('[Summarize] Failed for', item.id, e.message); }
+          }
+        }
+      }
+      // Reload to show summarized descriptions
+      await loadAPP();
+
       // Step 5: Show government-themed success summary modal
       let deptRows = '';
       if (result.by_department && result.by_department.length) {
