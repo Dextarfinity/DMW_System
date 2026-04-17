@@ -18173,6 +18173,22 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Step 7: After modal closes, reload APP data and navigate
       console.log('[CONSOLIDATE] Modal closed by user, loading fresh APP data...');
+      
+      // Clear caches to force fresh fetch
+      window._appData = null;
+      window._appItems = null;
+      window._appStatus = null;
+      
+      // Wait for database to fully commit
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Load fresh APP data
+      const freshAppData = await loadAPP();
+      console.log('[CONSOLIDATE] ✅ Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
+      
+      // Navigate to APP page to display the table
+      if (typeof navigateTo === 'function') navigateTo('app');
+      console.log('[CONSOLIDATE] ✅ CONSOLIDATION WORKFLOW COMPLETE');
     } catch (err) {
       // Remove loading overlay on error
       const loadEl = document.getElementById('consolidateLoadingOverlay');
