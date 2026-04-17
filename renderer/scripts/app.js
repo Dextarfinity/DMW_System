@@ -20678,18 +20678,22 @@ Failure to submit the above requirements within the prescribed period shall cons
 
         if (checkedIds.length === 0) {
           // No items checked — update plan fields, preserve existing item linkage
+          const preservedUnit = window._ppmpEditSpecificEntryData?.item_unit || 'pc';
+          const preservedPrice = window._ppmpEditSpecificEntryData?.unit_price || 0;
           const data = {
             ...commonData,
             ppmp_no: form.ppmp_no?.value || undefined,
             item_id: window._ppmpEditPlan?.item_id || null,
             item_description: window._ppmpEditPlan?.item_description || null,
+            unit: preservedUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+            unit_price: preservedPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
             // Preserve plan_items with current unit/price from the edit form
             items: [{
               item_code: '',
               item_name: commonData.description || '',
               item_description: window._ppmpEditPlan?.item_description || '',
-              unit: window._ppmpEditSpecificEntryData?.item_unit || 'pc',
-              unit_price: window._ppmpEditSpecificEntryData?.unit_price || 0,
+              unit: preservedUnit,
+              unit_price: preservedPrice,
               category: commonData.category || '',
               q1_qty: parseInt(commonData.quantity_size) || 1,
               q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
@@ -20702,18 +20706,22 @@ Failure to submit the above requirements within the prescribed period shall cons
           if (originalEntry) {
             const origItem = checked[originalEntry].item || {};
             const origDesc = checked[originalEntry].description || null;
+            const origItemUnit = origItem.unit || window._ppmpEditSpecificEntryData?.item_unit || 'pc';
+            const origItemPrice = parseFloat(origItem.unit_price || commonData.total_amount / (parseFloat(commonData.quantity_size) || 1)) || 0;
             const origData = {
               ...commonData,
               ppmp_no: form.ppmp_no?.value || undefined,
               item_id: parseInt(originalEntry),
               category: origItem.category || commonData.category,
               item_description: origDesc,
+              unit: origItemUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+              unit_price: origItemPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
               items: [{
                 item_code: origItem.code || '',
                 item_name: origItem.name || commonData.description || '',
                 item_description: origDesc || '',
-                unit: origItem.unit || window._ppmpEditSpecificEntryData?.item_unit || 'pc',
-                unit_price: parseFloat(origItem.unit_price || commonData.total_amount / (parseFloat(commonData.quantity_size) || 1)) || 0,
+                unit: origItemUnit,
+                unit_price: origItemPrice,
                 category: origItem.category || commonData.category || '',
                 q1_qty: parseInt(commonData.quantity_size) || 1,
                 q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
@@ -20726,18 +20734,22 @@ Failure to submit the above requirements within the prescribed period shall cons
             const firstId = checkedIds[0];
             const firstItem = checked[firstId].item || {};
             const firstDesc = checked[firstId].description || null;
+            const firstItemUnit = firstItem.unit || 'pc';
+            const firstItemPrice = parseFloat(firstItem.unit_price || 0);
             const firstData = {
               ...commonData,
               ppmp_no: form.ppmp_no?.value || undefined,
               item_id: parseInt(firstId),
               category: firstItem.category || commonData.category,
               item_description: firstDesc,
+              unit: firstItemUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+              unit_price: firstItemPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
               items: [{
                 item_code: firstItem.code || '',
                 item_name: firstItem.name || commonData.description || '',
                 item_description: firstDesc || '',
-                unit: firstItem.unit || 'pc',
-                unit_price: parseFloat(firstItem.unit_price || 0),
+                unit: firstItemUnit,
+                unit_price: firstItemPrice,
                 category: firstItem.category || commonData.category || '',
                 q1_qty: parseInt(commonData.quantity_size) || 1,
                 q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
@@ -20757,6 +20769,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               const itemPrice = parseFloat(c.item?.unit_price || 0);
               const itemQty = parseFloat(commonData.quantity_size || 1);
               const itemTotal = itemPrice * itemQty;
+              const itemUnit = c.item?.unit || 'pc';
               return {
                 ...commonData,
                 item_id: parseInt(id),
@@ -20764,11 +20777,13 @@ Failure to submit the above requirements within the prescribed period shall cons
                 item_description: c.description || null,
                 description: c.description || commonData.description,
                 total_amount: itemTotal,
+                unit: itemUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+                unit_price: itemPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
                 items: [{
                   item_code: c.item?.code || '',
                   item_name: c.item?.name || c.description || '',
                   item_description: c.description || '',
-                  unit: c.item?.unit || 'pc',
+                  unit: itemUnit,
                   unit_price: itemPrice,
                   category: c.item?.category || commonData.category || '',
                   q1_qty: parseInt(commonData.quantity_size) || 1,
