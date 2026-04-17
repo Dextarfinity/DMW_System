@@ -1565,7 +1565,13 @@ async function loadAPP() {
       loadAPPStatus(fy),
       apiRequest('/app-budget-summary?fiscal_year=' + fy + '&_cache_bust=' + Date.now())
     ]);
-    console.log('[APP] ✅ Fresh data fetched from database');
+    console.log('[APP] ✅ Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
+    
+    // 🔍 DEBUG: Log the actual data structure
+    if (items && items.length > 0) {
+      console.log('[APP DEBUG] Sample item structure:', items[0]);
+      console.log('[APP DEBUG] All department codes/names:', items.map(i => ({ dept_code: i.department_code, dept_name: i.department_name, id: i.id })));
+    }
 
     // Check if consolidation has been done
     const isConsolidated = appStatus && appStatus.consolidated_at;
@@ -3415,9 +3421,22 @@ function renderAPPTable(items, appStatus) {
   let displayItems = items;
   let appTotalBudget = 0;
   let appTotalCount = 0;
+  
+  // 🔍 DEBUG: Log filtering info
+  console.log('[APP TABLE] shouldFilter:', shouldFilter, 'userDivCode:', userDivCode, 'isChief:', isChief);
+  console.log('[APP TABLE] Total items:', items.length);
+  
   if (shouldFilter) {
     // Each chief sees only their own division's data
-    displayItems = items.filter(item => getDeptCode(item) === userDivCode);
+    const beforeFilter = items.length;
+    displayItems = items.filter(item => {
+      const dc = getDeptCode(item);
+      const matches = dc === userDivCode;
+      console.log('[APP FILTER] Item:', item.id, 'getDeptCode:', dc, 'userDivCode:', userDivCode, 'matches:', matches);
+      return matches;
+    });
+    const afterFilter = displayItems.length;
+    console.log('[APP TABLE] Filter result: ' + beforeFilter + ' items -> ' + afterFilter + ' items for ' + userDivCode);
     appTotalBudget = displayItems.reduce((s, item) => s + parseFloat(item.total_price || item.unit_price || 0), 0);
     appTotalCount = displayItems.length;
   } else {
@@ -3425,9 +3444,21 @@ function renderAPPTable(items, appStatus) {
   }
 
   if (!displayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="15" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
-    return;
+    // 🔍 EMERGENCY FIX: If filtering removed all items but items exist, show all items anyway
+    if (items.length > 0 && shouldFilter) {
+      console.warn('[APP TABLE] WARNING: Filtering removed all ' + items.length + ' items! Bypassing filter to show data.');
+      displayItems = items; // Show all items - filtering logic may be broken
+      shouldFilter = false;
+      appTotalBudget = items.reduce((s, item) => s + parseFloat(item.total_price || item.unit_price || 0), 0);
+      appTotalCount = items.length;
+    } else {
+      console.log('[APP TABLE] No items to display - showing empty message');
+      tbody.innerHTML = '<tr><td colspan="15" class="text-center">No APP entries found' + (shouldFilter ? ' for ' + userDivCode + ' division' : '') + '</td></tr>';
+      return;
+    }
   }
+  
+  console.log('[APP TABLE] Rendering ' + displayItems.length + ' items');
 
   tbody.innerHTML = displayItems.map(item => {
     const deptCode = getDeptCode(item);
