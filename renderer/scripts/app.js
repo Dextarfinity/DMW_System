@@ -18908,7 +18908,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const res = await fetch(getApiUrl() + '/api/plan-items/' + itemId + '/adjust-budget', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (authToken || '') },
         body: JSON.stringify({ total_amount: newAmount, reason: reason })
       });
       const data = await res.json();
