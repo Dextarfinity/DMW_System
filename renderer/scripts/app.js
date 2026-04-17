@@ -18170,60 +18170,47 @@ Failure to submit the above requirements within the prescribed period shall cons
           const budget = parseFloat(entry.total_price || 0);
           const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
           return `
-            <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb; align-items: center;">
-              <div style="color: #1a365d; font-weight: 600; font-size: 13px;">${code}</div>
-              <div style="color: #374151; font-size: 13px; word-break: break-word;">${escapeHtml(title)}</div>
-              <div style="text-align: right; color: #1a365d; font-weight: 600; font-size: 13px;">${budgetStr}</div>
+            <div style="display: grid; grid-template-columns: 180px 1fr 150px; gap: 15px; padding: 10px 15px; border-bottom: 1px solid #e5e7eb; align-items: center; font-size: 13px;">
+              <div style="color: #1a365d; font-weight: 600;">${code}</div>
+              <div style="color: #374151;">${escapeHtml(title)}</div>
+              <div style="text-align: right; color: #1a365d; font-weight: 600;">${budgetStr}</div>
             </div>
           `;
         }).join('');
       } else {
         entriesRowsHtml = `
-          <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 13px;">
+          <div style="padding: 15px; text-align: center; color: #9ca3af; font-size: 13px;">
             No APP entries were consolidated.
           </div>
         `;
       }
       
       const completionModalHtml = `
-        <form id="consolidateForm" onsubmit="closeModal(); return false;">
-          
-          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
-            <label style="color: #4b5563; font-weight: 500; font-size: 13px;">Fiscal Year</label>
-            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">FY ${fy}</span>
-          </div>
-          
-          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
-            <label style="color: #4b5563; font-weight: 500; font-size: 13px;">Entries Consolidated</label>
-            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">${result.total_items || 0} PPMP entries</span>
-          </div>
-          
-          <div class="form-group" style="margin-top: 20px;">
-            <label style="font-weight: 600; color: #1a365d; margin-bottom: 12px; display: block;">Consolidated APP Entries</label>
-            <div style="border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden;">
-              <!-- Header Row -->
-              <div style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #1a365d; font-size: 12px;">
-                <div>APP Code</div>
-                <div>Project Title</div>
-                <div style="text-align: right;">Est. Budget</div>
-              </div>
-              <!-- Entries -->
-              <div style="background: #fafbfc;">
-                ${entriesRowsHtml}
-              </div>
+        <div class="view-details">
+          <div class="detail-row"><label>Fiscal Year</label><span>FY ${fy}</span></div>
+          <div class="detail-row"><label>Entries Consolidated</label><span>${result.total_items || 0} PPMP entries</span></div>
+        </div>
+
+        <div style="margin-top: 20px; margin-bottom: 15px;">
+          <label style="display: block; font-weight: 600; color: #1a365d; margin-bottom: 10px; font-size: 13px;">Consolidated APP Entries</label>
+          <div style="border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden;">
+            <div style="display: grid; grid-template-columns: 180px 1fr 150px; gap: 15px; padding: 10px 15px; background: #f3f4f6; font-weight: 600; color: #1a365d; font-size: 12px; border-bottom: 1px solid #e5e7eb;">
+              <div>APP Code</div>
+              <div>Project Title</div>
+              <div style="text-align: right;">Est. Budget</div>
+            </div>
+            <div style="background: #fafbfc;">
+              ${entriesRowsHtml}
             </div>
           </div>
-          
-          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 0; margin-top: 20px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding-top: 12px;">
-            <label style="color: #4b5563; font-weight: 500; font-size: 13px;">Total Entries</label>
-            <span style="color: #1a365d; font-weight: 700; font-size: 14px;">${consolidatedEntries.length}</span>
-          </div>
-          
-          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
-            <label style="color: #4b5563; font-weight: 500; font-size: 13px;">Total Budget</label>
-            <span style="color: #1a365d; font-weight: 700; font-size: 14px;">${totalBudgetStr}</span>
-          </div>
-          
+        </div>
+
+        <div class="view-details">
+          <div class="detail-row"><label>Total Entries</label><span style="font-weight: 700;">${consolidatedEntries.length}</span></div>
+          <div class="detail-row"><label>Total Budget</label><span style="font-weight: 700; color: #1a365d;">${totalBudgetStr}</span></div>
+        </div>
+
+        <form id="consolidateForm" onsubmit="closeModal(); return false;">
           <div class="form-group" style="text-align: right; margin-top: 20px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
             <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()">View APP Table</button>
