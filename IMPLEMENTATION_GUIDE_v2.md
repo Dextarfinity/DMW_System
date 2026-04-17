@@ -6,7 +6,7 @@
 
 ---
 
-## 📋 Executive Summary
+##  Executive Summary
 
 This implementation provides comprehensive updates to the DMW Procurement Management System to support:
 
@@ -17,9 +17,9 @@ This implementation provides comprehensive updates to the DMW Procurement Manage
 
 ---
 
-## 📊 Key Changes
+##  Key Changes
 
-### 1. PPMP Categories & Sections ✅
+### 1. PPMP Categories & Sections 
 
 **Files:**
 - `migration_categories_sections_v1.sql` (already exists)
@@ -67,7 +67,7 @@ ppmp_categories
 - `DELETE /api/ppmp-sections/:id` - Delete section
 - `DELETE /api/ppmp-categories/:id` - Delete category
 
-### 2. Data Cleanup ✅
+### 2. Data Cleanup 
 
 **File:** `cleanup_and_migrate_v2.sql`
 
@@ -89,7 +89,7 @@ ppmp_categories
 
 ---
 
-### 3. Two-Phase BAC Resolutions ✅
+### 3. Two-Phase BAC Resolutions 
 
 **File:** `migration_bac_two_phases.sql`
 
@@ -120,7 +120,7 @@ PR (Pending Approval)
 └─ If REJECTED → End processing
 ```
 
-### 4. RIS Workflow Enhancement ✅
+### 4. RIS Workflow Enhancement 
 
 **File:** `migration_ris_workflow_v2.sql`
 
@@ -145,7 +145,7 @@ ris_items additions:
 
 ---
 
-## 🚀 Implementation Steps
+##  Implementation Steps
 
 ### Step 1: Apply Database Migrations
 
@@ -236,15 +236,15 @@ The BAC Resolution modal should now support:
 
 ---
 
-## 📁 Files Locations
+##  Files Locations
 
 ```
 server/database/
-├─ migration_categories_sections_v1.sql ✅ (existing)
-├─ seed_categories_2026.sql ✅ (created)
-├─ migration_bac_two_phases.sql ✅ (created)
-├─ migration_ris_workflow_v2.sql ✅ (created)
-├─ cleanup_and_migrate_v2.sql ✅ (created)
+├─ migration_categories_sections_v1.sql  (existing)
+├─ seed_categories_2026.sql  (created)
+├─ migration_bac_two_phases.sql  (created)
+├─ migration_ris_workflow_v2.sql  (created)
+├─ cleanup_and_migrate_v2.sql  (created)
 └─ consolidated_schema.sql (reference)
 
 renderer/scripts/
@@ -256,20 +256,20 @@ server/
 
 ---
 
-## ✅ Completed Tasks
+##  Completed Tasks
 
 | # | Task | Status | File |
 |---|------|--------|------|
-| 1 | Create PPMP categories & sections tables | ✅ DONE | migration_categories_sections_v1.sql |
-| 2 | Seed new categories | ✅ DONE | seed_categories_2026.sql |
-| 3 | Remove hardcoded categories | ✅ API READY | server/server.js (endpoints ready) |
-| 4 | Delete procurement data (PR→IAR) | ✅ DONE | cleanup_and_migrate_v2.sql |
-| 5 | Add two-phase BAC Resolution | ✅ DONE | migration_bac_two_phases.sql |
-| 6 | Update RIS workflow | ✅ DONE | migration_ris_workflow_v2.sql |
+| 1 | Create PPMP categories & sections tables |  DONE | migration_categories_sections_v1.sql |
+| 2 | Seed new categories |  DONE | seed_categories_2026.sql |
+| 3 | Remove hardcoded categories |  API READY | server/server.js (endpoints ready) |
+| 4 | Delete procurement data (PR→IAR) |  DONE | cleanup_and_migrate_v2.sql |
+| 5 | Add two-phase BAC Resolution |  DONE | migration_bac_two_phases.sql |
+| 6 | Update RIS workflow |  DONE | migration_ris_workflow_v2.sql |
 
 ---
 
-## 🔄 Rollback Instructions (If Needed)
+##  Rollback Instructions (If Needed)
 
 ```sql
 -- Restore from backup
@@ -282,7 +282,7 @@ server/
 
 ---
 
-## 📝 Notes
+##  Notes
 
 - All migrations are **idempotent** (safe to run multiple times)
 - Foreign key constraints are preserved
@@ -290,9 +290,9 @@ server/
 - Views provide convenient data access
 - Cleanup script includes optional sequence reset
 
-## 🎯 Next Steps
+##  Next Steps
 
-1. ✅ Review SQL migrations
+1.  Review SQL migrations
 2. ⏳ Execute migrations in PostgreSQL
 3. ⏳ Test API endpoints
 4. ⏳ Update frontend category loading

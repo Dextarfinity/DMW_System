@@ -161,21 +161,21 @@ function connectSocket() {
     }
   });
 
-  // ★ CORE: When another client changes data, auto-refresh the active page
+  //  CORE: When another client changes data, auto-refresh the active page
   socket.on('data_changed', (event) => {
-    console.log('[SOCKET] 🔄 Data changed:', event.resource, event.action, 'by', event.user?.username || 'system');
-    console.log('[SOCKET] ✅ Broadcasting to current page:', document.querySelector('.page.active')?.id || 'none');
+    console.log('[SOCKET]  Data changed:', event.resource, event.action, 'by', event.user?.username || 'system');
+    console.log('[SOCKET]  Broadcasting to current page:', document.querySelector('.page.active')?.id || 'none');
     handleRealtimeDataChange(event);
   });
 
   socket.on('clients_count', (data) => {
-    console.log('[SOCKET] 👥 Connected clients:', data.count);
+    console.log('[SOCKET]  Connected clients:', data.count);
     // Display connected client count in the UI
     const el = document.getElementById('connectedClientsCount');
     if (el) {
       el.textContent = data.count;
       el.style.display = 'inline-block';
-      console.log('[SOCKET] ✅ Updated connected clients display:', data.count);
+      console.log('[SOCKET]  Updated connected clients display:', data.count);
     }
   });
 
@@ -257,7 +257,7 @@ function handleRealtimeDataChange(event) {
   const isModalOpen = modalOverlay && modalOverlay.style.display !== 'none';
   
   if (isModalOpen) {
-    console.log('[SYNC] ⚠️ Modal is open - skipping page refresh to preserve modal state');
+    console.log('[SYNC] ️ Modal is open - skipping page refresh to preserve modal state');
     // Only update cache, don't reload page
     window._appData = null;
     window._appItems = null;
@@ -271,14 +271,14 @@ function handleRealtimeDataChange(event) {
   const resource = (event && event.resource ? String(event.resource) : '').toLowerCase();
   const targetPageId = RESOURCE_TO_PAGE[event.resource];
 
-  console.log('[SYNC] 🔄 Resource:', resource, '| Active Page:', activePageId, '| Target Page:', targetPageId);
+  console.log('[SYNC]  Resource:', resource, '| Active Page:', activePageId, '| Target Page:', targetPageId);
 
   // ALWAYS clear caches so next load gets fresh data
   window._appData = null;
   window._appItems = null;
   window._appStatus = null;
   window._ppmpData = null;
-  console.log('[SYNC] ✅ Cleared caches - fresh data will load');
+  console.log('[SYNC]  Cleared caches - fresh data will load');
 
   // Always refresh dashboard stats (it aggregates all tables)
   if (activePageId === 'dashboard') {
@@ -326,7 +326,7 @@ function handleRealtimeDataChange(event) {
     pollNotificationCount();
   }
 
-  console.log('[SYNC] ✅ Broadcast handled for resource:', resource);
+  console.log('[SYNC]  Broadcast handled for resource:', resource);
 }
 
 /** Simple toast notification (non-blocking) for server events */
@@ -883,9 +883,9 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 // Data loading functions
 async function loadDashboardStats() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const stats = await apiRequest('/dashboard/stats?_cache_bust=' + Date.now());
-    console.log('[DASHBOARD] ✅ Fresh data fetched from database');
+    console.log('[DASHBOARD]  Fresh data fetched from database');
     updateDashboardStats(stats);
     updateDashboardPipeline(stats);
 
@@ -924,9 +924,9 @@ let itemsPageSize = 50;
 
 async function loadItems() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const items = await apiRequest('/items?active_only=true&_cache_bust=' + Date.now());
-    console.log('[ITEMS] ✅ Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
+    console.log('[ITEMS]  Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
     allItemsData = items || [];
     // Extract and cache distinct categories
     const cats = [...new Set(allItemsData.map(i => i.category).filter(Boolean))].sort();
@@ -1287,9 +1287,9 @@ function buildUOMOptions(selectedValue) {
 
 async function loadSuppliers() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const suppliers = await apiRequest('/suppliers?_cache_bust=' + Date.now());
-    console.log('[SUPPLIERS] ✅ Fresh data fetched from database');
+    console.log('[SUPPLIERS]  Fresh data fetched from database');
     renderSuppliersTable(suppliers);
     return suppliers;
   } catch (err) {
@@ -1300,9 +1300,9 @@ async function loadSuppliers() {
 
 async function loadUsers() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const users = await apiRequest('/users?_cache_bust=' + Date.now());
-    console.log('[USERS] ✅ Fresh data fetched from database');
+    console.log('[USERS]  Fresh data fetched from database');
     renderUsersTable(users);
     return users;
   } catch (err) {
@@ -1613,9 +1613,9 @@ async function loadAPP() {
       loadAPPStatus(fy),
       apiRequest('/app-budget-summary?fiscal_year=' + fy + '&_cache_bust=' + Date.now())
     ]);
-    console.log('[APP] ✅ Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
+    console.log('[APP]  Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
     
-    // 🔍 DEBUG: Log the actual data structure
+    //  DEBUG: Log the actual data structure
     if (items && items.length > 0) {
       console.log('[APP DEBUG] Sample item structure:', items[0]);
       console.log('[APP DEBUG] All department codes/names:', items.map(i => ({ dept_code: i.department_code, dept_name: i.department_name, id: i.id })));
@@ -1651,7 +1651,7 @@ async function loadAPP() {
     }
 
     // Only show items if consolidated, otherwise show message
-    // 🔄 FIXED: Show table if items exist (even if status hasn't updated yet)
+    //  FIXED: Show table if items exist (even if status hasn't updated yet)
     if (isConsolidated || (items && items.length > 0)) {
       console.log('[APP] Rendering table - Items: ' + items.length + ', Consolidated: ' + (isConsolidated ? 'Yes' : 'No'));
       renderAPPTable(items, appStatus);
@@ -1667,7 +1667,7 @@ async function loadAPP() {
     }
 
     updateAPPVersionBanner(appStatus);
-    // 🔄 FIXED: Always return items array, regardless of consolidation status
+    //  FIXED: Always return items array, regardless of consolidation status
     // This is critical for consolidation function to know data was loaded successfully
     console.log('[APP] Returning ' + items.length + ' items (consolidated: ' + isConsolidated + ')');
     return items;
@@ -1679,7 +1679,7 @@ async function loadAPP() {
 
 async function loadAPPStatus(year) {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const status = await apiRequest('/app-settings/' + year + '?_cache_bust=' + Date.now());
     window._appStatus = status;
     return status;
@@ -1691,9 +1691,9 @@ async function loadAPPStatus(year) {
 
 async function loadPR() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const pr = await apiRequest('/pr?_cache_bust=' + Date.now());
-    console.log('[PR] ✅ Fresh data fetched from database');
+    console.log('[PR]  Fresh data fetched from database');
     cachedPR = pr;
 
     // Chiefs should be locked to their division even if they have other roles
@@ -1770,9 +1770,9 @@ async function loadRFQ() {
     if (!cachedPR || cachedPR.length === 0) {
       try { cachedPR = await apiRequest('/pr?_cache_bust=' + Date.now()); } catch(e) { console.log('Could not pre-load PRs for RFQ'); }
     }
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const rfq = await apiRequest('/rfq?_cache_bust=' + Date.now());
-    console.log('[RFQ] ✅ Fresh data fetched from database');
+    console.log('[RFQ]  Fresh data fetched from database');
     cachedRFQ = rfq;
     filterRFQTable();
     return rfq;
@@ -1805,9 +1805,9 @@ function filterRFQTable() {
 
 async function loadAbstract() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const abs = await apiRequest('/abstract?_cache_bust=' + Date.now());
-    console.log('[ABSTRACT] ✅ Fresh data fetched from database');
+    console.log('[ABSTRACT]  Fresh data fetched from database');
     cachedAbstract = abs;
     filterAbstractTable();
     return abs;
@@ -1840,9 +1840,9 @@ function filterAbstractTable() {
 
 async function loadPostQual() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const pq = await apiRequest('/postqual?_cache_bust=' + Date.now());
-    console.log('[POST_QUAL] ✅ Fresh data fetched from database');
+    console.log('[POST_QUAL]  Fresh data fetched from database');
     cachedPostQual = pq;
     filterPostQualTable();
     return pq;
@@ -1877,9 +1877,9 @@ function filterPostQualTable() {
 
 async function loadBACResolution() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const bacRes = await apiRequest('/bac-resolution?_cache_bust=' + Date.now());
-    console.log('[BAC_RESOLUTION] ✅ Fresh data fetched from database');
+    console.log('[BAC_RESOLUTION]  Fresh data fetched from database');
     cachedBACRes = bacRes;
     filterBACResTable();
     return bacRes;
@@ -1912,9 +1912,9 @@ function filterBACResTable() {
 
 async function loadNOA() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const noa = await apiRequest('/noa?_cache_bust=' + Date.now());
-    console.log('[NOA] ✅ Fresh data fetched from database');
+    console.log('[NOA]  Fresh data fetched from database');
     cachedNOA = noa;
     filterNOATable();
     return noa;
@@ -1947,9 +1947,9 @@ function filterNOATable() {
 
 async function loadPO() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const po = await apiRequest('/po?_cache_bust=' + Date.now());
-    console.log('[PO] ✅ Fresh data fetched from database');
+    console.log('[PO]  Fresh data fetched from database');
     cachedPO = po;
     filterPOTable();
     return po;
@@ -1982,9 +1982,9 @@ function filterPOTable() {
 
 async function loadIAR() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const iar = await apiRequest('/iar?_cache_bust=' + Date.now());
-    console.log('[IAR] ✅ Fresh data fetched from database');
+    console.log('[IAR]  Fresh data fetched from database');
     cachedIAR = iar;
     filterIARTable();
     return iar;
@@ -2002,9 +2002,9 @@ function filterIARTable() {
 
 async function loadPOPacket() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const data = await apiRequest('/po-packets/monitoring?_cache_bust=' + Date.now());
-    console.log('[PO_PACKET] ✅ Fresh data fetched from database');
+    console.log('[PO_PACKET]  Fresh data fetched from database');
     window._poPacketData = data;
     renderPOPacketTable(data);
     updatePOPacketSummary(data);
@@ -2024,9 +2024,9 @@ async function loadPOPacket() {
 
 async function loadCOA() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const coa = await apiRequest('/coa?_cache_bust=' + Date.now());
-    console.log('[COA] ✅ Fresh data fetched from database');
+    console.log('[COA]  Fresh data fetched from database');
     renderCOATable(coa);
     return coa;
   } catch (err) {
@@ -2039,9 +2039,9 @@ async function loadCOA() {
 
 async function loadStockCards() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const cards = await apiRequest('/stock-cards?_cache_bust=' + Date.now());
-    console.log('[STOCK_CARDS] ✅ Fresh data fetched from database');
+    console.log('[STOCK_CARDS]  Fresh data fetched from database');
     renderStockCardsTable(cards);
     return cards;
   } catch (err) {
@@ -2052,9 +2052,9 @@ async function loadStockCards() {
 
 async function loadPropertyCards() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const cards = await apiRequest('/property-cards?_cache_bust=' + Date.now());
-    console.log('[PROPERTY_CARDS] ✅ Fresh data fetched from database');
+    console.log('[PROPERTY_CARDS]  Fresh data fetched from database');
     renderPropertyCardsTable(cards);
     return cards;
   } catch (err) {
@@ -2065,9 +2065,9 @@ async function loadPropertyCards() {
 
 async function loadICS() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const ics = await apiRequest('/ics?_cache_bust=' + Date.now());
-    console.log('[ICS] ✅ Fresh data fetched from database');
+    console.log('[ICS]  Fresh data fetched from database');
     renderICSTable(ics);
     return ics;
   } catch (err) {
@@ -2078,9 +2078,9 @@ async function loadICS() {
 
 async function loadEmployees() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const employees = await apiRequest('/employees?_cache_bust=' + Date.now());
-    console.log('[EMPLOYEES] ✅ Fresh data fetched from database');
+    console.log('[EMPLOYEES]  Fresh data fetched from database');
     renderEmployeesTable(employees);
     return employees;
   } catch (err) {
@@ -2091,8 +2091,8 @@ async function loadEmployees() {
 
 async function loadDepartments() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
-    console.log('[DEPARTMENTS] ✅ Fresh data fetched from database');
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    console.log('[DEPARTMENTS]  Fresh data fetched from database');
     return await apiRequest('/departments?_cache_bust=' + Date.now());
   } catch (err) {
     console.log('Using demo departments');
@@ -2110,9 +2110,9 @@ async function loadDepartments() {
 
 async function loadPAR() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const pars = await apiRequest('/pars?_cache_bust=' + Date.now());
-    console.log('[PAR] ✅ Fresh data fetched from database');
+    console.log('[PAR]  Fresh data fetched from database');
     renderPARTable(pars);
     return pars;
   } catch (err) { console.log('Using demo PAR data'); return []; }
@@ -2120,9 +2120,9 @@ async function loadPAR() {
 
 async function loadPTR() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const ptrs = await apiRequest('/ptrs?_cache_bust=' + Date.now());
-    console.log('[PTR] ✅ Fresh data fetched from database');
+    console.log('[PTR]  Fresh data fetched from database');
     renderPTRTable(ptrs);
     return ptrs;
   } catch (err) { console.log('Using demo PTR data'); return []; }
@@ -2130,9 +2130,9 @@ async function loadPTR() {
 
 async function loadRIS() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const ris = await apiRequest('/ris?_cache_bust=' + Date.now());
-    console.log('[RIS] ✅ Fresh data fetched from database');
+    console.log('[RIS]  Fresh data fetched from database');
     renderRISTable(ris);
     return ris;
   } catch (err) { console.log('Using demo RIS data'); return []; }
@@ -2140,9 +2140,9 @@ async function loadRIS() {
 
 async function loadSuppliesLedger() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const cards = await apiRequest('/supplies-ledger-cards?_cache_bust=' + Date.now());
-    console.log('[SUPPLIES_LEDGER] ✅ Fresh data fetched from database');
+    console.log('[SUPPLIES_LEDGER]  Fresh data fetched from database');
     renderSuppliesLedgerTable(cards);
     return cards;
   } catch (err) { console.log('Using demo supplies ledger data'); return []; }
@@ -2150,9 +2150,9 @@ async function loadSuppliesLedger() {
 
 async function loadSemiExpendable() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const items = await apiRequest('/received-semi-expendable?_cache_bust=' + Date.now());
-    console.log('[SEMI_EXPENDABLE] ✅ Fresh data fetched from database');
+    console.log('[SEMI_EXPENDABLE]  Fresh data fetched from database');
     renderSemiExpendableTable(items);
     return items;
   } catch (err) { console.log('Using demo semi-expendable data'); return []; }
@@ -2160,9 +2160,9 @@ async function loadSemiExpendable() {
 
 async function loadCapitalOutlay() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const items = await apiRequest('/received-capital-outlay?_cache_bust=' + Date.now());
-    console.log('[CAPITAL_OUTLAY] ✅ Fresh data fetched from database');
+    console.log('[CAPITAL_OUTLAY]  Fresh data fetched from database');
     renderCapitalOutlayTable(items);
     return items;
   } catch (err) { console.log('Using demo capital outlay data'); return []; }
@@ -2170,9 +2170,9 @@ async function loadCapitalOutlay() {
 
 async function loadTripTickets() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const tickets = await apiRequest('/trip-tickets?_cache_bust=' + Date.now());
-    console.log('[TRIP_TICKETS] ✅ Fresh data fetched from database');
+    console.log('[TRIP_TICKETS]  Fresh data fetched from database');
     window._cachedTripTickets = tickets;
     renderTripTicketsTable(tickets);
     if (document.getElementById('tripCalendarView')?.style.display !== 'none') {
@@ -2289,9 +2289,9 @@ window.showTripCalendarDay = function(dateStr) {
 
 async function loadOffices() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const offices = await apiRequest('/offices?_cache_bust=' + Date.now());
-    console.log('[OFFICES] ✅ Fresh data fetched from database');
+    console.log('[OFFICES]  Fresh data fetched from database');
     renderOfficesTable(offices);
     return offices;
   } catch (err) { console.log('Using demo offices data'); return []; }
@@ -2299,9 +2299,9 @@ async function loadOffices() {
 
 async function loadDesignations() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const designations = await apiRequest('/designations?_cache_bust=' + Date.now());
-    console.log('[DESIGNATIONS] ✅ Fresh data fetched from database');
+    console.log('[DESIGNATIONS]  Fresh data fetched from database');
     renderDesignationsTable(designations);
     return designations;
   } catch (err) { console.log('Using demo designations data'); return []; }
@@ -2309,9 +2309,9 @@ async function loadDesignations() {
 
 async function loadDivisions() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const divisions = await apiRequest('/divisions?_cache_bust=' + Date.now());
-    console.log('[DIVISIONS] ✅ Fresh data fetched from database');
+    console.log('[DIVISIONS]  Fresh data fetched from database');
     renderDivisionsTable(divisions);
     renderDivisionsGrid(divisions);
     return divisions;
@@ -2320,9 +2320,9 @@ async function loadDivisions() {
 
 async function loadFundClusters() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const fc = await apiRequest('/fund-clusters?_cache_bust=' + Date.now());
-    console.log('[FUND_CLUSTERS] ✅ Fresh data fetched from database');
+    console.log('[FUND_CLUSTERS]  Fresh data fetched from database');
     renderFundClustersTable(fc);
     return fc;
   } catch (err) { console.log('Using demo fund clusters data'); return []; }
@@ -2330,9 +2330,9 @@ async function loadFundClusters() {
 
 async function loadProcurementModes() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const modes = await apiRequest('/procurement-modes?_cache_bust=' + Date.now());
-    console.log('[PROCUREMENT_MODES] ✅ Fresh data fetched from database');
+    console.log('[PROCUREMENT_MODES]  Fresh data fetched from database');
     renderProcurementModesTable(modes);
     return modes;
   } catch (err) { console.log('Using demo procurement modes data'); return []; }
@@ -2342,9 +2342,9 @@ let cachedUACSCodes = [];
 
 async function loadUACSCodes() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const codes = await apiRequest('/uacs-codes?_cache_bust=' + Date.now());
-    console.log('[UACS_CODES] ✅ Fresh data fetched from database');
+    console.log('[UACS_CODES]  Fresh data fetched from database');
     cachedUACSCodes = codes;
     filterUACSTable();
     return codes;
@@ -2360,9 +2360,9 @@ function filterUACSTable() {
 
 async function loadUOMs() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const uoms = await apiRequest('/uoms?_cache_bust=' + Date.now());
-    console.log('[UOMS] ✅ Fresh data fetched from database');
+    console.log('[UOMS]  Fresh data fetched from database');
     cachedUOMs = uoms;
     renderUOMsTable(uoms);
     return uoms;
@@ -2371,9 +2371,9 @@ async function loadUOMs() {
 
 async function loadSettings() {
   try {
-    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    //  FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
     const settings = await apiRequest('/settings?_cache_bust=' + Date.now());
-    console.log('[SETTINGS] ✅ Fresh data fetched from database');
+    console.log('[SETTINGS]  Fresh data fetched from database');
     renderSettingsTable(settings);
     return settings;
   } catch (err) { console.log('Using demo settings data'); return []; }
@@ -3473,7 +3473,7 @@ function renderAPPTable(items, appStatus) {
   let appTotalBudget = 0;
   let appTotalCount = 0;
   
-  // 🔍 DEBUG: Log filtering info
+  //  DEBUG: Log filtering info
   console.log('[APP TABLE] shouldFilter:', shouldFilter, 'userDivCode:', userDivCode, 'isChief:', isChief);
   console.log('[APP TABLE] Total items:', items.length);
   
@@ -3495,7 +3495,7 @@ function renderAPPTable(items, appStatus) {
   }
 
   if (!displayItems.length) {
-    // 🔍 EMERGENCY FIX: If filtering removed all items but items exist, show all items anyway
+    //  EMERGENCY FIX: If filtering removed all items but items exist, show all items anyway
     if (items.length > 0 && shouldFilter) {
       console.warn('[APP TABLE] WARNING: Filtering removed all ' + items.length + ' items! Bypassing filter to show data.');
       displayItems = items; // Show all items - filtering logic may be broken
@@ -3583,9 +3583,9 @@ function renderAPPTable(items, appStatus) {
   const appCard = tbody.closest('.data-card');
   if (appCard) initStickyTopScrollbar(appCard);
   
-  // 🔍 LOG: Verify table rendering
+  //  LOG: Verify table rendering
   const finalRowCount = tbody.querySelectorAll('tr').length;
-  console.log('[APP TABLE RENDER] ✅ Complete - ' + displayItems.length + ' data rows + 1 total row = ' + finalRowCount + ' total table rows');
+  console.log('[APP TABLE RENDER]  Complete - ' + displayItems.length + ' data rows + 1 total row = ' + finalRowCount + ' total table rows');
 }
 
 // APP table search filter — filters visible rows by search text
@@ -3810,15 +3810,15 @@ window.deleteAPPEntry = async function(planId) {
   if (!confirmed) return;
   
   try {
-    console.log('[DELETE-APP] 🗑️ Hard deleting APP entry for plan_id:', planId);
+    console.log('[DELETE-APP]  Hard deleting APP entry for plan_id:', planId);
     showNotification('Deleting APP entry from database...', 'info');
     
     const response = await apiRequest('/app-entries/' + planId + '/delete', 'PUT');
-    console.log('[DELETE-APP] ✅ Server response:', response);
+    console.log('[DELETE-APP]  Server response:', response);
     
     if (response.deleted === true) {
-      console.log('[DELETE-APP] ✅✅ Confirmed: Entry permanently removed from database');
-      showNotification('✅ APP entry permanently deleted from database', 'success');
+      console.log('[DELETE-APP]  Confirmed: Entry permanently removed from database');
+      showNotification(' APP entry permanently deleted from database', 'success');
       
       // Wait for database transaction to complete
       console.log('[DELETE-APP] Waiting for database commit...');
@@ -3832,9 +3832,9 @@ window.deleteAPPEntry = async function(planId) {
       
       // Reload to show updated list (deletion reflected immediately)
       await loadAPP();
-      console.log('[DELETE-APP] ✅ APP page reloaded - deleted entry removed from table');
+      console.log('[DELETE-APP]  APP page reloaded - deleted entry removed from table');
     } else {
-      console.warn('[DELETE-APP] ⚠️ Unexpected response:', response);
+      console.warn('[DELETE-APP] ️ Unexpected response:', response);
       showNotification('Refreshing APP page...', 'info');
       await new Promise(resolve => setTimeout(resolve, 500));
       window._appData = null;
@@ -3843,8 +3843,8 @@ window.deleteAPPEntry = async function(planId) {
       await loadAPP();
     }
   } catch (err) {
-    console.error('[DELETE-APP] 🚨 Error deleting APP entry:', err);
-    showNotification('❌ Error deleting APP entry: ' + err.message, 'error');
+    console.error('[DELETE-APP]  Error deleting APP entry:', err);
+    showNotification(' Error deleting APP entry: ' + err.message, 'error');
   }
 };
 
@@ -5486,21 +5486,21 @@ function showPageLoader() {
     if (mainContent) {
       mainContent.style.position = 'relative';
       mainContent.appendChild(overlay);
-      console.log('[LOADER] ✅ pageLoadingOverlay created and appended');
+      console.log('[LOADER]  pageLoadingOverlay created and appended');
     } else {
-      console.warn('[LOADER] ⚠️ .main-content not found!');
+      console.warn('[LOADER] ️ .main-content not found!');
     }
   }
   overlay.style.display = 'flex';
-  console.log('[LOADER] ✅ pageLoadingOverlay visible');
+  console.log('[LOADER]  pageLoadingOverlay visible');
   
   // Hide the fullscreen appLoader when page loader shows
   const appLoader = document.getElementById('appLoader');
   if (appLoader) {
     appLoader.style.display = 'none';
-    console.log('[LOADER] ✅ appLoader hidden, pageLoadingOverlay now showing');
+    console.log('[LOADER]  appLoader hidden, pageLoadingOverlay now showing');
   } else {
-    console.warn('[LOADER] ⚠️ appLoader not found to hide');
+    console.warn('[LOADER] ️ appLoader not found to hide');
   }
 }
 
@@ -5509,7 +5509,7 @@ function hidePageLoader() {
   const overlay = document.getElementById('pageLoadingOverlay');
   if (overlay) {
     overlay.style.display = 'none';
-    console.log('[LOADER] ✅ pageLoadingOverlay hidden');
+    console.log('[LOADER]  pageLoadingOverlay hidden');
   }
 }
 
@@ -5560,17 +5560,17 @@ async function loadPageData(pageId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Log initialization on both clients
-  console.log('[INIT] 🚀 DOMContentLoaded fired');
+  console.log('[INIT]  DOMContentLoaded fired');
   console.log('[INIT] Client IP: detecting...');
   console.log('[INIT] App Version: 20260417001');
   
   // Verify appLoader is visible at start
   const appLoader = document.getElementById('appLoader');
   if (appLoader) {
-    console.log('[INIT] ✅ appLoader element found');
+    console.log('[INIT]  appLoader element found');
     console.log('[INIT] appLoader display:', window.getComputedStyle(appLoader).display);
   } else {
-    console.warn('[INIT] ⚠️ appLoader element NOT found!');
+    console.warn('[INIT] ️ appLoader element NOT found!');
   }
   
   // DOM Elements
@@ -5832,7 +5832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Navigate to dashboard (always start here - no client-side page persistence)
     navigateTo('dashboard');
 
-    // 🔄 NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
+    //  NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
     // This prevents the loader from disappearing before page content is ready
   }
 
@@ -6589,7 +6589,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showAccessDeniedMessage(pageId) {
     const pageName = pageTitles[pageId] || pageId;
     const rolesList = (currentUser.roles || [currentUser.role]).map(r => formatRole(r)).join(', ');
-    alert(`⛔ Access Denied\n\nYou do not have permission to access "${pageName}".\n\nYour role(s): ${rolesList}\n\nContact your administrator if you need access.`);
+    alert(` Access Denied\n\nYou do not have permission to access "${pageName}".\n\nYour role(s): ${rolesList}\n\nContact your administrator if you need access.`);
   }
 
   // Change Password Modal
@@ -7000,7 +7000,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.validateAttachment = function(inputId, fieldName) {
     const fileInput = document.getElementById(inputId);
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-      alert('⚠️ Required Attachment Missing!\n\nPlease upload: ' + fieldName + '\n\nThis document is required before submission.');
+      alert('️ Required Attachment Missing!\n\nPlease upload: ' + fieldName + '\n\nThis document is required before submission.');
       return false;
     }
     return true;
@@ -7011,7 +7011,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < inputIds.length; i++) {
       const fileInput = document.getElementById(inputIds[i]);
       if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        alert('⚠️ Required Attachment Missing!\n\nPlease upload: ' + fieldNames[i] + '\n\nThis document is required before submission.');
+        alert('️ Required Attachment Missing!\n\nPlease upload: ' + fieldNames[i] + '\n\nThis document is required before submission.');
         return false;
       }
     }
@@ -7910,7 +7910,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this); onPRAppItemChange(this.value);">
             <option value="">-- Select APP Item --</option>
             ${appOptions}
-            <option value="not-in-app" style="color:#e53e3e;font-weight:600;">⚠ Item NOT in APP (Requires New PPMP)</option>
+            <option value="not-in-app" style="color:#e53e3e;font-weight:600;"> Item NOT in APP (Requires New PPMP)</option>
           </select>
           <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
         </div>
@@ -9527,7 +9527,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <select id="editPrAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this);">
               <option value="">-- Select APP Item --</option>
               ${appOptions}
-              <option value="not-in-app" style="color:#e53e3e;font-weight:600;">⚠ Item NOT in APP (Requires New PPMP)</option>
+              <option value="not-in-app" style="color:#e53e3e;font-weight:600;"> Item NOT in APP (Requires New PPMP)</option>
             </select>
             <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
           </div>
@@ -18077,15 +18077,15 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     try {
       // Step 3: Call server consolidation endpoint
-      console.log('[CONSOLIDATE] 🔄 Calling server endpoint: /plan-items/consolidate with FY:', fy);
+      console.log('[CONSOLIDATE]  Calling server endpoint: /plan-items/consolidate with FY:', fy);
       let result;
       try {
         result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
       } catch (apiErr) {
-        console.error('[CONSOLIDATE] 🚨 API ERROR from server:', apiErr);
+        console.error('[CONSOLIDATE]  API ERROR from server:', apiErr);
         throw apiErr;
       }
-      console.log('[CONSOLIDATE] ✅ Server consolidation complete. Result:', result);
+      console.log('[CONSOLIDATE]  Server consolidation complete. Result:', result);
       console.log('[CONSOLIDATE] Consolidated items:', result.count, 'Created:', result.created, 'Total:', result.total_items);
       console.log('[CONSOLIDATE] By department:', result.by_department);
 
@@ -18093,7 +18093,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const loadEl = document.getElementById('consolidateLoadingOverlay');
       if (loadEl) loadEl.remove();
 
-      console.log('[CONSOLIDATE] ✅ Server consolidation complete. Result:', result);
+      console.log('[CONSOLIDATE]  Server consolidation complete. Result:', result);
       console.log('[CONSOLIDATE] Consolidated items:', result.count, 'Created:', result.created, 'Total:', result.total_items);
 
       // Step 4: Fetch all consolidated APP entries to display in modal
@@ -18106,7 +18106,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         // Fetch fresh APP entries using cache-buster
         const appEntriesResponse = await apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now(), 'GET');
         consolidatedEntries = appEntriesResponse || [];
-        console.log('[CONSOLIDATE] ✅ Fetched', consolidatedEntries.length, 'consolidated APP entries');
+        console.log('[CONSOLIDATE]  Fetched', consolidatedEntries.length, 'consolidated APP entries');
       } catch (fetchErr) {
         console.warn('[CONSOLIDATE] Could not fetch APP entries:', fetchErr);
         consolidatedEntries = [];
@@ -18281,13 +18281,13 @@ Failure to submit the above requirements within the prescribed period shall cons
         }
       });
       
-      console.log('[CONSOLIDATE] ✅ CONSOLIDATION MODAL COMPLETE - Ready for user interaction');
+      console.log('[CONSOLIDATE]  CONSOLIDATION MODAL COMPLETE - Ready for user interaction');
     } catch (err) {
       // Remove loading overlay on error
       const loadEl = document.getElementById('consolidateLoadingOverlay');
       if (loadEl) loadEl.remove();
 
-      console.error('[CONSOLIDATE] 🚨 CRITICAL ERROR:', err);
+      console.error('[CONSOLIDATE]  CRITICAL ERROR:', err);
       console.error('[CONSOLIDATE] Error message:', err.message);
       console.error('[CONSOLIDATE] Error stack:', err.stack);
 
@@ -19816,8 +19816,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       ]);
 
       window._ppmpItemsCache = allItems || [];
-      console.log('[PPMP EDIT] ✅ Fresh database resources loaded - UOMs count:', (uomList || []).length);
-      console.log('[PPMP EDIT] ✅ Fresh database resources loaded - Items count:', allItems.length);
+      console.log('[PPMP EDIT]  Fresh database resources loaded - UOMs count:', (uomList || []).length);
+      console.log('[PPMP EDIT]  Fresh database resources loaded - Items count:', allItems.length);
       console.log('[PPMP EDIT] Sections count from DB:', cachedPPMPSections.length);
       console.log('[PPMP EDIT] Categories count from DB:', cachedPPMPCategories.length);
 
@@ -19841,7 +19841,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         uomOptionsRaw = '<option value="" disabled selected>-- Select Unit --</option>' + uomOptionsRaw;
       }
       const uomOptions = uomOptionsRaw;
-      console.log('[PPMP EDIT] ✅ UOM dropdown populated from fresh database - ' + (uomList || []).length + ' options');
+      console.log('[PPMP EDIT]  UOM dropdown populated from fresh database - ' + (uomList || []).length + ' options');
 
       // Determine procurement source from DB (normalize for dropdown)
       const dbProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
@@ -21663,7 +21663,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert('Cannot delete the primary admin account.');
       return;
     }
-    if (!confirm(`⚠️ PERMANENTLY DELETE user "${username}"?\n\nThis action CANNOT be undone. All user data will be lost.\n\nUse "Deactivate" instead if you want to preserve data.`)) return;
+    if (!confirm(`️ PERMANENTLY DELETE user "${username}"?\n\nThis action CANNOT be undone. All user data will be lost.\n\nUse "Deactivate" instead if you want to preserve data.`)) return;
     if (!confirm(`FINAL CONFIRMATION: Type the username to confirm.\n\nAre you absolutely sure you want to permanently delete "${username}"?`)) return;
     try {
       await apiRequest(`/users/${userId}?permanent=true`, 'DELETE');
@@ -27149,9 +27149,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Display client IP and connection info in the Connected Clients indicator
       const clientIPDisplay = document.getElementById('clientIPDisplay');
       if (clientIPDisplay) {
-        clientIPDisplay.textContent = `📍 Client: ${RESOLVED_SERVER_IP}`;
+        clientIPDisplay.textContent = ` Client: ${RESOLVED_SERVER_IP}`;
         clientIPDisplay.style.color = '#22863a';
-        console.log('[ACTIVITY-LOGS] ✅ Updated client IP display:', RESOLVED_SERVER_IP);
+        console.log('[ACTIVITY-LOGS]  Updated client IP display:', RESOLVED_SERVER_IP);
       }
       
       const data = await apiRequest('/activity-logs/live?limit=5000');

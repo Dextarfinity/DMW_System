@@ -2539,7 +2539,7 @@
         });
         const versionHeader = response.headers.get('X-App-Version') || CURRENT_VERSION;
         if (versionHeader !== CURRENT_VERSION) {
-          console.log('[AUTO-SYNC] ✅ New version detected:', versionHeader, '- Refreshing...');
+          console.log('[AUTO-SYNC]  New version detected:', versionHeader, '- Refreshing...');
           CURRENT_VERSION = versionHeader;
           window.location.reload(true); // Hard refresh
         }
