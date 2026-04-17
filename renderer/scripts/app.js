@@ -835,7 +835,9 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 // Data loading functions
 async function loadDashboardStats() {
   try {
-    const stats = await apiRequest('/dashboard/stats');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const stats = await apiRequest('/dashboard/stats?_cache_bust=' + Date.now());
+    console.log('[DASHBOARD] ✅ Fresh data fetched from database');
     updateDashboardStats(stats);
     updateDashboardPipeline(stats);
 
@@ -874,7 +876,9 @@ let itemsPageSize = 50;
 
 async function loadItems() {
   try {
-    const items = await apiRequest('/items?active_only=true');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const items = await apiRequest('/items?active_only=true&_cache_bust=' + Date.now());
+    console.log('[ITEMS] ✅ Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
     allItemsData = items || [];
     // Extract and cache distinct categories
     const cats = [...new Set(allItemsData.map(i => i.category).filter(Boolean))].sort();
@@ -1235,7 +1239,9 @@ function buildUOMOptions(selectedValue) {
 
 async function loadSuppliers() {
   try {
-    const suppliers = await apiRequest('/suppliers');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const suppliers = await apiRequest('/suppliers?_cache_bust=' + Date.now());
+    console.log('[SUPPLIERS] ✅ Fresh data fetched from database');
     renderSuppliersTable(suppliers);
     return suppliers;
   } catch (err) {
@@ -1246,7 +1252,9 @@ async function loadSuppliers() {
 
 async function loadUsers() {
   try {
-    const users = await apiRequest('/users');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const users = await apiRequest('/users?_cache_bust=' + Date.now());
+    console.log('[USERS] ✅ Fresh data fetched from database');
     renderUsersTable(users);
     return users;
   } catch (err) {
@@ -1553,10 +1561,11 @@ async function loadAPP() {
   try {
     const fy = window._appFilterYear || getCurrentFiscalYear();
     const [items, appStatus, budgetSummary] = await Promise.all([
-      apiRequest('/plan-items?fiscal_year=' + fy),
+      apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now()),
       loadAPPStatus(fy),
-      apiRequest('/app-budget-summary?fiscal_year=' + fy)
+      apiRequest('/app-budget-summary?fiscal_year=' + fy + '&_cache_bust=' + Date.now())
     ]);
+    console.log('[APP] ✅ Fresh data fetched from database');
 
     // Check if consolidation has been done
     const isConsolidated = appStatus && appStatus.consolidated_at;
@@ -1611,7 +1620,8 @@ async function loadAPP() {
 
 async function loadAPPStatus(year) {
   try {
-    const status = await apiRequest('/app-settings/' + year);
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const status = await apiRequest('/app-settings/' + year + '?_cache_bust=' + Date.now());
     window._appStatus = status;
     return status;
   } catch (err) {
@@ -1622,7 +1632,9 @@ async function loadAPPStatus(year) {
 
 async function loadPR() {
   try {
-    const pr = await apiRequest('/pr');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const pr = await apiRequest('/pr?_cache_bust=' + Date.now());
+    console.log('[PR] ✅ Fresh data fetched from database');
     cachedPR = pr;
 
     // Chiefs should be locked to their division even if they have other roles
@@ -1697,9 +1709,11 @@ async function loadRFQ() {
   try {
     // Always ensure PR data is loaded so we can show quantity/unit from linked PRs
     if (!cachedPR || cachedPR.length === 0) {
-      try { cachedPR = await apiRequest('/pr'); } catch(e) { console.log('Could not pre-load PRs for RFQ'); }
+      try { cachedPR = await apiRequest('/pr?_cache_bust=' + Date.now()); } catch(e) { console.log('Could not pre-load PRs for RFQ'); }
     }
-    const rfq = await apiRequest('/rfq');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const rfq = await apiRequest('/rfq?_cache_bust=' + Date.now());
+    console.log('[RFQ] ✅ Fresh data fetched from database');
     cachedRFQ = rfq;
     filterRFQTable();
     return rfq;
@@ -1732,7 +1746,9 @@ function filterRFQTable() {
 
 async function loadAbstract() {
   try {
-    const abs = await apiRequest('/abstract');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const abs = await apiRequest('/abstract?_cache_bust=' + Date.now());
+    console.log('[ABSTRACT] ✅ Fresh data fetched from database');
     cachedAbstract = abs;
     filterAbstractTable();
     return abs;
@@ -1765,7 +1781,9 @@ function filterAbstractTable() {
 
 async function loadPostQual() {
   try {
-    const pq = await apiRequest('/postqual');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const pq = await apiRequest('/postqual?_cache_bust=' + Date.now());
+    console.log('[POST_QUAL] ✅ Fresh data fetched from database');
     cachedPostQual = pq;
     filterPostQualTable();
     return pq;
@@ -1800,7 +1818,9 @@ function filterPostQualTable() {
 
 async function loadBACResolution() {
   try {
-    const bacRes = await apiRequest('/bac-resolution');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const bacRes = await apiRequest('/bac-resolution?_cache_bust=' + Date.now());
+    console.log('[BAC_RESOLUTION] ✅ Fresh data fetched from database');
     cachedBACRes = bacRes;
     filterBACResTable();
     return bacRes;
@@ -1833,7 +1853,9 @@ function filterBACResTable() {
 
 async function loadNOA() {
   try {
-    const noa = await apiRequest('/noa');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const noa = await apiRequest('/noa?_cache_bust=' + Date.now());
+    console.log('[NOA] ✅ Fresh data fetched from database');
     cachedNOA = noa;
     filterNOATable();
     return noa;
@@ -1866,7 +1888,9 @@ function filterNOATable() {
 
 async function loadPO() {
   try {
-    const po = await apiRequest('/po');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const po = await apiRequest('/po?_cache_bust=' + Date.now());
+    console.log('[PO] ✅ Fresh data fetched from database');
     cachedPO = po;
     filterPOTable();
     return po;
@@ -1899,7 +1923,9 @@ function filterPOTable() {
 
 async function loadIAR() {
   try {
-    const iar = await apiRequest('/iar');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const iar = await apiRequest('/iar?_cache_bust=' + Date.now());
+    console.log('[IAR] ✅ Fresh data fetched from database');
     cachedIAR = iar;
     filterIARTable();
     return iar;
@@ -1917,7 +1943,9 @@ function filterIARTable() {
 
 async function loadPOPacket() {
   try {
-    const data = await apiRequest('/po-packets/monitoring');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const data = await apiRequest('/po-packets/monitoring?_cache_bust=' + Date.now());
+    console.log('[PO_PACKET] ✅ Fresh data fetched from database');
     window._poPacketData = data;
     renderPOPacketTable(data);
     updatePOPacketSummary(data);
@@ -1937,7 +1965,9 @@ async function loadPOPacket() {
 
 async function loadCOA() {
   try {
-    const coa = await apiRequest('/coa');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const coa = await apiRequest('/coa?_cache_bust=' + Date.now());
+    console.log('[COA] ✅ Fresh data fetched from database');
     renderCOATable(coa);
     return coa;
   } catch (err) {
@@ -1950,7 +1980,9 @@ async function loadCOA() {
 
 async function loadStockCards() {
   try {
-    const cards = await apiRequest('/stock-cards');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const cards = await apiRequest('/stock-cards?_cache_bust=' + Date.now());
+    console.log('[STOCK_CARDS] ✅ Fresh data fetched from database');
     renderStockCardsTable(cards);
     return cards;
   } catch (err) {
@@ -1961,7 +1993,9 @@ async function loadStockCards() {
 
 async function loadPropertyCards() {
   try {
-    const cards = await apiRequest('/property-cards');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const cards = await apiRequest('/property-cards?_cache_bust=' + Date.now());
+    console.log('[PROPERTY_CARDS] ✅ Fresh data fetched from database');
     renderPropertyCardsTable(cards);
     return cards;
   } catch (err) {
@@ -1972,7 +2006,9 @@ async function loadPropertyCards() {
 
 async function loadICS() {
   try {
-    const ics = await apiRequest('/ics');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const ics = await apiRequest('/ics?_cache_bust=' + Date.now());
+    console.log('[ICS] ✅ Fresh data fetched from database');
     renderICSTable(ics);
     return ics;
   } catch (err) {
@@ -1983,7 +2019,9 @@ async function loadICS() {
 
 async function loadEmployees() {
   try {
-    const employees = await apiRequest('/employees');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const employees = await apiRequest('/employees?_cache_bust=' + Date.now());
+    console.log('[EMPLOYEES] ✅ Fresh data fetched from database');
     renderEmployeesTable(employees);
     return employees;
   } catch (err) {
@@ -1994,7 +2032,9 @@ async function loadEmployees() {
 
 async function loadDepartments() {
   try {
-    return await apiRequest('/departments');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    console.log('[DEPARTMENTS] ✅ Fresh data fetched from database');
+    return await apiRequest('/departments?_cache_bust=' + Date.now());
   } catch (err) {
     console.log('Using demo departments');
     return [
@@ -2011,7 +2051,9 @@ async function loadDepartments() {
 
 async function loadPAR() {
   try {
-    const pars = await apiRequest('/pars');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const pars = await apiRequest('/pars?_cache_bust=' + Date.now());
+    console.log('[PAR] ✅ Fresh data fetched from database');
     renderPARTable(pars);
     return pars;
   } catch (err) { console.log('Using demo PAR data'); return []; }
@@ -2019,7 +2061,9 @@ async function loadPAR() {
 
 async function loadPTR() {
   try {
-    const ptrs = await apiRequest('/ptrs');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const ptrs = await apiRequest('/ptrs?_cache_bust=' + Date.now());
+    console.log('[PTR] ✅ Fresh data fetched from database');
     renderPTRTable(ptrs);
     return ptrs;
   } catch (err) { console.log('Using demo PTR data'); return []; }
@@ -2027,7 +2071,9 @@ async function loadPTR() {
 
 async function loadRIS() {
   try {
-    const ris = await apiRequest('/ris');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const ris = await apiRequest('/ris?_cache_bust=' + Date.now());
+    console.log('[RIS] ✅ Fresh data fetched from database');
     renderRISTable(ris);
     return ris;
   } catch (err) { console.log('Using demo RIS data'); return []; }
@@ -2035,7 +2081,9 @@ async function loadRIS() {
 
 async function loadSuppliesLedger() {
   try {
-    const cards = await apiRequest('/supplies-ledger-cards');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const cards = await apiRequest('/supplies-ledger-cards?_cache_bust=' + Date.now());
+    console.log('[SUPPLIES_LEDGER] ✅ Fresh data fetched from database');
     renderSuppliesLedgerTable(cards);
     return cards;
   } catch (err) { console.log('Using demo supplies ledger data'); return []; }
@@ -2043,7 +2091,9 @@ async function loadSuppliesLedger() {
 
 async function loadSemiExpendable() {
   try {
-    const items = await apiRequest('/received-semi-expendable');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const items = await apiRequest('/received-semi-expendable?_cache_bust=' + Date.now());
+    console.log('[SEMI_EXPENDABLE] ✅ Fresh data fetched from database');
     renderSemiExpendableTable(items);
     return items;
   } catch (err) { console.log('Using demo semi-expendable data'); return []; }
@@ -2051,7 +2101,9 @@ async function loadSemiExpendable() {
 
 async function loadCapitalOutlay() {
   try {
-    const items = await apiRequest('/received-capital-outlay');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const items = await apiRequest('/received-capital-outlay?_cache_bust=' + Date.now());
+    console.log('[CAPITAL_OUTLAY] ✅ Fresh data fetched from database');
     renderCapitalOutlayTable(items);
     return items;
   } catch (err) { console.log('Using demo capital outlay data'); return []; }
@@ -2059,7 +2111,9 @@ async function loadCapitalOutlay() {
 
 async function loadTripTickets() {
   try {
-    const tickets = await apiRequest('/trip-tickets');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const tickets = await apiRequest('/trip-tickets?_cache_bust=' + Date.now());
+    console.log('[TRIP_TICKETS] ✅ Fresh data fetched from database');
     window._cachedTripTickets = tickets;
     renderTripTicketsTable(tickets);
     if (document.getElementById('tripCalendarView')?.style.display !== 'none') {
@@ -2176,7 +2230,9 @@ window.showTripCalendarDay = function(dateStr) {
 
 async function loadOffices() {
   try {
-    const offices = await apiRequest('/offices');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const offices = await apiRequest('/offices?_cache_bust=' + Date.now());
+    console.log('[OFFICES] ✅ Fresh data fetched from database');
     renderOfficesTable(offices);
     return offices;
   } catch (err) { console.log('Using demo offices data'); return []; }
@@ -2184,7 +2240,9 @@ async function loadOffices() {
 
 async function loadDesignations() {
   try {
-    const designations = await apiRequest('/designations');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const designations = await apiRequest('/designations?_cache_bust=' + Date.now());
+    console.log('[DESIGNATIONS] ✅ Fresh data fetched from database');
     renderDesignationsTable(designations);
     return designations;
   } catch (err) { console.log('Using demo designations data'); return []; }
@@ -2192,7 +2250,9 @@ async function loadDesignations() {
 
 async function loadDivisions() {
   try {
-    const divisions = await apiRequest('/divisions');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const divisions = await apiRequest('/divisions?_cache_bust=' + Date.now());
+    console.log('[DIVISIONS] ✅ Fresh data fetched from database');
     renderDivisionsTable(divisions);
     renderDivisionsGrid(divisions);
     return divisions;
@@ -2201,7 +2261,9 @@ async function loadDivisions() {
 
 async function loadFundClusters() {
   try {
-    const fc = await apiRequest('/fund-clusters');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const fc = await apiRequest('/fund-clusters?_cache_bust=' + Date.now());
+    console.log('[FUND_CLUSTERS] ✅ Fresh data fetched from database');
     renderFundClustersTable(fc);
     return fc;
   } catch (err) { console.log('Using demo fund clusters data'); return []; }
@@ -2209,7 +2271,9 @@ async function loadFundClusters() {
 
 async function loadProcurementModes() {
   try {
-    const modes = await apiRequest('/procurement-modes');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const modes = await apiRequest('/procurement-modes?_cache_bust=' + Date.now());
+    console.log('[PROCUREMENT_MODES] ✅ Fresh data fetched from database');
     renderProcurementModesTable(modes);
     return modes;
   } catch (err) { console.log('Using demo procurement modes data'); return []; }
@@ -2219,7 +2283,9 @@ let cachedUACSCodes = [];
 
 async function loadUACSCodes() {
   try {
-    const codes = await apiRequest('/uacs-codes');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const codes = await apiRequest('/uacs-codes?_cache_bust=' + Date.now());
+    console.log('[UACS_CODES] ✅ Fresh data fetched from database');
     cachedUACSCodes = codes;
     filterUACSTable();
     return codes;
@@ -2235,7 +2301,9 @@ function filterUACSTable() {
 
 async function loadUOMs() {
   try {
-    const uoms = await apiRequest('/uoms');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const uoms = await apiRequest('/uoms?_cache_bust=' + Date.now());
+    console.log('[UOMS] ✅ Fresh data fetched from database');
     cachedUOMs = uoms;
     renderUOMsTable(uoms);
     return uoms;
@@ -2244,7 +2312,9 @@ async function loadUOMs() {
 
 async function loadSettings() {
   try {
-    const settings = await apiRequest('/settings');
+    // 🔄 FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
+    const settings = await apiRequest('/settings?_cache_bust=' + Date.now());
+    console.log('[SETTINGS] ✅ Fresh data fetched from database');
     renderSettingsTable(settings);
     return settings;
   } catch (err) { console.log('Using demo settings data'); return []; }
