@@ -2299,6 +2299,23 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
         [fiscalYear]
       );
       console.log('[API /plan-items] 🔍 procurementplans has ' + ppmpCheck.rows[0].count + ' approved entries for FY ' + fiscalYear);
+      
+      // Debug: Check the actual plan_ids in app_entries
+      const idsInAppEntries = await pool.query(
+        `SELECT DISTINCT plan_id FROM app_entries WHERE fiscal_year = $1 LIMIT 10`,
+        [fiscalYear]
+      );
+      console.log('[API /plan-items] 🔍 Plan IDs in app_entries:', idsInAppEntries.rows.map(r => r.plan_id));
+      
+      // Debug: Check if those plan_ids exist in procurementplans as approved
+      if (idsInAppEntries.rows.length > 0) {
+        const planIds = idsInAppEntries.rows.map(r => r.plan_id);
+        const ppmpMatches = await pool.query(
+          `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
+          [planIds]
+        );
+        console.log('[API /plan-items] 🔍 Procurementplans for those IDs:', ppmpMatches.rows);
+      }
     }
     
     res.json(result.rows);
@@ -2601,6 +2618,27 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       [fiscalYear]
     );
     console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries now has ' + verifyCheck.rows[0].count + ' total entries for FY ' + fiscalYear);
+    
+    // Debug: Show the actual IDs and details of entries just created/updated
+    const debugEntries = await pool.query(
+      `SELECT id, plan_id, app_code, project_title, fiscal_year, created_at, updated_at 
+       FROM app_entries 
+       WHERE fiscal_year = $1 
+       ORDER BY updated_at DESC 
+       LIMIT 5`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 Sample entries created/updated:', debugEntries.rows);
+    
+    // Also verify those plan_ids exist in procurementplans
+    if (debugEntries.rows.length > 0) {
+      const planIds = debugEntries.rows.map(r => r.plan_id);
+      const ppmpCheck = await pool.query(
+        `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
+        [planIds]
+      );
+      console.log('[CONSOLIDATE] 🔍 Procurementplans for those IDs:', ppmpCheck.rows);
+    }
 
     res.json({
       message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}. ${appInsert.rowCount} new APP entries created.`,
