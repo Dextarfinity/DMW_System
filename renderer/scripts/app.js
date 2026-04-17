@@ -18005,16 +18005,32 @@ Failure to submit the above requirements within the prescribed period shall cons
       
       // Fetch fresh data
       const freshAppData = await loadAPP();
-      console.log('[CONSOLIDATE] Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
+      console.log('[CONSOLIDATE] ✅ Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
+      console.log('[CONSOLIDATE] Items in window._appItems:', window._appItems ? window._appItems.length : 0);
       
       // Verify data loaded successfully
       if (!freshAppData || freshAppData.length === 0) {
-        console.error('[CONSOLIDATE] WARNING: APP data still empty after load! Retrying...');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.error('[CONSOLIDATE] 🚨 CRITICAL: APP data still empty after load!');
+        console.error('[CONSOLIDATE] Server returned:', freshAppData);
+        console.error('[CONSOLIDATE] Checking window._appItems:', window._appItems);
+        console.error('[CONSOLIDATE] Retrying with longer delay...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
         window._appData = null;
         window._appItems = null;
         window._appStatus = null;
-        await loadAPP();
+        const retryData = await loadAPP();
+        console.log('[CONSOLIDATE] Retry result: ' + (retryData ? retryData.length : 0) + ' items');
+        if (retryData && retryData.length > 0) {
+          console.log('[CONSOLIDATE] ✅ Retry successful! Items now showing.');
+        } else {
+          console.error('[CONSOLIDATE] 🚨 CRITICAL FAILURE: Even retry returned no data!');
+          console.error('[CONSOLIDATE] Possible causes:');
+          console.error('  1. Server /plan-items endpoint not returning consolidated data');
+          console.error('  2. Consolidation endpoint failed silently');
+          console.error('  3. Data is not being saved to database');
+        }
+      } else {
+        console.log('[CONSOLIDATE] ✅ Data loaded successfully on first try');
       }
 
       // Step 4b: Auto-summarize general descriptions and save to DB
@@ -18039,6 +18055,19 @@ Failure to submit the above requirements within the prescribed period shall cons
       window._appStatus = null; // Clear app status cache too
       console.log('[CONSOLIDATE] Fetching fresh APP data with summarized descriptions...');
       await loadAPP();
+      
+      // 🔍 FINAL SAFETY CHECK: Verify table is populated
+      const appTableBody = document.getElementById('appTableBody');
+      if (appTableBody) {
+        const rowCount = appTableBody.querySelectorAll('tr:not(:has(td[colspan]))').length;
+        const emptyRow = appTableBody.querySelector('tr td[colspan]');
+        console.log('[CONSOLIDATE] Table state - Rows:', rowCount, 'Empty message:', emptyRow ? 'YES' : 'NO');
+        if (emptyRow && window._appItems && window._appItems.length > 0) {
+          console.error('[CONSOLIDATE] 🚨 TABLE EMPTY BUT DATA EXISTS! Forcing re-render...');
+          renderAPPTable(window._appItems, window._appStatus || {});
+          console.log('[CONSOLIDATE] ✅ Force re-render complete');
+        }
+      }
 
       // Step 5: Show government-themed success summary modal
       let deptRows = '';
