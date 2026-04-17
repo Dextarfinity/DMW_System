@@ -2806,10 +2806,10 @@ function formatQuantitySize(p) {
   const rawQty = (p.quantity_size ?? '').toString().trim();
   const qty = parseFloat(rawQty) || 0;
 
-  // Dynamic unit fallback priority:
-  // 1) PPMP row unit (edited in modal) - PRIMARY SOURCE
-  // 2) item catalog unit from JOIN
-  // 3) infer trailing text from quantity_size string (e.g. "25 pieces")
+  // DYNAMIC DATA FROM DATABASE - Priority system ensures fresh values:
+  // 1) PPMP row unit (procurementplans.unit) - PRIMARY SOURCE FROM DATABASE
+  // 2) item catalog unit from JOIN (items.unit) - SECONDARY FROM DATABASE
+  // 3) infer trailing text from quantity_size string - FALLBACK
   let unit = (p.unit || p.item_unit || '').toString().trim();
   
   // If unit still not found, try to parse from quantity_size string
@@ -2820,13 +2820,13 @@ function formatQuantitySize(p) {
     }
   }
 
-  // Dynamic price fallback priority:
-  // 1) PPMP row unit_price (edited in modal) - PRIMARY SOURCE
-  // 2) item catalog unit_price from JOIN
-  // 3) parse from quantity_size text if encoded (e.g. "@ ₱150.00/ pieces")
+  // DYNAMIC PRICE FROM DATABASE - Priority system ensures fresh values:
+  // 1) PPMP row unit_price (procurementplans.unit_price) - PRIMARY SOURCE FROM DATABASE
+  // 2) item catalog unit_price from JOIN (items.unit_price) - SECONDARY FROM DATABASE
+  // 3) parse from quantity_size text if encoded - FALLBACK
   let price = parseFloat(p.unit_price ?? p.item_unit_price ?? 0);
   
-  // Only try to parse from text if no numeric price is available
+  // Only try to parse from text if no numeric price is available from database
   if ((!price || Number.isNaN(price)) && rawQty) {
     const priceMatch = rawQty.match(/@\s*₱?\s*([\d,]+(?:\.\d+)?)/i);
     if (priceMatch && priceMatch[1]) {
@@ -2842,7 +2842,7 @@ function formatQuantitySize(p) {
     return rawQty || '-';
   }
 
-  // CASE 2: Qty + Unit exist → render DYNAMIC FORMAT: "25 pieces @ ₱150.00/ pieces"
+  // CASE 2: Qty + Unit exist → render DYNAMIC FORMAT with database values: "25 pieces @ ₱150.00/ pieces"
   if (qty && unit) {
     const unitLower = unit.toLowerCase().trim();
     // Format price with proper Philippine peso format
