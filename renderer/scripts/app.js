@@ -17979,6 +17979,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         }
       }
       // Reload to show summarized descriptions
+      // 🔄 Wait 500ms for summarization updates to commit to database
+      console.log('[CONSOLIDATE] Summarization complete, waiting for DB transaction commit...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      window._appData = null;
+      window._appItems = null;
+      console.log('[CONSOLIDATE] Fetching fresh APP data with summarized descriptions...');
       await loadAPP();
 
       // Step 5: Show government-themed success summary modal
