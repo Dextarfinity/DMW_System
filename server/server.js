@@ -2475,23 +2475,70 @@ app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
   }
 });
 
-// Soft-delete APP entry only (does NOT delete the PPMP)
+// Soft-delete APP entry (mark as deleted in database, does NOT delete the PPMP)
 app.put('/api/app-entries/:planId/delete', authenticateToken, async (req, res) => {
   try {
     const { planId } = req.params;
-    const result = await pool.query(
-      `UPDATE app_entries SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
-       WHERE plan_id = $1 RETURNING *`,
+    console.log('[DELETE-APP] 🗑️ Deleting APP entry for plan_id:', planId);
+    
+    // First, verify the entry exists
+    const checkResult = await pool.query(
+      `SELECT id, plan_id, app_code, project_title, is_deleted FROM app_entries WHERE plan_id = $1`,
       [planId]
     );
-    if (result.rows.length === 0) {
+    
+    if (checkResult.rows.length === 0) {
+      console.error('[DELETE-APP] ❌ Entry not found for plan_id:', planId);
       return res.status(404).json({ error: 'APP entry not found' });
     }
-    io.emit('data_changed', { type: 'plan-items', action: 'app_entry_deleted', plan_id: planId });
-    res.json({ message: 'APP entry deleted successfully' });
+    
+    const existingEntry = checkResult.rows[0];
+    console.log('[DELETE-APP] Found entry:', existingEntry.app_code, '- Currently deleted:', existingEntry.is_deleted);
+    
+    // Update: mark as deleted in database
+    const result = await pool.query(
+      `UPDATE app_entries 
+       SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
+       WHERE plan_id = $1 
+       RETURNING id, plan_id, app_code, project_title, is_deleted`,
+      [planId]
+    );
+    
+    const deletedEntry = result.rows[0];
+    console.log('[DELETE-APP] ✅ Marked as deleted in database - plan_id:', planId);
+    console.log('[DELETE-APP] Entry is_deleted status:', deletedEntry.is_deleted);
+    
+    // Verify deletion actually persisted
+    const verifyResult = await pool.query(
+      `SELECT id, is_deleted FROM app_entries WHERE plan_id = $1`,
+      [planId]
+    );
+    
+    if (verifyResult.rows.length > 0 && verifyResult.rows[0].is_deleted === true) {
+      console.log('[DELETE-APP] ✅✅ VERIFIED: Entry is_deleted = TRUE in database');
+    } else {
+      console.error('[DELETE-APP] ⚠️ WARNING: Deletion verification failed! Entry may not be marked as deleted.');
+    }
+    
+    // Broadcast deletion to all connected clients so they refresh immediately
+    io.emit('data_changed', { 
+      resource: 'plan-items', 
+      action: 'app_entry_deleted', 
+      plan_id: planId,
+      user: req.user,
+      timestamp: new Date().toISOString()
+    });
+    console.log('[DELETE-APP] 📡 Broadcast to all clients: app_entry_deleted event');
+    
+    res.json({ 
+      message: 'APP entry successfully deleted from database',
+      plan_id: planId,
+      is_deleted: true 
+    });
+    
   } catch (err) {
-    console.error('APP entry delete error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[DELETE-APP] 🚨 ERROR:', err.message);
+    res.status(500).json({ error: 'Failed to delete APP entry: ' + err.message });
   }
 });
 

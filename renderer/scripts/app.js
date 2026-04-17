@@ -3800,21 +3800,49 @@ window.submitEditAPP = async function(e, planId) {
   }
 };
 
-/** Delete APP Entry (soft-delete by marking as deleted) */
+/** Delete APP Entry (soft-delete by marking as deleted in database) */
 window.deleteAPPEntry = async function(planId) {
   const confirmed = await govConfirm({
     title: 'Delete APP Entry',
-    bodyHtml: '<p style="color:#c53030;">Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will only remove the entry from the APP. The original PPMP will not be affected.</p>',
+    bodyHtml: '<p style="color:#c53030;"><i class="fas fa-exclamation-triangle"></i> Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will remove the entry from the APP and mark it as deleted in the database. The original PPMP will not be affected.</p>',
     confirmText: 'Delete',
     cancelText: 'Cancel'
   });
   if (!confirmed) return;
+  
   try {
-    await apiRequest('/app-entries/' + planId + '/delete', 'PUT');
-    showNotification('APP entry deleted successfully', 'success');
-    loadAPP();
+    console.log('[DELETE-APP] 🗑️ Deleting APP entry for plan_id:', planId);
+    showNotification('Deleting APP entry...', 'info');
+    
+    const response = await apiRequest('/app-entries/' + planId + '/delete', 'PUT');
+    console.log('[DELETE-APP] ✅ Server response:', response);
+    
+    if (response.is_deleted === true) {
+      console.log('[DELETE-APP] ✅✅ Confirmed: Entry marked as deleted in database');
+      showNotification('✅ APP entry deleted successfully from database', 'success');
+      
+      // Wait for database transaction to complete
+      console.log('[DELETE-APP] Waiting for database commit...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Clear caches to force fresh fetch
+      window._appData = null;
+      window._appItems = null;
+      window._appStatus = null;
+      console.log('[DELETE-APP] Cleared caches, reloading APP page...');
+      
+      // Reload to show updated list (deletion reflected immediately)
+      await loadAPP();
+      console.log('[DELETE-APP] ✅ APP page reloaded - deleted entry no longer visible');
+    } else {
+      console.warn('[DELETE-APP] ⚠️ Unexpected response:', response);
+      showNotification('APP entry deleted, refreshing...', 'info');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadAPP();
+    }
   } catch (err) {
-    showNotification('Error deleting APP entry: ' + err.message, 'error');
+    console.error('[DELETE-APP] 🚨 Error deleting APP entry:', err);
+    showNotification('❌ Error deleting APP entry: ' + err.message, 'error');
   }
 };
 
