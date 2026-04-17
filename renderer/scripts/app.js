@@ -3802,10 +3802,38 @@ window.submitEditAPP = async function(e, planId) {
 
 /** Delete APP Entry (hard delete - completely remove from database) */
 window.deleteAPPEntry = async function(planId) {
+  // Get the APP entry details for confirmation
+  const appItem = window._appItems ? window._appItems.find(item => item.app_entry_id == planId || item.id == planId) : null;
+  const appCode = appItem ? appItem.item_code : 'APP-???';
+  const projectTitle = appItem ? appItem.item_name : 'Untitled Project';
+  const budget = appItem ? parseFloat(appItem.total_price || 0) : 0;
+  const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : 'N/A';
+
   const confirmed = await govConfirm({
     title: 'Delete APP Entry',
-    bodyHtml: '<p style="color:#c53030;"><i class="fas fa-exclamation-triangle"></i> Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will <strong>permanently remove</strong> the entry from the APP database. The original PPMP will not be affected.</p>',
-    confirmText: 'Delete',
+    bodyHtml: `
+      <div style="background:#fed7d7;border:1px solid #fc8181;border-radius:6px;padding:12px;margin-bottom:15px;">
+        <p style="margin:0;color:#c53030;font-weight:600;font-size:14px;">
+          <i class="fas fa-exclamation-triangle"></i> WARNING: Permanent Deletion
+        </p>
+      </div>
+      
+      <div style="background:#f7fafc;border-left:4px solid #e2e8f0;padding:12px;margin-bottom:15px;border-radius:4px;">
+        <p style="margin:0 0 8px 0;font-size:12px;color:#4a5568;">You are about to permanently delete this APP entry:</p>
+        <div style="background:#fff;border:1px solid #e2e8f0;padding:10px;border-radius:4px;margin-top:8px;">
+          <div style="margin-bottom:6px;"><span style="font-weight:600;color:#1a365d;font-size:12px;">APP Code:</span> <span style="color:#4a5568;font-size:12px;">${appCode}</span></div>
+          <div style="margin-bottom:6px;"><span style="font-weight:600;color:#1a365d;font-size:12px;">Project Title:</span> <span style="color:#4a5568;font-size:12px;">${projectTitle}</span></div>
+          <div><span style="font-weight:600;color:#1a365d;font-size:12px;">Estimated Budget:</span> <span style="color:#4a5568;font-size:12px;">${budgetStr}</span></div>
+        </div>
+      </div>
+      
+      <div style="background:#fffbeb;border-left:4px solid #d69e2e;padding:10px;border-radius:4px;margin-bottom:10px;">
+        <p style="margin:0;font-size:12px;color:#744210;">
+          <i class="fas fa-info-circle"></i> <strong>This action cannot be undone.</strong> The APP entry will be completely removed from the database.
+        </p>
+      </div>
+    `,
+    confirmText: 'Delete Permanently',
     cancelText: 'Cancel'
   });
   if (!confirmed) return;
