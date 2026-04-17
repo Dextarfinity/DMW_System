@@ -5558,33 +5558,6 @@ async function loadPageData(pageId) {
   applyActionPermissions();
 }
 
-/**
- * Restore a preserved modal from localStorage after navigating to a new page
- */
-function restorePreservedModal() {
-  try {
-    const savedState = localStorage.getItem('_preservedModalState');
-    if (!savedState) return; // No modal was preserved
-    
-    const modalState = JSON.parse(savedState);
-    if (!modalState || !modalState.visible) return;
-    
-    const modalTitle = document.getElementById('modalTitle');
-    const modalBody = document.getElementById('modalBody');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    if (modalTitle && modalBody && modalOverlay) {
-      // Restore modal content and show
-      modalTitle.textContent = modalState.title || '';
-      modalBody.innerHTML = modalState.body || '';
-      modalOverlay.style.display = 'flex';
-      console.log('[NAVIGATION] ✅ Modal restored on new page:', modalState.title);
-    }
-  } catch (err) {
-    console.warn('[NAVIGATION] Could not restore modal:', err.message);
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   // Log initialization on both clients
   console.log('[INIT] 🚀 DOMContentLoaded fired');
@@ -5679,6 +5652,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize the app
   async function init() {
+    // Clear any stuck modal state from localStorage
+    localStorage.removeItem('_preservedModalState');
+    
     console.log('[INIT] Starting application initialization...');
     // Discover which server IP is reachable BEFORE any API calls
     await discoverServer();
