@@ -6565,6 +6565,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // ✅ MODAL PERSISTENCE: Save modal state before navigating to a new page
+    const modalOverlay = document.querySelector('.modal-overlay');
+    const isModalOpen = modalOverlay && modalOverlay.style.display !== 'none';
+    let modalState = null;
+    
+    if (isModalOpen) {
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+      modalState = {
+        title: modalTitle?.textContent || '',
+        body: modalBody?.innerHTML || '',
+        visible: true,
+        timestamp: Date.now()
+      };
+      console.log('[NAVIGATION] Modal is open - preserving state before page change');
+      localStorage.setItem('_preservedModalState', JSON.stringify(modalState));
+    }
+
     // Update active nav item
     navItems.forEach(item => {
       item.classList.remove('active');
