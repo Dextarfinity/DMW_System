@@ -18161,7 +18161,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       const totalBudgetStr = totalBudget > 0 ? '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
       
-      // Create completion modal HTML - using EDIT PPMP form design
+      // Create completion modal HTML - SUCCESS MODAL STYLE
       let entriesRowsHtml = '';
       if (consolidatedEntries && consolidatedEntries.length > 0) {
         entriesRowsHtml = consolidatedEntries.map((entry, idx) => {
@@ -18171,9 +18171,9 @@ Failure to submit the above requirements within the prescribed period shall cons
           const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
           return `
             <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb; align-items: center;">
-              <div style="color: #1a365d; font-weight: 600; font-size: 13px;">${code}</div>
+              <div style="color: #059669; font-weight: 600; font-size: 13px;">${code}</div>
               <div style="color: #374151; font-size: 13px; word-break: break-word;">${escapeHtml(title)}</div>
-              <div style="text-align: right; color: #1e40af; font-weight: 700; font-size: 13px;">${budgetStr}</div>
+              <div style="text-align: right; color: #059669; font-weight: 700; font-size: 13px;">${budgetStr}</div>
             </div>
           `;
         }).join('');
@@ -18188,29 +18188,41 @@ Failure to submit the above requirements within the prescribed period shall cons
       const completionModalHtml = `
         <form id="consolidateForm" onsubmit="closeModal(); return false;">
           
-          <!-- CONSOLIDATION SUMMARY SECTION -->
-          <div style="background: #e8f4f8; padding: 12px 15px; margin-bottom: 20px; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
-            APP CONSOLIDATION COMPLETE
+          <!-- SUCCESS HEADER WITH ICON -->
+          <div style="text-align: center; padding: 25px 15px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-bottom: 3px solid #059669; margin-bottom: 25px; border-radius: 6px;">
+            <div style="font-size: 56px; margin-bottom: 12px; color: #059669;">
+              <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #059669;">
+                <circle cx="28" cy="28" r="26"></circle>
+                <polyline points="18 28 25 35 38 22" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+            </div>
+            <h3 style="margin: 0 0 8px 0; color: #059669; font-weight: 700; font-size: 18px;">Consolidation Successful!</h3>
+            <p style="margin: 0; color: #047857; font-size: 13px;">All approved PPMP entries have been successfully consolidated into the Annual Procurement Plan.</p>
+          </div>
+          
+          <!-- CONSOLIDATION DETAILS SECTION -->
+          <div style="background: #d1fae5; padding: 12px 15px; margin-bottom: 15px; border-left: 4px solid #059669; font-weight: 600; color: #059669; font-size: 13px;">
+            CONSOLIDATION DETAILS
           </div>
           
           <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
             <label style="color: #4b5563; font-weight: 500; font-size: 12px;">FISCAL YEAR</label>
-            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">FY ${fy}</span>
+            <span style="color: #059669; font-weight: 700; font-size: 13px;">FY ${fy}</span>
           </div>
           
           <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
             <label style="color: #4b5563; font-weight: 500; font-size: 12px;">ENTRIES CONSOLIDATED</label>
-            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">${result.total_items || 0} PPMP entries</span>
+            <span style="color: #059669; font-weight: 700; font-size: 13px;">${result.total_items || 0} PPMP entries</span>
           </div>
           
           <!-- CONSOLIDATED APP ENTRIES SECTION -->
-          <div style="background: #e8f4f8; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
+          <div style="background: #d1fae5; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #059669; font-weight: 600; color: #059669; font-size: 13px;">
             CONSOLIDATED APP ENTRIES
           </div>
           
-          <div style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
+          <div style="background: #f0fdf4; border-top: 1px solid #e5e7eb;">
             <!-- Header Row -->
-            <div style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; background: #f3f4f6; border-bottom: 2px solid #d1d5db; font-weight: 600; color: #1a365d; font-size: 12px;">
+            <div style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; background: linear-gradient(to right, #dcfce7, #ccfbf1); border-bottom: 2px solid #059669; font-weight: 600; color: #059669; font-size: 12px;">
               <div>APP CODE</div>
               <div>PROJECT TITLE</div>
               <div style="text-align: right;">ESTIMATED BUDGET</div>
@@ -18220,24 +18232,31 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           
           <!-- CONSOLIDATION SUMMARY SECTION -->
-          <div style="background: #e8f4f8; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
+          <div style="background: #d1fae5; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #059669; font-weight: 600; color: #059669; font-size: 13px;">
             CONSOLIDATION SUMMARY
           </div>
           
           <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
             <label style="color: #4b5563; font-weight: 500; font-size: 12px;">TOTAL ENTRIES</label>
-            <span style="color: #1a365d; font-weight: 700; font-size: 14px;">${consolidatedEntries.length}</span>
+            <span style="color: #059669; font-weight: 700; font-size: 14px;">${consolidatedEntries.length}</span>
           </div>
           
           <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
             <label style="color: #4b5563; font-weight: 500; font-size: 12px;">TOTAL BUDGET</label>
-            <span style="color: #1e40af; font-weight: 700; font-size: 14px;">${totalBudgetStr}</span>
+            <span style="color: #059669; font-weight: 700; font-size: 14px;">${totalBudgetStr}</span>
+          </div>
+          
+          <!-- SUCCESS MESSAGE BOX -->
+          <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 12px; color: #047857; line-height: 1.5;">
+              <strong>Ready for Review:</strong> All consolidated APP entries are now ready for review and approval. Access the complete list in the APP table to proceed with next steps.
+            </p>
           </div>
           
           <!-- BUTTONS -->
-          <div style="padding: 20px 0; text-align: right; border-top: 1px solid #e5e7eb; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="margin-right: 10px;">Cancel</button>
-            <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()">View APP Table</button>
+          <div style="padding: 20px 0; text-align: right; border-top: 1px solid #e5e7eb; margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="cursor: pointer; border: 1px solid #d1d5db; background: #f3f4f6; color: #374151; padding: 10px 20px; border-radius: 4px; font-weight: 500; font-size: 13px;">Close</button>
+            <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()" style="cursor: pointer; background: #10b981; border: 1px solid #10b981; color: #fff; padding: 10px 20px; border-radius: 4px; font-weight: 600; font-size: 13px;">View APP Table</button>
           </div>
         </form>
       `;
