@@ -1401,7 +1401,6 @@ async function loadPPMP() {
       catFilter.innerHTML = optionsHtml;
     }
     
-    renderPPMPTable(filtered, accessFiltered);
 
     // Update division banner
     let banner = document.getElementById('ppmpDivisionBanner');
