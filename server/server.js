@@ -2504,6 +2504,7 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
 app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    console.log('[CONSOLIDATE] 🔄 Starting consolidation for FY', fiscalYear);
 
     // Get all active (non-deleted) PPMP entries for this fiscal year
     const result = await pool.query(
@@ -2513,6 +2514,8 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
        WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
       [fiscalYear]
     );
+    
+    console.log('[CONSOLIDATE] ✅ Found ' + result.rows[0].item_count + ' approved PPMP entries');
 
     // Get total approved (non-deleted only)
     const totalResult = await pool.query(
@@ -2535,6 +2538,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     );
 
     // Record consolidation timestamp in app_settings
+    console.log('[CONSOLIDATE] 🔄 Updating app_settings...');
     await pool.query(
       `INSERT INTO app_settings (fiscal_year, app_type, consolidated_at, consolidated_count, set_by, set_at)
        VALUES ($1, 'indicative', CURRENT_TIMESTAMP, 1, $2, CURRENT_TIMESTAMP)
@@ -2544,9 +2548,11 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          set_at = CURRENT_TIMESTAMP`,
       [fiscalYear, req.user.id]
     );
+    console.log('[CONSOLIDATE] ✅ app_settings updated');
 
     // Auto-populate item_description from description for items that don't have one
     // The client-side summarization will be used, but we store a server-side fallback
+    console.log('[CONSOLIDATE] 🔄 Updating item descriptions...');
     await pool.query(
       `UPDATE procurementplans
        SET item_description = description
@@ -2555,8 +2561,10 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          AND (item_description IS NULL OR item_description = '')`,
       [fiscalYear]
     );
+    console.log('[CONSOLIDATE] ✅ Item descriptions updated');
 
     // Create app_entries for each approved PPMP (idempotent — won't overwrite existing edits)
+    console.log('[CONSOLIDATE] 🔄 Inserting into app_entries...');
     const appInsert = await pool.query(
       `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
         procurement_mode, early_procurement, bid_criteria, start_date, end_date,
@@ -2573,6 +2581,15 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       [fiscalYear]
     );
 
+    console.log('[CONSOLIDATE] ✅ ' + appInsert.rowCount + ' entries inserted into app_entries');
+    
+    // VERIFY: Check what was actually created
+    const verifyCheck = await pool.query(
+      `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries now has ' + verifyCheck.rows[0].count + ' total entries for FY ' + fiscalYear);
+
     res.json({
       message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}. ${appInsert.rowCount} new APP entries created.`,
       created: appInsert.rowCount,
@@ -2580,6 +2597,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       total_abc: parseFloat(result.rows[0].total_abc),
       total_approved: parseFloat(totalResult.rows[0].total_approved),
       available_budget: 0,
+      count: parseInt(result.rows[0].item_count),
       by_department: deptBreakdown.rows
     });
   } catch (err) {
