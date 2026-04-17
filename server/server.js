@@ -2779,8 +2779,7 @@ app.get('/api/paps', authenticateToken, async (req, res) => {
       params.push(req.query.status);
       conditions.push(`p.status = $${params.length}`);
     }
-    // Exclude soft-deleted
-    conditions.push(`(p.is_deleted = false OR p.is_deleted IS NULL)`);
+    // Hard delete means no need to check is_deleted
 
     if (conditions.length > 0) {
       query += ` WHERE ` + conditions.join(' AND ');
