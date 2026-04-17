@@ -249,11 +249,23 @@ const RESOURCE_TO_PAGE = {
 function handleRealtimeDataChange(event) {
   const activePage = document.querySelector('.page.active');
   const activePageId = activePage ? activePage.id : null;
+  const resource = (event && event.resource ? String(event.resource) : '').toLowerCase();
   const targetPageId = RESOURCE_TO_PAGE[event.resource];
 
   // Always refresh dashboard stats (it aggregates all tables)
   if (activePageId === 'dashboard') {
     loadPageData('dashboard');
+    return;
+  }
+
+  // PPMP safe real-time fallback: force refresh when PPMP-related resources change
+  if (
+    activePageId === 'ppmp' &&
+    (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items' || resource === 'paps')
+  ) {
+    console.log('[SOCKET] PPMP realtime refresh via fallback for resource:', resource);
+    if (typeof loadPPMP === 'function') loadPPMP();
+    if (typeof pollNotificationCount === 'function') pollNotificationCount();
     return;
   }
 
