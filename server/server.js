@@ -2694,7 +2694,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
         procurement_mode, early_procurement, bid_criteria, start_date, end_date,
         fund_source, estimated_budget, procurement_strategy, app_version, remarks, is_deleted)
       SELECT pp.id, pp.fiscal_year, REPLACE(pp.ppmp_no, 'PPMP-', 'APP-'),
-             pp.description, COALESCE(NULLIF(pp.item_description, ''), pp.description),
+             pp.description, pp.description,
              pp.procurement_mode, 'No', 'LCRB', pp.start_date, pp.end_date,
              pp.fund_source, pp.total_amount, COALESCE(pp.procurement_source, '-'),
              'indicative', pp.remarks, false
@@ -5772,6 +5772,65 @@ app.get('/api/activity-logs/summary', authenticateToken, authorizeRoles('admin',
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ==============================================================================
+// HELPER FUNCTION: Summarize Project Title to General Description
+// ==============================================================================
+function summarizeProjectTitle(title) {
+  if (!title) return '-';
+  let desc = title.trim();
+
+  // Strip common procurement prefixes
+  const prefixes = [
+    /^Provision\s+of\s+(Repairs\s+and\s+Maintenance\s+(for|of)\s+)?/i,
+    /^Procurement\s+of\s+/i,
+    /^Supply\s+and\s+Delivery\s+of\s+/i,
+    /^Purchase\s+of\s+/i,
+    /^Acquisition\s+of\s+/i,
+    /^Hiring\s+of\s+/i,
+    /^Engagement\s+of\s+/i,
+    /^Availment\s+of\s+/i,
+    /^Hosting\s+(of\s+)?/i,
+    /^Conduct(ing)?\s+of\s+(the\s+)?/i,
+    /^Payment\s+for\s+(the\s+)?/i,
+    /^Subscription\s+(to|of|for)\s+/i,
+    /^Renewal\s+of\s+/i,
+    /^Lease\s+of\s+/i,
+    /^Contracting\s+of\s+/i,
+    /^Orientation\s+on\s+(the\s+)?/i,
+    /^Lecture\s+on\s+(the\s+)?/i,
+    /^Training\s+on\s+(the\s+)?/i,
+    /^Seminar\s+on\s+(the\s+)?/i,
+    /^Workshop\s+on\s+(the\s+)?/i,
+    /^Conference\s+on\s+(the\s+)?/i,
+    /^Facilitation\s+of\s+(the\s+)?/i,
+    /^Implementation\s+of\s+(the\s+)?/i,
+    /^Installation\s+of\s+/i,
+    /^Repair\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^Repairs\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^RM\s*[-–]\s*/i,
+    /^Maintenance\s+(of|for)\s+/i,
+    /^Development\s+of\s+/i,
+    /^Preparation\s+of\s+/i,
+    /^Reproduction\s+of\s+/i,
+    /^Printing\s+of\s+/i,
+    /^Publication\s+of\s+/i,
+    /^Production\s+of\s+/i,
+  ];
+  for (const prefix of prefixes) {
+    desc = desc.replace(prefix, '');
+  }
+
+  // Strip trailing fiscal year references
+  desc = desc.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '').trim();
+
+  // Strip trailing location references (in parentheses or after "at")
+  desc = desc.replace(/\s*\(.*\)\s*$/i, '').trim();
+  desc = desc.replace(/\s+at\s+.+$/i, '').trim();
+
+  // Return original or summarized (prefer summarized if different and not empty)
+  return desc && desc.length > 0 ? desc : title.substring(0, 100);
+}
 
 // ==============================================================================
 // HEALTH CHECK
