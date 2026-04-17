@@ -163,15 +163,20 @@ function connectSocket() {
 
   // ★ CORE: When another client changes data, auto-refresh the active page
   socket.on('data_changed', (event) => {
-    console.log('[SOCKET] Data changed:', event.resource, event.action, 'by', event.user?.username || 'system');
+    console.log('[SOCKET] 🔄 Data changed:', event.resource, event.action, 'by', event.user?.username || 'system');
+    console.log('[SOCKET] ✅ Broadcasting to current page:', document.querySelector('.page.active')?.id || 'none');
     handleRealtimeDataChange(event);
   });
 
   socket.on('clients_count', (data) => {
-    console.log('[SOCKET] Connected clients:', data.count);
-    // Optionally display connected client count in the UI
+    console.log('[SOCKET] 👥 Connected clients:', data.count);
+    // Display connected client count in the UI
     const el = document.getElementById('connectedClientsCount');
-    if (el) el.textContent = data.count;
+    if (el) {
+      el.textContent = data.count;
+      el.style.display = 'inline-block';
+      console.log('[SOCKET] ✅ Updated connected clients display:', data.count);
+    }
   });
 
   socket.on('server_shutdown', () => {
@@ -252,8 +257,18 @@ function handleRealtimeDataChange(event) {
   const resource = (event && event.resource ? String(event.resource) : '').toLowerCase();
   const targetPageId = RESOURCE_TO_PAGE[event.resource];
 
+  console.log('[SYNC] 🔄 Resource:', resource, '| Active Page:', activePageId, '| Target Page:', targetPageId);
+
+  // ALWAYS clear caches so next load gets fresh data
+  window._appData = null;
+  window._appItems = null;
+  window._appStatus = null;
+  window._ppmpData = null;
+  console.log('[SYNC] ✅ Cleared caches - fresh data will load');
+
   // Always refresh dashboard stats (it aggregates all tables)
   if (activePageId === 'dashboard') {
+    console.log('[SYNC] Reloading dashboard...');
     loadPageData('dashboard');
     return;
   }
@@ -261,24 +276,43 @@ function handleRealtimeDataChange(event) {
   // PPMP safe real-time fallback: force refresh when PPMP-related resources change
   if (
     activePageId === 'ppmp' &&
-    (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items' || resource === 'paps')
+    (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items' || resource === 'paps' || resource === 'app-settings')
   ) {
-    console.log('[SOCKET] PPMP realtime refresh via fallback for resource:', resource);
+    console.log('[SYNC] Reloading PPMP...');
     if (typeof loadPPMP === 'function') loadPPMP();
+    if (typeof pollNotificationCount === 'function') pollNotificationCount();
+    return;
+  }
+
+  // APP-related resources always refresh the APP page if it's active
+  if ((resource === 'plan-items' || resource === 'app-settings' || resource === 'app-budget-summary') && activePageId === 'app') {
+    console.log('[SYNC] Reloading APP...');
+    if (typeof loadAPP === 'function') loadAPP();
     if (typeof pollNotificationCount === 'function') pollNotificationCount();
     return;
   }
 
   // If the changed resource maps to the page the user is currently viewing, reload it
   if (targetPageId && targetPageId === activePageId) {
-    console.log('[SOCKET] Refreshing active page:', activePageId);
+    console.log('[SYNC] Reloading active page:', activePageId);
     loadPageData(activePageId);
+    return;
+  }
+
+  // Even if not the active page, prefetch the data so when user switches, it's ready
+  if (targetPageId && typeof window['load' + targetPageId.charAt(0).toUpperCase() + targetPageId.slice(1)] === 'function') {
+    console.log('[SYNC] Prefetching background page:', targetPageId);
+    window['load' + targetPageId.charAt(0).toUpperCase() + targetPageId.slice(1)]().catch(() => {
+      // Silent - just prefetch
+    });
   }
 
   // Always refresh notifications count when any data changes
   if (typeof pollNotificationCount === 'function') {
     pollNotificationCount();
   }
+
+  console.log('[SYNC] ✅ Broadcast handled for resource:', resource);
 }
 
 /** Simple toast notification (non-blocking) for server events */
