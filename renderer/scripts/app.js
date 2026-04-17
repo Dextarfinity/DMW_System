@@ -3896,11 +3896,15 @@ function updateAPPSummary(items, budgetSummary) {
  displayItems = items;
  }
 
+ // DYNAMIC: Calculate totals based on items currently displayed in the APP table
  const activeBudget = displayItems.reduce((sum, i) => sum + parseFloat(i.total_price || i.unit_price || 0), 0);
  const totalProjects = displayItems.length;
 
- // Budget summary — for division-restricted users, use their division's data
- let totalApproved, availableBudget, removedCount;
+ // DYNAMIC: Total Approved Budget = Sum of all items in the APP table (updates when items are deleted/added)
+ let totalApproved = activeBudget;
+ 
+ // Get overall allocated budget from budgetSummary for division-restricted users
+ let overallAllocatedBudget = 0;
  if (shouldFilter && budgetSummary && budgetSummary.by_department) {
  // chief_wrsd: only WRSD, chief_fad: all except WRSD, others: own division
  let filteredDepts;
@@ -3911,14 +3915,28 @@ function updateAPPSummary(items, budgetSummary) {
  } else {
  filteredDepts = budgetSummary.by_department.filter(d => d.department_code === userDivCode);
  }
- totalApproved = filteredDepts.reduce((s, d) => s + parseFloat(d.active || 0), 0);
- availableBudget = totalApproved - activeBudget;
+ overallAllocatedBudget = filteredDepts.reduce((s, d) => s + parseFloat(d.total || d.active || 0), 0);
+ } else if (budgetSummary) {
+ overallAllocatedBudget = parseFloat(budgetSummary.total_budget || budgetSummary.active_budget || 0);
+ }
+ 
+ // DYNAMIC: Available Budget = Overall allocated - Total approved (items in table)
+ let availableBudget = overallAllocatedBudget > 0 ? (overallAllocatedBudget - totalApproved) : 0;
  if (availableBudget < 0) availableBudget = 0;
+ 
+ // Get removed count from budget summary
+ let removedCount = 0;
+ if (shouldFilter && budgetSummary && budgetSummary.by_department) {
+ let filteredDepts;
+ if (chiefRole2 === 'chief_wrsd') {
+ filteredDepts = budgetSummary.by_department.filter(d => d.department_code === 'WRSD');
+ } else if (chiefRole2 === 'chief_fad') {
+ filteredDepts = budgetSummary.by_department.filter(d => d.department_code !== 'WRSD');
+ } else {
+ filteredDepts = budgetSummary.by_department.filter(d => d.department_code === userDivCode);
+ }
  removedCount = filteredDepts.reduce((s, d) => s + parseInt(d.removed_count || 0), 0);
  } else {
- totalApproved = budgetSummary ? parseFloat(budgetSummary.active_budget || 0) : activeBudget;
- availableBudget = totalApproved - activeBudget;
- if (availableBudget < 0) availableBudget = 0;
  removedCount = budgetSummary ? parseInt(budgetSummary.removed_count || 0) : 0;
  }
 
