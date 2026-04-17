@@ -4828,7 +4828,7 @@ window.pktMergeAndDownload = async function(attachmentIds, label) {
     showNotification('Merging files into PDF... Please wait.', 'info');
     const response = await fetch(API_URL + '/attachments/merge-download', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('token') },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (authToken || '') },
       body: JSON.stringify({ attachmentIds })
     });
     if (!response.ok) {
@@ -4861,7 +4861,7 @@ window.pktDownloadAllMerged = async function(rowId) {
     showNotification('Merging files into PDF... Please wait.', 'info');
     const response = await fetch(API_URL + '/attachments/merge-download', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('token') },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (authToken || '') },
       body: JSON.stringify({ attachmentIds: data.attIds })
     });
     if (!response.ok) {
@@ -6644,7 +6644,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser.division = me.department_code || me.department_name || '';
         currentUser.designation = me.designation_name || currentUser.designation || '';
         currentUser.roles = me.roles || [me.role, me.secondary_role].filter(Boolean);
-        sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
+        // User data updated in memory - no client-side persistence
       }
     } catch (e) {
       console.error('Failed to fetch fresh user data:', e);
@@ -6741,8 +6741,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUser.department_code = updated.department_code || '';
       currentUser.division = updated.department_code || updated.department_name || '';
 
-      // Persist to sessionStorage
-      sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
+      // User data updated in memory - no client-side persistence
 
       // Update sidebar display
       if (userNameEl) userNameEl.textContent = currentUser.name;
@@ -7149,9 +7148,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Helper: append JWT token as query parameter for attachment view/download URLs
   // so that window.open() and BrowserWindow.loadURL() can authenticate
   window.authAttUrl = function(url) {
-    const t = localStorage.getItem('token');
-    if (!t) return url;
-    return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+    if (!authToken) return url;
+    return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(authToken);
   };
 
   /**
