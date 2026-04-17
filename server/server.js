@@ -2601,8 +2601,9 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       by_department: deptBreakdown.rows
     });
   } catch (err) {
-    console.error('Consolidation error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[CONSOLIDATE] 🚨 CONSOLIDATION ERROR:', err.message);
+    console.error('[CONSOLIDATE] Stack:', err.stack);
+    res.status(500).json({ error: err.message, details: 'Consolidation failed. Check server logs.' });
   }
 });
 
