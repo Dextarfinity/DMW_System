@@ -5742,9 +5742,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedPage = localStorage.getItem('dmw_current_page');
     navigateTo(savedPage || 'dashboard');
 
-    // Hide the fullscreen loader (session restored successfully)
-    const appLoader = document.getElementById('appLoader');
-    if (appLoader) appLoader.style.display = 'none';
+    // 🔄 NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
+    // This prevents the loader from disappearing before page content is ready
   }
 
   // Format role for display (As-Is Roles)
