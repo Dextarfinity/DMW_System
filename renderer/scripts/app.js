@@ -1619,7 +1619,10 @@ async function loadAPP() {
     }
 
     updateAPPVersionBanner(appStatus);
-    return isConsolidated ? items : [];
+    // 🔄 FIXED: Always return items array, regardless of consolidation status
+    // This is critical for consolidation function to know data was loaded successfully
+    console.log('[APP] Returning ' + items.length + ' items (consolidated: ' + isConsolidated + ')');
+    return items;
   } catch (err) {
     console.log('Using demo APP data');
     return [];
