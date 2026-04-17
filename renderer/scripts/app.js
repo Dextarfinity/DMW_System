@@ -18149,34 +18149,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         consolidatedEntries = [];
       }
 
-      // Step 5: Build enumerated list of consolidated APP entries
-      let enumeratedList = '<div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;max-height:300px;overflow-y:auto;">';
-      
-      if (consolidatedEntries && consolidatedEntries.length > 0) {
-        consolidatedEntries.forEach((entry, idx) => {
-          const code = entry.item_code || 'N/A';
-          const title = entry.item_name || 'Untitled';
-          const budget = parseFloat(entry.total_price || 0);
-          const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : 'N/A';
-          
-          enumeratedList += `
-            <div style="border-bottom:1px solid #e2e8f0;padding:8px 0;${idx === consolidatedEntries.length - 1 ? 'border-bottom:none;' : ''}">
-              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;">
-                <span style="background:#1a365d;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:600;font-size:11px;">${idx + 1}</span>
-                <div style="flex:1;overflow:hidden;">
-                  <div style="font-weight:600;color:#1a365d;">${code}</div>
-                  <div style="color:#4a5568;font-size:12px;margin-top:2px;">${title}</div>
-                  <div style="color:#a0aec0;font-size:11px;margin-top:2px;">Budget: ${budgetStr}</div>
-                </div>
-              </div>
-            </div>
-          `;
-        });
-        enumeratedList += '</div>';
-      } else {
-        enumeratedList += '<div style="text-align:center;padding:20px;color:#a0aec0;"><p>No APP entries were consolidated.</p></div></div>';
-      }
-
       // Step 6: Show completion modal with enumerated list and WAIT for user to click button
       console.log('[CONSOLIDATE] Showing completion modal with enumerated APP list...');
       
