@@ -147,9 +147,8 @@ function connectSocket() {
   socket.on('connect', () => {
     console.log('[SOCKET] Connected to server:', socket.id);
     // Authenticate with JWT
-    const token = authToken || sessionStorage.getItem('dmw_token');
-    if (token) {
-      socket.emit('authenticate', { token });
+    if (authToken) {
+      socket.emit('authenticate', { token: authToken });
     }
   });
 
@@ -5741,28 +5740,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if user has a session
   function checkSession() {
     try {
-      const savedUser = sessionStorage.getItem('dmw_user');
-      const savedToken = sessionStorage.getItem('dmw_token');
-      if (savedUser && savedToken) {
-        currentUser = JSON.parse(savedUser);
-        authToken = savedToken;
-        // Ensure roles array exists (backward compat for older sessions)
-        if (!currentUser.roles || !Array.isArray(currentUser.roles)) {
-          currentUser.roles = [currentUser.role].filter(Boolean);
-        }
-        // Clear stale hardcoded division if user has no real dept assigned
-        if (currentUser.division === 'FAD' && !currentUser.department_code && !currentUser.department) {
-          currentUser.division = '';
-        }
-        sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
-        console.log('Session restored for:', currentUser.name, 'roles:', currentUser.roles);
-        showApp();
-        return;
+      // ✅ NO CLIENT-SIDE SESSION STORAGE - Always require fresh login
+      // This ensures 100% dynamic behavior with all data from server
+      if (!authToken || !currentUser) {
+        throw new Error('No session in memory - must log in');
       }
+      console.log('User authenticated in memory:', currentUser.name, 'roles:', currentUser.roles);
+      showApp();
+      return;
     } catch (e) {
-      console.error('Error restoring session:', e);
-      sessionStorage.removeItem('dmw_user');
-      sessionStorage.removeItem('dmw_token');
+      console.warn('Session check:', e.message);
     }
     // No valid session — show login screen and hide loader
     if (loginOverlay) {
@@ -6881,8 +6868,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clear session data
     currentUser = { name: '', role: '', division: '' };
     authToken = null;
-    sessionStorage.removeItem('dmw_user');
-    sessionStorage.removeItem('dmw_token');
+    currentUser = null;
+    // Session cleared
 
     // Stop notification polling
     stopNotificationPolling();
@@ -26060,8 +26047,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       };
       
       // Persist session to sessionStorage
-      sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
-      sessionStorage.setItem('dmw_token', authToken);
+// No session storage - keep only in memory for this session
       
       console.log('Login successful:', currentUser);
       
