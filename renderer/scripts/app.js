@@ -18297,13 +18297,11 @@ Failure to submit the above requirements within the prescribed period shall cons
               `;
               
               // Update modal body with full table
-              const modalBody = document.querySelector('.modal-body');
               if (modalBody) {
                 modalBody.innerHTML = fullTableHtml;
               }
               
               // Update modal title
-              const modalTitle = document.querySelector('.modal-title');
               if (modalTitle) {
                 modalTitle.textContent = 'APP CONSOLIDATION — Full Table View';
               }
