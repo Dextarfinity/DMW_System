@@ -2702,17 +2702,10 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     
     // VERIFY: Check what was actually created
     const verifyCheck = await pool.query(
-      `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1 AND (is_deleted = false OR is_deleted IS NULL)`,
-      [fiscalYear]
-    );
-    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries now has ' + verifyCheck.rows[0].count + ' total NON-DELETED entries for FY ' + fiscalYear);
-    
-    // Debug: Show ALL entries (including deleted)
-    const allCheck = await pool.query(
       `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
       [fiscalYear]
     );
-    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries (including deleted) has ' + allCheck.rows[0].count + ' entries');
+    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries has ' + verifyCheck.rows[0].count + ' total entries for FY ' + fiscalYear);
     
     // Debug: Show the actual IDs and details of entries just created/updated
     const debugEntries = await pool.query(
