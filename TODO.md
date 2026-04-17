@@ -1,20 +1,18 @@
-# PPMP Unit Display Fix - MWPTD Issue
+# PPMP Unit Display Fix - MWPTD PAPs
 
-## Current Status
-- [x] Analyzed frontend: `formatQuantitySize()` correct
-- [x] Confirmed issue: MWPTD shows only quantity, missing unit/price
-- [x] Plan approved by user
+## Current Issue
+- Edit PPMP modal unit dropdown → table shows only "25" 
+- Expected: "25 pieces @ ₱150.00/ pieces" (dynamic from DB)
 
-## Implementation Steps
-- [x] 1. Read DB schema (`server/database/schema.sql`) → `procurementplans` MISSING unit/unit_price (in `plan_items`)
-- [ ] 2. Read `server/server.js` → `/api/ppmp` JOIN logic
-- [ ] 3. Fix frontend `formatQuantitySize()` → use `p.item_unit` fallback
-- [ ] 4. Test edit modal → verify table display "25 pieces @ ₱150.00/ pieces"
-- [ ] 5. Verify ALL divisions work
-- [ ] 6. Update TODO.md → complete
+## Plan Status
+- [x] Step 1: Create TODO.md ✅
+- [ ] Step 2: Read app.js to locate formatQuantitySize()
+- [ ] Step 3: Fix formatQuantitySize() - PAPs fallback logic
+- [ ] Step 4: Test edit → save → table refresh (all divisions)
+- [ ] Step 5: Backend verification - /api/ppmp returns item_unit/unit_price
+- [ ] Step 6: Complete & demo
 
-## Next Action
-Read `server/server.js` → confirm `/api/ppmp` endpoint
-
-## Next Action
-Examine `server/database/schema.sql`
+## Technical Details
+**Backend:** `/api/ppmp` → `procurementplans JOIN items` → `item_unit`, `item_unit_price`
+**Frontend:** `formatQuantitySize(p)` → needs PAPs handling: `p.quantity_size + p.item_unit + p.item_unit_price`
+**DB:** `procurementplans.unit`, `unit_price`, `quantity_size` + `plan_items` fallback
