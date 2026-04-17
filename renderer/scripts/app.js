@@ -18076,8 +18076,16 @@ Failure to submit the above requirements within the prescribed period shall cons
         console.log('[CONSOLIDATE] Table state - Rows:', rowCount, 'Empty message:', emptyRow ? 'YES' : 'NO');
         if (emptyRow && window._appItems && window._appItems.length > 0) {
           console.error('[CONSOLIDATE] 🚨 TABLE EMPTY BUT DATA EXISTS! Forcing re-render...');
-          renderAPPTable(window._appItems, window._appStatus || {});
+          console.log('[CONSOLIDATE] DEBUG - Items:', window._appItems.length, 'First item:', window._appItems[0]);
+          console.log('[CONSOLIDATE] DEBUG - Item structure:', JSON.stringify(window._appItems[0], null, 2));
+          // Force re-render with explicit status
+          const status = window._appStatus || { consolidated_at: new Date().toISOString(), app_type: 'indicative' };
+          renderAPPTable(window._appItems, status);
           console.log('[CONSOLIDATE] ✅ Force re-render complete');
+          // Verify re-render worked
+          const newRowCount = appTableBody.querySelectorAll('tr:not(:has(td[colspan]))').length;
+          const stillEmpty = appTableBody.querySelector('tr td[colspan]');
+          console.log('[CONSOLIDATE] After re-render - Rows:', newRowCount, 'Still empty:', stillEmpty ? 'YES' : 'NO');
         }
       }
 
