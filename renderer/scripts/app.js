@@ -20559,8 +20559,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           section: manualSection,
           category: manualCategory,
           procurement_source: 'MANUAL-NON-PSDBM', // Ensure manual entries are always marked
-          unit: itemUnit,
-          unit_price: itemPrice,
+          unit: itemUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+          unit_price: itemPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
           total_amount: itemPrice * (parseFloat(itemQty) || 1),
           // Include items array for plan_items table storage
           items: [{
@@ -20618,6 +20618,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           category: papCategory,
           total_amount: papPrice * (parseFloat(papQty) || 1),
           procurement_source: 'PAPs',
+          unit: papUnit, // SAVE UNIT TO PROCUREMENTPLANS TABLE
+          unit_price: papPrice, // SAVE UNIT_PRICE TO PROCUREMENTPLANS TABLE
           // Include items array for plan_items table storage
           items: [{
             item_code: 'PAP-' + Date.now(),
@@ -20793,8 +20795,17 @@ Failure to submit the above requirements within the prescribed period shall cons
         showNotification('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!', 'success');
       }
 
+      // Close modal and refresh table in real-time (no server restart needed)
       closeModal();
-      loadPPMP();
+      
+      // Real-time refresh: Short delay to ensure database commits, then reload table with dynamic formatting
+      setTimeout(() => {
+        if (typeof loadPPMP === 'function') {
+          console.log('[PPMP EDIT] Real-time refresh: Reloading table...');
+          loadPPMP();
+        }
+      }, 300); // 300ms delay allows database transaction to complete
+      
     } catch (err) {
       alert('Failed to update PPMP: ' + err.message);
     }
