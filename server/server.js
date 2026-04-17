@@ -2605,32 +2605,31 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
     console.log('[CONSOLIDATE] 🔄 Starting consolidation for FY', fiscalYear);
 
-    // Get all active (non-deleted) PPMP entries for this fiscal year
+    // Get all active PPMP entries for this fiscal year (hard delete means no is_deleted check)
     const result = await pool.query(
       `SELECT COUNT(*) as item_count,
               COALESCE(SUM(pp.total_amount), 0) as total_abc
        FROM procurementplans pp
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'`,
       [fiscalYear]
     );
     
     console.log('[CONSOLIDATE] ✅ Found ' + result.rows[0].item_count + ' approved PPMP entries');
 
-    // Get total approved (non-deleted only)
+    // Get total approved (hard delete means no is_deleted check)
     const totalResult = await pool.query(
       `SELECT COALESCE(SUM(total_amount), 0) as total_approved
-       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND (is_deleted = false OR is_deleted IS NULL)`,
+       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
       [fiscalYear]
     );
 
-    // Get breakdown by department
+    // Get breakdown by department (hard delete only)
     const deptBreakdown = await pool.query(
       `SELECT d.name as department_name, COUNT(*) as count,
               COALESCE(SUM(pp.total_amount), 0) as total
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
          AND pp.status = 'approved'
        GROUP BY d.name ORDER BY d.name`,
       [fiscalYear]
@@ -2650,13 +2649,12 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     console.log('[CONSOLIDATE] ✅ app_settings updated');
 
     // Auto-populate item_description from description for items that don't have one
-    // The client-side summarization will be used, but we store a server-side fallback
     console.log('[CONSOLIDATE] 🔄 Updating item descriptions...');
     await pool.query(
       `UPDATE procurementplans
        SET item_description = description
        WHERE ppmp_no IS NOT NULL AND fiscal_year = $1
-         AND (is_deleted = false OR is_deleted IS NULL) AND status = 'approved'
+         AND status = 'approved'
          AND (item_description IS NULL OR item_description = '')`,
       [fiscalYear]
     );
@@ -2667,15 +2665,15 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     const appInsert = await pool.query(
       `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
         procurement_mode, early_procurement, bid_criteria, start_date, end_date,
-        fund_source, estimated_budget, procurement_strategy, app_version, remarks, is_deleted)
+        fund_source, estimated_budget, procurement_strategy, app_version, remarks)
       SELECT pp.id, pp.fiscal_year, REPLACE(pp.ppmp_no, 'PPMP-', 'APP-'),
              pp.description, pp.description,
              pp.procurement_mode, 'No', 'LCRB', pp.start_date, pp.end_date,
              pp.fund_source, pp.total_amount, COALESCE(pp.procurement_source, '-'),
-             'indicative', pp.remarks, false
+             'indicative', pp.remarks
       FROM procurementplans pp
       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
-        AND pp.status = 'approved' AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+        AND pp.status = 'approved'
       ON CONFLICT (plan_id) DO UPDATE SET
         app_code = EXCLUDED.app_code,
         project_title = EXCLUDED.project_title,
