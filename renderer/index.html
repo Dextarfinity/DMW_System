@@ -188,13 +188,6 @@
       </nav>
 
       <div class="sidebar-footer">
-        <!-- Connected Clients Indicator -->
-        <div style="padding:8px 12px; background:#f0f4f8; border-radius:6px; margin-bottom:12px; text-align:center; border:1px solid #cbd5e0;">
-          <div style="font-size:11px; color:#718096; font-weight:600; margin-bottom:4px;">🔗 CONNECTED CLIENTS</div>
-          <div id="connectedClientsCount" style="font-size:16px; font-weight:800; color:#2b6cb0; display:none;">0</div>
-          <div id="clientIPDisplay" style="font-size:10px; color:#4a5568; margin-top:4px; word-break:break-word;">Connecting...</div>
-        </div>
-        
         <div class="user-account-toggle" id="userAccountToggle" onclick="document.getElementById('userAccountDropdown').classList.toggle('open'); this.classList.toggle('open')">
           <div class="user-avatar-initials" id="userAvatarInitials">AU</div>
           <div class="user-details">
@@ -2238,6 +2231,23 @@
             <div class="stat-card" style="flex:1; min-width:140px; padding:12px 16px; background:#fff; border:1px solid #bbb; border-radius:4px;">
               <div style="font-size:10px; text-transform:uppercase; color:#555; font-weight:700;">Logins</div>
               <div id="alLoginCount" style="font-size:22px; font-weight:700; color:#b45309;">0</div>
+            </div>
+          </div>
+
+          <!-- Connected Clients Indicator -->
+          <div style="padding:16px; background:#f0f4f8; border-radius:8px; margin-bottom:16px; border:2px solid #2b6cb0; text-align:center;">
+            <div style="font-size:14px; color:#1a365d; font-weight:700; margin-bottom:12px;">
+              <i class="fas fa-sitemap"></i> Real-Time Network Synchronization
+            </div>
+            <div style="display:flex; gap:20px; justify-content:center; flex-wrap:wrap;">
+              <div>
+                <div style="font-size:11px; color:#718096; font-weight:600; margin-bottom:6px;">👥 CONNECTED CLIENTS</div>
+                <div id="connectedClientsCount" style="font-size:24px; font-weight:800; color:#2b6cb0;">0</div>
+              </div>
+              <div style="border-left:2px solid #cbd5e0; padding-left:20px;">
+                <div style="font-size:11px; color:#718096; font-weight:600; margin-bottom:6px;">📍 THIS CLIENT</div>
+                <div id="clientIPDisplay" style="font-size:14px; color:#22863a; font-weight:600;">Connecting...</div>
+              </div>
             </div>
           </div>
 
