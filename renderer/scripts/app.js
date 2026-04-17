@@ -1467,6 +1467,8 @@ async function loadPPMP() {
       banner.style.display = 'none';
     }
 
+    // Render the filtered PPMP data to the table
+    renderPPMPTable(filtered, ppmp);
     return filtered;
   } catch (err) {
     console.error('Error loading PPMP:', err);
