@@ -3733,13 +3733,13 @@ window.submitEditAPP = async function(e, planId) {
   });
   if (!confirmed) return;
   try {
-    const descValue = document.getElementById('editAppDescription')?.value || '';
+    const titleValue = document.getElementById('editAppTitle')?.value || '';
     // Single API call to app-entries endpoint (saves all APP-specific fields)
     await apiRequest('/app-entries/' + planId, 'PUT', {
-      project_title: descValue,
-      general_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(descValue),
+      project_title: titleValue,
+      general_description: document.getElementById('editAppGenDesc')?.value || summarizeProjectTitle(titleValue),
       procurement_mode: document.getElementById('editAppProcMode')?.value || '',
-      early_procurement: document.getElementById('editAppEarlyProcurement')?.value || 'No',
+      early_procurement: document.getElementById('editAppEarlyProc')?.value || 'No',
       bid_criteria: document.getElementById('editAppBidCriteria')?.value || 'LCRB',
       start_date: document.getElementById('editAppStartDate')?.value || null,
       end_date: document.getElementById('editAppEndDate')?.value || null,
