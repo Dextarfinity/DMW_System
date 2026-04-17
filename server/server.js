@@ -2692,12 +2692,12 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     const appInsert = await pool.query(
       `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
         procurement_mode, early_procurement, bid_criteria, start_date, end_date,
-        fund_source, estimated_budget, procurement_strategy, app_version, remarks)
+        fund_source, estimated_budget, procurement_strategy, app_version, remarks, is_deleted)
       SELECT pp.id, pp.fiscal_year, REPLACE(pp.ppmp_no, 'PPMP-', 'APP-'),
              pp.description, COALESCE(NULLIF(pp.item_description, ''), pp.description),
              pp.procurement_mode, 'No', 'LCRB', pp.start_date, pp.end_date,
              pp.fund_source, pp.total_amount, COALESCE(pp.procurement_source, '-'),
-             'indicative', pp.remarks
+             'indicative', pp.remarks, false
       FROM procurementplans pp
       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
         AND pp.status = 'approved' AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
@@ -2713,6 +2713,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
         estimated_budget = EXCLUDED.estimated_budget,
         procurement_strategy = EXCLUDED.procurement_strategy,
         remarks = EXCLUDED.remarks,
+        is_deleted = false,
         updated_at = CURRENT_TIMESTAMP`,
       [fiscalYear]
     );
