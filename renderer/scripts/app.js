@@ -20816,7 +20816,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Real-time refresh: Short delay to ensure database commits, then reload table with dynamic formatting
       setTimeout(() => {
         if (typeof loadPPMP === 'function') {
-          console.log('[PPMP EDIT] Real-time refresh: Reloading table...');
+          console.log('[PPMP EDIT] Real-time refresh: Fetching fresh data from database...');
+          // Clear any cached data to ensure fresh fetch
+          window._ppmpData = null;
+          // Fetch fresh PPMP data from database
           loadPPMP();
         }
       }, 300); // 300ms delay allows database transaction to complete
