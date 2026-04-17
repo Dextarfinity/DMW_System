@@ -2677,31 +2677,48 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       [fiscalYear]
     );
 
-    console.log('[CONSOLIDATE] ✅ ' + appInsert.rowCount + ' entries inserted/updated in app_entries');
+    console.log('[CONSOLIDATE] ✅ INSERT rowCount: ' + appInsert.rowCount + ' entries inserted/updated in app_entries');
     
     // VERIFY: Check what was actually created
     const verifyCheck = await pool.query(
+      `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1 AND (is_deleted = false OR is_deleted IS NULL)`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries now has ' + verifyCheck.rows[0].count + ' total NON-DELETED entries for FY ' + fiscalYear);
+    
+    // Debug: Show ALL entries (including deleted)
+    const allCheck = await pool.query(
       `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
       [fiscalYear]
     );
-    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries now has ' + verifyCheck.rows[0].count + ' total entries for FY ' + fiscalYear);
+    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries (including deleted) has ' + allCheck.rows[0].count + ' entries');
     
     // Debug: Show the actual IDs and details of entries just created/updated
     const debugEntries = await pool.query(
-      `SELECT id, plan_id, app_code, project_title, fiscal_year, created_at, updated_at 
+      `SELECT id, plan_id, app_code, project_title, fiscal_year, is_deleted, created_at, updated_at 
        FROM app_entries 
        WHERE fiscal_year = $1 
        ORDER BY updated_at DESC 
        LIMIT 5`,
       [fiscalYear]
     );
-    console.log('[CONSOLIDATE] 🔍 Sample entries created/updated:', debugEntries.rows);
+    console.log('[CONSOLIDATE] 🔍 Sample entries (last 5):', debugEntries.rows);
     
-    // Also verify those plan_ids exist in procurementplans
+    // Check procurementplans for approved entries
+    const ppmpAllCheck = await pool.query(
+      `SELECT COUNT(*) as count, status FROM procurementplans 
+       WHERE fiscal_year = $1 AND ppmp_no IS NOT NULL
+       GROUP BY status`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 Procurementplans status breakdown:', ppmpAllCheck.rows);
+    
+    // Also verify those plan_ids exist in procurementplans as APPROVED
     if (debugEntries.rows.length > 0) {
       const planIds = debugEntries.rows.map(r => r.plan_id);
+      console.log('[CONSOLIDATE] 🔍 Checking plan_ids:', planIds);
       const ppmpCheck = await pool.query(
-        `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
+        `SELECT id, ppmp_no, status, fiscal_year, is_deleted FROM procurementplans WHERE id = ANY($1)`,
         [planIds]
       );
       console.log('[CONSOLIDATE] 🔍 Procurementplans for those IDs:', ppmpCheck.rows);
