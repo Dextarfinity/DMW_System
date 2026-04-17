@@ -188,6 +188,13 @@
       </nav>
 
       <div class="sidebar-footer">
+        <!-- Connected Clients Indicator -->
+        <div style="padding:8px 12px; background:#f0f4f8; border-radius:6px; margin-bottom:12px; text-align:center; border:1px solid #cbd5e0;">
+          <div style="font-size:11px; color:#718096; font-weight:600; margin-bottom:4px;">🔗 CONNECTED CLIENTS</div>
+          <div id="connectedClientsCount" style="font-size:16px; font-weight:800; color:#2b6cb0; display:none;">0</div>
+          <div id="clientIPDisplay" style="font-size:10px; color:#4a5568; margin-top:4px; word-break:break-word;">Connecting...</div>
+        </div>
+        
         <div class="user-account-toggle" id="userAccountToggle" onclick="document.getElementById('userAccountDropdown').classList.toggle('open'); this.classList.toggle('open')">
           <div class="user-avatar-initials" id="userAvatarInitials">AU</div>
           <div class="user-details">
