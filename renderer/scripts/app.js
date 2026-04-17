@@ -2785,14 +2785,46 @@ function escapeHtml(str) {
 }
 
 function formatQuantitySize(p) {
-  const qty = parseInt(p.quantity_size) || 0;
-  const unit = p.unit || p.item_unit || '';
-  const price = parseFloat(p.unit_price || p.item_unit_price || 0);
-  if (!qty && !unit) return p.quantity_size || '-';
-  const unitLower = unit.toLowerCase();
-  const priceStr = '₱' + price.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-  if (qty && unit) return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
-  return p.quantity_size || '-';
+  const rawQty = (p.quantity_size ?? '').toString().trim();
+  const qty = parseInt(rawQty, 10) || 0;
+
+  // Dynamic unit fallback priority:
+  // 1) PPMP row unit (edited in modal)
+  // 2) item catalog unit from JOIN
+  // 3) infer trailing text from quantity_size string (e.g. "25 pieces")
+  let unit = (p.unit || p.item_unit || '').toString().trim();
+  if (!unit && rawQty) {
+    const qtyWithUnitMatch = rawQty.match(/^\s*\d+(?:\.\d+)?\s*([A-Za-z][A-Za-z\s\-]*)\s*$/);
+    if (qtyWithUnitMatch && qtyWithUnitMatch[1]) {
+      unit = qtyWithUnitMatch[1].trim();
+    }
+  }
+
+  // Dynamic price fallback priority:
+  // 1) PPMP row unit_price
+  // 2) item catalog unit_price from JOIN
+  // 3) parse from quantity_size text if encoded (e.g. "@ ₱150.00/ pieces")
+  let price = parseFloat(p.unit_price ?? p.item_unit_price ?? 0);
+  if ((!price || Number.isNaN(price)) && rawQty) {
+    const priceMatch = rawQty.match(/@\s*₱?\s*([\d,]+(?:\.\d+)?)/i);
+    if (priceMatch && priceMatch[1]) {
+      price = parseFloat(priceMatch[1].replace(/,/g, ''));
+    }
+  }
+  if (!Number.isFinite(price)) price = 0;
+
+  // If no qty and no unit, keep original display
+  if (!qty && !unit) return rawQty || '-';
+
+  // If qty + unit exist, always render canonical dynamic format
+  if (qty && unit) {
+    const unitLower = unit.toLowerCase();
+    const priceStr = '₱' + price.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
+  }
+
+  // If only qty exists, show qty only (rare edge case)
+  return String(qty || rawQty || '-');
 }
 
 function renderPPMPTable(ppmp, allPPMPItems) {
