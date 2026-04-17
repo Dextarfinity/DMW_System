@@ -3800,26 +3800,26 @@ window.submitEditAPP = async function(e, planId) {
   }
 };
 
-/** Delete APP Entry (soft-delete by marking as deleted in database) */
+/** Delete APP Entry (hard delete - completely remove from database) */
 window.deleteAPPEntry = async function(planId) {
   const confirmed = await govConfirm({
     title: 'Delete APP Entry',
-    bodyHtml: '<p style="color:#c53030;"><i class="fas fa-exclamation-triangle"></i> Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will remove the entry from the APP and mark it as deleted in the database. The original PPMP will not be affected.</p>',
+    bodyHtml: '<p style="color:#c53030;"><i class="fas fa-exclamation-triangle"></i> Are you sure you want to delete this APP entry?</p><p style="font-size:12px;color:#666;">This will <strong>permanently remove</strong> the entry from the APP database. The original PPMP will not be affected.</p>',
     confirmText: 'Delete',
     cancelText: 'Cancel'
   });
   if (!confirmed) return;
   
   try {
-    console.log('[DELETE-APP] 🗑️ Deleting APP entry for plan_id:', planId);
-    showNotification('Deleting APP entry...', 'info');
+    console.log('[DELETE-APP] 🗑️ Hard deleting APP entry for plan_id:', planId);
+    showNotification('Deleting APP entry from database...', 'info');
     
     const response = await apiRequest('/app-entries/' + planId + '/delete', 'PUT');
     console.log('[DELETE-APP] ✅ Server response:', response);
     
-    if (response.is_deleted === true) {
-      console.log('[DELETE-APP] ✅✅ Confirmed: Entry marked as deleted in database');
-      showNotification('✅ APP entry deleted successfully from database', 'success');
+    if (response.deleted === true) {
+      console.log('[DELETE-APP] ✅✅ Confirmed: Entry permanently removed from database');
+      showNotification('✅ APP entry permanently deleted from database', 'success');
       
       // Wait for database transaction to complete
       console.log('[DELETE-APP] Waiting for database commit...');
@@ -3833,11 +3833,14 @@ window.deleteAPPEntry = async function(planId) {
       
       // Reload to show updated list (deletion reflected immediately)
       await loadAPP();
-      console.log('[DELETE-APP] ✅ APP page reloaded - deleted entry no longer visible');
+      console.log('[DELETE-APP] ✅ APP page reloaded - deleted entry removed from table');
     } else {
       console.warn('[DELETE-APP] ⚠️ Unexpected response:', response);
-      showNotification('APP entry deleted, refreshing...', 'info');
+      showNotification('Refreshing APP page...', 'info');
       await new Promise(resolve => setTimeout(resolve, 500));
+      window._appData = null;
+      window._appItems = null;
+      window._appStatus = null;
       await loadAPP();
     }
   } catch (err) {
