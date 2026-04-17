@@ -147,8 +147,9 @@ function connectSocket() {
   socket.on('connect', () => {
     console.log('[SOCKET] Connected to server:', socket.id);
     // Authenticate with JWT
-    if (authToken) {
-      socket.emit('authenticate', { token: authToken });
+    const token = authToken || sessionStorage.getItem('dmw_token');
+    if (token) {
+      socket.emit('authenticate', { token });
     }
   });
 
@@ -5740,16 +5741,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if user has a session
   function checkSession() {
     try {
-      // ✅ NO CLIENT-SIDE SESSION STORAGE - Always require fresh login
-      // This ensures 100% dynamic behavior with all data from server
-      if (!authToken || !currentUser) {
-        throw new Error('No session in memory - must log in');
+      // Try to restore session from sessionStorage (survives page refresh, clears on app close)
+      const savedToken = sessionStorage.getItem('dmw_token');
+      const savedUser = sessionStorage.getItem('dmw_user');
+      
+      if (savedToken && savedUser) {
+        authToken = savedToken;
+        currentUser = JSON.parse(savedUser);
+        // Ensure roles array exists
+        if (!currentUser.roles || !Array.isArray(currentUser.roles)) {
+          currentUser.roles = [currentUser.role].filter(Boolean);
+        }
+        console.log('[AUTH] Session restored for:', currentUser.name, 'roles:', currentUser.roles);
+        showApp();
+        return;
       }
-      console.log('User authenticated in memory:', currentUser.name, 'roles:', currentUser.roles);
-      showApp();
-      return;
+      throw new Error('No session in storage');
     } catch (e) {
-      console.warn('Session check:', e.message);
+      console.warn('[AUTH] Session check failed:', e.message);
     }
     // No valid session — show login screen and hide loader
     if (loginOverlay) {
@@ -5757,7 +5766,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const appLoader = document.getElementById('appLoader');
     if (appLoader) appLoader.style.display = 'none';
-    console.log('No saved session - showing login screen');
+    console.log('[AUTH] No saved session - showing login screen');
   }
 
   // Handle login - redirect form submit to doLogin
@@ -6868,6 +6877,8 @@ document.addEventListener('DOMContentLoaded', () => {
     currentUser = { name: '', role: '', division: '' };
     authToken = null;
     currentUser = null;
+    sessionStorage.removeItem('dmw_token');
+    sessionStorage.removeItem('dmw_user');
     // Session cleared
 
     // Stop notification polling
@@ -26044,8 +26055,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         managed_dept_ids: data.user.managed_dept_ids || null
       };
       
-      // Persist session to sessionStorage
-// No session storage - keep only in memory for this session
+      // Persist session to sessionStorage (survives page refresh, clears on app close)
+      sessionStorage.setItem('dmw_token', data.token);
+      sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
       
       console.log('Login successful:', currentUser);
       
@@ -26234,6 +26246,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       
       // Wait a moment then proceed to app
       setTimeout(() => {
+        // Persist session
+        sessionStorage.setItem('dmw_token', data.token);
+        sessionStorage.setItem('dmw_user', JSON.stringify(currentUser));
         showApp();
       }, 1500);
       
