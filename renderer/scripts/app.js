@@ -18098,21 +18098,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       const totalABC = parseFloat(result.total_abc || 0);
-      const totalApproved = parseFloat(result.total_approved || 0);
-      const availableBudget = parseFloat(result.available_budget || 0);
-
-      let budgetExtra = '';
-      if (availableBudget > 0) {
-        budgetExtra = `
-          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#718096;">
-            <span>Available Budget (removed items):</span>
-            <span>₱${availableBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#718096;">
-            <span>Total Approved Budget:</span>
-            <span>₱${totalApproved.toLocaleString('en-PH', {minimumFractionDigits:2})}</span>
-          </div>`;
-      }
 
       await govAlert({
         title: 'APP Consolidation Complete',
@@ -18123,7 +18108,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <i class="fas fa-check-circle" style="font-size:28px;color:#276749;"></i>
             </div>
             <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
-            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — PPMP → APP</p>
+            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries converted to APP</p>
           </div>
 
           <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:15px;">
@@ -18148,11 +18133,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             </table>
           </div>
 
-          ${budgetExtra}
-
           <div style="background:#ebf8ff;border-left:4px solid #3182ce;padding:10px 12px;border-radius:4px;margin-top:10px;">
             <p style="margin:0;font-size:12px;color:#2b6cb0;">
-              <i class="fas fa-lightbulb"></i> All PPMP codes have been transformed to APP codes. General Descriptions have been auto-summarized from Project Titles.
+              <i class="fas fa-lightbulb"></i> All PPMP codes have been transformed to APP codes. General Descriptions have been auto-summarized from Project Titles. View detailed APP data below.
             </p>
           </div>
         `,
