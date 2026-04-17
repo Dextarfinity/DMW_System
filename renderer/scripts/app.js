@@ -3848,6 +3848,55 @@ window.deleteAPPEntry = async function(planId) {
  }
 };
 
+// Dynamic budget recalculation based on visible table rows
+function recalculateAPPBudgetsSynchronized() {
+ const appTable = document.querySelector('#appTableBody, #app-table tbody');
+ if (!appTable) return;
+ 
+ // Get all visible data rows (excluding header/footer rows)
+ const rows = Array.from(appTable.querySelectorAll('tr[data-plan-id]'));
+ 
+ // Sum budget from visible rows
+ let totalApproved = 0;
+ rows.forEach(row => {
+ const budgetCell = row.querySelector('[data-budget-total], td:nth-child(8)');
+ if (budgetCell) {
+ const budgetText = budgetCell.textContent || '';
+ const budgetNum = parseFloat(budgetText.replace(/[^0-9.-]/g, '')) || 0;
+ totalApproved += budgetNum;
+ }
+ });
+ 
+ // Get overall allocated budget from the page
+ let overallAllocatedBudget = 0;
+ const activeBudgetEl = document.getElementById('appActiveBudget');
+ if (activeBudgetEl && activeBudgetEl.textContent) {
+ const activeText = activeBudgetEl.textContent || '';
+ overallAllocatedBudget = parseFloat(activeText.replace(/[^0-9.-]/g, '')) || 0;
+ }
+ 
+ // If no budget in Active Budget, try to get from data attribute or cache
+ if (overallAllocatedBudget === 0 && window._appStatus && window._appStatus.total_budget) {
+ overallAllocatedBudget = parseFloat(window._appStatus.total_budget) || 0;
+ }
+ 
+ // Calculate available budget
+ let availableBudget = overallAllocatedBudget > totalApproved ? (overallAllocatedBudget - totalApproved) : 0;
+ 
+ // Update the display
+ const elTotalApproved = document.getElementById('appTotalApproved');
+ const elAvailableBudget = document.getElementById('appAvailableBudget');
+ 
+ if (elTotalApproved) {
+ elTotalApproved.textContent = '₱' + totalApproved.toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ if (elAvailableBudget) {
+ elAvailableBudget.textContent = '₱' + availableBudget.toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ 
+ console.log('[APP BUDGET] Synchronized - Total Approved: ₱' + totalApproved.toLocaleString('en-PH') + ' | Available: ₱' + availableBudget.toLocaleString('en-PH') + ' | Rows: ' + rows.length);
+}
+
 function updateAPPSummary(items, budgetSummary) {
  // Determine division filtering — all users see only their own division except global roles
  const userRole = (currentUser && currentUser.role) || '';
