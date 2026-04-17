@@ -2540,19 +2540,6 @@
         const versionHeader = response.headers.get('X-App-Version') || CURRENT_VERSION;
         if (versionHeader !== CURRENT_VERSION) {
           console.log('[AUTO-SYNC] ✅ New version detected:', versionHeader, '- Refreshing...');
-          // Save modal state before refresh if modal is open
-          const modalOverlay = document.querySelector('.modal-overlay');
-          if (modalOverlay && modalOverlay.style.display !== 'none') {
-            const modalBody = document.getElementById('modalBody');
-            const modalTitle = document.getElementById('modalTitle');
-            localStorage.setItem('_modalState', JSON.stringify({
-              title: modalTitle?.textContent || '',
-              body: modalBody?.innerHTML || '',
-              open: true,
-              timestamp: Date.now()
-            }));
-            console.log('[AUTO-SYNC] Modal state saved before refresh');
-          }
           CURRENT_VERSION = versionHeader;
           window.location.reload(true); // Hard refresh
         }

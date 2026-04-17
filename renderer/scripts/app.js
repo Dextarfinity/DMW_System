@@ -5652,9 +5652,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize the app
   async function init() {
-    // Clear any stuck modal state from localStorage
-    localStorage.removeItem('_preservedModalState');
-    
     console.log('[INIT] Starting application initialization...');
     // Discover which server IP is reachable BEFORE any API calls
     await discoverServer();
@@ -5836,9 +5833,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect to Socket.IO for real-time sync across all Electron clients
     connectSocket();
 
-    // Navigate to saved page or dashboard
-    const savedPage = localStorage.getItem('dmw_current_page');
-    navigateTo(savedPage || 'dashboard');
+    // Navigate to dashboard (always start here - no client-side page persistence)
+    navigateTo('dashboard');
 
     // 🔄 NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
     // This prevents the loader from disappearing before page content is ready
@@ -6583,9 +6579,6 @@ document.addEventListener('DOMContentLoaded', () => {
         page.classList.add('active');
       }
     });
-
-    // Save current page to localStorage for persistence on reload
-    localStorage.setItem('dmw_current_page', pageId);
 
     // Update page title
     if (pageTitle) {
