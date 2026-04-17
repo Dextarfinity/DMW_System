@@ -18848,24 +18848,49 @@ Failure to submit the above requirements within the prescribed period shall cons
       return { label: mode, css: 'svp' };
     }
 
+    // Format procurement date (same as in renderAPPTable)
+    const formatProcDate = (d) => {
+      if (!d) return '-';
+      const parts = d.split('-');
+      if (parts.length >= 2) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return months[parseInt(parts[1])-1] + ' ' + parts[0];
+      }
+      return d;
+    };
+
     const deptCode = getDeptCode(item.department_name);
     const mode = getProcMode(item);
-    const unitPrice = parseFloat(item.unit_price || 0);
-    const totalQty = parseInt(item.total_qty || 0);
-    const totalPrice = parseFloat(item.total_price || (unitPrice * totalQty));
+    const estBudget = parseFloat(item.total_price || item.unit_price || 0);
+    const startDate = formatProcDate(item.start_date);
+    const endDate = formatProcDate(item.end_date);
+    
+    // Build version tag per item
+    let versionTag = '';
+    const appVer = (item.app_version || 'indicative').toLowerCase();
+    if (appVer === 'indicative') {
+      versionTag = '<span class="version-tag indicative">Indicative</span>';
+    } else if (appVer === 'final') {
+      versionTag = '<span class="version-tag final">Final</span>';
+    } else if (appVer === 'updated') {
+      versionTag = '<span class="version-tag updated">Updated</span>';
+    }
 
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>APP Code:</label><span>${item.item_code || '-'}</span></div>
         <div class="detail-row"><label>Project Title:</label><span>${item.item_name || '-'}</span></div>
+        <div class="detail-row"><label>Department:</label><span>${deptCode}</span></div>
         <div class="detail-row"><label>General Description:</label><span>${(item.item_description && item.item_description !== item.item_name) ? item.item_description : summarizeProjectTitle(item.item_name)}</span></div>
-        <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
-        <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
-        <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-        <div class="detail-row"><label>Total Quantity:</label><span>${totalQty} ${item.unit || ''}</span></div>
-        <div class="detail-row"><label>Total Price:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
         <div class="detail-row"><label>Procurement Mode:</label><span><span class="mode-badge ${mode.css}">${mode.label}</span></span></div>
-        <div class="detail-row"><label>Funding Source:</label><span>GAA ${item.fiscal_year || String(getCurrentFiscalYear())}</span></div>
+        <div class="detail-row"><label>Early Procurement:</label><span>${item.early_procurement || 'No'}</span></div>
+        <div class="detail-row"><label>Bid Criteria:</label><span>${item.bid_criteria || 'LCRB'}</span></div>
+        <div class="detail-row"><label>Start Date:</label><span>${startDate}</span></div>
+        <div class="detail-row"><label>End Date:</label><span>${endDate}</span></div>
+        <div class="detail-row"><label>Fund Source:</label><span>${item.fund_source || 'GAA'}</span></div>
+        <div class="detail-row"><label>Est. Budget:</label><span>₱${estBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        <div class="detail-row"><label>Procurement Strategy:</label><span>${item.procurement_strategy || '-'}</span></div>
+        <div class="detail-row"><label>App Version:</label><span>${versionTag}</span></div>
         <div class="detail-row"><label>Remarks:</label><span>${item.remarks || '-'}</span></div>
       </div>
       <div class="form-group" style="text-align: right; margin-top: 20px;">
