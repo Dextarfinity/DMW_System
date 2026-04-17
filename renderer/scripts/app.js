@@ -17955,6 +17955,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (loadEl) loadEl.remove();
 
       // Step 4: Reload APP data to reflect current state
+      // 🔄 Wait 800ms for database transaction to complete before fresh fetch
+      console.log('[CONSOLIDATE] Consolidation complete, waiting for DB transaction commit...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // 🔄 Clear APP cache and fetch fresh data from database
+      window._appData = null;
+      window._appItems = null;
+      console.log('[CONSOLIDATE] Fetching fresh APP data from database...');
       await loadAPP();
 
       // Step 4b: Auto-summarize general descriptions and save to DB
