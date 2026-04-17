@@ -1754,7 +1754,7 @@ app.get('/api/debug/plans-unit-data', async (req, res) => {
       FROM procurementplans pp
       LEFT JOIN plan_items pi ON pi.plan_id = pp.id
       LEFT JOIN items it ON pp.item_id = it.id
-      WHERE pp.is_deleted = false
+      WHERE pp.ppmp_no IS NOT NULL
       ORDER BY pp.id DESC
       LIMIT 20
     `);
