@@ -2288,34 +2288,74 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
     
     // If no rows, check if app_entries table has any data at all
     if (result.rows.length === 0 && fiscalYear) {
-      const appEntriesCheck = await pool.query(
-        `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
+      console.log('[API /plan-items] 🔍 DIAGNOSTIC: Query returned 0 rows. Running detailed diagnostics...');
+      
+      // Check app_entries count (without fiscal_year filter)
+      const appAllCheck = await pool.query(
+        `SELECT COUNT(*) as total, COUNT(CASE WHEN is_deleted = false OR is_deleted IS NULL THEN 1 END) as active FROM app_entries`
+      );
+      console.log('[API /plan-items] 🔍 Total app_entries in DB:', appAllCheck.rows[0].total, 'Active:', appAllCheck.rows[0].active);
+      
+      // Check app_entries for this FY
+      const appFYCheck = await pool.query(
+        `SELECT COUNT(*) as total, COUNT(CASE WHEN is_deleted = false OR is_deleted IS NULL THEN 1 END) as active 
+         FROM app_entries WHERE fiscal_year = $1`,
         [fiscalYear]
       );
-      console.log('[API /plan-items] 🔍 app_entries table has ' + appEntriesCheck.rows[0].count + ' entries for FY ' + fiscalYear);
+      console.log('[API /plan-items] 🔍 app_entries for FY ' + fiscalYear + ': ' + appFYCheck.rows[0].total + ' total, ' + appFYCheck.rows[0].active + ' active');
       
-      const ppmpCheck = await pool.query(
-        `SELECT COUNT(*) as count FROM procurementplans WHERE fiscal_year = $1 AND status = 'approved'`,
+      // Check procurementplans for this FY with status = approved
+      const ppmpApprovedCheck = await pool.query(
+        `SELECT COUNT(*) as count FROM procurementplans 
+         WHERE fiscal_year = $1 AND status = 'approved' AND ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL)`,
         [fiscalYear]
       );
-      console.log('[API /plan-items] 🔍 procurementplans has ' + ppmpCheck.rows[0].count + ' approved entries for FY ' + fiscalYear);
+      console.log('[API /plan-items] 🔍 Approved active PPMP for FY ' + fiscalYear + ': ' + ppmpApprovedCheck.rows[0].count);
       
-      // Debug: Check the actual plan_ids in app_entries
-      const idsInAppEntries = await pool.query(
-        `SELECT DISTINCT plan_id FROM app_entries WHERE fiscal_year = $1 LIMIT 10`,
+      // Check the actual INNER JOIN without WHERE to see if any join at all works
+      const joinCheck = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM procurementplans pp
+         INNER JOIN app_entries ae ON ae.plan_id = pp.id`
+      );
+      console.log('[API /plan-items] 🔍 Total INNER JOIN (all tables): ' + joinCheck.rows[0].count);
+      
+      // Check if there are app_entries with plan_ids that DON\'T exist in procurementplans
+      const orphanCheck = await pool.query(
+        `SELECT COUNT(*) as count FROM app_entries ae 
+         WHERE ae.plan_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM procurementplans pp WHERE pp.id = ae.plan_id)`
+      );
+      console.log('[API /plan-items] 🔍 Orphan app_entries (plan_id not in procurementplans): ' + orphanCheck.rows[0].count);
+      
+      // Show sample app_entries
+      const sampleAppEntries = await pool.query(
+        `SELECT id, plan_id, app_code, fiscal_year, is_deleted FROM app_entries LIMIT 5`
+      );
+      console.log('[API /plan-items] 🔍 Sample app_entries:', sampleAppEntries.rows);
+      
+      // Show sample procurementplans
+      const samplePPMP = await pool.query(
+        `SELECT id, ppmp_no, status, fiscal_year, is_deleted FROM procurementplans WHERE status = 'approved' LIMIT 5`
+      );
+      console.log('[API /plan-items] 🔍 Sample approved PPMP (first 5):', samplePPMP.rows);
+      
+      // Try the INNER JOIN filtered to just FY
+      const innerJoinFYCheck = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM procurementplans pp
+         INNER JOIN app_entries ae ON ae.plan_id = pp.id
+         WHERE ae.fiscal_year = $1`,
         [fiscalYear]
       );
-      console.log('[API /plan-items] 🔍 Plan IDs in app_entries:', idsInAppEntries.rows.map(r => r.plan_id));
+      console.log('[API /plan-items] 🔍 INNER JOIN for FY ' + fiscalYear + ': ' + innerJoinFYCheck.rows[0].count);
       
-      // Debug: Check if those plan_ids exist in procurementplans as approved
-      if (idsInAppEntries.rows.length > 0) {
-        const planIds = idsInAppEntries.rows.map(r => r.plan_id);
-        const ppmpMatches = await pool.query(
-          `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
-          [planIds]
-        );
-        console.log('[API /plan-items] 🔍 Procurementplans for those IDs:', ppmpMatches.rows);
-      }
+      // Check if PPMP statuses match what we expect
+      const statusCheck = await pool.query(
+        `SELECT status, COUNT(*) as count FROM procurementplans 
+         WHERE fiscal_year = $1 GROUP BY status`,
+        [fiscalYear]
+      );
+      console.log('[API /plan-items] 🔍 PPMP status breakdown for FY ' + fiscalYear + ':', statusCheck.rows);
     }
     
     res.json(result.rows);
