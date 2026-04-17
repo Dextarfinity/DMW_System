@@ -2249,6 +2249,10 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
       params.push(parseInt(fiscalYear));
       whereClause += ` AND ae.fiscal_year = $${params.length}`;
     }
+    
+    // 🔍 DEBUG LOGGING
+    console.log('[API /plan-items] Query fiscal_year:', fiscalYear);
+    
     const result = await pool.query(
       `SELECT pp.id, pp.ppmp_no,
               ae.id as app_entry_id,
@@ -2279,8 +2283,29 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
        ORDER BY ae.id`,
       params
     );
+    
+    console.log('[API /plan-items] ✅ Query returned ' + result.rows.length + ' rows');
+    
+    // If no rows, check if app_entries table has any data at all
+    if (result.rows.length === 0 && fiscalYear) {
+      const appEntriesCheck = await pool.query(
+        `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
+        [fiscalYear]
+      );
+      console.log('[API /plan-items] 🔍 app_entries table has ' + appEntriesCheck.rows[0].count + ' entries for FY ' + fiscalYear);
+      
+      const ppmpCheck = await pool.query(
+        `SELECT COUNT(*) as count FROM procurementplans WHERE fiscal_year = $1 AND status = 'approved'`,
+        [fiscalYear]
+      );
+      console.log('[API /plan-items] 🔍 procurementplans has ' + ppmpCheck.rows[0].count + ' approved entries for FY ' + fiscalYear);
+    }
+    
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('[API /plan-items] ERROR:', err.message);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // PUT adjust APP item budget (total_amount on procurementplans)
