@@ -2450,52 +2450,113 @@ app.put('/api/app-entries/:planId/delete', authenticateToken, async (req, res) =
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
   try {
     const fy = req.query.fiscal_year || new Date().getFullYear();
-    // Only count non-deleted approved PPMPs for budget figures
-    const result = await pool.query(
-      `SELECT 
-        COALESCE(SUM(total_amount), 0) as total_budget,
-        COALESCE(SUM(total_amount), 0) as active_budget,
-        COUNT(*)::int as active_count
-       FROM procurementplans
-       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND (is_deleted = false OR is_deleted IS NULL)`,
+    
+    // Check if consolidation has been done (check app_entries table for this FY)
+    const appCheckResult = await pool.query(
+      `SELECT COUNT(*)::int as count FROM app_entries WHERE fiscal_year = $1`,
       [fy]
     );
-    // Count removed (soft-deleted) approved PPMPs for this fiscal year
-    const removedResult = await pool.query(
-      `SELECT COUNT(*)::int as removed_count,
-              COALESCE(SUM(total_amount), 0) as removed_budget
-       FROM procurementplans
-       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND is_deleted = true`,
-      [fy]
-    );
+    const hasConsolidated = appCheckResult.rows[0].count > 0;
+    
+    console.log('[APP-BUDGET] FY ' + fy + ' - Consolidated: ' + hasConsolidated + ', APP entries: ' + appCheckResult.rows[0].count);
+    
+    let result, removedResult, deptResult, deptRemovedResult;
+    
+    if (hasConsolidated) {
+      // Return APP entries budget (after consolidation)
+      console.log('[APP-BUDGET] Returning APP entries budget');
+      result = await pool.query(
+        `SELECT 
+          COALESCE(SUM(estimated_budget), 0) as total_budget,
+          COALESCE(SUM(estimated_budget), 0) as active_budget,
+          COUNT(*)::int as active_count
+         FROM app_entries
+         WHERE fiscal_year = $1 AND (is_deleted = false OR is_deleted IS NULL)`,
+        [fy]
+      );
+      
+      removedResult = await pool.query(
+        `SELECT COUNT(*)::int as removed_count,
+                COALESCE(SUM(estimated_budget), 0) as removed_budget
+         FROM app_entries
+         WHERE fiscal_year = $1 AND is_deleted = true`,
+        [fy]
+      );
+      
+      deptResult = await pool.query(
+        `SELECT d.code as department_code, d.name as department_name,
+                COALESCE(SUM(ae.estimated_budget), 0) as active,
+                COUNT(*)::int as active_count
+         FROM app_entries ae
+         LEFT JOIN procurementplans pp ON ae.plan_id = pp.id
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE ae.fiscal_year = $1 AND (ae.is_deleted = false OR ae.is_deleted IS NULL)
+         GROUP BY d.code, d.name ORDER BY d.code`,
+        [fy]
+      );
+      
+      deptRemovedResult = await pool.query(
+        `SELECT d.code as department_code,
+                COALESCE(SUM(ae.estimated_budget), 0) as removed_budget,
+                COUNT(*)::int as removed_count
+         FROM app_entries ae
+         LEFT JOIN procurementplans pp ON ae.plan_id = pp.id
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE ae.fiscal_year = $1 AND ae.is_deleted = true
+         GROUP BY d.code`,
+        [fy]
+      );
+    } else {
+      // Return PPMP budget (before consolidation)
+      console.log('[APP-BUDGET] Returning PPMP budget (no consolidation yet)');
+      result = await pool.query(
+        `SELECT 
+          COALESCE(SUM(total_amount), 0) as total_budget,
+          COALESCE(SUM(total_amount), 0) as active_budget,
+          COUNT(*)::int as active_count
+         FROM procurementplans
+         WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
+           AND (is_deleted = false OR is_deleted IS NULL)`,
+        [fy]
+      );
+      
+      removedResult = await pool.query(
+        `SELECT COUNT(*)::int as removed_count,
+                COALESCE(SUM(total_amount), 0) as removed_budget
+         FROM procurementplans
+         WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
+           AND is_deleted = true`,
+        [fy]
+      );
+      
+      deptResult = await pool.query(
+        `SELECT d.code as department_code, d.name as department_name,
+                COALESCE(SUM(pp.total_amount), 0) as active,
+                COUNT(*)::int as active_count
+         FROM procurementplans pp
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+           AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+         GROUP BY d.code, d.name ORDER BY d.code`,
+        [fy]
+      );
+      
+      deptRemovedResult = await pool.query(
+        `SELECT d.code as department_code,
+                COALESCE(SUM(pp.total_amount), 0) as removed_budget,
+                COUNT(*)::int as removed_count
+         FROM procurementplans pp
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+           AND pp.is_deleted = true
+         GROUP BY d.code`,
+        [fy]
+      );
+    }
+    
     const row = result.rows[0];
     const removed = removedResult.rows[0];
-    // Department breakdown (non-deleted approved only)
-    const deptResult = await pool.query(
-      `SELECT d.code as department_code, d.name as department_name,
-              COALESCE(SUM(pp.total_amount), 0) as active,
-              COUNT(*)::int as active_count
-       FROM procurementplans pp
-       LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
-         AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
-       GROUP BY d.code, d.name ORDER BY d.code`,
-      [fy]
-    );
-    // Department removed breakdown
-    const deptRemovedResult = await pool.query(
-      `SELECT d.code as department_code,
-              COALESCE(SUM(pp.total_amount), 0) as removed_budget,
-              COUNT(*)::int as removed_count
-       FROM procurementplans pp
-       LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
-         AND pp.is_deleted = true
-       GROUP BY d.code`,
-      [fy]
-    );
+    
     // Merge removed data into department breakdown
     const removedMap = {};
     deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
@@ -2504,6 +2565,9 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
       removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
       removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
     }));
+    
+    console.log('[APP-BUDGET] Returning: active=' + row.active_budget + ', departments=' + departments.length);
+    
     res.json({
       total_budget: row.total_budget,
       active_budget: row.active_budget,
@@ -2513,7 +2577,10 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
       removed_budget: removed.removed_budget,
       by_department: departments
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('[APP-BUDGET] ERROR:', err.message);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // POST consolidate PPMP into APP
