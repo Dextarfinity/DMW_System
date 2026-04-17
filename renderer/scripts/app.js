@@ -1566,7 +1566,6 @@ async function loadAPP() {
       apiRequest('/app-budget-summary?fiscal_year=' + fy + '&_cache_bust=' + Date.now())
     ]);
     console.log('[APP] ✅ Fresh data fetched from database - ' + (items ? items.length : 0) + ' items');
-    console.log('[APP] 💰 Budget Summary:', budgetSummary);
     
     // 🔍 DEBUG: Log the actual data structure
     if (items && items.length > 0) {
@@ -1609,11 +1608,9 @@ async function loadAPP() {
       console.log('[APP] Rendering table - Items: ' + items.length + ', Consolidated: ' + (isConsolidated ? 'Yes' : 'No'));
       renderAPPTable(items, appStatus);
       updateAPPSummary(items, budgetSummary);
-      console.log('[APP] ✅ Budget cards updated with summary data');
     } else {
       renderAPPTable([], appStatus);
       updateAPPSummary([], budgetSummary);
-      console.log('[APP] ℹ️ No items found - showing empty state');
       // Show notice
       const tableBody = document.querySelector('#appTableBody, #app-table tbody');
       if (tableBody) {
@@ -3873,15 +3870,6 @@ function updateAPPSummary(items, budgetSummary) {
   if (elAvailableBudget) elAvailableBudget.textContent = '₱' + availableBudget.toLocaleString('en-PH', {minimumFractionDigits: 2});
   if (elRemovedCount) elRemovedCount.textContent = removedCount;
   if (elActiveProjects) elActiveProjects.textContent = totalProjects;
-
-  // Log budget update for debugging
-  console.log('[APP BUDGET] ✅ Summary cards updated:', {
-    totalApproved: '₱' + totalApproved.toLocaleString('en-PH', {minimumFractionDigits: 2}),
-    activeBudget: '₱' + activeBudget.toLocaleString('en-PH', {minimumFractionDigits: 2}),
-    availableBudget: '₱' + availableBudget.toLocaleString('en-PH', {minimumFractionDigits: 2}),
-    activeProjects: totalProjects,
-    removedCount: removedCount
-  });
 
   // Count items per mode of procurement (using filtered items)
   const modeCounts = {};
