@@ -1597,7 +1597,9 @@ async function loadAPP() {
     }
 
     // Only show items if consolidated, otherwise show message
-    if (isConsolidated) {
+    // 🔄 FIXED: Show table if items exist (even if status hasn't updated yet)
+    if (isConsolidated || (items && items.length > 0)) {
+      console.log('[APP] Rendering table - Items: ' + items.length + ', Consolidated: ' + (isConsolidated ? 'Yes' : 'No'));
       renderAPPTable(items, appStatus);
       updateAPPSummary(items, budgetSummary);
     } else {
@@ -17959,10 +17961,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       console.log('[CONSOLIDATE] Consolidation complete, waiting for DB transaction commit...');
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // 🔄 Clear APP cache and fetch fresh data from database
+      // 🔄 Clear ALL APP caches to force fresh fetch from database
       window._appData = null;
       window._appItems = null;
-      console.log('[CONSOLIDATE] Fetching fresh APP data from database...');
+      window._appStatus = null; // Also clear cached app status
+      console.log('[CONSOLIDATE] Cleared app caches, fetching fresh APP data from database...');
       await loadAPP();
 
       // Step 4b: Auto-summarize general descriptions and save to DB
@@ -17984,6 +17987,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       await new Promise(resolve => setTimeout(resolve, 500));
       window._appData = null;
       window._appItems = null;
+      window._appStatus = null; // Clear app status cache too
       console.log('[CONSOLIDATE] Fetching fresh APP data with summarized descriptions...');
       await loadAPP();
 
