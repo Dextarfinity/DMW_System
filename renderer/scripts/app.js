@@ -18102,109 +18102,55 @@ Failure to submit the above requirements within the prescribed period shall cons
       const loadEl = document.getElementById('consolidateLoadingOverlay');
       if (loadEl) loadEl.remove();
 
-      // Step 4: Reload APP data to reflect current state
-      // 🔄 Wait 800ms for database transaction to complete before fresh fetch
-      console.log('[CONSOLIDATE] Consolidation complete, waiting for DB transaction commit...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // 🔄 Clear ALL APP caches to force fresh fetch from database
-      window._appData = null;
-      window._appItems = null;
-      window._appStatus = null; // Also clear cached app status
-      console.log('[CONSOLIDATE] Cleared app caches, fetching fresh APP data from database...');
-      
-      // Fetch fresh data
-      const freshAppData = await loadAPP();
-      console.log('[CONSOLIDATE] ✅ Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
-      console.log('[CONSOLIDATE] Items in window._appItems:', window._appItems ? window._appItems.length : 0);
-      
-      // Verify data loaded successfully
-      if (!freshAppData || freshAppData.length === 0) {
-        console.error('[CONSOLIDATE] 🚨 CRITICAL: APP data still empty after load!');
-        console.error('[CONSOLIDATE] Server returned:', freshAppData);
-        console.error('[CONSOLIDATE] Checking window._appItems:', window._appItems);
-        console.error('[CONSOLIDATE] Retrying with longer delay...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        window._appData = null;
-        window._appItems = null;
-        window._appStatus = null;
-        const retryData = await loadAPP();
-        console.log('[CONSOLIDATE] Retry result: ' + (retryData ? retryData.length : 0) + ' items');
-        if (retryData && retryData.length > 0) {
-          console.log('[CONSOLIDATE] ✅ Retry successful! Items now showing.');
-        } else {
-          console.error('[CONSOLIDATE] 🚨 CRITICAL FAILURE: Even retry returned no data!');
-          console.error('[CONSOLIDATE] Possible causes:');
-          console.error('  1. Server /plan-items endpoint not returning consolidated data');
-          console.error('  2. Consolidation endpoint failed silently');
-          console.error('  3. Data is not being saved to database');
-        }
-      } else {
-        console.log('[CONSOLIDATE] ✅ Data loaded successfully on first try');
-      }
+      console.log('[CONSOLIDATE] ✅ Server consolidation complete. Result:', result);
+      console.log('[CONSOLIDATE] Consolidated items:', result.count, 'Created:', result.created, 'Total:', result.total_items);
 
-      // Step 4b: Auto-summarize general descriptions and save to DB
-      // The consolidation copies raw description — now summarize each one client-side and persist
-      const appItems = window._appItems || [];
-      for (const item of appItems) {
-        if (item.item_name && item.item_description === item.item_name) {
-          const summarized = summarizeProjectTitle(item.item_name);
-          if (summarized && summarized !== item.item_name) {
-            try {
-              await apiRequest('/app-entries/' + item.id, 'PUT', { general_description: summarized });
-            } catch (e) { console.warn('[Summarize] Failed for', item.id, e.message); }
-          }
-        }
-      }
-      // Reload to show summarized descriptions
-      // 🔄 Wait 500ms for summarization updates to commit to database
-      console.log('[CONSOLIDATE] Summarization complete, waiting for DB transaction commit...');
+      // Step 4: Fetch all consolidated APP entries to display in modal
+      console.log('[CONSOLIDATE] Fetching consolidated APP entries for display...');
+      // Wait a bit for database to commit
       await new Promise(resolve => setTimeout(resolve, 500));
-      window._appData = null;
-      window._appItems = null;
-      window._appStatus = null; // Clear app status cache too
-      console.log('[CONSOLIDATE] Fetching fresh APP data with summarized descriptions...');
-      await loadAPP();
       
-      // 🔍 FINAL SAFETY CHECK: Verify table is populated
-      const appTableBody = document.getElementById('appTableBody');
-      if (appTableBody) {
-        const rowCount = appTableBody.querySelectorAll('tr:not(:has(td[colspan]))').length;
-        const emptyRow = appTableBody.querySelector('tr td[colspan]');
-        console.log('[CONSOLIDATE] Table state - Rows:', rowCount, 'Empty message:', emptyRow ? 'YES' : 'NO');
-        if (emptyRow && window._appItems && window._appItems.length > 0) {
-          console.error('[CONSOLIDATE] 🚨 TABLE EMPTY BUT DATA EXISTS! Forcing re-render...');
-          console.log('[CONSOLIDATE] DEBUG - Items:', window._appItems.length, 'First item:', window._appItems[0]);
-          console.log('[CONSOLIDATE] DEBUG - Item structure:', JSON.stringify(window._appItems[0], null, 2));
-          // Force re-render with explicit status
-          const status = window._appStatus || { consolidated_at: new Date().toISOString(), app_type: 'indicative' };
-          renderAPPTable(window._appItems, status);
-          console.log('[CONSOLIDATE] ✅ Force re-render complete');
-          // Verify re-render worked
-          const newRowCount = appTableBody.querySelectorAll('tr:not(:has(td[colspan]))').length;
-          const stillEmpty = appTableBody.querySelector('tr td[colspan]');
-          console.log('[CONSOLIDATE] After re-render - Rows:', newRowCount, 'Still empty:', stillEmpty ? 'YES' : 'NO');
-        }
+      let consolidatedEntries = [];
+      try {
+        // Fetch fresh APP entries using cache-buster
+        const appEntriesResponse = await apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now(), 'GET');
+        consolidatedEntries = appEntriesResponse || [];
+        console.log('[CONSOLIDATE] ✅ Fetched', consolidatedEntries.length, 'consolidated APP entries');
+      } catch (fetchErr) {
+        console.warn('[CONSOLIDATE] Could not fetch APP entries:', fetchErr);
+        consolidatedEntries = [];
       }
 
-      // Step 5: Show government-themed success summary modal
-      let deptRows = '';
-      if (result.by_department && result.by_department.length) {
-        result.by_department.forEach(dept => {
-          const name = dept.department_name || 'Unknown';
-          const count = dept.count || 0;
-          const total = parseFloat(dept.total || 0);
-          deptRows += `
-            <tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">${name}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:13px;font-weight:600;">${count}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:13px;">₱${total.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-            </tr>`;
+      // Step 5: Build enumerated list of consolidated APP entries
+      let enumeratedList = '<div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;max-height:300px;overflow-y:auto;">';
+      
+      if (consolidatedEntries && consolidatedEntries.length > 0) {
+        consolidatedEntries.forEach((entry, idx) => {
+          const code = entry.item_code || 'N/A';
+          const title = entry.item_name || 'Untitled';
+          const budget = parseFloat(entry.total_price || 0);
+          const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : 'N/A';
+          
+          enumeratedList += `
+            <div style="border-bottom:1px solid #e2e8f0;padding:8px 0;${idx === consolidatedEntries.length - 1 ? 'border-bottom:none;' : ''}">
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;">
+                <span style="background:#1a365d;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:600;font-size:11px;">${idx + 1}</span>
+                <div style="flex:1;overflow:hidden;">
+                  <div style="font-weight:600;color:#1a365d;">${code}</div>
+                  <div style="color:#4a5568;font-size:12px;margin-top:2px;">${title}</div>
+                  <div style="color:#a0aec0;font-size:11px;margin-top:2px;">Budget: ${budgetStr}</div>
+                </div>
+              </div>
+            </div>
+          `;
         });
+        enumeratedList += '</div>';
+      } else {
+        enumeratedList += '<div style="text-align:center;padding:20px;color:#a0aec0;"><p>No APP entries were consolidated.</p></div></div>';
       }
 
-      const totalABC = parseFloat(result.total_abc || 0);
-
+      // Step 6: Show completion modal with enumerated list (BEFORE loading data)
+      console.log('[CONSOLIDATE] Showing completion modal with enumerated APP list...');
       await govAlert({
         title: 'APP Consolidation Complete',
         type: 'success',
@@ -18214,42 +18160,19 @@ Failure to submit the above requirements within the prescribed period shall cons
               <i class="fas fa-check-circle" style="font-size:28px;color:#276749;"></i>
             </div>
             <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
-            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries converted to APP</p>
+            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries consolidated to APP</p>
           </div>
 
-          <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:15px;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="background:#1a365d;">
-                  <th style="padding:8px 12px;text-align:left;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Division</th>
-                  <th style="padding:8px 12px;text-align:center;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Items</th>
-                  <th style="padding:8px 12px;text-align:right;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Total ABC</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${deptRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#edf2f7;font-weight:700;">
-                  <td style="padding:10px 12px;font-size:13px;border-top:2px solid #1a365d;">Total</td>
-                  <td style="padding:10px 12px;text-align:center;font-size:13px;border-top:2px solid #1a365d;">${result.total_items || 0}</td>
-                  <td style="padding:10px 12px;text-align:right;font-size:13px;border-top:2px solid #1a365d;">₱${totalABC.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <div style="background:#ebf8ff;border-left:4px solid #3182ce;padding:10px 12px;border-radius:4px;margin-top:10px;">
-            <p style="margin:0;font-size:12px;color:#2b6cb0;">
-              <i class="fas fa-lightbulb"></i> All PPMP codes have been transformed to APP codes. General Descriptions have been auto-summarized from Project Titles. View detailed APP data below.
-            </p>
+          <div style="margin-bottom:15px;">
+            <p style="margin:0 0 8px 0;font-weight:600;color:#1a365d;font-size:13px;"><i class="fas fa-list-ol"></i> Consolidated APP Entries:</p>
+            ${enumeratedList}
           </div>
         `,
-        buttonText: 'View APP'
+        buttonText: 'View APP Table'
       });
 
-      // Navigate to APP page to show results
-      if (typeof navigateTo === 'function') navigateTo('app');
+      // Step 7: After modal closes, reload APP data and navigate
+      console.log('[CONSOLIDATE] Modal closed by user, loading fresh APP data...');
     } catch (err) {
       // Remove loading overlay on error
       const loadEl = document.getElementById('consolidateLoadingOverlay');
