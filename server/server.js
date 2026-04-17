@@ -2563,7 +2563,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
     );
     console.log('[CONSOLIDATE] ✅ Item descriptions updated');
 
-    // Create app_entries for each approved PPMP (idempotent — won't overwrite existing edits)
+    // Create app_entries for each approved PPMP (idempotent — UPSERT to handle re-consolidation)
     console.log('[CONSOLIDATE] 🔄 Inserting into app_entries...');
     const appInsert = await pool.query(
       `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
@@ -2577,11 +2577,23 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       FROM procurementplans pp
       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
         AND pp.status = 'approved' AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
-      ON CONFLICT (plan_id) DO NOTHING`,
+      ON CONFLICT (plan_id) DO UPDATE SET
+        app_code = EXCLUDED.app_code,
+        project_title = EXCLUDED.project_title,
+        general_description = EXCLUDED.general_description,
+        procurement_mode = EXCLUDED.procurement_mode,
+        bid_criteria = EXCLUDED.bid_criteria,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        fund_source = EXCLUDED.fund_source,
+        estimated_budget = EXCLUDED.estimated_budget,
+        procurement_strategy = EXCLUDED.procurement_strategy,
+        remarks = EXCLUDED.remarks,
+        updated_at = CURRENT_TIMESTAMP`,
       [fiscalYear]
     );
 
-    console.log('[CONSOLIDATE] ✅ ' + appInsert.rowCount + ' entries inserted into app_entries');
+    console.log('[CONSOLIDATE] ✅ ' + appInsert.rowCount + ' entries inserted/updated in app_entries');
     
     // VERIFY: Check what was actually created
     const verifyCheck = await pool.query(
