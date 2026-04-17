@@ -113,6 +113,14 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // Serve renderer (frontend) files so Electron clients load UI from the server.
 // This makes ALL frontend changes on the server propagate to every client automatically.
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+
+// REAL-TIME VERSION SYNC: Send version header so all clients auto-refresh on changes
+const APP_VERSION = String(Date.now()); // Use timestamp to force refresh whenever server restarts
+app.use((req, res, next) => {
+  res.setHeader('X-App-Version', APP_VERSION);
+  next();
+});
+
 app.use(express.static(RENDERER_DIR, {
   etag: false,
   lastModified: true,
@@ -122,6 +130,7 @@ app.use(express.static(RENDERER_DIR, {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('X-App-Version', APP_VERSION);
     }
   }
 }));

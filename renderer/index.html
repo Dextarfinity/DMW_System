@@ -2527,7 +2527,7 @@
     // AUTO-SYNC VERSION CHECK - Ensures all clients stay on same code version
     // ============================================================================
     // Check server for updated code every 30 seconds and refresh if needed
-    const CURRENT_VERSION = '20260417001';
+    let CURRENT_VERSION = '20260417002'; // Updated for real-time refresh
     
     async function checkForUpdates() {
       try {
