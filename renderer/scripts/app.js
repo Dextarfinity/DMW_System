@@ -5480,6 +5480,20 @@ async function loadPageData(pageId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Log initialization on both clients
+  console.log('[INIT] 🚀 DOMContentLoaded fired');
+  console.log('[INIT] Client IP: detecting...');
+  console.log('[INIT] App Version: 20260417001');
+  
+  // Verify appLoader is visible at start
+  const appLoader = document.getElementById('appLoader');
+  if (appLoader) {
+    console.log('[INIT] ✅ appLoader element found');
+    console.log('[INIT] appLoader display:', window.getComputedStyle(appLoader).display);
+  } else {
+    console.warn('[INIT] ⚠️ appLoader element NOT found!');
+  }
+  
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
   const loginForm = document.getElementById('loginForm');
@@ -5559,10 +5573,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize the app
   async function init() {
+    console.log('[INIT] Starting application initialization...');
     // Discover which server IP is reachable BEFORE any API calls
     await discoverServer();
     API_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api`;
     console.log('[INIT] API_URL resolved to', API_URL);
+    console.log('[INIT] Client is connected to server at:', RESOLVED_SERVER_IP);
 
     setCurrentDate();
     setupEventListeners();

@@ -2504,8 +2504,41 @@
     </div>
   </div>
 
-  <script src="scripts/app.js"></script>
+  <script src="scripts/app.js?v=20260417001"></script>
   <script>
+    // ============================================================================
+    // AUTO-SYNC VERSION CHECK - Ensures all clients stay on same code version
+    // ============================================================================
+    // Check server for updated code every 30 seconds and refresh if needed
+    const CURRENT_VERSION = '20260417001';
+    
+    async function checkForUpdates() {
+      try {
+        const response = await fetch('/', { 
+          method: 'HEAD',
+          cache: 'no-cache',
+          pragma: 'no-cache'
+        });
+        const versionHeader = response.headers.get('X-App-Version') || CURRENT_VERSION;
+        if (versionHeader !== CURRENT_VERSION) {
+          console.log('[AUTO-SYNC] ✅ New version detected:', versionHeader, '- Refreshing...');
+          window.location.reload(true); // Hard refresh
+        }
+      } catch (e) {
+        console.warn('[AUTO-SYNC] Could not check for updates:', e.message);
+      }
+    }
+    
+    // Check for updates every 30 seconds (keeps both clients in sync)
+    setInterval(checkForUpdates, 30000);
+    
+    // Also check when page becomes visible (user switched tabs)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkForUpdates();
+      }
+    });
+
     // Inject DMW letterhead into every gov-form-header (matching official DMW Regional Office letterhead)
     document.querySelectorAll('.gov-form-header').forEach(function(header) {
       if (header.querySelector('.dmw-letterhead')) return; // already injected
