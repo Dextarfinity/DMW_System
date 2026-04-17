@@ -252,6 +252,20 @@ const RESOURCE_TO_PAGE = {
 
 /** Handle a real-time data_changed event from the server */
 function handleRealtimeDataChange(event) {
+  // Check if a modal is open - if so, don't refresh the page
+  const modalOverlay = document.querySelector('.modal-overlay');
+  const isModalOpen = modalOverlay && modalOverlay.style.display !== 'none';
+  
+  if (isModalOpen) {
+    console.log('[SYNC] ⚠️ Modal is open - skipping page refresh to preserve modal state');
+    // Only update cache, don't reload page
+    window._appData = null;
+    window._appItems = null;
+    window._appStatus = null;
+    window._ppmpData = null;
+    return;
+  }
+
   const activePage = document.querySelector('.page.active');
   const activePageId = activePage ? activePage.id : null;
   const resource = (event && event.resource ? String(event.resource) : '').toLowerCase();
