@@ -2238,7 +2238,7 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.query.fiscal_year;
     let whereClause = `WHERE ae.id IS NOT NULL
-      AND pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
+      AND pp.ppmp_no IS NOT NULL AND pp.status = 'approved'`;
     const params = [];
     if (fiscalYear) {
       params.push(parseInt(fiscalYear));
