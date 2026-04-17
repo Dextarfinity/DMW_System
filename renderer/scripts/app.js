@@ -18317,27 +18317,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         }
       });
       
-      // WAIT for user to click the button before proceeding
-      await modalClosed;
-
-      // Step 7: After user clicks "View APP Table", NOW load the data and navigate
-      console.log('[CONSOLIDATE] User clicked "View APP Table", loading fresh APP data...');
-      
-      // Clear caches to force fresh fetch
-      window._appData = null;
-      window._appItems = null;
-      window._appStatus = null;
-      
-      // Wait for database to fully commit
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Load fresh APP data
-      const freshAppData = await loadAPP();
-      console.log('[CONSOLIDATE] ✅ Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
-      
-      // Navigate to APP page to display the table
-      if (typeof navigateTo === 'function') navigateTo('app');
-      console.log('[CONSOLIDATE] ✅ CONSOLIDATION WORKFLOW COMPLETE');
+      console.log('[CONSOLIDATE] ✅ CONSOLIDATION MODAL COMPLETE - Ready for user interaction');
     } catch (err) {
       // Remove loading overlay on error
       const loadEl = document.getElementById('consolidateLoadingOverlay');
