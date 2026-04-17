@@ -2526,8 +2526,9 @@
     // ============================================================================
     // AUTO-SYNC VERSION CHECK - Ensures all clients stay on same code version
     // ============================================================================
-    // Refresh ONLY when there are actual changes (via Socket.IO or tab switch)
+    // Only refresh when there are actual CODE changes, NOT on every tab switch
     let CURRENT_VERSION = '20260417002'; // Updated for real-time refresh
+    let lastVersionCheck = Date.now();
     
     async function checkForUpdates() {
       try {
@@ -2539,6 +2540,20 @@
         const versionHeader = response.headers.get('X-App-Version') || CURRENT_VERSION;
         if (versionHeader !== CURRENT_VERSION) {
           console.log('[AUTO-SYNC] ✅ New version detected:', versionHeader, '- Refreshing...');
+          // Save modal state before refresh if modal is open
+          const modalOverlay = document.querySelector('.modal-overlay');
+          if (modalOverlay && modalOverlay.style.display !== 'none') {
+            const modalBody = document.getElementById('modalBody');
+            const modalTitle = document.getElementById('modalTitle');
+            localStorage.setItem('_modalState', JSON.stringify({
+              title: modalTitle?.textContent || '',
+              body: modalBody?.innerHTML || '',
+              open: true,
+              timestamp: Date.now()
+            }));
+            console.log('[AUTO-SYNC] Modal state saved before refresh');
+          }
+          CURRENT_VERSION = versionHeader;
           window.location.reload(true); // Hard refresh
         }
       } catch (e) {
@@ -2546,13 +2561,14 @@
       }
     }
     
-    // Check when page becomes visible (user switched tabs back to app)
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        console.log('[AUTO-SYNC] Page became visible - checking for updates...');
-        checkForUpdates();
-      }
-    });
+    // Check for updates on a longer interval (5 minutes) - NOT on every tab switch
+    setInterval(() => {
+      console.log('[AUTO-SYNC] Checking for version updates (5 min interval)...');
+      checkForUpdates();
+    }, 300000); // 5 minutes
+    
+    // DO NOT refresh on tab visibility change - preserve modal state
+    // Users can manually refresh if they want the latest version
 
     // Inject DMW letterhead into every gov-form-header (matching official DMW Regional Office letterhead)
     document.querySelectorAll('.gov-form-header').forEach(function(header) {
