@@ -3534,6 +3534,10 @@ function renderAPPTable(items, appStatus) {
   // Initialize sticky top scrollbar for APP table
   const appCard = tbody.closest('.data-card');
   if (appCard) initStickyTopScrollbar(appCard);
+  
+  // 🔍 LOG: Verify table rendering
+  const finalRowCount = tbody.querySelectorAll('tr').length;
+  console.log('[APP TABLE RENDER] ✅ Complete - ' + displayItems.length + ' data rows + 1 total row = ' + finalRowCount + ' total table rows');
 }
 
 // APP table search filter — filters visible rows by search text
