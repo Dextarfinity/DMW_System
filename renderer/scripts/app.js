@@ -18227,7 +18227,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (btn) {
           btn.addEventListener('click', async () => {
             // Show loading
-            showPageLoader();
+            const loader = document.getElementById('pageLoader');
+            if (loader) loader.style.display = 'block';
             
             // Fetch fresh APP data with all columns
             try {
@@ -18309,7 +18310,9 @@ Failure to submit the above requirements within the prescribed period shall cons
               console.error('[CONSOLIDATE] Error fetching APP table:', err);
               alert('Error loading APP table. Please try again.');
             } finally {
-              hidePageLoader();
+              // Hide loading
+              const loader = document.getElementById('pageLoader');
+              if (loader) loader.style.display = 'none';
             }
           });
         }
