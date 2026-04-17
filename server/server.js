@@ -2413,8 +2413,16 @@ app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
     } = req.body;
 
     // Ensure app_entries row exists
-    const existing = await pool.query('SELECT id FROM app_entries WHERE plan_id = $1', [req.params.planId]);
+    const existing = await pool.query('SELECT id, project_title FROM app_entries WHERE plan_id = $1', [req.params.planId]);
     let appEntryId;
+    
+    // Auto-summarize general_description if not provided or empty
+    let finalGenDesc = general_description;
+    const titleToSummarize = project_title || (existing.rows.length ? existing.rows[0].project_title : '');
+    if (!finalGenDesc || finalGenDesc.trim() === '') {
+      finalGenDesc = summarizeProjectTitle(titleToSummarize);
+    }
+    
     if (!existing.rows.length) {
       const ppmp = await pool.query('SELECT fiscal_year FROM procurementplans WHERE id = $1', [req.params.planId]);
       if (!ppmp.rows.length) return res.status(404).json({ error: 'PPMP not found' });
@@ -2425,7 +2433,7 @@ app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
         VALUES ($1, $2, REPLACE((SELECT ppmp_no FROM procurementplans WHERE id=$1), 'PPMP-', 'APP-'),
           $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING id`,
-        [req.params.planId, ppmp.rows[0].fiscal_year, project_title, general_description,
+        [req.params.planId, ppmp.rows[0].fiscal_year, project_title, finalGenDesc,
          procurement_mode, early_procurement || 'No', bid_criteria || 'LCRB',
          start_date, end_date, fund_source, estimated_budget || 0,
          procurement_strategy || '-', app_version || 'indicative', remarks]
@@ -2453,11 +2461,12 @@ app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
          updated_at = CURRENT_TIMESTAMP
        WHERE id = $13
        RETURNING *`,
-      [project_title, general_description, procurement_mode, early_procurement,
+      [project_title, finalGenDesc, procurement_mode, early_procurement,
        bid_criteria, start_date, end_date, fund_source, estimated_budget,
        procurement_strategy, app_version, remarks, appEntryId]
     );
 
+    console.log('[APP-ENTRIES] ✅ Updated app_entry ' + appEntryId + ' - General description auto-summarized: ' + (finalGenDesc !== general_description));
     io.emit('data_changed', { type: 'plan-items', action: 'app_entry_updated', app_entry_id: appEntryId });
     res.json({ message: 'APP entry updated successfully', app_entry: result.rows[0] });
   } catch (err) {
