@@ -18052,9 +18052,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             <i class="fas fa-exclamation-triangle"></i> <strong>What will happen:</strong>
           </p>
           <ul style="margin:6px 0 0 0;padding-left:18px;font-size:12px;color:#744210;">
-            <li>PPMP codes will be transformed to APP codes</li>
-            <li>All approved entries will be displayed in the APP table</li>
-            <li>General Descriptions will be auto-summarized from Project Titles</li>
+            <li>All approved PPMP entries will be consolidated into the APP</li>
+            <li>APP codes will be auto-generated from PPMP codes</li>
+            <li>Project titles will be preserved and displayed in the APP table</li>
           </ul>
         </div>
       `,
