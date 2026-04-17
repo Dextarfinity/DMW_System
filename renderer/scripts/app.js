@@ -18861,9 +18861,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="detail-row"><label>General Description:</label><span>${(item.item_description && item.item_description !== item.item_name) ? item.item_description : summarizeProjectTitle(item.item_name)}</span></div>
         <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
         <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
-        <div class="detail-row"><label>Unit:</label><span>${item.unit || '-'}</span></div>
         <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
-        <div class="detail-row"><label>Quarterly Qty:</label><span>Q1: ${item.q1_qty||0} | Q2: ${item.q2_qty||0} | Q3: ${item.q3_qty||0} | Q4: ${item.q4_qty||0}</span></div>
         <div class="detail-row"><label>Total Quantity:</label><span>${totalQty} ${item.unit || ''}</span></div>
         <div class="detail-row"><label>Total Price:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
         <div class="detail-row"><label>Procurement Mode:</label><span><span class="mode-badge ${mode.css}">${mode.label}</span></span></div>
