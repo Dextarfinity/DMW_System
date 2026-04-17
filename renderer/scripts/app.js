@@ -18177,30 +18177,65 @@ Failure to submit the above requirements within the prescribed period shall cons
         enumeratedList += '<div style="text-align:center;padding:20px;color:#a0aec0;"><p>No APP entries were consolidated.</p></div></div>';
       }
 
-      // Step 6: Show completion modal with enumerated list (BEFORE loading data)
+      // Step 6: Show completion modal with enumerated list and WAIT for user to click button
       console.log('[CONSOLIDATE] Showing completion modal with enumerated APP list...');
-      await govAlert({
-        title: 'APP Consolidation Complete',
-        type: 'success',
-        bodyHtml: `
-          <div style="text-align:center;margin-bottom:15px;">
-            <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#c6f6d5;margin-bottom:8px;">
-              <i class="fas fa-check-circle" style="font-size:28px;color:#276749;"></i>
+      
+      // Create a promise that resolves when user clicks "View APP Table"
+      const modalClosed = new Promise((resolve) => {
+        // Create modal overlay
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'gov-dialog-overlay';
+        modalOverlay.id = 'consolidateCompleteModal';
+        modalOverlay.style.zIndex = '10000';
+        
+        modalOverlay.innerHTML = `
+          <div class="gov-dialog" style="max-width:600px;">
+            <div class="gov-dialog-header confirm">
+              <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#c6f6d5;margin-right:12px;">
+                <i class="fas fa-check-circle" style="font-size:20px;color:#276749;"></i>
+              </div>
+              <h3 style="margin:0;">APP Consolidation Complete</h3>
             </div>
-            <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
-            <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries consolidated to APP</p>
-          </div>
+            <div class="gov-dialog-body" style="padding:20px;max-height:500px;overflow-y:auto;">
+              <div style="text-align:center;margin-bottom:15px;">
+                <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
+                <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries consolidated to APP</p>
+              </div>
 
-          <div style="margin-bottom:15px;">
-            <p style="margin:0 0 8px 0;font-weight:600;color:#1a365d;font-size:13px;"><i class="fas fa-list-ol"></i> Consolidated APP Entries:</p>
-            ${enumeratedList}
+              <div style="margin-bottom:15px;">
+                <p style="margin:0 0 8px 0;font-weight:600;color:#1a365d;font-size:13px;"><i class="fas fa-list-ol"></i> Consolidated APP Entries:</p>
+                ${enumeratedList}
+              </div>
+            </div>
+            <div class="gov-dialog-footer" style="padding:15px 20px;background:#f7fafc;border-top:1px solid #e2e8f0;text-align:right;gap:10px;display:flex;justify-content:flex-end;">
+              <button type="button" class="btn btn-primary" id="viewAPPTableBtn" style="cursor:pointer;">
+                <i class="fas fa-table"></i> View APP Table
+              </button>
+            </div>
           </div>
-        `,
-        buttonText: 'View APP Table'
+        `;
+        
+        document.body.appendChild(modalOverlay);
+        
+        // Add click handler to the button INSIDE the modal
+        const viewBtn = document.getElementById('viewAPPTableBtn');
+        if (viewBtn) {
+          viewBtn.addEventListener('click', () => {
+            // Remove the modal
+            if (modalOverlay.parentNode) {
+              modalOverlay.parentNode.removeChild(modalOverlay);
+            }
+            // Resolve the promise - this allows the consolidation workflow to continue
+            resolve();
+          });
+        }
       });
+      
+      // WAIT for user to click the button before proceeding
+      await modalClosed;
 
-      // Step 7: After modal closes, reload APP data and navigate
-      console.log('[CONSOLIDATE] Modal closed by user, loading fresh APP data...');
+      // Step 7: After user clicks "View APP Table", NOW load the data and navigate
+      console.log('[CONSOLIDATE] User clicked "View APP Table", loading fresh APP data...');
       
       // Clear caches to force fresh fetch
       window._appData = null;
