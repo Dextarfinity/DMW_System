@@ -5803,6 +5803,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect to Socket.IO for real-time sync across all Electron clients
     connectSocket();
 
+    // Display client IP in the connected clients indicator
+    const clientIPDisplay = document.getElementById('clientIPDisplay');
+    if (clientIPDisplay) {
+      clientIPDisplay.textContent = `📍 Client: ${RESOLVED_SERVER_IP}`;
+      clientIPDisplay.style.color = '#22863a';
+      console.log('[APP] ✅ Updated client IP display');
+    }
+
     // Navigate to saved page or dashboard
     const savedPage = localStorage.getItem('dmw_current_page');
     navigateTo(savedPage || 'dashboard');
