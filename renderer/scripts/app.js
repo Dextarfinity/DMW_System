@@ -1332,7 +1332,7 @@ async function loadPPMP() {
 
     // Show loading indicator
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><i class="fas fa-spinner fa-spin" style="font-size:20px;margin-right:8px;"></i>Loading PPMP data...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><i class="fas fa-spinner fa-spin" style="font-size:20px;margin-right:8px;"></i>Loading PPMP data from database...</td></tr>';
     }
 
     // Build server query with all filters
@@ -1345,7 +1345,12 @@ async function loadPPMP() {
     if (selectedMode) url += '&procurement_mode=' + encodeURIComponent(selectedMode);
     if (selectedSource) url += '&procurement_source=' + encodeURIComponent(selectedSource);
 
+    // Add cache-busting parameter to ensure fresh data from database
+    url += '&_cache_bust=' + Date.now();
+
+    console.log('[PPMP] Fetching fresh data from database: ' + url);
     const ppmp = await apiRequest(url);
+    console.log('[PPMP] Fresh data received from database - ' + ppmp.length + ' entries');
     
     // === SPECIAL ACCESS: ESPALDON sees all except WRSD (dept_id=4) ===
     let accessFiltered = ppmp;
@@ -19424,10 +19429,12 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showEditPPMPModal = async function(planId) {
     try {
       // ===== PRIMARY KEY LOOKUP AND FETCH =====
-      // Fetch the specific PPMP entry from database using planId as primary key
-      console.log('[PPMP EDIT] Fetching PPMP entry with planId:', planId);
-      const plan = await apiRequest('/plans/' + planId);
-      console.log('[PPMP EDIT] PPMP entry fetched successfully:', plan);
+      // Fetch the SPECIFIC PPMP entry from database using planId as primary key
+      // Add cache-busting parameter to ensure fresh data from database
+      const freshUrl = '/plans/' + planId + '?_cache_bust=' + Date.now();
+      console.log('[PPMP EDIT] Fetching fresh PPMP entry from database:', freshUrl);
+      const plan = await apiRequest(freshUrl);
+      console.log('[PPMP EDIT] Fresh PPMP entry received from database:', plan);
 
       // ===== CREATE STRUCTURED DATA FOR SPECIFIC ENTRY =====
       // Extract all fetched data into a structured object with comprehensive fallback logic
