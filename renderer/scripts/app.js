@@ -2799,13 +2799,15 @@ function escapeHtml(str) {
 
 function formatQuantitySize(p) {
   const rawQty = (p.quantity_size ?? '').toString().trim();
-  const qty = parseInt(rawQty, 10) || 0;
+  const qty = parseFloat(rawQty) || 0;
 
   // Dynamic unit fallback priority:
-  // 1) PPMP row unit (edited in modal)
+  // 1) PPMP row unit (edited in modal) - PRIMARY SOURCE
   // 2) item catalog unit from JOIN
   // 3) infer trailing text from quantity_size string (e.g. "25 pieces")
   let unit = (p.unit || p.item_unit || '').toString().trim();
+  
+  // If unit still not found, try to parse from quantity_size string
   if (!unit && rawQty) {
     const qtyWithUnitMatch = rawQty.match(/^\s*\d+(?:\.\d+)?\s*([A-Za-z][A-Za-z\s\-]*)\s*$/);
     if (qtyWithUnitMatch && qtyWithUnitMatch[1]) {
@@ -2814,30 +2816,42 @@ function formatQuantitySize(p) {
   }
 
   // Dynamic price fallback priority:
-  // 1) PPMP row unit_price
+  // 1) PPMP row unit_price (edited in modal) - PRIMARY SOURCE
   // 2) item catalog unit_price from JOIN
   // 3) parse from quantity_size text if encoded (e.g. "@ ₱150.00/ pieces")
   let price = parseFloat(p.unit_price ?? p.item_unit_price ?? 0);
+  
+  // Only try to parse from text if no numeric price is available
   if ((!price || Number.isNaN(price)) && rawQty) {
     const priceMatch = rawQty.match(/@\s*₱?\s*([\d,]+(?:\.\d+)?)/i);
     if (priceMatch && priceMatch[1]) {
       price = parseFloat(priceMatch[1].replace(/,/g, ''));
     }
   }
+  
+  // Ensure price is always a valid number
   if (!Number.isFinite(price)) price = 0;
 
-  // If no qty and no unit, keep original display
-  if (!qty && !unit) return rawQty || '-';
+  // CASE 1: No qty and no unit → return raw string or dash
+  if (!qty && !unit) {
+    return rawQty || '-';
+  }
 
-  // If qty + unit exist, always render canonical dynamic format
+  // CASE 2: Qty + Unit exist → render DYNAMIC FORMAT: "25 pieces @ ₱150.00/ pieces"
   if (qty && unit) {
-    const unitLower = unit.toLowerCase();
-    const priceStr = '₱' + price.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    const unitLower = unit.toLowerCase().trim();
+    // Format price with proper Philippine peso format
+    const priceStr = '₱' + (price > 0 ? price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00');
     return `${qty} ${unitLower} @ ${priceStr}/ ${unitLower}`;
   }
 
-  // If only qty exists, show qty only (rare edge case)
-  return String(qty || rawQty || '-');
+  // CASE 3: Only qty exists (no unit) → show qty only
+  if (qty && !unit) {
+    return String(qty);
+  }
+
+  // CASE 4: Fallback to original
+  return rawQty || '-';
 }
 
 function renderPPMPTable(ppmp, allPPMPItems) {
