@@ -19485,14 +19485,15 @@ Failure to submit the above requirements within the prescribed period shall cons
         ensureProcModesLoaded().catch(() => []),
         ensurePPMPSectionsLoaded().catch(() => []),
         ensurePPMPCategoriesLoaded().catch(() => []),
-        apiRequest('/items').catch(() => []),
-        apiRequest('/uoms').catch(() => [])
+        apiRequest('/items?_cache_bust=' + Date.now()).catch(() => []), // Fresh fetch from database
+        apiRequest('/uoms?_cache_bust=' + Date.now()).catch(() => []) // Fresh UOM list from database
       ]);
 
       window._ppmpItemsCache = allItems || [];
-      console.log('[PPMP EDIT] Database resources loaded.');
-      console.log('[PPMP EDIT] Sections count:', cachedPPMPSections.length);
-      console.log('[PPMP EDIT] Categories count:', cachedPPMPCategories.length);
+      console.log('[PPMP EDIT] ✅ Fresh database resources loaded - UOMs count:', (uomList || []).length);
+      console.log('[PPMP EDIT] ✅ Fresh database resources loaded - Items count:', allItems.length);
+      console.log('[PPMP EDIT] Sections count from DB:', cachedPPMPSections.length);
+      console.log('[PPMP EDIT] Categories count from DB:', cachedPPMPCategories.length);
 
       // Build UOM options - ensure the current unit is always in the list
       let uomOptionsRaw = (uomList || []).map(u =>
@@ -19514,6 +19515,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         uomOptionsRaw = '<option value="" disabled selected>-- Select Unit --</option>' + uomOptionsRaw;
       }
       const uomOptions = uomOptionsRaw;
+      console.log('[PPMP EDIT] ✅ UOM dropdown populated from fresh database - ' + (uomList || []).length + ' options');
 
       // Determine procurement source from DB (normalize for dropdown)
       const dbProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
