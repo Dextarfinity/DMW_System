@@ -765,8 +765,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     ] = await Promise.all([
       // Basic counts — uses safeQuery so missing tables don't crash the dashboard
       safeQuery('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
-      safeQuery('SELECT COUNT(*) FROM procurementplans WHERE (is_deleted = false OR is_deleted IS NULL)'),
-      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery('SELECT COUNT(*) FROM procurementplans'),
+      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
       safeQuery('SELECT COUNT(*) FROM purchaserequests'),
       safeQuery('SELECT COUNT(*) FROM purchaseorders'),
       safeQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
@@ -796,11 +796,11 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       safeQuery("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
       safeQuery("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
       // PPMP by division (with status breakdown) — current fiscal year only
-      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
+      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
       // Total PPMP budget — current fiscal year only
-      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
       // PPMP status breakdown — current fiscal year only
-      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
+      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
       // Recent PRs with department + item descriptions
       safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
         COALESCE(
@@ -1693,11 +1693,6 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
     // Only return PPMP line items (with ppmp_no) unless explicitly requesting all
     if (req.query.ppmp_only !== 'false') {
       conditions.push(`pp.ppmp_no IS NOT NULL`);
-    }
-
-    // Exclude soft-deleted unless explicitly requesting them
-    if (req.query.include_deleted !== 'true') {
-      conditions.push(`(pp.is_deleted = false OR pp.is_deleted IS NULL)`);
     }
 
     if (conditions.length > 0) {
@@ -2732,7 +2727,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
       const planIds = debugEntries.rows.map(r => r.plan_id);
       console.log('[CONSOLIDATE] 🔍 Checking plan_ids:', planIds);
       const ppmpCheck = await pool.query(
-        `SELECT id, ppmp_no, status, fiscal_year, is_deleted FROM procurementplans WHERE id = ANY($1)`,
+        `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
         [planIds]
       );
       console.log('[CONSOLIDATE] 🔍 Procurementplans for those IDs:', ppmpCheck.rows);
@@ -2971,15 +2966,44 @@ app.put('/api/paps/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
-// DELETE PAP (soft-delete)
+// DELETE PAP (hard delete)
 app.delete('/api/paps/:id', authenticateToken, async (req, res) => {
   try {
+    console.log('[DELETE-PAP] 🗑️ Hard deleting PAP for id:', req.params.id);
+    
+    // Verify PAP exists
+    const checkResult = await pool.query('SELECT id, pap_name FROM paps WHERE id = $1', [req.params.id]);
+    if (checkResult.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
+    
+    // Delete PAP items first
+    await pool.query('DELETE FROM pap_items WHERE pap_id = $1', [req.params.id]);
+    
+    // Hard delete the PAP
     const result = await pool.query(
-      `UPDATE paps SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+      `DELETE FROM paps WHERE id = $1 RETURNING id, pap_name`,
       [req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
-    res.json({ message: 'PAP removed successfully', pap: result.rows[0] });
+    
+    // Verify deletion
+    const verifyResult = await pool.query('SELECT id FROM paps WHERE id = $1', [req.params.id]);
+    if (verifyResult.rows.length === 0) {
+      console.log('[DELETE-PAP] ✅✅ VERIFIED: PAP completely removed');
+    }
+    
+    io.emit('data_changed', { 
+      resource: 'paps', 
+      action: 'pap_deleted', 
+      pap_id: req.params.id,
+      user: req.user,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ 
+      message: 'PAP successfully deleted',
+      pap_id: req.params.id,
+      deleted: true,
+      deleted_pap: result.rows[0]
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
