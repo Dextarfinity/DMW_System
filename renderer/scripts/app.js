@@ -18161,66 +18161,85 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       const totalBudgetStr = totalBudget > 0 ? '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
       
-      // Create completion modal HTML
-      let entriesHtml = '';
+      // Create completion modal HTML - using EDIT PPMP form design
+      let entriesRowsHtml = '';
       if (consolidatedEntries && consolidatedEntries.length > 0) {
-        entriesHtml = `
-          <div style="margin: 20px 0;">
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr style="background: linear-gradient(to right, #1a365d, #1e40af); color: #fff;">
-                  <th style="padding: 14px 12px; text-align: left; font-weight: 600; font-size: 13px; width: 18%;">APP Code</th>
-                  <th style="padding: 14px 12px; text-align: left; font-weight: 600; font-size: 13px; flex: 1;">Project Title</th>
-                  <th style="padding: 14px 12px; text-align: right; font-weight: 600; font-size: 13px; width: 22%;">Estimated Budget</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${consolidatedEntries.map((entry, idx) => {
-                  const code = entry.item_code || 'N/A';
-                  const title = entry.item_name || 'Untitled';
-                  const budget = parseFloat(entry.total_price || 0);
-                  const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
-                  const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8fbff';
-                  const borderColor = idx === consolidatedEntries.length - 1 ? '1px solid #e5e7eb' : '1px solid #e5e7eb';
-                  return `
-                    <tr style="background-color: ${bgColor}; border-bottom: ${borderColor}; transition: background-color 0.2s;">
-                      <td style="padding: 16px 12px; color: #1a365d; font-weight: 600; font-size: 13px;">${code}</td>
-                      <td style="padding: 16px 12px; color: #374151; font-size: 13px; word-break: break-word;">${escapeHtml(title)}</td>
-                      <td style="padding: 16px 12px; text-align: right; color: #1e40af; font-weight: 700; font-size: 14px;">${budgetStr}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-          <div style="background: linear-gradient(to right, #dbeafe, #eff6ff); border-left: 5px solid #1e40af; padding: 15px 14px; margin: 20px 0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <p style="margin: 0; font-size: 13px; color: #1e3a8a; font-weight: 600;">
-              Total: <span style="color: #1a365d; font-size: 14px;">${consolidatedEntries.length} entries</span> consolidated • Budget Total: <span style="color: #1a365d; font-size: 15px; font-weight: 700;">${totalBudgetStr}</span>
-            </p>
-          </div>
-        `;
+        entriesRowsHtml = consolidatedEntries.map((entry, idx) => {
+          const code = entry.item_code || 'N/A';
+          const title = entry.item_name || 'Untitled';
+          const budget = parseFloat(entry.total_price || 0);
+          const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
+          return `
+            <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb; align-items: center;">
+              <div style="color: #1a365d; font-weight: 600; font-size: 13px;">${code}</div>
+              <div style="color: #374151; font-size: 13px; word-break: break-word;">${escapeHtml(title)}</div>
+              <div style="text-align: right; color: #1e40af; font-weight: 700; font-size: 13px;">${budgetStr}</div>
+            </div>
+          `;
+        }).join('');
       } else {
-        entriesHtml = `
-          <div style="background: #f3f4f6; padding: 30px; text-align: center; border-radius: 4px; margin: 20px 0;">
-            <p style="margin: 0; color: #6b7280; font-size: 13px;">No APP entries were consolidated.</p>
+        entriesRowsHtml = `
+          <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 13px;">
+            No APP entries were consolidated.
           </div>
         `;
       }
       
       const completionModalHtml = `
-        <div style="text-align: center; margin-bottom: 15px;">
-          <div style="font-size: 40px; margin-bottom: 10px;">✓</div>
-          <h4 style="margin: 0; color: #1a365d; font-weight: 600;">APP Consolidation Complete</h4>
-        </div>
-        <div style="background: #dbeafe; border-left: 4px solid #1e40af; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
-          <p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 13px;">Consolidation Summary</p>
-          <p style="margin: 6px 0 0 0; color: #1e3a8a; font-size: 12px;">FY ${fy} • ${result.total_items || 0} PPMP entries consolidated to APP</p>
-        </div>
-        <p style="margin: 12px 0; font-weight: 600; color: #1a365d; font-size: 13px;">Consolidated APP Entries:</p>
-        ${entriesHtml}
-        <div style="margin-top: 15px; text-align: right;">
-          <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()" style="cursor: pointer;">View APP Table</button>
-        </div>
+        <form id="consolidateForm" onsubmit="closeModal(); return false;">
+          
+          <!-- CONSOLIDATION SUMMARY SECTION -->
+          <div style="background: #e8f4f8; padding: 12px 15px; margin-bottom: 20px; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
+            APP CONSOLIDATION COMPLETE
+          </div>
+          
+          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
+            <label style="color: #4b5563; font-weight: 500; font-size: 12px;">FISCAL YEAR</label>
+            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">FY ${fy}</span>
+          </div>
+          
+          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
+            <label style="color: #4b5563; font-weight: 500; font-size: 12px;">ENTRIES CONSOLIDATED</label>
+            <span style="color: #1a365d; font-weight: 600; font-size: 13px;">${result.total_items || 0} PPMP entries</span>
+          </div>
+          
+          <!-- CONSOLIDATED APP ENTRIES SECTION -->
+          <div style="background: #e8f4f8; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
+            CONSOLIDATED APP ENTRIES
+          </div>
+          
+          <div style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
+            <!-- Header Row -->
+            <div style="display: grid; grid-template-columns: 200px 1fr 180px; gap: 15px; padding: 12px 15px; background: #f3f4f6; border-bottom: 2px solid #d1d5db; font-weight: 600; color: #1a365d; font-size: 12px;">
+              <div>APP CODE</div>
+              <div>PROJECT TITLE</div>
+              <div style="text-align: right;">ESTIMATED BUDGET</div>
+            </div>
+            <!-- Entries -->
+            ${entriesRowsHtml}
+          </div>
+          
+          <!-- CONSOLIDATION SUMMARY SECTION -->
+          <div style="background: #e8f4f8; padding: 12px 15px; margin-top: 20px; margin-bottom: 0; border-left: 4px solid #1a365d; font-weight: 600; color: #1a365d; font-size: 13px;">
+            CONSOLIDATION SUMMARY
+          </div>
+          
+          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
+            <label style="color: #4b5563; font-weight: 500; font-size: 12px;">TOTAL ENTRIES</label>
+            <span style="color: #1a365d; font-weight: 700; font-size: 14px;">${consolidatedEntries.length}</span>
+          </div>
+          
+          <div class="detail-row" style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; padding: 12px 15px; border-bottom: 1px solid #e5e7eb;">
+            <label style="color: #4b5563; font-weight: 500; font-size: 12px;">TOTAL BUDGET</label>
+            <span style="color: #1e40af; font-weight: 700; font-size: 14px;">${totalBudgetStr}</span>
+          </div>
+          
+          <!-- BUTTONS -->
+          <div style="padding: 20px 0; text-align: right; border-top: 1px solid #e5e7eb; margin-top: 20px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="margin-right: 10px;">Cancel</button>
+            <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()">View APP Table</button>
+          </div>
+        </form>
       `;
       
       // Show modal using standard openModal function
