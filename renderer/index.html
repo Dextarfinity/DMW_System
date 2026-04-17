@@ -2526,7 +2526,7 @@
     // ============================================================================
     // AUTO-SYNC VERSION CHECK - Ensures all clients stay on same code version
     // ============================================================================
-    // Check server for updated code every 30 seconds and refresh if needed
+    // Refresh ONLY when there are actual changes (via Socket.IO or tab switch)
     let CURRENT_VERSION = '20260417002'; // Updated for real-time refresh
     
     async function checkForUpdates() {
@@ -2546,12 +2546,10 @@
       }
     }
     
-    // Check for updates every 30 seconds (keeps both clients in sync)
-    setInterval(checkForUpdates, 30000);
-    
-    // Also check when page becomes visible (user switched tabs)
+    // Check when page becomes visible (user switched tabs back to app)
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
+        console.log('[AUTO-SYNC] Page became visible - checking for updates...');
         checkForUpdates();
       }
     });
