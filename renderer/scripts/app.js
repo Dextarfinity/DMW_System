@@ -17982,6 +17982,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       // Step 3: Call server consolidation endpoint
       const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
+      console.log('[CONSOLIDATE] ✅ Server consolidation complete. Result:', result);
+      console.log('[CONSOLIDATE] Consolidated items:', result.count, 'by department:', result.by_department);
 
       // Remove loading overlay
       const loadEl = document.getElementById('consolidateLoadingOverlay');
@@ -17997,7 +17999,20 @@ Failure to submit the above requirements within the prescribed period shall cons
       window._appItems = null;
       window._appStatus = null; // Also clear cached app status
       console.log('[CONSOLIDATE] Cleared app caches, fetching fresh APP data from database...');
-      await loadAPP();
+      
+      // Fetch fresh data
+      const freshAppData = await loadAPP();
+      console.log('[CONSOLIDATE] Fresh APP data loaded:', freshAppData ? freshAppData.length : 0, 'items');
+      
+      // Verify data loaded successfully
+      if (!freshAppData || freshAppData.length === 0) {
+        console.error('[CONSOLIDATE] WARNING: APP data still empty after load! Retrying...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        window._appData = null;
+        window._appItems = null;
+        window._appStatus = null;
+        await loadAPP();
+      }
 
       // Step 4b: Auto-summarize general descriptions and save to DB
       // The consolidation copies raw description — now summarize each one client-side and persist
