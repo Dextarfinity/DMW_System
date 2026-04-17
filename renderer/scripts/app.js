@@ -18165,13 +18165,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       let entriesHtml = '';
       if (consolidatedEntries && consolidatedEntries.length > 0) {
         entriesHtml = `
-          <div class="table-responsive" style="margin: 15px 0;">
-            <table class="table table-sm" style="margin-bottom: 0;">
+          <div style="margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
               <thead>
-                <tr style="background-color: #f3f4f6;">
-                  <th style="width: 15%; padding: 10px 8px;">APP Code</th>
-                  <th style="padding: 10px 8px;">Project Title</th>
-                  <th style="width: 20%; text-align: right; padding: 10px 8px;">Estimated Budget</th>
+                <tr style="background: linear-gradient(to right, #1a365d, #1e40af); color: #fff;">
+                  <th style="padding: 14px 12px; text-align: left; font-weight: 600; font-size: 13px; width: 18%;">APP Code</th>
+                  <th style="padding: 14px 12px; text-align: left; font-weight: 600; font-size: 13px; flex: 1;">Project Title</th>
+                  <th style="padding: 14px 12px; text-align: right; font-weight: 600; font-size: 13px; width: 22%;">Estimated Budget</th>
                 </tr>
               </thead>
               <tbody>
@@ -18180,24 +18180,28 @@ Failure to submit the above requirements within the prescribed period shall cons
                   const title = entry.item_name || 'Untitled';
                   const budget = parseFloat(entry.total_price || 0);
                   const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
+                  const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8fbff';
+                  const borderColor = idx === consolidatedEntries.length - 1 ? '1px solid #e5e7eb' : '1px solid #e5e7eb';
                   return `
-                    <tr>
-                      <td style="padding: 8px; color: #1a365d; font-weight: 500;">${code}</td>
-                      <td style="padding: 8px;">${escapeHtml(title)}</td>
-                      <td style="padding: 8px; text-align: right; color: #1e40af; font-weight: 500;">${budgetStr}</td>
+                    <tr style="background-color: ${bgColor}; border-bottom: ${borderColor}; transition: background-color 0.2s;">
+                      <td style="padding: 16px 12px; color: #1a365d; font-weight: 600; font-size: 13px;">${code}</td>
+                      <td style="padding: 16px 12px; color: #374151; font-size: 13px; word-break: break-word;">${escapeHtml(title)}</td>
+                      <td style="padding: 16px 12px; text-align: right; color: #1e40af; font-weight: 700; font-size: 14px;">${budgetStr}</td>
                     </tr>
                   `;
                 }).join('')}
               </tbody>
             </table>
           </div>
-          <div style="background: #eff6ff; border-left: 4px solid #1e40af; padding: 12px; margin: 15px 0; border-radius: 4px;">
-            <p style="margin: 0; font-size: 13px; color: #1e40af; font-weight: 500;">Total: ${consolidatedEntries.length} entries consolidated • Budget Total: ${totalBudgetStr}</p>
+          <div style="background: linear-gradient(to right, #dbeafe, #eff6ff); border-left: 5px solid #1e40af; padding: 15px 14px; margin: 20px 0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="margin: 0; font-size: 13px; color: #1e3a8a; font-weight: 600;">
+              Total: <span style="color: #1a365d; font-size: 14px;">${consolidatedEntries.length} entries</span> consolidated • Budget Total: <span style="color: #1a365d; font-size: 15px; font-weight: 700;">${totalBudgetStr}</span>
+            </p>
           </div>
         `;
       } else {
         entriesHtml = `
-          <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 4px; margin: 15px 0;">
+          <div style="background: #f3f4f6; padding: 30px; text-align: center; border-radius: 4px; margin: 20px 0;">
             <p style="margin: 0; color: #6b7280; font-size: 13px;">No APP entries were consolidated.</p>
           </div>
         `;
