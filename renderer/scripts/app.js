@@ -18180,6 +18180,15 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Step 6: Show completion modal with enumerated list and WAIT for user to click button
       console.log('[CONSOLIDATE] Showing completion modal with enumerated APP list...');
       
+      // Calculate totals
+      let totalBudget = 0;
+      if (consolidatedEntries && consolidatedEntries.length > 0) {
+        consolidatedEntries.forEach(entry => {
+          totalBudget += parseFloat(entry.total_price || 0);
+        });
+      }
+      const totalBudgetStr = totalBudget > 0 ? '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
+      
       // Create a promise that resolves when user clicks "View APP Table"
       const modalClosed = new Promise((resolve) => {
         // Create modal overlay
@@ -18189,27 +18198,80 @@ Failure to submit the above requirements within the prescribed period shall cons
         modalOverlay.style.zIndex = '10000';
         
         modalOverlay.innerHTML = `
-          <div class="gov-dialog" style="max-width:600px;">
-            <div class="gov-dialog-header confirm">
-              <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#c6f6d5;margin-right:12px;">
-                <i class="fas fa-check-circle" style="font-size:20px;color:#276749;"></i>
+          <div class="gov-dialog" style="max-width:700px;">
+            <div class="gov-dialog-header confirm" style="background:#1a365d;border-bottom:3px solid #2d5a8c;">
+              <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#dbeafe;margin-right:12px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#1e40af;">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
               </div>
-              <h3 style="margin:0;">APP Consolidation Complete</h3>
+              <h3 style="margin:0;color:#fff;font-weight:600;">APP Consolidation Complete</h3>
             </div>
-            <div class="gov-dialog-body" style="padding:20px;max-height:500px;overflow-y:auto;">
-              <div style="text-align:center;margin-bottom:15px;">
-                <p style="margin:0;color:#276749;font-weight:600;font-size:15px;">Successfully Consolidated</p>
-                <p style="margin:4px 0 0 0;color:#718096;font-size:12px;">FY ${fy} — ${result.total_items || 0} PPMP entries consolidated to APP</p>
+            <div class="gov-dialog-body" style="padding:20px;max-height:550px;overflow-y:auto;background:#fff;">
+              
+              <div style="background:#dbeafe;border-left:4px solid #1e40af;padding:12px;margin-bottom:15px;border-radius:4px;">
+                <p style="margin:0;color:#1e40af;font-weight:600;font-size:13px;">Consolidation Summary</p>
+                <p style="margin:6px 0 0 0;color:#1e3a8a;font-size:12px;">FY ${fy} • ${result.total_items || 0} PPMP entries consolidated to APP</p>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">
+                <div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px;">
+                  <div style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Entries</div>
+                  <div style="color:#1e40af;font-weight:700;font-size:18px;">${consolidatedEntries.length}</div>
+                </div>
+                <div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px;">
+                  <div style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Budget</div>
+                  <div style="color:#1e40af;font-weight:700;font-size:18px;">${totalBudgetStr}</div>
+                </div>
               </div>
 
               <div style="margin-bottom:15px;">
-                <p style="margin:0 0 8px 0;font-weight:600;color:#1a365d;font-size:13px;"><i class="fas fa-list-ol"></i> Consolidated APP Entries:</p>
-                ${enumeratedList}
+                <p style="margin:0 0 10px 0;font-weight:600;color:#1a365d;font-size:13px;">Consolidated APP Entries</p>
+                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;max-height:280px;overflow-y:auto;">
+                  ${consolidatedEntries && consolidatedEntries.length > 0 ? `
+                    ${consolidatedEntries.map((entry, idx) => {
+                      const code = entry.item_code || 'N/A';
+                      const title = entry.item_name || 'Untitled';
+                      const budget = parseFloat(entry.total_price || 0);
+                      const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : 'N/A';
+                      return `
+                        <div style="border-bottom:1px solid #e5e7eb;padding:10px 0;${idx === consolidatedEntries.length - 1 ? 'border-bottom:none;' : ''}">
+                          <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;">
+                            <div style="background:#1e40af;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:600;font-size:12px;">${idx + 1}</div>
+                            <div style="flex:1;overflow:hidden;min-width:0;">
+                              <div style="font-weight:600;color:#1a365d;margin-bottom:2px;">${code}</div>
+                              <div style="color:#4b5563;font-size:12px;margin-bottom:2px;word-break:break-word;">${title}</div>
+                              <div style="color:#6b7280;font-size:11px;font-weight:500;">Amount: <span style="color:#1e40af;font-weight:600;">${budgetStr}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  ` : `
+                    <div style="text-align:center;padding:20px;color:#9ca3af;">
+                      <p style="margin:0;font-size:13px;">No APP entries were consolidated.</p>
+                    </div>
+                  `}
+                </div>
+              </div>
+
+              <div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:10px 12px;border-radius:4px;">
+                <p style="margin:0;font-size:12px;color:#1e40af;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:6px;vertical-align:text-top;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  All PPMP codes have been transformed to APP codes and are ready for review. Click "View APP Table" to see the complete list.
+                </p>
               </div>
             </div>
-            <div class="gov-dialog-footer" style="padding:15px 20px;background:#f7fafc;border-top:1px solid #e2e8f0;text-align:right;gap:10px;display:flex;justify-content:flex-end;">
-              <button type="button" class="btn btn-primary" id="viewAPPTableBtn" style="cursor:pointer;">
-                <i class="fas fa-table"></i> View APP Table
+            <div class="gov-dialog-footer" style="padding:15px 20px;background:#f3f4f6;border-top:1px solid #e5e7eb;text-align:right;gap:10px;display:flex;justify-content:flex-end;">
+              <button type="button" class="btn btn-primary" id="viewAPPTableBtn" style="cursor:pointer;background:#1e40af;border:1px solid #1e40af;color:#fff;padding:8px 16px;border-radius:4px;font-weight:500;font-size:13px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:6px;vertical-align:text-bottom;">
+                  <path d="M3 5a2 2 0 0 1 2-2h3.28a1 1 0 0 1 .948.684l1.498 4.493a1 1 0 0 1-.502 1.21l-2.257 1.13a11.042 11.042 0 0 0 5.516 5.516l1.13-2.257a1 1 0 0 1 1.21-.502l4.493 1.498a1 1 0 0 1 .684.949V19a2 2 0 0 1-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                </svg>
+                View APP Table
               </button>
             </div>
           </div>
