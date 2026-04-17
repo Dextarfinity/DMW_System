@@ -18166,6 +18166,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       const loadEl = document.getElementById('consolidateLoadingOverlay');
       if (loadEl) loadEl.remove();
 
+      console.error('[CONSOLIDATE] 🚨 CRITICAL ERROR:', err);
+      console.error('[CONSOLIDATE] Error message:', err.message);
+      console.error('[CONSOLIDATE] Error stack:', err.stack);
+
       await govAlert({
         title: 'Consolidation Failed',
         type: 'error',
@@ -18181,7 +18185,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <i class="fas fa-exclamation-circle"></i> ${err.message || 'An unexpected error occurred during consolidation.'}
             </p>
           </div>
-          <p style="margin:10px 0 0 0;font-size:12px;color:#a0aec0;text-align:center;">Please try again or contact the system administrator.</p>
+          <p style="margin:10px 0 0 0;font-size:12px;color:#a0aec0;text-align:center;">Please try again or contact the system administrator. Check browser console for details.</p>
         `,
         buttonText: 'Close'
       });
