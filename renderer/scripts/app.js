@@ -18221,12 +18221,98 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Show modal using standard openModal function - IDENTICAL to EDIT PPMP ENTRY
       openModal('APP CONSOLIDATION — FY ' + fy, completionModalHtml);
       
-      // Wait for user to close the modal
-      const modalClosed = new Promise((resolve) => {
+      // Wait for user to click "View APP Table" button to show the full table
+      const viewTableClicked = new Promise((resolve) => {
         const btn = document.getElementById('closeConsolidateModal');
         if (btn) {
-          btn.addEventListener('click', () => {
-            resolve();
+          btn.addEventListener('click', async () => {
+            // Show loading
+            showPageLoader();
+            
+            // Fetch fresh APP data with all columns
+            try {
+              const appData = await apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now(), 'GET');
+              console.log('[CONSOLIDATE] Fetched all APP entries for full table:', appData ? appData.length : 0);
+              
+              // Generate full APP table HTML with all columns
+              let fullTableHtml = `
+                <div class="view-details">
+                  <div class="detail-row"><label>Fiscal Year</label><span>FY ${fy}</span></div>
+                  <div class="detail-row"><label>Total APP Entries</label><span style="font-weight: 700;">${appData ? appData.length : 0}</span></div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                  <label style="display: block; font-weight: 600; color: #1a365d; margin-bottom: 10px; font-size: 13px;">Annual Procurement Plan (APP) — Full Table</label>
+                  <div style="border: 1px solid #e5e7eb; border-radius: 4px; overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                      <thead style="background: #f3f4f6; position: sticky; top: 0;">
+                        <tr>
+                          <th style="padding: 10px; text-align: left; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">APP Code</th>
+                          <th style="padding: 10px; text-align: left; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Department</th>
+                          <th style="padding: 10px; text-align: left; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Project Title</th>
+                          <th style="padding: 10px; text-align: left; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Category</th>
+                          <th style="padding: 10px; text-align: left; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Source</th>
+                          <th style="padding: 10px; text-align: right; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Quantity</th>
+                          <th style="padding: 10px; text-align: right; font-weight: 600; color: #1a365d; border-bottom: 1px solid #e5e7eb;">Est. Budget</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${appData && appData.length > 0 ? appData.map((item, idx) => {
+                          const code = item.item_code || 'N/A';
+                          const dept = item.end_user_division || 'N/A';
+                          const title = item.item_name || 'Untitled';
+                          const cat = item.category || 'N/A';
+                          const source = item.procurement_source || 'N/A';
+                          const qty = item.quantity_size || '1';
+                          const budget = parseFloat(item.total_price || 0);
+                          const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : '₱0.00';
+                          const bgColor = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+                          return `
+                            <tr style="background: ${bgColor};">
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a365d; font-weight: 600;">${code}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #374151;">${dept}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #374151;">${escapeHtml(title)}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #374151;">${cat}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #374151; font-size: 11px;">${source}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #374151; text-align: right;">${qty}</td>
+                              <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a365d; font-weight: 600; text-align: right;">${budgetStr}</td>
+                            </tr>
+                          `;
+                        }).join('') : `
+                          <tr>
+                            <td colspan="7" style="padding: 20px; text-align: center; color: #9ca3af; border-bottom: 1px solid #e5e7eb;">No APP entries found.</td>
+                          </tr>
+                        `}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <form id="viewAppForm" style="margin-top: 20px;">
+                  <div class="form-group" style="text-align: right;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()" style="margin-right: 10px;">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="navigateTo('app'); closeModal();">Go to APP Page</button>
+                  </div>
+                </form>
+              `;
+              
+              // Update modal body with full table
+              const modalBody = document.querySelector('.modal-body');
+              if (modalBody) {
+                modalBody.innerHTML = fullTableHtml;
+              }
+              
+              // Update modal title
+              const modalTitle = document.querySelector('.modal-title');
+              if (modalTitle) {
+                modalTitle.textContent = 'APP CONSOLIDATION — Full Table View';
+              }
+            } catch (err) {
+              console.error('[CONSOLIDATE] Error fetching APP table:', err);
+              alert('Error loading APP table. Please try again.');
+            } finally {
+              hidePageLoader();
+            }
           });
         }
       });
