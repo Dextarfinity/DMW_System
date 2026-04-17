@@ -18225,14 +18225,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           
           <div class="form-group" style="text-align: right; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="margin-right: 10px;">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
             <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()">View APP Table</button>
           </div>
         </form>
       `;
       
-      // Show modal using standard openModal function
-      openModal('APP Consolidation', completionModalHtml, { preventOutsideClose: true });
+      // Show modal using standard openModal function - IDENTICAL to EDIT PPMP ENTRY
+      openModal('APP CONSOLIDATION — FY ' + fy, completionModalHtml);
       
       // Wait for user to close the modal
       const modalClosed = new Promise((resolve) => {
