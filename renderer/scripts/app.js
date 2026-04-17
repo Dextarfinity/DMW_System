@@ -3833,6 +3833,7 @@ window.deleteAPPEntry = async function(planId) {
  // Reload to show updated list (deletion reflected immediately)
  await loadAPP();
  console.log('[DELETE-APP] APP page reloaded - deleted entry removed from table');
+ console.log('[DELETE-APP] Budget should be automatically recalculated by loadAPP() -> renderAPPTable() -> updateAPPSummary()');
  } else {
  console.warn('[DELETE-APP] ️ Unexpected response:', response);
  showNotification('Refreshing APP page...', 'info');
@@ -5847,8 +5848,10 @@ document.addEventListener('DOMContentLoaded', () => {
  // Connect to Socket.IO for real-time sync across all Electron clients
  connectSocket();
 
- // Navigate to dashboard (always start here - no client-side page persistence)
- navigateTo('dashboard');
+ // FIXED: Restore the page the user was on (stored in sessionStorage), or default to dashboard
+ const lastPage = sessionStorage.getItem('dmw_lastPage') || 'dashboard';
+ console.log('[ROUTING] Restoring last page from session:', lastPage);
+ navigateTo(lastPage);
 
  // NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
  // This prevents the loader from disappearing before page content is ready
@@ -6544,6 +6547,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Navigate to page with RBAC access control
  function navigateTo(pageId) {
+ // FIXED: Store current page in sessionStorage for persistence across refresh
+ sessionStorage.setItem('dmw_lastPage', pageId);
+ console.log('[ROUTING] Saved current page to session:', pageId);
+ 
  // RBAC: Check if user has access to this page
  const chiefNavPages = ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'items', 'suppliers', 'stock-cards', 'property-cards', 'ris', 'reports'];
  const rolePermissions = {
