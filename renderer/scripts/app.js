@@ -5402,6 +5402,7 @@ function filterTripTickets(status) {
 
 // Page content loading overlay — simple spinner on blurry white
 function showPageLoader() {
+  console.log('[LOADER] Showing page loader...');
   let overlay = document.getElementById('pageLoadingOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -5421,17 +5422,31 @@ function showPageLoader() {
     if (mainContent) {
       mainContent.style.position = 'relative';
       mainContent.appendChild(overlay);
+      console.log('[LOADER] ✅ pageLoadingOverlay created and appended');
+    } else {
+      console.warn('[LOADER] ⚠️ .main-content not found!');
     }
   }
   overlay.style.display = 'flex';
+  console.log('[LOADER] ✅ pageLoadingOverlay visible');
+  
   // Hide the fullscreen appLoader when page loader shows
   const appLoader = document.getElementById('appLoader');
-  if (appLoader) appLoader.style.display = 'none';
+  if (appLoader) {
+    appLoader.style.display = 'none';
+    console.log('[LOADER] ✅ appLoader hidden, pageLoadingOverlay now showing');
+  } else {
+    console.warn('[LOADER] ⚠️ appLoader not found to hide');
+  }
 }
 
 function hidePageLoader() {
+  console.log('[LOADER] Hiding page loader');
   const overlay = document.getElementById('pageLoadingOverlay');
-  if (overlay) overlay.style.display = 'none';
+  if (overlay) {
+    overlay.style.display = 'none';
+    console.log('[LOADER] ✅ pageLoadingOverlay hidden');
+  }
 }
 
 // Load all data when navigating to a page
