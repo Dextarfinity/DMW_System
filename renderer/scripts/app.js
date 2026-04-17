@@ -3608,23 +3608,14 @@ window.onAPPFYChange = function() {
 /** Edit APP Modal */
 window.showEditAPPModal = async function(planId) {
   try {
-    // Get the app entry from cached items (loaded from /api/plan-items which now includes app_entries data)
+    // Get the app entry from cached items
     const item = window._appItems && window._appItems.find(i => i.id === planId);
     if (!item) { showNotification('APP entry not found', 'error'); return; }
 
     const procModes = await apiRequest('/procurement-modes').catch(() => []);
     const procModeOpts = procModes.map(m => `<option value="${m.name || m}" ${(item.procurement_mode || '') === (m.name || m) ? 'selected' : ''}>${m.name || m}</option>`).join('');
 
-    const appCode = item.item_code || '-';
-    const deptName = item.department_name || '-';
-    const deptCode = item.department_code || '';
-    const endUser = deptCode ? (deptCode + ' - ' + deptName) : deptName;
-    const estBudget = parseFloat(item.total_price || item.unit_price || 0).toFixed(2);
-
-    // General Description: already from app_entries in the API response
-    const genDesc = item.item_description || '-';
-
-    // Format dates: DB may store as ISO or YYYY-MM — convert to YYYY-MM for month input
+    // Format dates: DB may store as ISO or YYYY-MM
     const toMonthValue = (d) => {
       if (!d) return '';
       const s = String(d);
@@ -3635,128 +3626,94 @@ window.showEditAPPModal = async function(planId) {
     const startDateVal = toMonthValue(item.start_date);
     const endDateVal = toMonthValue(item.end_date);
 
-    // Format display dates for readonly display
-    const formatDateDisplay = (d) => {
-      if (!d) return 'Not set';
-      const s = String(d);
-      const m = s.match(/^(\d{4})-(\d{2})/);
-      if (m) {
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        return months[parseInt(m[2])-1] + ' ' + m[1];
-      }
-      return s;
-    };
+    function getDeptCode(name) {
+      if (!name) return 'DMW';
+      const lower = name.toLowerCase();
+      if (lower.includes('finance')) return 'FAD';
+      if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+      if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+      if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+      if (lower.includes('director')) return 'ORD';
+      return name.substring(0,3).toUpperCase();
+    }
+
+    const deptCode = getDeptCode(item.department_name);
+    const estBudget = parseFloat(item.total_price || item.unit_price || 0).toFixed(2);
+    const genDesc = item.item_description || summarizeProjectTitle(item.item_name);
 
     const html = `
       <form id="editAPPForm" onsubmit="submitEditAPP(event, ${planId})">
-        <div style="background:linear-gradient(135deg,#1a365d,#2c5282);color:#fff;padding:12px 18px;border-radius:6px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
-          <i class="fas fa-edit" style="font-size:18px;"></i>
-          <div>
-            <div style="font-weight:700;font-size:15px;">Edit APP Entry</div>
-            <div style="font-size:12px;opacity:0.85;">${appCode} &mdash; ${escapeHtml(deptName)}</div>
+        <div class="view-details">
+          <div class="detail-row">
+            <label>APP Code:</label>
+            <input type="text" value="${item.item_code || '-'}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;padding:6px 10px;border-radius:4px;color:#4a5568;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>Project Title:</label>
+            <input type="text" id="editAppTitle" value="${escapeHtml(item.item_name || '')}" required style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>Department:</label>
+            <input type="text" value="${deptCode}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;padding:6px 10px;border-radius:4px;color:#4a5568;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>General Description:</label>
+            <textarea id="editAppGenDesc" rows="2" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;font-family:inherit;resize:vertical;">${escapeHtml(genDesc)}</textarea>
+          </div>
+          <div class="detail-row">
+            <label>Procurement Mode:</label>
+            <select id="editAppProcMode" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+              <option value="">-- Select --</option>
+              ${procModeOpts}
+            </select>
+          </div>
+          <div class="detail-row">
+            <label>Early Procurement:</label>
+            <select id="editAppEarlyProc" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+              <option value="No" ${(item.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
+              <option value="Yes" ${(item.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
+            </select>
+          </div>
+          <div class="detail-row">
+            <label>Bid Criteria:</label>
+            <input type="text" id="editAppBidCriteria" value="${escapeHtml(item.bid_criteria || 'LCRB')}" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>Start Date:</label>
+            <input type="month" id="editAppStartDate" value="${startDateVal}" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>End Date:</label>
+            <input type="month" id="editAppEndDate" value="${endDateVal}" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>Fund Source:</label>
+            <input type="text" id="editAppFundSource" value="${escapeHtml(item.fund_source || 'GAA')}" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>Est. Budget:</label>
+            <input type="number" id="editAppBudget" value="${estBudget}" step="0.01" min="0" required style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;font-weight:600;">
+          </div>
+          <div class="detail-row">
+            <label>Procurement Strategy:</label>
+            <input type="text" id="editAppProcStrategy" value="${escapeHtml(item.procurement_strategy || '-')}" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+          </div>
+          <div class="detail-row">
+            <label>App Version:</label>
+            <select id="editAppVersion" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;">
+              <option value="indicative" ${(item.app_version || '') === 'indicative' || !(item.app_version) ? 'selected' : ''}>Indicative</option>
+              <option value="final" ${(item.app_version || '') === 'final' ? 'selected' : ''}>Final</option>
+              <option value="updated" ${(item.app_version || '') === 'updated' ? 'selected' : ''}>Updated</option>
+            </select>
+          </div>
+          <div class="detail-row">
+            <label>Remarks:</label>
+            <textarea id="editAppRemarks" rows="2" style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;width:100%;font-family:inherit;resize:vertical;">${escapeHtml(item.remarks || '')}</textarea>
           </div>
         </div>
-
-        <table style="width:100%;border-collapse:collapse;font-size:13px;" class="app-edit-table">
-          <tbody>
-            <!-- Row 1: APP Code + Project Title -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;width:180px;text-transform:uppercase;font-size:11px;">APP Code</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" value="${appCode}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;width:100%;padding:6px 10px;border-radius:4px;color:#4a5568;">
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;width:180px;text-transform:uppercase;font-size:11px;">Project Title</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppDescription" value="${escapeHtml(item.item_name || '')}" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;" oninput="document.getElementById('editAppGenDesc').value = summarizeProjectTitle(this.value)">
-              </td>
-            </tr>
-            <!-- Row 2: End-User + General Description -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">End-User / Implementing Unit</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" value="${escapeHtml(endUser)}" readonly style="background:#f7fafc;border:1px solid #e2e8f0;width:100%;padding:6px 10px;border-radius:4px;color:#4a5568;">
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">General Description of the Project</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppGenDesc" value="${escapeHtml(genDesc)}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;background:#f0f7ff;">
-              </td>
-            </tr>
-            <!-- Row 3: Mode of Procurement + Early Procurement -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Mode of Procurement</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <select class="form-select" id="editAppProcMode" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                  <option value="">-- Select --</option>
-                  ${procModeOpts}
-                </select>
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Early Procurement Activity?</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <select class="form-select" id="editAppEarlyProcurement" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                  <option value="No" ${(item.early_procurement || 'No') === 'No' ? 'selected' : ''}>No</option>
-                  <option value="Yes" ${(item.early_procurement || '') === 'Yes' ? 'selected' : ''}>Yes</option>
-                </select>
-              </td>
-            </tr>
-            <!-- Row 4: Criteria for Bid Evaluation (full width) -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Criteria for Bid Evaluation</td>
-              <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppBidCriteria" value="${escapeHtml(item.bid_criteria || 'LCRB')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-              </td>
-            </tr>
-            <!-- Row 5: Start + End of Procurement -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Start of Procurement Activity</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="month" id="editAppStartDate" value="${startDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                ${startDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(item.start_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">End of Procurement Activity</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="month" id="editAppEndDate" value="${endDateVal}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                ${endDateVal ? '<small style="color:#38a169;margin-top:2px;display:block;"><i class="fas fa-check-circle"></i> ' + formatDateDisplay(item.end_date) + '</small>' : '<small style="color:#e53e3e;margin-top:2px;display:block;"><i class="fas fa-exclamation-circle"></i> Not set</small>'}
-              </td>
-            </tr>
-            <!-- Row 6: Source of Fund + Budget -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Source of Fund</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppFundSource" value="${escapeHtml(item.fund_source || 'GAA')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Estimated Budget / ABC (₱)</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="number" id="editAppBudget" value="${estBudget}" step="0.01" min="0" required style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;font-weight:600;">
-              </td>
-            </tr>
-            <!-- Row 7: Procurement Strategy + APP Version -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Procurement Strategy or Tools</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <input type="text" id="editAppProcStrategy" value="${escapeHtml(item.procurement_strategy || '-')}" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-              </td>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">APP Version</td>
-              <td style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <select class="form-select" id="editAppVersion" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;">
-                  <option value="indicative" ${(item.app_version || '') === 'indicative' || !(item.app_version) ? 'selected' : ''}>Indicative</option>
-                  <option value="final" ${(item.app_version || '') === 'final' ? 'selected' : ''}>Final</option>
-                  <option value="updated" ${(item.app_version || '') === 'updated' ? 'selected' : ''}>Updated</option>
-                </select>
-              </td>
-            </tr>
-            <!-- Row 8: Remarks (full width) -->
-            <tr>
-              <td style="background:#e8eef5;font-weight:700;color:#1a365d;padding:10px 14px;border:1px solid #cbd5e0;text-transform:uppercase;font-size:11px;">Remarks</td>
-              <td colspan="3" style="padding:8px 12px;border:1px solid #cbd5e0;">
-                <textarea id="editAppRemarks" rows="2" style="width:100%;padding:6px 10px;border:1px solid #cbd5e0;border-radius:4px;resize:vertical;font-family:inherit;">${escapeHtml(item.remarks || '')}</textarea>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" style="background:#1a365d;border-color:#1a365d;"><i class="fas fa-save"></i> Save Changes</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
         </div>
       </form>
     `;
