@@ -17988,9 +17988,17 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     try {
       // Step 3: Call server consolidation endpoint
-      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
+      console.log('[CONSOLIDATE] 🔄 Calling server endpoint: /plan-items/consolidate with FY:', fy);
+      let result;
+      try {
+        result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: fy });
+      } catch (apiErr) {
+        console.error('[CONSOLIDATE] 🚨 API ERROR from server:', apiErr);
+        throw apiErr;
+      }
       console.log('[CONSOLIDATE] ✅ Server consolidation complete. Result:', result);
-      console.log('[CONSOLIDATE] Consolidated items:', result.count, 'by department:', result.by_department);
+      console.log('[CONSOLIDATE] Consolidated items:', result.count, 'Created:', result.created, 'Total:', result.total_items);
+      console.log('[CONSOLIDATE] By department:', result.by_department);
 
       // Remove loading overlay
       const loadEl = document.getElementById('consolidateLoadingOverlay');
