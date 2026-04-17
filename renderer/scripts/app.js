@@ -5424,6 +5424,9 @@ function showPageLoader() {
     }
   }
   overlay.style.display = 'flex';
+  // Hide the fullscreen appLoader when page loader shows
+  const appLoader = document.getElementById('appLoader');
+  if (appLoader) appLoader.style.display = 'none';
 }
 
 function hidePageLoader() {
