@@ -5754,6 +5754,12 @@ document.addEventListener('DOMContentLoaded', () => {
  closeModal();
  }
  });
+
+ // Browser back/forward navigation (hash change)
+ window.addEventListener('hashchange', navigateToFromHash);
+
+ // Handle browser back button (popstate)
+ window.addEventListener('popstate', navigateToFromHash);
  }
 
  // Check if user has a session
@@ -5847,8 +5853,8 @@ document.addEventListener('DOMContentLoaded', () => {
  // Connect to Socket.IO for real-time sync across all Electron clients
  connectSocket();
 
- // Navigate to dashboard (always start here - no client-side page persistence)
- navigateTo('dashboard');
+ // Navigate to previous page from hash/localStorage, or dashboard if none exists
+ navigateToFromHash();
 
  // NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
  // This prevents the loader from disappearing before page content is ready
@@ -6571,12 +6577,16 @@ document.addEventListener('DOMContentLoaded', () => {
  };
  
  const allowedPages = getMergedPermissions(rolePermissions);
- 
+
  // Block access if user doesn't have permission
  if (!allowedPages.includes(pageId)) {
  showAccessDeniedMessage(pageId);
  return;
  }
+
+ // Store current page in hash and localStorage for persistence
+ window.location.hash = pageId;
+ localStorage.setItem('dmw_active_page', pageId);
 
  // Update active nav item
  navItems.forEach(item => {
@@ -6602,7 +6612,14 @@ document.addEventListener('DOMContentLoaded', () => {
  // Load data from API for this page (applyActionPermissions is called inside after data loads)
  loadPageData(pageId);
  }
- 
+
+ // Navigate to page from hash (used for refresh and back/forward navigation)
+ function navigateToFromHash() {
+ const hash = window.location.hash.slice(1); // Remove the # character
+ const pageId = hash || localStorage.getItem('dmw_active_page') || 'dashboard';
+ navigateTo(pageId);
+ }
+
  // Show access denied message
  function showAccessDeniedMessage(pageId) {
  const pageName = pageTitles[pageId] || pageId;
