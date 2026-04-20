@@ -3921,8 +3921,17 @@ function updateAPPSummary(items, budgetSummary) {
  }
  
  // DYNAMIC: Available Budget = Overall allocated - Total approved (items in table)
- let availableBudget = overallAllocatedBudget > 0 ? (overallAllocatedBudget - totalApproved) : 0;
- if (availableBudget < 0) availableBudget = 0;
+ // Even if no items consolidated, show available budget from allocated amount
+ let availableBudget = Math.max(0, overallAllocatedBudget - totalApproved);
+
+ // If still no budget data, try to fetch from previous consolidated periods
+ if (availableBudget === 0 && (!items || items.length === 0) && budgetSummary) {
+ // Fall back to showing total available from budget summary
+ const summaryAvailable = parseFloat(budgetSummary.available_budget || budgetSummary.available || 0);
+ if (summaryAvailable > 0) {
+ availableBudget = summaryAvailable;
+ }
+ }
  
  // Get removed count from budget summary
  let removedCount = 0;
@@ -18211,7 +18220,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <form id="consolidateForm" onsubmit="closeModal(); return false;">
  <div class="form-group" style="text-align: right; margin-top: 20px;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
- <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal()">View APP Table</button>
+ <button type="button" class="btn btn-primary" id="closeConsolidateModal" onclick="closeModal(); setTimeout(() => { window._appData = null; window._appItems = null; window._appStatus = null; }, 50);">View APP Table</button>
  </div>
  </form>
  `;
@@ -18290,7 +18299,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <form id="viewAppForm" style="margin-top: 20px;">
  <div class="form-group" style="text-align: right;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()" style="margin-right: 10px;">Close</button>
- <button type="button" class="btn btn-primary" onclick="navigateTo('app'); closeModal();">Go to APP Page</button>
+ <button type="button" class="btn btn-primary" onclick="closeModal(); navigateTo('app'); setTimeout(() => { window._appData = null; window._appItems = null; window._appStatus = null; loadAPP(); }, 100);">Go to APP Page</button>
  </div>
  </form>
  `;
@@ -18381,21 +18390,121 @@ Failure to submit the above requirements within the prescribed period shall cons
  openModal('Set APP Status — FY ' + getCurrentFiscalYear(), html, { preventOutsideClose: true });
  };
 
- // Submit APP Status
+ // Submit APP Status with real-time sync to all consolidated entries
  window.submitAPPStatus = async function(e) {
  e.preventDefault();
- if (!confirm('Are you sure you want to update the APP status?')) return;
+ if (!confirm('Are you sure you want to update the APP status for ALL consolidated entries?')) return;
  const form = e.target;
  const appType = form.app_type.value;
  const remarks = form.remarks.value;
+ const fy = getCurrentFiscalYear();
+ 
  try {
- const result = await apiRequest(`/app-settings/${getCurrentFiscalYear()}`, 'PUT', { app_type: appType, remarks: remarks });
- alert('APP status set to ' + appType.charAt(0).toUpperCase() + appType.slice(1) + (appType === 'updated' ? ' (v' + result.update_count + ')' : ''));
- closeModal();
- loadAPP();
- } catch (err) {
- alert('Failed to update APP status: ' + err.message);
+ console.log('[SET-STATUS] Updating APP status to:', appType);
+ 
+ // Update app_settings in database
+ const result = await apiRequest(`/app-settings/${fy}`, 'PUT', { app_type: appType, remarks: remarks });
+ console.log('[SET-STATUS] app_settings updated:', result);
+ 
+ // Update ALL app_entries with new app_version to sync status
+ console.log('[SET-STATUS] Syncing status to all app_entries for FY', fy);
+ try {
+ await apiRequest(`/plan-items/sync-status`, 'POST', { 
+ fiscal_year: fy,
+ app_version: appType,
+ remarks: remarks
+ });
+ console.log('[SET-STATUS] All app_entries synced with new status');
+ } catch (syncErr) {
+ console.warn('[SET-STATUS] Could not sync app_entries:', syncErr.message);
+ // Don't fail - app_settings was still updated
  }
+ 
+ // Broadcast real-time update to all clients
+ if (window.socket && window.socket.emit) {
+ window.socket.emit('status_changed', {
+ resource: 'app-entries',
+ fiscal_year: fy,
+ app_version: appType,
+ timestamp: new Date().toISOString()
+ });
+ }
+ 
+ showNotification('APP status updated to ' + appType.charAt(0).toUpperCase() + appType.slice(1) + (appType === 'updated' ? ' (v' + result.update_count + ')' : ''), 'success');
+ closeModal();
+ 
+ // Reload APP table with fresh data
+ window._appData = null;
+ window._appItems = null;
+ window._appStatus = null;
+ await new Promise(resolve => setTimeout(resolve, 300));
+ await realTimeUpdateAPPTable(fy);
+ 
+ } catch (err) {
+ showNotification('Failed to update APP status: ' + err.message, 'error');
+ }
+ };
+
+ // Real-time APP table update function (no full page refresh)
+ window.realTimeUpdateAPPTable = async function(fiscalYear) {
+ const fy = fiscalYear || getCurrentFiscalYear();
+ console.log('[REAL-TIME] Updating APP table for FY', fy);
+
+ try {
+ // Fetch fresh APP data with cache busting
+ const appData = await apiRequest(`/plan-items?fiscal_year=${fy}&_t=${Date.now()}`, 'GET');
+ const appStatus = await apiRequest(`/app-settings/${fy}`, 'GET');
+
+ console.log('[REAL-TIME] Fetched', appData ? appData.length : 0, 'items, status:', appStatus?.app_type);
+
+ // Update global cache
+ window._appItems = appData || [];
+ window._appStatus = appStatus;
+
+ // FIXED: Always update table display and badges, even if no APP data
+ // Re-render the table with fresh data (may be empty, which is OK)
+ renderAPPTable(appData || [], appStatus);
+
+ // Update stats and badges
+ updateAPPStatsAndBudget(appData || [], appStatus);
+
+ // Emit event for any listeners
+ if (window.socket) {
+ window.socket.emit('app_table_updated', { fiscal_year: fy, count: (appData || []).length });
+ }
+
+ console.log('[REAL-TIME] APP table updated successfully');
+ } catch (err) {
+ console.error('[REAL-TIME] Error updating APP table:', err);
+ showNotification('Error updating APP table: ' + err.message, 'warning');
+ }
+ };
+
+ // Update APP statistics and budget display (dynamic)
+ window.updateAPPStatsAndBudget = function(items, appStatus) {
+ if (!items || !Array.isArray(items)) return;
+ 
+ const totalCount = items.length;
+ const totalBudget = items.reduce((sum, item) => sum + parseFloat(item.total_price || item.unit_price || 0), 0);
+ const hasConsolidated = appStatus && appStatus.consolidated_at;
+ 
+ // Update badges
+ const consolidateBtn = document.querySelector('[data-action="consolidate-app"]');
+ if (consolidateBtn && hasConsolidated) {
+ consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#4caf50;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">✓ Consolidated</span>';
+ }
+ 
+ // Update any displayed stats
+ const statElements = document.querySelectorAll('[data-stat="app-count"], [data-stat="app-budget"]');
+ statElements.forEach(el => {
+ if (el.getAttribute('data-stat') === 'app-count') {
+ el.textContent = totalCount.toString();
+ } else if (el.getAttribute('data-stat') === 'app-budget') {
+ el.textContent = '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+ }
+ });
+ 
+ console.log('[STATS] Updated: Count=' + totalCount + ', Budget=₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2}));
  };
 
  // APP Version Filter Change (dropdown sync)

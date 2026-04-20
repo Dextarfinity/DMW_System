@@ -2740,6 +2740,49 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   }
 });
 
+// Sync APP status to all consolidated entries (update app_version field)
+app.post('/api/plan-items/sync-status', authenticateToken, async (req, res) => {
+  try {
+    const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    const appVersion = req.body.app_version || 'indicative';
+    const remarks = req.body.remarks || '';
+
+    console.log('[SYNC-STATUS] 🔄 Syncing status to all app_entries for FY', fiscalYear, 'version:', appVersion);
+
+    // Update all app_entries with new app_version
+    const updateResult = await pool.query(
+      `UPDATE app_entries
+       SET app_version = $1, remarks = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE fiscal_year = $3 AND is_deleted = false`,
+      [appVersion, remarks, fiscalYear]
+    );
+
+    console.log('[SYNC-STATUS] ✅ Updated ' + updateResult.rowCount + ' app_entries with app_version:', appVersion);
+
+    // Broadcast the change to all connected clients
+    if (io) {
+      io.emit('data_changed', {
+        resource: 'plan-items',
+        action: 'sync-status',
+        fiscal_year: fiscalYear,
+        app_version: appVersion,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+      console.log('[SYNC-STATUS] ✅ Broadcasted status change to all clients');
+    }
+
+    res.json({
+      message: `Synced ${updateResult.rowCount} app_entries to version ${appVersion}`,
+      updated: updateResult.rowCount,
+      app_version: appVersion
+    });
+  } catch (err) {
+    console.error('[SYNC-STATUS] 🚨 ERROR:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==============================================================================
 // PAP (Programs, Activities & Projects) MANAGEMENT
 // ==============================================================================
@@ -3088,6 +3131,19 @@ app.put('/api/app-settings/:year', authenticateToken, async (req, res) => {
        RETURNING *`,
       [year, app_type, updateCount, req.user.id, remarks || '']
     );
+
+    // Broadcast the change to all connected clients
+    if (io) {
+      io.emit('data_changed', {
+        resource: 'app-settings',
+        action: 'update',
+        fiscal_year: year,
+        app_type: app_type,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+    }
+
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
