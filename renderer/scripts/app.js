@@ -3984,8 +3984,16 @@ function updateAPPSummary(items, budgetSummary) {
  }
  
  // DYNAMIC: Available Budget = Overall allocated - Total approved (items in table)
- // When all apps are deleted, available budget is 0 (no fallback to old budget)
- let availableBudget = Math.max(0, overallAllocatedBudget - totalApproved);
+ // CRITICAL: When NO apps exist (items.length === 0), available budget MUST be 0
+ // This represents that there's no active budget to use since no projects are planned
+ let availableBudget = 0;
+ if (displayItems && displayItems.length > 0) {
+ // Only calculate available budget when there are actual items
+ availableBudget = Math.max(0, overallAllocatedBudget - totalApproved);
+ } else {
+ // When all apps are deleted, available budget is 0 (no budget to allocate)
+ availableBudget = 0;
+ }
  
  // Get removed count from budget summary
  let removedCount = 0;

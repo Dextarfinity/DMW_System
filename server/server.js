@@ -2505,13 +2505,14 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
       );
       
       deptResult = await pool.query(
-        `SELECT d.code as department_code, d.name as department_name,
+        `SELECT COALESCE(d.code, 'N/A') as department_code,
+                COALESCE(d.name, 'Unknown') as department_name,
                 COALESCE(SUM(ae.estimated_budget), 0) as active,
-                COUNT(*)::int as active_count
-         FROM app_entries ae
-         LEFT JOIN procurementplans pp ON ae.plan_id = pp.id
-         LEFT JOIN departments d ON pp.dept_id = d.id
-         WHERE ae.fiscal_year = $1
+                COUNT(ae.id)::int as active_count
+         FROM departments d
+         LEFT JOIN app_entries ae ON ae.plan_id IN (
+           SELECT id FROM procurementplans WHERE dept_id = d.id AND fiscal_year = $1
+         )
          GROUP BY d.code, d.name ORDER BY d.code`,
         [fy]
       );
@@ -2569,6 +2570,8 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
     deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
     const departments = deptResult.rows.map(d => ({
       ...d,
+      total: d.active,  // total = sum of app_entries for this dept
+      available: 0,  // available = 0 when all apps are deleted (no budget allocation from previous PPMP)
       removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
       removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
     }));
