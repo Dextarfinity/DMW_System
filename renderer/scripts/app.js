@@ -3809,6 +3809,39 @@ window.deleteAPPEntry = async function(planId) {
  const budget = appItem ? parseFloat(appItem.total_price || 0) : 0;
  const budgetStr = budget > 0 ? '₱' + budget.toLocaleString('en-PH', {minimumFractionDigits:2}) : 'N/A';
 
+ // Get current budget status to show impact
+ const currentAvailableBudgetEl = document.getElementById('appAvailableBudget');
+ const currentTotalApprovedEl = document.getElementById('appTotalApproved');
+ const currentActiveProjectsEl = document.getElementById('appActiveProjects');
+
+ let currentAvailable = 0, newAvailable = 0, projCount = 0, newProjCount = 0;
+ if (currentAvailableBudgetEl && currentAvailableBudgetEl.textContent) {
+ const match = currentAvailableBudgetEl.textContent.replace('₱', '').replace(/,/g, '');
+ currentAvailable = parseFloat(match) || 0;
+ newAvailable = Math.max(0, currentAvailable + budget); // Adding back because budget was used from available
+ }
+ if (currentActiveProjectsEl && currentActiveProjectsEl.textContent) {
+ projCount = parseInt(currentActiveProjectsEl.textContent) || 0;
+ newProjCount = Math.max(0, projCount - 1);
+ }
+
+ const budgetImpactHtml = budget > 0 ? `
+ <div style="background:#edf2f7;border-radius:6px;padding:12px;margin-top:10px;">
+ <p style="margin:0 0 8px 0;font-size:11px;color:#2d3748;font-weight:600;"><i class="fas fa-chart-line"></i> Budget Impact:</p>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+ <div style="background:#fff;padding:8px;border-radius:4px;border-left:3px solid #4299e1;">
+ <p style="margin:0 0 4px 0;color:#718096;font-size:10px;">After Deletion</p>
+ <p style="margin:0;color:#2b6cb0;font-weight:600;">Available: ₱${newAvailable.toLocaleString('en-PH', {minimumFractionDigits:2})}</p>
+ </div>
+ <div style="background:#fff;padding:8px;border-radius:4px;border-left:3px solid #ed8936;">
+ <p style="margin:0 0 4px 0;color:#718096;font-size:10px;">Active Projects</p>
+ <p style="margin:0;color:#c05621;font-weight:600;">${newProjCount} project(s)</p>
+ </div>
+ </div>
+ ${newAvailable === 0 ? '<p style="margin:8px 0 0 0;font-size:10px;color:#c53030;"><i class="fas fa-alert-circle"></i> All budget will be freed</p>' : ''}
+ </div>
+ ` : '';
+
  const confirmed = await govConfirm({
  title: 'Delete APP Entry',
  bodyHtml: `
@@ -3817,19 +3850,20 @@ window.deleteAPPEntry = async function(planId) {
  <i class="fas fa-exclamation-triangle"></i> WARNING: Permanent Deletion
  </p>
  </div>
- 
+
  <div style="background:#f7fafc;border-left:4px solid #e2e8f0;padding:12px;margin-bottom:15px;border-radius:4px;">
  <p style="margin:0 0 8px 0;font-size:12px;color:#4a5568;">You are about to permanently delete this APP entry:</p>
  <div style="background:#fff;border:1px solid #e2e8f0;padding:10px;border-radius:4px;margin-top:8px;">
  <div style="margin-bottom:6px;"><span style="font-weight:600;color:#1a365d;font-size:12px;">APP Code:</span> <span style="color:#4a5568;font-size:12px;">${appCode}</span></div>
  <div style="margin-bottom:6px;"><span style="font-weight:600;color:#1a365d;font-size:12px;">Project Title:</span> <span style="color:#4a5568;font-size:12px;">${projectTitle}</span></div>
- <div><span style="font-weight:600;color:#1a365d;font-size:12px;">Estimated Budget:</span> <span style="color:#4a5568;font-size:12px;">${budgetStr}</span></div>
+ <div><span style="font-weight:600;color:#1a365d;font-size:12px;">Estimated Budget to Free:</span> <span style="color:#28a745;font-weight:600;font-size:12px;">${budgetStr}</span></div>
  </div>
+ ${budgetImpactHtml}
  </div>
- 
+
  <div style="background:#fffbeb;border-left:4px solid #d69e2e;padding:10px;border-radius:4px;margin-bottom:10px;">
  <p style="margin:0;font-size:12px;color:#744210;">
- <i class="fas fa-info-circle"></i> <strong>This action cannot be undone.</strong> The APP entry will be completely removed from the database.
+ <i class="fas fa-info-circle"></i> <strong>This action cannot be undone.</strong> The APP entry will be completely removed from the database and budget will be freed immediately.
  </p>
  </div>
  `,
@@ -3978,9 +4012,67 @@ function updateAPPSummary(items, budgetSummary) {
 
  if (elTotalApproved) elTotalApproved.textContent = '₱' + totalApproved.toLocaleString('en-PH', {minimumFractionDigits: 2});
  if (elActiveBudget) elActiveBudget.textContent = '₱' + activeBudget.toLocaleString('en-PH', {minimumFractionDigits: 2});
- if (elAvailableBudget) elAvailableBudget.textContent = '₱' + availableBudget.toLocaleString('en-PH', {minimumFractionDigits: 2});
+ if (elAvailableBudget) {
+ // Calculate budget percentage for realistic status
+ const budgetPercentage = overallAllocatedBudget > 0 ? (availableBudget / overallAllocatedBudget) * 100 : 0;
+ const approvedPercentage = overallAllocatedBudget > 0 ? (totalApproved / overallAllocatedBudget) * 100 : 0;
+
+ // Build the available budget display with status
+ let statusBadge = '';
+ let statusColor = '#28a745';
+
+ if (availableBudget === 0) {
+ statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+ statusColor = '#c53030';
+ } else if (budgetPercentage < 10) {
+ statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+ statusColor = '#f6ad55';
+ } else if (budgetPercentage < 25) {
+ statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+ statusColor = '#ed8936';
+ } else if (approvedPercentage >= 90) {
+ statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> OPTIMIZED</span>';
+ statusColor = '#38a169';
+ } else {
+ statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#28a745;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+ statusColor = '#28a745';
+ }
+
+ elAvailableBudget.innerHTML = '₱' + availableBudget.toLocaleString('en-PH', {minimumFractionDigits: 2}) + statusBadge;
+ elAvailableBudget.style.color = statusColor;
+
+ // Update card border color
+ const cardEl = elAvailableBudget.closest('.summary-card');
+ if (cardEl) {
+ cardEl.style.borderLeftColor = statusColor;
+ }
+
+ // Add progress bar visual indicator
+ let progressBarHtml = '';
+ if (overallAllocatedBudget > 0) {
+ progressBarHtml = `<div style="margin-top:8px;background:#e2e8f0;border-radius:3px;height:4px;overflow:hidden;">
+ <div style="background:${statusColor};height:100%;width:${Math.min(approvedPercentage, 100)}%;transition:width 0.3s ease;"></div>
+ </div>`;
+ }
+
+ const cardContent = cardEl ? cardEl.innerHTML : '';
+ if (cardEl && !cardEl.querySelector('.budget-progress-bar')) {
+ // Only add if not already present
+ if (progressBarHtml) {
+ cardEl.innerHTML = cardContent + '<div class="budget-progress-bar" style="margin-top:8px;">' + progressBarHtml + '</div>';
+ }
+ }
+ }
  if (elRemovedCount) elRemovedCount.textContent = removedCount;
- if (elActiveProjects) elActiveProjects.textContent = totalProjects;
+ if (elActiveProjects) {
+ elActiveProjects.textContent = totalProjects;
+ // Add visual indicator for project count
+ if (totalProjects === 0) {
+ elActiveProjects.style.color = '#c53030';
+ } else {
+ elActiveProjects.style.color = '#2d3748';
+ }
+ }
 
  // Count items per mode of procurement (using filtered items)
  const modeCounts = {};
