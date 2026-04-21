@@ -38759,7 +38759,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
  // Print Record Function
  // ==================== NATIVE PRINT PREVIEW SYSTEM ====================
- const { ipcRenderer } = require('electron');
 
  /**
  * Open a print preview window via Electron IPC
