@@ -9165,6 +9165,16381 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
 4. PhilGEPS Registration Number
 
 Failure to submit the above requirements within the prescribed period shall constitute sufficient ground for cancellation of the award. You are likewise required to post the required Performance Security within ten (10) calendar days from receipt hereof.</textarea>
+<<<<<<< HEAD
+          </div>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-user-tie"></i> Addressee (Winning Bidder)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label>Company/Supplier Name</label>
+            <input type="text" id="noaSupplierName" class="form-select" placeholder="Enter winning bidder / supplier name" required>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Address</label>
+            <textarea rows="2" id="noaAddress" placeholder="Complete business address (auto-fills from supplier)" required></textarea>
+          </div>
+        </div>
+
+        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+        <div class="form-boxed-section">
+          <div class="boxed-content box-yellow">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Head of the Procuring Entity (HoPE)</label>
+              <input type="text" id="noaHopeName" value="RITCHEL M. BUTAO" readonly style="background: #f5f5f5; font-weight: 600;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Designation</label>
+              <input type="text" id="noaHopeDesig" value="Regional Director" readonly style="background: #f5f5f5;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-header section-acceptance"><i class="fas fa-handshake"></i> Bidder Receipt</div>
+        <div class="form-boxed-section">
+          <div class="boxed-content box-blue">
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 12px;">Received by (Bidder/Representative)</label>
+                <input type="text" id="noaBidderRep" placeholder="Name of Bidder representative">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 12px;">Date Received</label>
+                <input type="date" id="noaBidderReceiptDate">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-award"></i> NOA Document (Signed by HoPE)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="noaDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'noaDocumentLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('noaDocument').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="noaDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="issueNOA()"><i class="fas fa-award"></i> Issue NOA</button>
+        </div>
+      </form>
+    `;
+    openModal('Issue Notice of Award (NOA)', html, { preventOutsideClose: true });
+
+    // Store suppliers data for address auto-fill
+    window._noaSuppliers = suppliers;
+  };
+
+  // Auto-update Award Letter Text when Date or RFQ selection changes
+  window.noaUpdateAwardText = function() {
+    const dateVal = document.getElementById('noaDate')?.value;
+    const rfqSelect = document.getElementById('noaRFQRef');
+    let dateStr = '_____________';
+    if (dateVal) {
+      const d = new Date(dateVal + 'T00:00:00');
+      dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+    let rfqStr = '_____________';
+    if (rfqSelect && rfqSelect.value) {
+      const optText = rfqSelect.options[rfqSelect.selectedIndex].text;
+      rfqStr = optText.split(' (')[0].trim();
+    }
+    const textArea = document.getElementById('noaAwardText');
+    if (textArea) {
+      textArea.value = `This is to inform you that your quotation dated ${dateStr} for the above-captioned project per RFQ No. ${rfqStr} has been accepted. You are hereby required to submit within three (3) calendar days the following post-qualification documents:\n\n1. Latest Income Tax Return (ITR)\n2. Omnibus Sworn Statement\n3. Valid Mayor's/Business Permit\n4. PhilGEPS Registration Number\n\nFailure to submit the above requirements within the prescribed period shall constitute sufficient ground for cancellation of the award. You are likewise required to post the required Performance Security within ten (10) calendar days from receipt hereof.`;
+    }
+  };
+
+  // noaFillSupplierAddress removed — supplier is now a free-text input
+
+  // Auto-fill NOA supplier and contract amount from linked BAC Resolution's abstract
+  window.noaAutoFillFromBAC = async function(bacResId) {
+    if (!bacResId) return;
+    try {
+      const bacRes = await apiRequest('/bac-resolutions/' + bacResId);
+      if (bacRes && bacRes.abstract_id) {
+        const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+        if (abstract) {
+          const supplierField = document.getElementById('noaSupplierName');
+          const amountField = document.getElementById('noaContractAmount');
+          const addressField = document.getElementById('noaAddress');
+          if (supplierField && abstract.recommended_supplier_name) {
+            supplierField.value = abstract.recommended_supplier_name;
+            // Try to fetch supplier address from suppliers list
+            if (addressField) {
+              const suppliers = window._noaSuppliers || [];
+              const matchedSupplier = suppliers.find(s =>
+                (s.name || '').toLowerCase().trim() === abstract.recommended_supplier_name.toLowerCase().trim()
+              );
+              if (matchedSupplier && matchedSupplier.address) {
+                addressField.value = matchedSupplier.address;
+              } else if (abstract.recommended_supplier_id) {
+                try {
+                  const sup = await apiRequest('/suppliers/' + abstract.recommended_supplier_id);
+                  if (sup && sup.address) addressField.value = sup.address;
+                } catch(e) {}
+              }
+            }
+          }
+          if (amountField && abstract.recommended_amount) {
+            amountField.value = abstract.recommended_amount;
+          }
+        }
+      }
+    } catch (e) { console.warn('[NOA] Could not auto-fill from BAC:', e.message); }
+  };
+
+  window.showNewPOModal = async function() {
+    await ensureProcModesLoaded();
+    // Load items catalog for picker
+    const allItems = await ensureItemsCatalogLoaded();
+    const poCatOpts = buildCatalogCategoryOptions(allItems);
+    const poItemOpts = buildCatalogItemOptions(allItems);
+
+    // Load suppliers from DB
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) { console.error('Failed to load suppliers:', e); }
+    const supplierOptions = suppliers.map(s =>
+      `<option value="${s.id}">${s.name || s.company_name || ''}</option>`
+    ).join('');
+    window._poSuppliers = suppliers;
+
+    const html = `
+      <form id="poForm" onsubmit="saveNewPO(event)">
+        <div class="info-banner" style="margin-bottom: 0;">
+          <i class="fas fa-file-contract"></i>
+          <strong>PURCHASE ORDER</strong> — Per Government PO Form
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Supplier</label>
+            <select class="form-select" id="poSupplierId" required onchange="poFillSupplierDetails()">
+              <option value="">-- Select Supplier --</option>
+              ${supplierOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>P.O. No.</label>
+            <input type="text" id="poNumber" value="${generateDocNumber('PO')}" readonly>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" id="poAddress" placeholder="Auto-fills from supplier" required readonly style="background:#f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="poDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TIN</label>
+            <input type="text" id="poTIN" placeholder="Auto-fills from supplier" readonly style="background:#f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Mode of Procurement</label>
+            <select class="form-select" id="poProcMode" required>
+              ${buildProcModeOptions('Small Value Procurement', true)}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Place of Delivery</label>
+            <input type="text" id="poPlaceDelivery" value="DMW Regional Office XIII (Caraga), Butuan City" required>
+          </div>
+          <div class="form-group">
+            <label>Delivery Term</label>
+            <input type="text" id="poDeliveryTerm" placeholder="e.g., 15 calendar days from receipt of PO">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Delivery</label>
+            <input type="date" id="poDeliveryDate" required>
+          </div>
+          <div class="form-group">
+            <label>Payment Term</label>
+            <select class="form-select" id="poPaymentTerm">
+              <option value="Government Terms">Government Terms</option>
+              <option value="COD">Cash on Delivery</option>
+              <option value="30 Days">30 Days from Delivery</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Linked NOA (Issued)</label>
+          <select class="form-select" id="poLinkedNOA" required onchange="poAutoFillFromNOA(this.value)">
+            <option value="">-- Select NOA --</option>
+          </select>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Items</div>
+        <div class="form-items-section">
+        ${buildCatalogPickerHTML('po', poCatOpts, poItemOpts, true)}
+        </div>
+        <div class="form-group">
+          <label>PURPOSE</label>
+          <textarea rows="2" id="poPurpose" placeholder="Purpose of purchase order..." required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Total Amount (in words)</label>
+            <input type="text" id="poAmountWords" placeholder="e.g., One Hundred Fifteen Thousand Pesos Only" required>
+          </div>
+          <div class="form-group">
+            <label>Total Amount</label>
+            <input type="number" id="poTotalAmount" placeholder="0.00" step="0.01" readonly style="font-weight: bold; font-size: 16px;">
+          </div>
+        </div>
+        <div class="form-note">
+          <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> In case of failure to make the full delivery within the time specified above, a penalty of one-tenth (1/10) of one percent for every day of delay shall be imposed.
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-contract"></i> Purchase Order Document (Signed)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="poDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'poDocumentLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('poDocument').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="poDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-signature"></i> Supplier Conforme / Signed PO</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="poSupplierConforme" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'poSupplierConformeLabel')">
+                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('poSupplierConforme').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="poSupplierConformeLabel" style="font-size: 12px; color: #666;">Upload after supplier signs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
+          <button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>
+        </div>
+      </form>
+    `;
+    openModal('Create Purchase Order (PO)', html, { preventOutsideClose: true });
+    window._docSelectedItems['po'] = [];
+
+    // Dynamically populate NOA dropdown
+    (async () => {
+      try {
+        const noaList = cachedNOA.length ? cachedNOA : await apiRequest('/noa');
+        window._poNOAList = noaList;
+        const sel = document.getElementById('poLinkedNOA');
+        if (sel && noaList.length) {
+          noaList.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n.id;
+            opt.textContent = `${n.noa_number || 'NOA-' + n.id} — ${n.supplier_name || 'Unknown Supplier'} (₱${parseFloat(n.contract_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})`;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) { console.error('Failed to load NOA list:', err); }
+    })();
+  };
+
+  // Auto-fill supplier address and TIN when supplier selected in PO modal
+  window.poFillSupplierDetails = function() {
+    const supplierId = document.getElementById('poSupplierId')?.value;
+    const addressField = document.getElementById('poAddress');
+    const tinField = document.getElementById('poTIN');
+    if (!window._poSuppliers) return;
+    if (!supplierId) {
+      if (addressField) addressField.value = '';
+      if (tinField) tinField.value = '';
+      return;
+    }
+    const supplier = window._poSuppliers.find(s => s.id == supplierId);
+    if (supplier) {
+      if (addressField) addressField.value = supplier.address || '';
+      if (tinField) tinField.value = supplier.tin || '';
+    }
+  };
+
+  // Auto-fill PO supplier from linked NOA's supplier name
+  window.poAutoFillFromNOA = async function(noaId) {
+    if (!noaId || !window._poNOAList) return;
+    const noa = window._poNOAList.find(n => String(n.id) === String(noaId));
+    if (!noa) return;
+    // Auto-fill supplier: use supplier_id directly if available, otherwise match by name
+    const sel = document.getElementById('poSupplierId');
+    if (sel) {
+      if (noa.supplier_id) {
+        sel.value = String(noa.supplier_id);
+        poFillSupplierDetails();
+      } else if (noa.supplier_name) {
+        const noaName = noa.supplier_name.toLowerCase().trim();
+        for (const opt of sel.options) {
+          if (opt.textContent.toLowerCase().trim().includes(noaName)) {
+            sel.value = opt.value;
+            poFillSupplierDetails();
+            break;
+          }
+        }
+      }
+    }
+    // Auto-fill contract amount
+    const amountField = document.getElementById('poTotalAmount');
+    if (amountField && noa.contract_amount) {
+      amountField.value = parseFloat(noa.contract_amount).toFixed(2);
+    }
+    // Auto-fill purpose, procurement mode, and items by tracing: NOA -> RFQ -> PR -> pr_items
+    try {
+      let prData = null;
+      // First try direct path: NOA.rfq_id -> RFQ.pr_id -> PR (with items)
+      if (noa.rfq_id) {
+        try {
+          const rfq = await apiRequest('/rfqs/' + noa.rfq_id);
+          if (rfq && rfq.pr_id) {
+            prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+          }
+        } catch(e) { console.warn('[PO] Direct RFQ path failed:', e); }
+      }
+      // Fallback: NOA -> BAC Res -> Abstract -> RFQ -> PR
+      if (!prData && noa.bac_resolution_id) {
+        try {
+          const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
+          if (bacRes && bacRes.abstract_id) {
+            const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+            if (abstract) {
+              // Fill procurement mode from abstract
+              const procModeField = document.getElementById('poProcMode');
+              if (procModeField && abstract.procurement_mode) {
+                for (const opt of procModeField.options) {
+                  if (opt.value === abstract.procurement_mode || opt.textContent.includes(abstract.procurement_mode)) {
+                    procModeField.value = opt.value;
+                    break;
+                  }
+                }
+              }
+              if (abstract.rfq_id) {
+                const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
+                if (rfq && rfq.pr_id) {
+                  prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+                }
+              }
+            }
+          }
+        } catch(e) { console.warn('[PO] BAC Res path failed:', e); }
+      }
+      // Auto-fill from PR data
+      if (prData) {
+        // Fill purpose
+        const purposeField = document.getElementById('poPurpose');
+        if (purposeField && !purposeField.value && prData.purpose) {
+          purposeField.value = prData.purpose;
+        }
+        // Fill items from PR items into the catalog picker system
+        if (prData.items && prData.items.length > 0) {
+          window._docSelectedItems['po'] = prData.items.map(item => ({
+            item_id: item.item_id || null,
+            item_name: item.item_name || '',
+            item_code: item.item_code || '',
+            item_unit: item.unit || '',
+            item_category: item.category || '',
+            item_description: item.item_description || '',
+            description: item.item_description || item.item_name || '',
+            unit_price: parseFloat(item.unit_price || 0),
+            quantity: parseInt(item.quantity || 1),
+            total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+          }));
+          renderDocItemsList('po');
+        }
+      }
+    } catch(e) { console.warn('[PO] Could not auto-fill from NOA chain:', e); }
+  };
+
+  window.addPOItemRow = function() {
+    const tbody = document.getElementById('poItemsBody');
+    const nextNum = tbody.rows.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" value="${nextNum}" style="width: 50px; text-align: center;"></td>
+      <td><select class="form-select" style="width: 60px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Sq.ft</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option></select></td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><input type="number" placeholder="0" style="width: 60px;" min="0" onchange="calcPOItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" min="0" onchange="calcPOItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px;" readonly></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.calcPOItemTotal = function(el) {
+    const row = el.closest('tr');
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const qty = parseFloat(inputs[0].value) || 0;
+    const unitCost = parseFloat(inputs[1].value) || 0;
+    inputs[2].value = (qty * unitCost).toFixed(2);
+    // Recalculate grand total
+    let grandTotal = 0;
+    document.querySelectorAll('#poItemsBody tr').forEach(r => {
+      const amountInput = r.querySelectorAll('input[type="number"]')[2];
+      grandTotal += parseFloat(amountInput.value) || 0;
+    });
+    const totalEl = document.getElementById('poTotalAmount');
+    if (totalEl) totalEl.value = grandTotal.toFixed(2);
+  };
+
+  window.approvePO = async function() {
+    if (!confirm('Approve this Purchase Order?')) return;
+    const poNumber = document.getElementById('poNumber')?.value || '';
+    const poDate = document.getElementById('poDate')?.value || '';
+    const supplierId = document.getElementById('poSupplierId')?.value || '';
+    const procMode = document.getElementById('poProcMode')?.value || '';
+    const placeDelivery = document.getElementById('poPlaceDelivery')?.value || '';
+    const deliveryDate = document.getElementById('poDeliveryDate')?.value || '';
+    const paymentTerm = document.getElementById('poPaymentTerm')?.value || 'Government Terms';
+    const noaId = document.getElementById('poLinkedNOA')?.value || '';
+    const purpose = document.getElementById('poPurpose')?.value || '';
+    const selectedItems = window._docSelectedItems['po'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id, item_code: si.item_code || 'PO-ITEM-' + (idx + 1),
+      item_name: si.item_name, item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit, quantity: si.quantity, unit_price: si.unit_price
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+    try {
+      const data = {
+        po_number: poNumber, supplier_id: supplierId ? parseInt(supplierId) : null,
+        noa_id: noaId ? parseInt(noaId) : null, total_amount: totalAmount,
+        payment_terms: paymentTerm, delivery_address: placeDelivery,
+        status: 'for_signing', workflow_status: 'pending',
+        expected_delivery_date: deliveryDate || null, po_date: poDate || null,
+        purpose: purpose, mode_of_procurement: procMode, place_of_delivery: placeDelivery, items: items
+      };
+      const result = await apiRequest('/purchase-orders', 'POST', data);
+      const poId = result.id || result.po_id;
+      if (poId) {
+        await uploadAttachments('purchase_order', poId, [
+          { inputId: 'poDocument', description: 'Purchase Order Document (Signed)' },
+          { inputId: 'poSupplierConforme', description: 'Supplier Conforme / Signed PO' }
+        ]);
+      }
+      alert('Purchase Order approved successfully!');
+      closeModal();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
+    } catch (err) { alert('Error approving PO: ' + err.message); }
+  };
+
+  // ===== FULL EDIT MODALS FOR ALL TRANSACTION PAGES =====
+
+  // --- EDIT PR ---
+  window.showEditPRModal = async function(id) {
+    // Fetch fresh data from server
+    let pr = {};
+    try { pr = await apiRequest('/purchase-requests/' + id); } catch (err) { alert('Could not load Purchase Request'); return; }
+    const items = pr.items || [];
+    const isDraft = (pr.status === 'draft');
+
+    // ----- DRAFT: show create-style modal with catalog picker -----
+    if (isDraft) {
+      // Load APP items for validation
+      let appItems = [];
+      try { appItems = await apiRequest('/plan-items'); } catch(e) { console.warn('Could not load APP items:', e); }
+      // Filter APP items by user's division (admin/hope see all)
+      const editPrSeeAllRoles = ['admin', 'hope'];
+      if (!userHasAnyRole(editPrSeeAllRoles)) {
+        const chiefDivCodeMap = { chief_fad: 'FAD', chief_wrsd: 'WRSD', chief_mwpsd: 'MWPSD', chief_mwptd: 'MWPTD' };
+        const chiefRole = getUserChiefRole();
+        const userDeptCode = chiefRole ? chiefDivCodeMap[chiefRole] : (currentUser.department_code || currentUser.division || '');
+        const userDeptId = currentUser.dept_id;
+        if (userDeptCode || userDeptId) {
+          appItems = appItems.filter(item => {
+            return (userDeptId && String(item.dept_id) === String(userDeptId)) ||
+                   (userDeptCode && (item.department_code || '').toUpperCase() === userDeptCode.toUpperCase());
+          });
+        }
+      }
+      const allItems = await ensureItemsCatalogLoaded();
+      const prCatOpts = buildCatalogCategoryOptions(allItems);
+      const prItemOpts = buildCatalogItemOptions(allItems);
+
+      const appOptions = appItems.map(item => {
+        const desc = (item.description || item.item_description || '').substring(0, 60);
+        const dept = item.department_code || '';
+        return `<option value="${item.id}" data-desc="${desc}" data-dept="${dept}">${desc} (${dept} - FY${item.fiscal_year || String(getCurrentFiscalYear())})</option>`;
+      }).join('');
+
+      const html = `
+        <form id="editPRForm" onsubmit="saveEditPRDraft(event, ${id})">
+          <div class="info-banner" style="margin-bottom: 0;">
+            <i class="fas fa-file-alt"></i>
+            <strong>PURCHASE REQUEST</strong> — ${pr.pr_number || 'Draft'} <span class="status-badge draft" style="margin-left:8px;">DRAFT</span>
+          </div>
+
+          <!-- APP/PPMP Validation Section -->
+          <div class="form-validation-section">
+            <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
+              <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
+            </label>
+            <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on.</p>
+            <select id="editPrAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this);">
+              <option value="">-- Select APP Item --</option>
+              ${appOptions}
+              <option value="not-in-app" style="color:#e53e3e;font-weight:600;">⚠ Item NOT in APP (Requires New PPMP)</option>
+            </select>
+            <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Office/Section</label>
+              <input type="text" id="editPrOffice" value="${(pr.office || 'DMW Caraga').replace(/"/g, '&quot;')}" required>
+            </div>
+            <div class="form-group">
+              <label>PR No.</label>
+              <input type="text" id="editPrNumber" value="${pr.pr_number || ''}" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="editPrDate" value="${pr.pr_date ? pr.pr_date.substring(0,10) : (pr.created_at ? pr.created_at.substring(0,10) : '')}">
+            </div>
+          </div>
+
+          <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Item Details</div>
+          <div class="form-items-section">
+            ${buildCatalogPickerHTML('editpr', prCatOpts, prItemOpts, true)}
+            <div style="text-align:right; margin-top:8px;">
+              <strong id="editPrTotalAmount">₱0.00</strong>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Purpose</label>
+            <textarea rows="2" id="editPrPurpose" placeholder="Purpose of the purchase request" required>${(pr.purpose || '').replace(/</g, '&lt;')}</textarea>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+          <div class="form-group">
+            <label>Specifications (one per line)</label>
+            <textarea rows="4" id="editPrItemSpecs" placeholder="Enter item specifications, one per line...">${(pr.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+          <div class="form-attachment-section">
+            <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
+              <div style="margin-bottom: 12px;">
+                <label style="font-weight: 600; display: block;"><i class="fas fa-file-alt"></i> Route Slip / Annex 1</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="file" id="editPrRouteSlip" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'editPrRouteSlipLabel')">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('editPrRouteSlip').click()"><i class="fas fa-upload"></i> Upload</button>
+                  <span id="editPrRouteSlipLabel" style="font-size: 12px; color: #666;">Optional</span>
+                </div>
+              </div>
+              <div>
+                <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Technical Specifications / TOR</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="file" id="editPrTechSpecs" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'editPrTechSpecsLabel')">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('editPrTechSpecs').click()"><i class="fas fa-upload"></i> Upload</button>
+                  <span id="editPrTechSpecsLabel" style="font-size: 12px; color: #666;">Optional</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="text-align: right; margin-top: 20px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+            <button type="button" class="btn btn-primary" style="background:#2e7d32;" onclick="submitEditPRForApproval(${id})"><i class="fas fa-paper-plane"></i> Submit for Approval</button>
+          </div>
+        </form>
+      `;
+      openModal('Edit Purchase Request (Draft)', html, { preventOutsideClose: true });
+      // Initialize catalog picker with existing items
+      window._docSelectedItems['editpr'] = [];
+      if (items.length > 0) {
+        items.forEach(item => {
+          window._docSelectedItems['editpr'].push({
+            item_id: item.item_id || item.id,
+            item_code: item.item_code || '',
+            item_name: item.item_name || item.item_description || '',
+            description: item.item_description || item.item_name || '',
+            item_description: item.item_description || '',
+            item_unit: item.unit || 'Lot',
+            item_category: item.category || 'general',
+            quantity: item.quantity || 0,
+            unit_price: item.unit_price || 0,
+            total: (item.quantity || 0) * (item.unit_price || 0)
+          });
+        });
+        // Render existing items into the catalog picker table
+        if (typeof renderDocItemsList === 'function') renderDocItemsList('editpr');
+      }
+      return;
+    }
+
+    // ----- NON-DRAFT: existing table-based edit modal -----
+    const unitOptions = ['Lot','Pax','Pcs','Unit','Sq.ft','Gal','Ltrs','Box','Ream','Set'];
+    const buildUnitSelect = (selected) => {
+      return `<select class="form-select" style="width:75px;">${unitOptions.map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
+    };
+
+    const buildItemRow = (item, idx) => {
+      return `<tr>
+        <td><input type="number" value="${idx + 1}" style="width:50px;" readonly></td>
+        <td>${buildUnitSelect(item.unit || 'Lot')}</td>
+        <td><textarea rows="2" style="width:100%;">${(item.item_description || item.item_name || '').replace(/</g, '&lt;')}</textarea></td>
+        <td><input type="number" placeholder="0" style="width:70px;" min="0" value="${item.quantity || 0}" onchange="calculateEditPRItemTotal(this)"></td>
+        <td><input type="number" placeholder="0.00" step="0.01" style="width:100px;" min="0" value="${item.unit_price || 0}" onchange="calculateEditPRItemTotal(this)"></td>
+        <td><input type="number" placeholder="0.00" step="0.01" style="width:100px;" readonly value="${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}"></td>
+        <td style="width:40px;text-align:center;"><button type="button" class="btn-icon" style="color:#e53e3e;" title="Remove" onclick="removeEditPRItemRow(this)"><i class="fas fa-trash"></i></button></td>
+      </tr>`;
+    };
+
+    const itemRows = items.length > 0
+      ? items.map((item, idx) => buildItemRow(item, idx)).join('')
+      : buildItemRow({ unit: 'Lot', item_description: '', quantity: 0, unit_price: 0 }, 0);
+
+    let initTotal = 0;
+    items.forEach(item => { initTotal += (item.quantity || 0) * (item.unit_price || 0); });
+
+    const html = `
+      <form id="editPRForm" onsubmit="saveEditPR(event, ${id})">
+        <div class="info-banner" style="margin-bottom:0;">
+          <i class="fas fa-edit"></i>
+          <strong>EDIT PURCHASE REQUEST</strong> — ${pr.pr_number || ''}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Office/Section</label>
+            <input type="text" id="editPrOffice" value="${(pr.office || 'DMW Caraga').replace(/"/g, '&quot;')}">
+          </div>
+          <div class="form-group">
+            <label>PR No.</label>
+            <input type="text" id="editPrNumber" value="${pr.pr_number || ''}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="editPrDate" value="${pr.pr_date ? pr.pr_date.substring(0,10) : (pr.created_at ? pr.created_at.substring(0,10) : '')}">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editPrStatus" class="form-select">
+              <option value="draft" ${pr.status==='draft'?'selected':''}>DRAFT</option>
+              <option value="pending_approval" ${pr.status==='pending_approval'?'selected':''}>PENDING APPROVAL</option>
+              <option value="approved" ${pr.status==='approved'?'selected':''}>APPROVED</option>
+              <option value="rejected" ${pr.status==='rejected'?'selected':''}>REJECTED</option>
+              <option value="cancelled" ${pr.status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Item Details</div>
+        <div class="form-items-section">
+          <table class="data-table" style="font-size:12px;margin-bottom:10px;">
+            <thead>
+              <tr>
+                <th style="width:60px;">Item No.</th>
+                <th style="width:80px;">Unit</th>
+                <th>Item Description</th>
+                <th style="width:80px;">Quantity</th>
+                <th style="width:110px;">Unit Cost</th>
+                <th style="width:110px;">Total Cost</th>
+                <th style="width:40px;"></th>
+              </tr>
+            </thead>
+            <tbody id="editPrItemsBody">
+              ${itemRows}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" style="text-align:right;font-weight:bold;">TOTAL AMOUNT</td>
+                <td><strong id="editPrTotalAmount">₱${(initTotal || pr.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          <button type="button" class="btn btn-sm btn-outline" onclick="addEditPRItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        </div>
+        <div class="form-group">
+          <label>Purpose</label>
+          <textarea rows="2" id="editPrPurpose" placeholder="Purpose of the purchase request">${(pr.purpose || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-clipboard-list"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editPrItemSpecs" placeholder="Enter specifications, one per line...">${(pr.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+        ${getEditAttachmentSectionHTML('purchase_request', id, 'editPrAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Purchase Request', html, { preventOutsideClose: true });
+  };
+
+  // Dynamic helpers for Edit PR (same pattern as New PR)
+  window.addEditPRItemRow = function() {
+    const tbody = document.getElementById('editPrItemsBody');
+    if (!tbody) return;
+    const rowCount = tbody.rows.length + 1;
+    const unitOpts = ['Lot','Pax','Pcs','Unit','Sq.ft','Gal','Ltrs','Box','Ream','Set'];
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="number" value="${rowCount}" style="width:50px;" readonly></td>
+      <td>
+        <select class="form-select" style="width:75px;">
+          ${unitOpts.map(u => `<option value="${u}">${u}</option>`).join('')}
+        </select>
+      </td>
+      <td><textarea rows="2" placeholder="Item description..." style="width:100%;"></textarea></td>
+      <td><input type="number" placeholder="0" style="width:70px;" min="0" onchange="calculateEditPRItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width:100px;" min="0" onchange="calculateEditPRItemTotal(this)"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width:100px;" readonly></td>
+      <td style="width:40px;text-align:center;"><button type="button" class="btn-icon" style="color:#e53e3e;" title="Remove" onclick="removeEditPRItemRow(this)"><i class="fas fa-trash"></i></button></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.removeEditPRItemRow = function(btn) {
+    const tbody = document.getElementById('editPrItemsBody');
+    if (!tbody || tbody.rows.length <= 1) { alert('At least one item row is required.'); return; }
+    btn.closest('tr').remove();
+    // Re-number rows
+    Array.from(tbody.rows).forEach((r, i) => {
+      const numInput = r.querySelector('input[type="number"]');
+      if (numInput) numInput.value = i + 1;
+    });
+    recalcEditPRTotal();
+  };
+
+  window.calculateEditPRItemTotal = function(el) {
+    const row = el.closest('tr');
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const qty = parseFloat(inputs[1].value) || 0;
+    const unitCost = parseFloat(inputs[2].value) || 0;
+    inputs[3].value = (qty * unitCost).toFixed(2);
+    recalcEditPRTotal();
+  };
+
+  function recalcEditPRTotal() {
+    let total = 0;
+    document.querySelectorAll('#editPrItemsBody tr').forEach(r => {
+      const cells = r.querySelectorAll('input[type="number"]');
+      total += parseFloat(cells[3]?.value) || 0;
+    });
+    const el = document.getElementById('editPrTotalAmount');
+    if (el) el.textContent = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits: 2});
+  }
+
+  window.saveEditPR = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    // Collect items from the edit table (same pattern as saveNewPR)
+    const items = [];
+    const rows = document.getElementById('editPrItemsBody')?.querySelectorAll('tr') || [];
+    rows.forEach((row, idx) => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 6) {
+        const unit = cells[1].querySelector('select')?.value || 'Lot';
+        const desc = cells[2].querySelector('textarea')?.value || '';
+        const qty = parseFloat(cells[3].querySelector('input')?.value) || 0;
+        const unitPrice = parseFloat(cells[4].querySelector('input')?.value) || 0;
+        if (desc || qty > 0) {
+          items.push({
+            item_code: 'PR-ITEM-' + (idx + 1),
+            item_name: desc.substring(0, 100),
+            item_description: desc,
+            unit: unit,
+            quantity: qty,
+            unit_price: unitPrice,
+            category: 'general'
+          });
+        }
+      }
+    });
+    const totalText = document.getElementById('editPrTotalAmount')?.textContent || '0';
+    const totalAmount = parseFloat(totalText.replace(/[^\d.]/g, '')) || 0;
+    // Preserve dept_id from cached record so division assignment isn't lost
+    const cachedRecord = cachedPR.find(r => r.id === id);
+    const data = {
+      pr_number: document.getElementById('editPrNumber').value,
+      purpose: document.getElementById('editPrPurpose').value,
+      total_amount: totalAmount,
+      status: document.getElementById('editPrStatus').value,
+      dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+      item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
+      items: items
+    };
+    try {
+      await apiRequest('/purchase-requests/' + id, 'PUT', data);
+      await uploadEditAttachments('purchase_request', id, 'editPrAttachment');
+      showToast('Purchase Request updated successfully!', 'success');
+      closeModal(); loadPR();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Save edited draft PR (uses catalog picker like create modal)
+  window.saveEditPRDraft = async function(e, id) {
+    e.preventDefault();
+    const purpose = document.getElementById('editPrPurpose')?.value || '';
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    const selectedItems = window._docSelectedItems['editpr'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Save this Purchase Request as Draft?')) return;
+
+    const cachedRecord = cachedPR.find(r => r.id === id);
+    try {
+      await apiRequest('/purchase-requests/' + id, 'PUT', {
+        pr_number: document.getElementById('editPrNumber').value,
+        purpose: purpose,
+        total_amount: totalAmount,
+        status: 'draft',
+        dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+        item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
+        items: items
+      });
+      await uploadAttachments('purchase_request', id, [
+        { inputId: 'editPrRouteSlip', description: 'Route Slip / Annex 1' },
+        { inputId: 'editPrTechSpecs', description: 'Technical Specifications / TOR' }
+      ]);
+      showToast('Draft saved!', 'success');
+      closeModal(); loadPR();
+    } catch (err) { alert('Error saving draft: ' + err.message); }
+  };
+
+  // Submit a draft PR for approval (from edit-draft modal)
+  window.submitEditPRForApproval = async function(id) {
+    const purpose = document.getElementById('editPrPurpose')?.value || '';
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    const selectedItems = window._docSelectedItems['editpr'] || [];
+    if (selectedItems.length === 0) { alert('Please add at least one item.'); return; }
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Submit this PR for approval? It will be visible to approvers.')) return;
+
+    const cachedRecord = cachedPR.find(r => r.id === id);
+    try {
+      await apiRequest('/purchase-requests/' + id, 'PUT', {
+        pr_number: document.getElementById('editPrNumber').value,
+        purpose: purpose,
+        total_amount: totalAmount,
+        status: 'pending_approval',
+        dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
+        item_specifications: document.getElementById('editPrItemSpecs')?.value.trim() || null,
+        items: items
+      });
+      await uploadAttachments('purchase_request', id, [
+        { inputId: 'editPrRouteSlip', description: 'Route Slip / Annex 1' },
+        { inputId: 'editPrTechSpecs', description: 'Technical Specifications / TOR' }
+      ]);
+      showToast('Purchase Request submitted for approval!', 'success');
+      closeModal(); loadPR();
+    } catch (err) { alert('Error submitting PR: ' + err.message); }
+  };
+
+  // --- EDIT RFQ ---
+  window.showEditRFQModal = async function(id) {
+    let r;
+    try { r = await apiRequest('/rfqs/' + id); } catch(e) {}
+    if (!r) { r = (cachedRFQ || []).find(x => x.id === id); }
+    if (!r) { alert('Record not found'); return; }
+    // Build PR options from cached PRs
+    const prOptions = (cachedPR || []).map(p => 
+      `<option value="${p.id}" ${r.pr_id == p.id ? 'selected' : ''}>${p.pr_number}</option>`
+    ).join('');
+
+    // Load saved specs directly from rfqs.item_specifications column
+    let savedSpecsText = r.item_specifications || '';
+
+    const html = `
+      <form id="editRFQForm" onsubmit="saveEditRFQ(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit RFQ</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>RFQ Number</label><input type="text" id="editRfqNumber" value="${r.rfq_number || ''}" required></div>
+          <div class="form-group"><label>PR Reference</label>
+            <select id="editRfqPrId" class="form-select" onchange="loadPRItemsForRFQ()">
+              <option value="">-- No PR Reference --</option>
+              ${prOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Date Prepared</label><input type="date" id="editRfqDate" value="${r.date_prepared ? r.date_prepared.substring(0,10) : ''}"></div>
+          <div class="form-group"><label>Submission Deadline</label><input type="date" id="editRfqDeadline" value="${r.submission_deadline ? r.submission_deadline.substring(0,10) : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>ABC Amount</label><input type="number" step="0.01" id="editRfqAbc" value="${r.abc_amount || 0}"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editRfqStatus" class="form-select">
+              <option value="on_going" ${r.status==='on_going'?'selected':''}>ON-GOING</option>
+              <option value="completed" ${r.status==='completed'?'selected':''}>COMPLETED</option>
+              <option value="cancelled" ${r.status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>PhilGEPS Required</label>
+          <select id="editRfqPhilgeps" class="form-select">
+            <option value="false" ${!r.philgeps_required?'selected':''}>No</option>
+            <option value="true" ${r.philgeps_required?'selected':''}>Yes</option>
+          </select>
+        </div>
+
+        <!-- PR Items Reference (Quantity & Unit from PR) -->
+        <div class="form-group" style="margin-top:15px;">
+          <label><i class="fas fa-list"></i> PR Items (Quantity & Unit)</label>
+          <div id="rfqPrItemsContainer" style="border:1px solid #ddd;border-radius:6px;padding:10px;background:#f9f9f9;min-height:40px;">
+            <span style="color:#999;font-size:13px;">Select a PR Reference to load items...</span>
+          </div>
+        </div>
+
+        <!-- Item Specifications (Bullet Form Input) -->
+        <div class="form-group" style="margin-top:10px;">
+          <label><i class="fas fa-clipboard-list"></i> Item Specifications (one per line = one bullet)</label>
+          <textarea id="editRfqItemSpecs" class="form-control" rows="6" placeholder="Enter item specifications, one per line...&#10;Example:&#10;Brand new, original&#10;Compatible with HP LaserJet Pro&#10;Yield: 2,500 pages"
+            style="font-size:13px;line-height:1.6;">${savedSpecsText}</textarea>
+          <small style="color:#888;">Each line will appear as a bullet point (•) in the RFQ table and print.</small>
+        </div>
+
+        <!-- Bullet Preview -->
+        <div class="form-group" style="margin-top:5px;">
+          <label style="font-size:12px;color:#666;">Preview:</label>
+          <div id="rfqSpecPreview" style="border:1px dashed #ccc;border-radius:4px;padding:8px;background:#fff;min-height:30px;font-size:12px;">
+            <span style="color:#ccc;">Type specifications above to preview...</span>
+          </div>
+        </div>
+
+        ${getEditAttachmentSectionHTML('rfq', id, 'editRfqAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit RFQ', html, { preventOutsideClose: true });
+
+    // Attach live preview for specs textarea
+    const specsTA = document.getElementById('editRfqItemSpecs');
+    if (specsTA) {
+      specsTA.addEventListener('input', updateRfqSpecPreview);
+      // Trigger initial preview if there are saved specs
+      if (savedSpecsText) updateRfqSpecPreview();
+    }
+
+    // Auto-load PR items if PR is already selected
+    if (r.pr_id) loadPRItemsForRFQ();
+  };
+
+  // Load PR items into the RFQ edit modal
+  window.loadPRItemsForRFQ = async function() {
+    const prId = document.getElementById('editRfqPrId')?.value;
+    const container = document.getElementById('rfqPrItemsContainer');
+    if (!container) return;
+    if (!prId) {
+      container.innerHTML = '<span style="color:#999;font-size:13px;">Select a PR Reference to load items...</span>';
+      return;
+    }
+    container.innerHTML = '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+    try {
+      const prDetail = await apiRequest('/purchase-requests/' + prId);
+      const items = prDetail.items || [];
+      if (items.length === 0) {
+        container.innerHTML = '<span style="color:#999;font-size:13px;">No items found in this PR.</span>';
+        return;
+      }
+      container.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#e9ecef;font-weight:bold;">
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:center;width:15%;">Quantity</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:center;width:15%;">Unit</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Item Name</th>
+              <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;width:20%;">Unit Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${it.quantity || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${it.unit || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;">${it.item_name || ''}</td>
+                <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;">₱${parseFloat(it.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } catch (err) {
+      container.innerHTML = '<span style="color:red;font-size:13px;">Error loading PR items: ' + err.message + '</span>';
+    }
+  };
+
+  // Live preview of bullet specs
+  window.updateRfqSpecPreview = function() {
+    const ta = document.getElementById('editRfqItemSpecs');
+    const preview = document.getElementById('rfqSpecPreview');
+    if (!ta || !preview) return;
+    const lines = ta.value.split('\n').filter(l => l.trim() !== '');
+    if (lines.length === 0) {
+      preview.innerHTML = '<span style="color:#ccc;">Type specifications above to preview...</span>';
+    } else {
+      preview.innerHTML = '<ul style="margin:0;padding-left:18px;">' + lines.map(l => `<li>${l.trim()}</li>`).join('') + '</ul>';
+    }
+  };
+
+  window.saveEditRFQ = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    const data = {
+      rfq_number: document.getElementById('editRfqNumber').value,
+      pr_id: document.getElementById('editRfqPrId').value || null,
+      date_prepared: document.getElementById('editRfqDate').value || null,
+      submission_deadline: document.getElementById('editRfqDeadline').value || null,
+      abc_amount: parseFloat(document.getElementById('editRfqAbc').value) || 0,
+      philgeps_required: document.getElementById('editRfqPhilgeps').value === 'true',
+      status: document.getElementById('editRfqStatus').value
+    };
+
+    // Send item_specifications directly to server
+    const specsText = document.getElementById('editRfqItemSpecs')?.value || '';
+    data.item_specifications = specsText.trim() || null;
+
+    try {
+      await apiRequest('/rfqs/' + id, 'PUT', data);
+      await uploadEditAttachments('rfq', id, 'editRfqAttachment');
+      showToast('RFQ updated successfully!', 'success');
+      closeModal(); loadRFQ();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT ABSTRACT ---
+  window.showEditAbstractModal = async function(id) {
+    let a;
+    try { a = await apiRequest('/abstracts/' + id); } catch(e) {}
+    if (!a) { a = (cachedAbstract || []).find(x => x.id === id); }
+    if (!a) { alert('Record not found'); return; }
+
+    // Load suppliers from DB
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
+    const supplierOptions = suppliers.map(s => `<option value="${s.id}">${s.name || s.company_name || ''}</option>`).join('');
+
+    // Load employees for signatory dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    const buildEmpOpts = (selectedId) => {
+      return '<option value="">-- Select --</option>' + employees.map(emp =>
+        `<option value="${emp.id}" ${parseInt(selectedId) === emp.id ? 'selected' : ''}>${emp.full_name || ''} ${emp.designation_name ? '(' + emp.designation_name + ')' : ''}</option>`
+      ).join('');
+    };
+
+    // Load existing quotations for this abstract
+    let absDetail = null;
+    try { absDetail = await apiRequest('/abstracts/' + id); } catch(e) {}
+    const existingQuotations = absDetail ? (absDetail.quotations || []) : [];
+
+    // Map existing quotations to 3 slots
+    const slot = [null, null, null];
+    existingQuotations.forEach((q, idx) => { if (idx < 3) slot[idx] = q; });
+
+    // Build supplier text input with pre-filled value
+    function buildSupplierInput(slotNum, existingName) {
+      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || '')}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
+    }
+
+    // Build header labels
+    const s1Label = slot[0] ? (slot[0].supplier_name || 'Supplier 1') : 'NO BIDDER';
+    const s2Label = slot[1] ? (slot[1].supplier_name || 'Supplier 2') : 'NO BIDDER';
+    const s3Label = slot[2] ? (slot[2].supplier_name || 'Supplier 3') : 'NO BIDDER';
+
+    // Build items rows from existing quotation data
+    let itemsHTML = '';
+    // Merge items from all quotation slots — use slot[0] items as base (they share same item descriptions)
+    const baseItems = (slot[0] && slot[0].items) ? slot[0].items : [];
+    const s2Items = (slot[1] && slot[1].items) ? slot[1].items : [];
+    const s3Items = (slot[2] && slot[2].items) ? slot[2].items : [];
+
+    if (baseItems.length > 0) {
+      baseItems.forEach((item, idx) => {
+        const s2item = s2Items[idx] || {};
+        const s3item = s3Items[idx] || {};
+        const qty = item.quantity || 0;
+        const s1up = parseFloat(item.unit_price) || 0;
+        const s2up = parseFloat(s2item.unit_price) || 0;
+        const s3up = parseFloat(s3item.unit_price) || 0;
+        itemsHTML += `<tr>
+          <td><input type="number" value="${qty}" style="width: 45px; font-size: 11px;" min="0"></td>
+          <td><select class="form-select" style="width: 50px; font-size: 11px;">
+            ${['Lot','Pax','Pcs','Unit','Ltrs','Gal','Set','Box','Ream'].map(u => `<option value="${u}" ${(item.unit||'').toLowerCase() === u.toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}
+          </select></td>
+          <td><input type="text" value="${(item.item_description || '').replace(/"/g, '&quot;')}" style="width: 100%; font-size: 11px;"></td>
+          <td><input type="number" value="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+          <td style="background: #f5f9ff;"><input type="number" value="${s1up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+          <td style="background: #f5f9ff;"><input type="number" value="${(qty * s1up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+          <td style="background: #dce9fc;"><input type="number" value="${s2up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+          <td style="background: #dce9fc;"><input type="number" value="${(qty * s2up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+          <td style="background: #cddff5;"><input type="number" value="${s3up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+          <td style="background: #cddff5;"><input type="number" value="${(qty * s3up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+        </tr>`;
+      });
+    } else {
+      // Default empty row
+      itemsHTML = `<tr>
+        <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
+        <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
+        <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
+        <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+        <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+        <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+        <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+        <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+        <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+        <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+      </tr>`;
+    }
+
+    const html = `
+      <form id="editAbstractForm" onsubmit="saveEditAbstract(event, ${id})">
+        <input type="hidden" id="editAbsRfqId" value="${a.rfq_id || ''}">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Abstract of Quotations</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Abstract Number</label><input type="text" id="editAbsNumber" value="${a.abstract_number || ''}" required></div>
+          <div class="form-group"><label>RFQ Reference</label><input type="text" id="editAbsRfqRef" value="${a.rfq_number || ''}" readonly></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Date Prepared</label><input type="date" id="editAbsDate" value="${a.date_prepared ? a.date_prepared.substring(0,10) : ''}"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editAbsStatus" class="form-select">
+              <option value="on_going" ${a.status==='on_going'?'selected':''}>ON-GOING</option>
+              <option value="completed" ${a.status==='completed'?'selected':''}>COMPLETED</option>
+              <option value="cancelled" ${a.status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Purpose</label><input type="text" id="editAbsPurpose" value="${(a.purpose || '').replace(/"/g, '&quot;')}"></div>
+
+        <div class="form-section-header section-items"><i class="fas fa-table"></i> Particulars & Supplier Quotations</div>
+        <div class="form-items-section">
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 900px;">
+            <thead>
+              <tr>
+                <th rowspan="2" style="width: 50px;">Qty</th>
+                <th rowspan="2" style="width: 50px;">Unit</th>
+                <th rowspan="2">Items</th>
+                <th rowspan="2" style="width: 100px;">ABC</th>
+                <th colspan="2" style="text-align: center; background: #e3f2fd;" id="editAbsSupplier1Header">${s1Label}</th>
+                <th colspan="2" style="text-align: center; background: #d0e8ff;" id="editAbsSupplier2Header">${s2Label}</th>
+                <th colspan="2" style="text-align: center; background: #bbdefb;" id="editAbsSupplier3Header">${s3Label}</th>
+              </tr>
+              <tr>
+                <th style="width: 90px; background: #e3f2fd;">Unit Price</th>
+                <th style="width: 90px; background: #e3f2fd;">Total Price</th>
+                <th style="width: 90px; background: #d0e8ff;">Unit Price</th>
+                <th style="width: 90px; background: #d0e8ff;">Total Price</th>
+                <th style="width: 90px; background: #bbdefb;">Unit Price</th>
+                <th style="width: 90px; background: #bbdefb;">Total Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" style="padding: 4px;"><strong>Supplier Names:</strong></td>
+                <td colspan="2" style="background: #e3f2fd;">${buildSupplierInput(1, slot[0] ? slot[0].supplier_name : '')}</td>
+                <td colspan="2" style="background: #d0e8ff;">${buildSupplierInput(2, slot[1] ? slot[1].supplier_name : '')}</td>
+                <td colspan="2" style="background: #bbdefb;">${buildSupplierInput(3, slot[2] ? slot[2].supplier_name : '')}</td>
+              </tr>
+            </tbody>
+            <tbody id="editAbstractItemsBody">
+              ${itemsHTML}
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addEditAbstractItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        </div>
+
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editAbsItemSpecs" placeholder="Enter specifications, one per line...">${(a.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-user-tie"></i> BAC Signatories</div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Chairperson</label><select id="editAbsBacChair" class="form-select">${buildEmpOpts(a.bac_chairperson_id)}</select></div>
+          <div class="form-group"><label>Vice-Chairperson</label><select id="editAbsViceChair" class="form-select">${buildEmpOpts(a.vice_chairperson_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Member 1</label><select id="editAbsMember1" class="form-select">${buildEmpOpts(a.bac_member1_id)}</select></div>
+          <div class="form-group"><label>BAC Member 2</label><select id="editAbsMember2" class="form-select">${buildEmpOpts(a.bac_member2_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Member 3</label><select id="editAbsMember3" class="form-select">${buildEmpOpts(a.bac_member3_id)}</select></div>
+          <div class="form-group"><label>BAC Secretariat</label><select id="editAbsSecretariat" class="form-select">${buildEmpOpts(a.bac_secretariat_id)}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>BAC Secretariat 2</label><select id="editAbsSecretariat2" class="form-select">${buildEmpOpts(a.bac_secretariat2_id)}</select></div>
+          <div class="form-group"><label>Regional Director / Head</label><select id="editAbsRD" class="form-select">${buildEmpOpts(a.regional_director_id)}</select></div>
+        </div>
+
+        ${getEditAttachmentSectionHTML('abstract', id, 'editAbsAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Abstract of Quotations', html, { preventOutsideClose: true });
+  };
+
+  // Add item row for edit abstract modal
+  window.addEditAbstractItemRow = function() {
+    const tbody = document.getElementById('editAbstractItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
+      <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
+      <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
+      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
+      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.saveEditAbstract = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    const rfqIdVal = document.getElementById('editAbsRfqId')?.value || null;
+
+    // Gather supplier names from text inputs
+    const supplier1Name = document.getElementById('editAbsSupplier1Id')?.value?.trim() || '';
+    const supplier2Name = document.getElementById('editAbsSupplier2Id')?.value?.trim() || '';
+    const supplier3Name = document.getElementById('editAbsSupplier3Id')?.value?.trim() || '';
+
+    // Gather items from table rows
+    const itemRows = document.querySelectorAll('#editAbstractItemsBody tr');
+    const itemsData = [];
+    itemRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 10) return;
+      const qty = parseFloat(cells[0]?.querySelector('input')?.value) || 0;
+      const unit = cells[1]?.querySelector('select')?.value || '';
+      const desc = cells[2]?.querySelector('input')?.value || '';
+      const s1UnitPrice = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
+      const s1Total = parseFloat(cells[5]?.querySelector('input')?.value) || 0;
+      const s2UnitPrice = parseFloat(cells[6]?.querySelector('input')?.value) || 0;
+      const s2Total = parseFloat(cells[7]?.querySelector('input')?.value) || 0;
+      const s3UnitPrice = parseFloat(cells[8]?.querySelector('input')?.value) || 0;
+      const s3Total = parseFloat(cells[9]?.querySelector('input')?.value) || 0;
+      if (desc.trim()) {
+        itemsData.push({ qty, unit, desc, s1UnitPrice, s1Total, s2UnitPrice, s2Total, s3UnitPrice, s3Total });
+      }
+    });
+
+    // Calculate totals per supplier
+    let s1Total = 0, s2Total = 0, s3Total = 0;
+    itemsData.forEach(it => { s1Total += it.s1Total; s2Total += it.s2Total; s3Total += it.s3Total; });
+
+    // Build quotations array
+    const quotations = [];
+    const supplierBids = [];
+    const supplierSlots = [
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+    ];
+    supplierSlots.forEach((slot, idx) => {
+      if (slot.name) {
+        const qItems = slot.items.map(it => ({
+          item_description: it.desc,
+          quantity: it.qty,
+          unit: it.unit,
+          unit_price: it[slot.priceKey]
+        }));
+        quotations.push({
+          supplier_name: slot.name,
+          bid_amount: slot.total,
+          is_compliant: true,
+          remarks: null,
+          rank_no: idx + 1,
+          items: qItems
+        });
+        supplierBids.push({ name: slot.name, total: slot.total });
+      }
+    });
+
+    // Determine recommended (lowest total) supplier
+    supplierBids.sort((a, b) => a.total - b.total);
+    const recommendedSupplier = supplierBids.length > 0 ? supplierBids[0] : null;
+
+    // Update rank_no based on bid amount
+    const sortedQuotations = [...quotations].sort((a, b) => a.bid_amount - b.bid_amount);
+    sortedQuotations.forEach((q, idx) => { q.rank_no = idx + 1; });
+
+    const data = {
+      abstract_number: document.getElementById('editAbsNumber').value,
+      rfq_id: rfqIdVal ? parseInt(rfqIdVal) : null,
+      date_prepared: document.getElementById('editAbsDate').value || null,
+      purpose: document.getElementById('editAbsPurpose').value,
+      recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
+      recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+      status: document.getElementById('editAbsStatus').value,
+      item_specifications: document.getElementById('editAbsItemSpecs')?.value.trim() || null,
+      bac_chairperson_id: document.getElementById('editAbsBacChair')?.value || null,
+      vice_chairperson_id: document.getElementById('editAbsViceChair')?.value || null,
+      bac_member1_id: document.getElementById('editAbsMember1')?.value || null,
+      bac_member2_id: document.getElementById('editAbsMember2')?.value || null,
+      bac_member3_id: document.getElementById('editAbsMember3')?.value || null,
+      bac_secretariat_id: document.getElementById('editAbsSecretariat')?.value || null,
+      bac_secretariat2_id: document.getElementById('editAbsSecretariat2')?.value || null,
+      regional_director_id: document.getElementById('editAbsRD')?.value || null,
+      quotations: sortedQuotations
+    };
+    try {
+      await apiRequest('/abstracts/' + id, 'PUT', data);
+      await uploadEditAttachments('abstract', id, 'editAbsAttachment');
+      showToast('Abstract updated successfully!', 'success');
+      closeModal(); loadAbstract();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT POST-QUALIFICATION ---
+  window.showEditPostQualModal = async function(id) {
+    let p;
+    try { p = await apiRequest('/post-qualifications/' + id); } catch(e) {}
+    if (!p) { p = (cachedPostQual || []).find(x => x.id === id); }
+    if (!p) { alert('Record not found'); return; }
+
+    // Load employees from DB for TWG member dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    function buildEmpSelect(fieldId, selectedId, isRequired) {
+      const opts = employees.filter(e => e.status === 'active' || !e.status).map(e =>
+        `<option value="${e.id}" ${e.id == selectedId ? 'selected' : ''}>${e.full_name}${e.designation_name ? ' — ' + e.designation_name : ''}</option>`
+      ).join('');
+      return `<select id="${fieldId}" class="form-select" ${isRequired ? 'required' : ''}>
+        <option value="">-- Select Employee --</option>
+        ${opts}
+      </select>`;
+    }
+
+    // Load abstracts for linking dropdown
+    let abstracts = [];
+    try { abstracts = cachedAbstract && cachedAbstract.length > 0 ? cachedAbstract : await apiRequest('/abstracts'); } catch(e) {}
+    const abstractOptions = abstracts.map(a => `<option value="${a.id}" ${a.id == p.abstract_id ? 'selected' : ''}>${a.abstract_number || 'AOQ-' + a.id}${a.recommended_supplier_name ? ' — ' + a.recommended_supplier_name : ''}${a.recommended_amount ? ' (₱' + Number(a.recommended_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`).join('');
+
+    // Load suppliers from DB for bidder dropdowns
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) { console.error('Failed to load suppliers:', e); }
+    function buildBidderInput(fieldId, existingName) {
+      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || '')}">`;
+    }
+
+    const html = `
+      <form id="editPQForm" onsubmit="saveEditPostQual(event, ${id})">
+        <input type="hidden" id="editPqDocumentsVerified" value="${(p.documents_verified || '{}').replace(/"/g, '&quot;')}">
+        <input type="hidden" id="editPqTechnicalCompliance" value="${(p.technical_compliance || '').replace(/"/g, '&quot;')}">
+        <input type="hidden" id="editPqFinancialValidation" value="${(p.financial_validation || '').replace(/"/g, '&quot;')}">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Post-Qualification</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Post-Qual Number</label><input type="text" id="editPqNumber" value="${p.postqual_number || ''}" required></div>
+          <div class="form-group">
+            <label>Linked Abstract</label>
+            <select class="form-select" id="editPqLinkedAbstract">
+              <option value="">-- Select Abstract --</option>
+              ${abstractOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Subject / Bidder Name</label><input type="text" id="editPqBidder" value="${(p.bidder_name || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editPqStatus" class="form-select">
+              <option value="on_going" ${p.status==='on_going'?'selected':''}>ON-GOING</option>
+              <option value="completed" ${p.status==='completed'?'selected':''}>COMPLETED</option>
+              <option value="cancelled" ${p.status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>TWG Result</label><input type="text" id="editPqTwgResult" value="${(p.twg_result || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Findings</label><input type="text" id="editPqFindings" value="${(p.findings || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-section-header section-signatories"><i class="fas fa-users"></i> TWG Members (Signatories)</div>
+        <div style="background: #e8eaf6; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">TWG Head</label>
+              ${buildEmpSelect('editTwgHeadId', p.twg_head_id, true)}
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              ${buildEmpSelect('editTwgMember1Id', p.twg_member1_id, false)}
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              ${buildEmpSelect('editTwgMember2Id', p.twg_member2_id, false)}
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              ${buildEmpSelect('editTwgMember3Id', p.twg_member3_id, false)}
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            ${buildEmpSelect('editTwgMember4Id', p.twg_member4_id, false)}
+          </div>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-store"></i> Bidders</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Bidder 1</label>
+              ${buildBidderInput('editBidder1', p.bidder1_name || '')}
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Bidder 2</label>
+              ${buildBidderInput('editBidder2', p.bidder2_name || '')}
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">Bidder 3</label>
+            ${buildBidderInput('editBidder3', p.bidder3_name || '')}
+          </div>
+        </div>
+        ${getEditAttachmentSectionHTML('post_qualification', id, 'editPqAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Post-Qualification', html, { preventOutsideClose: true });
+  };
+  window.saveEditPostQual = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+
+    const twgHeadId = document.getElementById('editTwgHeadId')?.value || null;
+    const twgMember1Id = document.getElementById('editTwgMember1Id')?.value || null;
+    const twgMember2Id = document.getElementById('editTwgMember2Id')?.value || null;
+    const twgMember3Id = document.getElementById('editTwgMember3Id')?.value || null;
+    const twgMember4Id = document.getElementById('editTwgMember4Id')?.value || null;
+    const abstractId = document.getElementById('editPqLinkedAbstract')?.value || null;
+
+    const bidder1Name = document.getElementById('editBidder1')?.value.trim() || null;
+    const bidder2Name = document.getElementById('editBidder2')?.value.trim() || null;
+    const bidder3Name = document.getElementById('editBidder3')?.value.trim() || null;
+
+    const data = {
+      postqual_number: document.getElementById('editPqNumber').value,
+      abstract_id: abstractId ? parseInt(abstractId) : null,
+      bidder_name: document.getElementById('editPqBidder').value,
+      documents_verified: document.getElementById('editPqDocumentsVerified')?.value || '{}',
+      technical_compliance: document.getElementById('editPqTechnicalCompliance')?.value || null,
+      financial_validation: document.getElementById('editPqFinancialValidation')?.value || null,
+      twg_result: document.getElementById('editPqTwgResult').value,
+      findings: document.getElementById('editPqFindings').value,
+      status: document.getElementById('editPqStatus').value,
+      twg_head_id: twgHeadId ? parseInt(twgHeadId) : null,
+      twg_member1_id: twgMember1Id ? parseInt(twgMember1Id) : null,
+      twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
+      twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
+      twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
+      bidder1_name: bidder1Name,
+      bidder2_name: bidder2Name,
+      bidder3_name: bidder3Name
+    };
+    try {
+      await apiRequest('/post-qualifications/' + id, 'PUT', data);
+      await uploadEditAttachments('post_qualification', id, 'editPqAttachment');
+      showToast('Post-Qualification updated successfully!', 'success');
+      closeModal(); loadPostQual();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT BAC RESOLUTION ---
+  window.showEditBACResolutionModal = async function(id) {
+    let b;
+    try { b = await apiRequest('/bac-resolutions/' + id); } catch(e) {}
+    if (!b) { b = (cachedBACRes || []).find(x => x.id === id); }
+    if (!b) { alert('Record not found'); return; }
+    await ensureProcModesLoaded();
+
+    // Load employees from DB for BAC member dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    function buildEmpSelect(fieldId, selectedId, isRequired) {
+      const opts = employees.filter(e => e.status === 'active' || !e.status).map(e =>
+        `<option value="${e.id}" ${e.id == selectedId ? 'selected' : ''}>${e.full_name}${e.designation_name ? ' — ' + e.designation_name : ''}</option>`
+      ).join('');
+      return `<select id="${fieldId}" class="form-select" ${isRequired ? 'required' : ''}>
+        <option value="">-- Select Employee --</option>
+        ${opts}
+      </select>`;
+    }
+
+    // Load abstracts for linking dropdown
+    let abstracts = [];
+    try { abstracts = cachedAbstract && cachedAbstract.length > 0 ? cachedAbstract : await apiRequest('/abstracts'); } catch(e) {}
+    const abstractOptions = abstracts.map(a => `<option value="${a.id}" ${a.id == b.abstract_id ? 'selected' : ''}>${a.abstract_number || 'AOQ-' + a.id}${a.recommended_supplier_name ? ' — ' + a.recommended_supplier_name : ''}${a.recommended_amount ? ' (₱' + Number(a.recommended_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`).join('');
+
+    const html = `
+      <form id="editBACForm" onsubmit="saveEditBACResolution(event, ${id})">
+        <input type="hidden" id="editBacRecSupplierId" value="${b.recommended_supplier_id || ''}">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit BAC Resolution</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Resolution Number</label><input type="text" id="editBacNumber" value="${b.resolution_number || ''}" required></div>
+          <div class="form-group"><label>Resolution Date</label><input type="date" id="editBacDate" value="${b.resolution_date ? b.resolution_date.substring(0,10) : ''}"></div>
+        </div>
+        <div class="form-group">
+          <label>Linked Abstract of Quotation</label>
+          <select class="form-select" id="editBacLinkedAbstract">
+            <option value="">-- Select Abstract of Quotation --</option>
+            ${abstractOptions}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Procurement Mode</label>
+            <select id="editBacMode" class="form-select">
+              ${buildProcModeOptions(b.procurement_mode || '')}
+            </select>
+          </div>
+          <div class="form-group"><label>ABC Amount</label><input type="number" step="0.01" id="editBacAbc" value="${b.abc_amount || 0}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Recommended Awardee</label><input type="text" id="editBacAwardee" value="${(b.recommended_awardee_name || b.supplier_name || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Bid Amount</label><input type="number" step="0.01" id="editBacBidAmount" value="${b.bid_amount || 0}"></div>
+        </div>
+        <div class="form-group">
+          <label>Bidder Type Classification</label>
+          <select id="editBacBidderType" class="form-select">
+            <option value="LOWEST CALCULATED AND RESPONSIVE (LCRB)" ${b.bidder_type === 'LOWEST CALCULATED AND RESPONSIVE (LCRB)' ? 'selected' : ''}>LOWEST CALCULATED AND RESPONSIVE (LCRB)</option>
+            <option value="HIGHEST RATED AND RESPONSIVE (HRRB)" ${b.bidder_type === 'HIGHEST RATED AND RESPONSIVE (HRRB)' ? 'selected' : ''}>HIGHEST RATED AND RESPONSIVE (HRRB)</option>
+            <option value="MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)" ${b.bidder_type === 'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)' ? 'selected' : ''}>MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)</option>
+            <option value="MOST ADVANTAGEOUS AND RESPONSIVE (MARB)" ${b.bidder_type === 'MOST ADVANTAGEOUS AND RESPONSIVE (MARB)' ? 'selected' : ''}>MOST ADVANTAGEOUS AND RESPONSIVE (MARB)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="editBacStatus" class="form-select">
+            <option value="on_going" ${b.status==='on_going'?'selected':''}>ON-GOING</option>
+            <option value="completed" ${b.status==='completed'?'selected':''}>COMPLETED</option>
+            <option value="cancelled" ${b.status==='cancelled'?'selected':''}>CANCELLED</option>
+          </select>
+        </div>
+        <div class="form-section-header section-signatories"><i class="fas fa-users"></i> BAC Members (Signatories)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">BAC Chairperson</label>
+              ${buildEmpSelect('editBacChairpersonId', b.bac_chairperson_id, true)}
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Vice-Chairperson</label>
+              ${buildEmpSelect('editBacViceChairpersonId', b.bac_vice_chairperson_id, false)}
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              ${buildEmpSelect('editBacMember1Id', b.bac_member1_id, false)}
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              ${buildEmpSelect('editBacMember2Id', b.bac_member2_id, false)}
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            ${buildEmpSelect('editBacMember3Id', b.bac_member3_id, false)}
+          </div>
+        </div>
+        <div class="form-section-header section-signatories"><i class="fas fa-user-tie"></i> Head of Procuring Entity (HoPE)</div>
+        <div style="background: #bbdefb; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">Head of Procuring Entity</label>
+            ${buildEmpSelect('editBacHopeId', b.hope_id, true)}
+          </div>
+        </div>
+        ${getEditAttachmentSectionHTML('bac_resolution', id, 'editBacAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit BAC Resolution', html, { preventOutsideClose: true });
+  };
+  window.saveEditBACResolution = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+
+    const bacChairpersonId = document.getElementById('editBacChairpersonId')?.value || null;
+    const bacViceChairpersonId = document.getElementById('editBacViceChairpersonId')?.value || null;
+    const bacMember1Id = document.getElementById('editBacMember1Id')?.value || null;
+    const bacMember2Id = document.getElementById('editBacMember2Id')?.value || null;
+    const bacMember3Id = document.getElementById('editBacMember3Id')?.value || null;
+    const hopeId = document.getElementById('editBacHopeId')?.value || null;
+    const abstractId = document.getElementById('editBacLinkedAbstract')?.value || null;
+    const recSupplierId = document.getElementById('editBacRecSupplierId')?.value || null;
+    const bidderType = document.getElementById('editBacBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+
+    const data = {
+      resolution_number: document.getElementById('editBacNumber').value,
+      abstract_id: abstractId ? parseInt(abstractId) : null,
+      resolution_date: document.getElementById('editBacDate').value || null,
+      procurement_mode: document.getElementById('editBacMode').value,
+      abc_amount: parseFloat(document.getElementById('editBacAbc').value) || 0,
+      recommended_supplier_id: recSupplierId ? parseInt(recSupplierId) : null,
+      recommended_awardee_name: document.getElementById('editBacAwardee').value,
+      bid_amount: parseFloat(document.getElementById('editBacBidAmount').value) || 0,
+      bidder_type: bidderType,
+      status: document.getElementById('editBacStatus').value,
+      bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
+      bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
+      bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
+      bac_member2_id: bacMember2Id ? parseInt(bacMember2Id) : null,
+      bac_member3_id: bacMember3Id ? parseInt(bacMember3Id) : null,
+      hope_id: hopeId ? parseInt(hopeId) : null
+    };
+    try {
+      await apiRequest('/bac-resolutions/' + id, 'PUT', data);
+      await uploadEditAttachments('bac_resolution', id, 'editBacAttachment');
+      showToast('BAC Resolution updated successfully!', 'success');
+      closeModal(); loadBACResolution();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT NOA ---
+  window.showEditNOAModal = async function(id) {
+    let n;
+    try { n = await apiRequest('/notices-of-award/' + id); } catch(e) {}
+    if (!n) { n = (cachedNOA || []).find(x => x.id === id); }
+    if (!n) { alert('Record not found'); return; }
+
+    // Load BAC Resolutions
+    let bacResolutions = [];
+    try { bacResolutions = await apiRequest('/bac-resolutions'); } catch(e) {}
+    const bacOptions = bacResolutions.map(br =>
+      `<option value="${br.id}" ${br.id == n.bac_resolution_id ? 'selected' : ''}>${br.resolution_number || 'BAC-RES-' + br.id}${br.supplier_name ? ' — ' + br.supplier_name : ''}${br.abc_amount ? ' (₱' + Number(br.abc_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`
+    ).join('');
+
+    // Load RFQs
+    let rfqs = [];
+    try { rfqs = await apiRequest('/rfq'); } catch(e) {}
+    const rfqOptions = rfqs.map(r =>
+      `<option value="${r.id}" ${r.id == n.rfq_id ? 'selected' : ''}>${r.rfq_number || 'RFQ-' + r.id}${r.abc_amount ? ' (ABC: ₱' + Number(r.abc_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`
+    ).join('');
+
+    // Load suppliers
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
+    const supplierOptions = suppliers.map(s =>
+      `<option value="${s.id}" ${s.id == n.supplier_id ? 'selected' : ''}>${s.name || s.company_name || ''}${s.address ? ' — ' + s.address : ''}</option>`
+    ).join('');
+
+    const html = `
+      <form id="editNOAForm" onsubmit="saveEditNOA(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Notice of Award</strong></div>
+
+        <div class="form-section-header section-items"><i class="fas fa-award"></i> Award Details</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group"><label>NOA Number</label><input type="text" id="editNoaNumber" value="${n.noa_number || ''}" required></div>
+            <div class="form-group"><label>Date Issued</label><input type="date" id="editNoaDateIssued" value="${n.date_issued ? n.date_issued.substring(0,10) : ''}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Linked BAC Resolution</label>
+              <select class="form-select" id="editNoaLinkedBAC" required>
+                <option value="">-- Select BAC Resolution --</option>
+                ${bacOptions}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>RFQ Reference No.</label>
+              <select class="form-select" id="editNoaRFQRef">
+                <option value="">-- Select RFQ --</option>
+                ${rfqOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group"><label>Contract Amount</label><input type="number" step="0.01" id="editNoaAmount" value="${n.contract_amount || 0}"></div>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-user-tie"></i> Addressee (Winning Bidder)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Company/Supplier</label>
+            <input type="text" id="editNoaSupplierName" class="form-select" placeholder="Enter winning bidder / supplier name" value="${escapeHtml(n.supplier_name || '')}" required>
+          </div>
+        </div>
+
+        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+        <div class="form-boxed-section">
+          <div class="boxed-content box-yellow">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Head of the Procuring Entity (HoPE)</label>
+              <input type="text" value="RITCHEL M. BUTAO" readonly style="background: #f5f5f5; font-weight: 600;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Designation</label>
+              <input type="text" value="Regional Director" readonly style="background: #f5f5f5;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-header section-acceptance"><i class="fas fa-handshake"></i> Bidder Receipt</div>
+        <div class="form-boxed-section">
+          <div class="boxed-content box-blue">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Bidder Receipt Date</label>
+              <input type="date" id="editNoaReceiptDate" value="${n.bidder_receipt_date ? n.bidder_receipt_date.substring(0,10) : ''}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Status</label>
+          <select id="editNoaStatus" class="form-select">
+            <option value="awaiting_noa" ${n.status==='awaiting_noa'?'selected':''}>AWAITING NOA</option>
+            <option value="with_noa" ${n.status==='with_noa'?'selected':''}>WITH NOA</option>
+            <option value="issued" ${n.status==='issued'?'selected':''}>ISSUED</option>
+            <option value="cancelled" ${n.status==='cancelled'?'selected':''}>CANCELLED</option>
+          </select>
+        </div>
+        ${getEditAttachmentSectionHTML('notice_of_award', id, 'editNoaAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Notice of Award', html, { preventOutsideClose: true });
+  };
+  window.saveEditNOA = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    const data = {
+      noa_number: document.getElementById('editNoaNumber').value,
+      bac_resolution_id: document.getElementById('editNoaLinkedBAC')?.value ? parseInt(document.getElementById('editNoaLinkedBAC').value) : null,
+      rfq_id: document.getElementById('editNoaRFQRef')?.value ? parseInt(document.getElementById('editNoaRFQRef').value) : null,
+      supplier_name: document.getElementById('editNoaSupplierName')?.value.trim() || null,
+      contract_amount: parseFloat(document.getElementById('editNoaAmount').value) || 0,
+      date_issued: document.getElementById('editNoaDateIssued').value || null,
+      bidder_receipt_date: document.getElementById('editNoaReceiptDate').value || null,
+      status: document.getElementById('editNoaStatus').value
+    };
+    try {
+      await apiRequest('/notices-of-award/' + id, 'PUT', data);
+      await uploadEditAttachments('notice_of_award', id, 'editNoaAttachment');
+      showToast('NOA updated successfully!', 'success');
+      closeModal(); loadNOA();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT PO ---
+  window.showEditPOModal = async function(id) {
+    let p;
+    try { p = await apiRequest('/purchase-orders/' + id); } catch(e) {}
+    if (!p) { p = (cachedPO || []).find(x => x.id === id); }
+    if (!p) { alert('Record not found'); return; }
+    const html = `
+      <form id="editPOForm" onsubmit="saveEditPO(event, ${id})">
+        <input type="hidden" id="editPoPrId" value="${p.pr_id || ''}">
+        <input type="hidden" id="editPoSupplierId" value="${p.supplier_id || ''}">
+        <input type="hidden" id="editPoDeliveryAddress" value="${(p.delivery_address || '').replace(/"/g, '&quot;')}">
+        <input type="hidden" id="editPoExpectedDelivery" value="${p.expected_delivery_date ? p.expected_delivery_date.substring(0,10) : ''}">
+        <input type="hidden" id="editPoPoDate" value="${p.po_date ? p.po_date.substring(0,10) : ''}">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Purchase Order</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>PO Number</label><input type="text" id="editPoNumber" value="${p.po_number || ''}" required></div>
+          <div class="form-group"><label>Supplier</label><input type="text" id="editPoSupplier" value="${(p.supplier_name || '').replace(/"/g, '&quot;')}" readonly></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Mode of Procurement</label><input type="text" id="editPoMode" value="${(p.mode_of_procurement || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Total Amount</label><input type="number" step="0.01" id="editPoAmount" value="${p.total_amount || 0}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Place of Delivery</label><input type="text" id="editPoPlace" value="${(p.place_of_delivery || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Delivery Date</label><input type="date" id="editPoDeliveryDate" value="${p.delivery_date ? p.delivery_date.substring(0,10) : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Purpose</label><input type="text" id="editPoPurpose" value="${(p.purpose || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Payment Terms</label><input type="text" id="editPoPayTerms" value="${(p.payment_terms || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Linked NOA</label>
+            <select class="form-select" id="editPoLinkedNOA">
+              <option value="">-- Select NOA --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editPoStatus" class="form-select">
+              <option value="for_signing" ${p.status==='for_signing'?'selected':''}>FOR SIGNING</option>
+              <option value="signed" ${p.status==='signed'?'selected':''}>SIGNED</option>
+              <option value="cancelled" ${p.status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Workflow Status</label>
+            <select id="editPoWorkflow" class="form-select">
+              <option value="pending" ${p.workflow_status==='pending'?'selected':''}>PENDING</option>
+              <option value="on_process" ${p.workflow_status==='on_process'?'selected':''}>ON PROCESS</option>
+              <option value="awaiting_delivery" ${p.workflow_status==='awaiting_delivery'?'selected':''}>AWAITING DELIVERY</option>
+              <option value="for_payment" ${p.workflow_status==='for_payment'?'selected':''}>FOR PAYMENT</option>
+              <option value="paid_ada" ${p.workflow_status==='paid_ada'?'selected':''}>PAID (ADA)</option>
+              <option value="submitted_to_coa" ${p.workflow_status==='submitted_to_coa'?'selected':''}>SUBMITTED TO COA</option>
+              <option value="cancelled" ${p.workflow_status==='cancelled'?'selected':''}>CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editPoItemSpecs" placeholder="Enter specifications, one per line...">${(p.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+        ${getEditAttachmentSectionHTML('purchase_order', id, 'editPoAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Purchase Order', html, { preventOutsideClose: true });
+
+    // Dynamically populate NOA dropdown in edit modal
+    (async () => {
+      try {
+        const noaList = await apiRequest('/noa');
+        const sel = document.getElementById('editPoLinkedNOA');
+        if (sel && noaList.length) {
+          noaList.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n.id;
+            opt.textContent = `${n.noa_number || 'NOA-' + n.id} — ${n.supplier_name || 'Unknown Supplier'} (₱${parseFloat(n.contract_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})`;
+            if (p.noa_id && n.id === p.noa_id) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) { console.error('Failed to load NOA list for edit:', err); }
+    })();
+  };
+  window.saveEditPO = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    const data = {
+      po_number: document.getElementById('editPoNumber').value,
+      pr_id: document.getElementById('editPoPrId')?.value ? parseInt(document.getElementById('editPoPrId').value) : null,
+      noa_id: document.getElementById('editPoLinkedNOA')?.value ? parseInt(document.getElementById('editPoLinkedNOA').value) : null,
+      supplier_id: document.getElementById('editPoSupplierId')?.value ? parseInt(document.getElementById('editPoSupplierId').value) : null,
+      total_amount: parseFloat(document.getElementById('editPoAmount').value) || 0,
+      payment_terms: document.getElementById('editPoPayTerms').value,
+      delivery_address: document.getElementById('editPoDeliveryAddress')?.value || null,
+      status: document.getElementById('editPoStatus').value,
+      workflow_status: document.getElementById('editPoWorkflow').value,
+      expected_delivery_date: document.getElementById('editPoExpectedDelivery')?.value || null,
+      delivery_date: document.getElementById('editPoDeliveryDate').value || null,
+      po_date: document.getElementById('editPoPoDate')?.value || null,
+      purpose: document.getElementById('editPoPurpose').value,
+      mode_of_procurement: document.getElementById('editPoMode').value,
+      place_of_delivery: document.getElementById('editPoPlace').value,
+      item_specifications: document.getElementById('editPoItemSpecs')?.value.trim() || null
+    };
+    try {
+      await apiRequest('/purchase-orders/' + id, 'PUT', data);
+      await uploadEditAttachments('purchase_order', id, 'editPoAttachment');
+      showToast('Purchase Order updated successfully!', 'success');
+      closeModal(); loadPO();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // --- EDIT IAR ---
+  window.showEditIARModal = async function(id) {
+    let i;
+    try { i = await apiRequest('/iars/' + id); } catch(e) {}
+    if (!i) { i = (cachedIAR || []).find(x => x.id === id); }
+    if (!i) { alert('Record not found'); return; }
+    const html = `
+      <form id="editIARForm" onsubmit="saveEditIAR(event, ${id})">
+        <input type="hidden" id="editIarInvoiceDate" value="${i.invoice_date ? i.invoice_date.substring(0,10) : ''}">
+        <input type="hidden" id="editIarDeliveryReceiptNum" value="${(i.delivery_receipt_number || '').replace(/"/g, '&quot;')}">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit IAR</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>IAR Number</label><input type="text" id="editIarNumber" value="${i.iar_number || ''}" required></div>
+          <div class="form-group"><label>Linked PO</label>
+            <select class="form-select" id="editIarLinkedPO">
+              <option value="">-- Select PO --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Supplier</label><input type="text" id="editIarSupplier" value="${(i.supplier_name || '').replace(/"/g, '&quot;')}" readonly></div>
+          <div class="form-group"><label>Invoice Number</label><input type="text" id="editIarInvoice" value="${(i.invoice_number || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Inspection Date</label><input type="date" id="editIarInspDate" value="${i.inspection_date ? i.inspection_date.substring(0,10) : ''}"></div>
+          <div class="form-group"><label>Delivery Date</label><input type="date" id="editIarDelDate" value="${i.delivery_date ? i.delivery_date.substring(0,10) : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Purpose</label><input type="text" id="editIarPurpose" value="${(i.purpose || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Findings</label><input type="text" id="editIarFindings" value="${(i.findings || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inspection Result</label>
+            <select id="editIarInspResult" class="form-select" onchange="handleEditIARInspChange()">
+              <option value="on_going" ${i.inspection_result==='on_going'?'selected':''}>ON GOING</option>
+              <option value="verified" ${i.inspection_result==='verified'?'selected':''}>VERIFIED</option>
+              <option value="to_be_checked" ${i.inspection_result==='to_be_checked'?'selected':''}>TO BE CHECKED</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Acceptance</label>
+            <select id="editIarAcceptance" class="form-select" ${i.inspection_result==='on_going'?'disabled':''}>
+              <option value="to_be_checked" ${i.acceptance==='to_be_checked'?'selected':''}>TO BE CHECKED</option>
+              <option value="complete" ${i.acceptance==='complete'?'selected':''}>COMPLETE</option>
+              <option value="partial" ${i.acceptance==='partial'?'selected':''}>PARTIAL</option>
+            </select>
+            <small id="editIarAccHint" style="color:#b7791f;display:${i.inspection_result==='on_going'?'block':'none'};">Acceptance locked while inspection is on going.</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
+          <textarea rows="4" id="editIarItemSpecs" placeholder="Enter specifications, one per line...">${(i.item_specifications || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+        ${getEditAttachmentSectionHTML('iar', id, 'editIarAttachment')}
+        <div class="form-group" style="text-align:right;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit IAR', html, { preventOutsideClose: true });
+
+    // Dynamically populate PO dropdown in edit modal
+    (async () => {
+      try {
+        const poList = await apiRequest('/po');
+        const sel = document.getElementById('editIarLinkedPO');
+        if (sel && poList.length) {
+          poList.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.po_number || 'PO-' + p.id} \u2014 ${p.supplier_name || 'Unknown Supplier'} (\u20b1${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})`;
+            if (i.po_id && p.id === i.po_id) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) { console.error('Failed to load PO list for edit:', err); }
+    })();
+  };
+  window.handleEditIARInspChange = function() {
+    const inspVal = document.getElementById('editIarInspResult').value;
+    const accSelect = document.getElementById('editIarAcceptance');
+    const hint = document.getElementById('editIarAccHint');
+    if (inspVal === 'on_going') {
+      accSelect.value = 'to_be_checked';
+      accSelect.disabled = true;
+      if (hint) hint.style.display = 'block';
+    } else {
+      accSelect.disabled = false;
+      if (hint) hint.style.display = 'none';
+    }
+  };
+  window.saveEditIAR = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these changes?')) return;
+    const data = {
+      iar_number: document.getElementById('editIarNumber').value,
+      po_id: document.getElementById('editIarLinkedPO')?.value ? parseInt(document.getElementById('editIarLinkedPO').value) : null,
+      inspection_date: document.getElementById('editIarInspDate').value || null,
+      delivery_date: document.getElementById('editIarDelDate').value || null,
+      invoice_number: document.getElementById('editIarInvoice').value,
+      invoice_date: document.getElementById('editIarInvoiceDate')?.value || null,
+      delivery_receipt_number: document.getElementById('editIarDeliveryReceiptNum')?.value || null,
+      inspection_result: document.getElementById('editIarInspResult').value,
+      findings: document.getElementById('editIarFindings').value,
+      purpose: document.getElementById('editIarPurpose').value,
+      acceptance: document.getElementById('editIarAcceptance').value,
+      item_specifications: document.getElementById('editIarItemSpecs')?.value.trim() || null
+    };
+    try {
+      await apiRequest('/iars/' + id, 'PUT', data);
+      await uploadEditAttachments('iar', id, 'editIarAttachment');
+      showToast('IAR updated successfully!', 'success');
+      closeModal(); loadIAR();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  window.showSetIARStatusModal = function(iarId, currentInspection, currentAcceptance) {
+    const html = `
+      <form id="iarStatusForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-clipboard-check"></i>
+          <strong>SET IAR STATUS</strong>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inspection Result</label>
+            <select id="iarInspSelect" class="form-select" onchange="handleIARInspChange()">
+              <option value="on_going" ${currentInspection === 'on_going' ? 'selected' : ''}>ON GOING</option>
+              <option value="verified" ${currentInspection === 'verified' ? 'selected' : ''}>VERIFIED</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Acceptance</label>
+            <select id="iarAccSelect" class="form-select" ${currentInspection === 'on_going' ? 'disabled' : ''}>
+              <option value="to_be_checked" ${currentAcceptance === 'to_be_checked' ? 'selected' : ''}>TO BE CHECKED</option>
+              <option value="complete" ${currentAcceptance === 'complete' ? 'selected' : ''}>COMPLETE</option>
+              <option value="partial" ${currentAcceptance === 'partial' ? 'selected' : ''}>PARTIAL</option>
+            </select>
+            <small id="iarAccHint" style="color:#b7791f;display:${currentInspection === 'on_going' ? 'block' : 'none'};">Acceptance is locked to "TO BE CHECKED" while inspection is on going.</small>
+          </div>
+        </div>
+      </form>
+    `;
+    showModal('Set IAR Status', html, async () => {
+      if (!confirm('Are you sure you want to update the IAR status?')) return;
+      const inspection_result = document.getElementById('iarInspSelect').value;
+      const acceptance = document.getElementById('iarAccSelect').value;
+      try {
+        await apiRequest('/iars/' + iarId + '/set-status', 'PUT', { inspection_result, acceptance });
+        showNotification('IAR status updated successfully', 'success');
+        loadIAR();
+        closeModal();
+      } catch (err) {
+        showNotification('Failed to update IAR status: ' + err.message, 'error');
+      }
+    });
+  };
+
+  window.handleIARInspChange = function() {
+    const inspVal = document.getElementById('iarInspSelect').value;
+    const accSelect = document.getElementById('iarAccSelect');
+    const hint = document.getElementById('iarAccHint');
+    if (inspVal === 'on_going') {
+      accSelect.value = 'to_be_checked';
+      accSelect.disabled = true;
+      hint.style.display = 'block';
+    } else {
+      accSelect.disabled = false;
+      hint.style.display = 'none';
+    }
+  };
+
+  window.showNewIARModal = async function() {
+    // Load items catalog for picker
+    const allItems = await ensureItemsCatalogLoaded();
+    const iarCatOpts = buildCatalogCategoryOptions(allItems);
+    const iarItemOpts = buildCatalogItemOptions(allItems);
+    const html = `
+      <form id="iarForm" onsubmit="saveNewIAR(event)">
+        <div class="info-banner" style="margin-bottom: 0;">
+          <i class="fas fa-clipboard-check"></i>
+          <strong>INSPECTION AND ACCEPTANCE REPORT</strong> — Appendix 62
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Entity Name</label>
+            <input type="text" value="Department of Migrant Workers - Regional Office XIII" readonly>
+          </div>
+          <div class="form-group">
+            <label>Fund Cluster</label>
+            <input type="text" id="iarFundCluster" placeholder="e.g., 01 101 101" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Supplier</label>
+            <input type="text" id="iarSupplier" placeholder="Supplier Name" required>
+          </div>
+          <div class="form-group">
+            <label>IAR No.</label>
+            <input type="text" id="iarNumber" value="${generateDocNumber('IAR')}" readonly>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>PO No. / Date</label>
+            <div style="display: flex; gap: 8px;">
+              <select class="form-select" id="iarLinkedPO" required style="flex: 2;" onchange="iarAutoFillFromPO(this.value)">
+                <option value="">-- Select PO --</option>
+              </select>
+              <input type="date" id="iarPODate" style="flex: 1;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="iarDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Requisitioning Office/Dept.</label>
+            <input type="text" id="iarReqOffice" placeholder="e.g., FAD, OWWA, etc." required>
+          </div>
+          <div class="form-group">
+            <label>Invoice No.</label>
+            <input type="text" id="iarInvoiceNo" placeholder="Supplier's Sales Invoice No." required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2;">
+            <label>Responsibility Center Code</label>
+            <input type="text" placeholder="Responsibility Center Code">
+          </div>
+          <div class="form-group" style="flex:1; display:flex; align-items:flex-end;">
+            ${buildCatalogButtonHTML('iar')}
+          </div>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-list-ol"></i> Items</div>
+        <div class="form-items-section">
+        ${buildCatalogItemsTableHTML('iar', false)}
+        </div>
+        <div class="form-section-header section-inspection"><i class="fas fa-search"></i> Inspection</div>
+        <div style="background: #d0e8ff; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:start;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Date Inspected</label>
+              <input type="date" id="iarInspectionDate" required style="font-size:12px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Inspection Officer / Property Custodian</label>
+              <input type="text" id="iarInspector" placeholder="Name of Inspector" required style="font-size:12px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px; display:flex; align-items:flex-start; gap:4px; line-height:1.3; margin-top:2px;">
+                <input type="checkbox" checked style="margin-top:2px; flex-shrink:0;">
+                <span>I hereby certify that I have inspected/verified the articles/items as described above and found the same in order.</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="form-section-header section-acceptance"><i class="fas fa-check-circle"></i> Acceptance</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:start;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Date Received</label>
+              <input type="date" id="iarDateReceived" required style="font-size:12px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Supply and/or Property Custodian</label>
+              <input type="text" id="iarPropertyCustodian" placeholder="Name of Receiver" required style="font-size:12px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">Acceptance Type</label>
+              <div style="display: flex; gap: 12px; margin-top: 5px;">
+                <label style="font-size: 12px;"><input type="radio" name="acceptanceType" value="complete" checked> Complete</label>
+                <label style="font-size: 12px;"><input type="radio" name="acceptanceType" value="partial"> Partial</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-list-ul"></i> Item Specifications</div>
+        <div class="form-group">
+          <label>Specifications (one per line)</label>
+          <textarea rows="4" id="iarItemSpecs" placeholder="Enter item specifications, one per line..."></textarea>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; display: block;"><i class="fas fa-clipboard-check"></i> IAR Document (Signed - Appendix 62)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="iarDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'iarDocumentLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarDocument').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="iarDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; display: block;"><i class="fas fa-file-invoice"></i> Supplier Invoice (Scanned)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="iarInvoice" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'iarInvoiceLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarInvoice').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="iarInvoiceLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-truck"></i> Delivery Receipt (Scanned)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="iarDeliveryReceipt" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'iarDeliveryReceiptLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('iarDeliveryReceipt').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="iarDeliveryReceiptLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-clipboard-check"></i> Complete IAR</button>
+        </div>
+      </form>
+    `;
+    openModal('Inspection & Acceptance Report (IAR - Appendix 62)', html, { preventOutsideClose: true });
+    window._docSelectedItems['iar'] = [];
+
+    // Dynamically populate PO dropdown
+    (async () => {
+      try {
+        const poList = cachedPO.length ? cachedPO : await apiRequest('/po');
+        window._iarPOList = poList;
+        const sel = document.getElementById('iarLinkedPO');
+        if (sel && poList.length) {
+          poList.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.po_number || 'PO-' + p.id} \u2014 ${p.supplier_name || 'Unknown Supplier'} (\u20b1${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})`;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) { console.error('Failed to load PO list:', err); }
+    })();
+  };
+
+  // Auto-fill IAR fields from linked PO (supplier, dept, items, item specs)
+  window.iarAutoFillFromPO = async function(poId) {
+    if (!poId || !window._iarPOList) return;
+    const po = window._iarPOList.find(p => String(p.id) === String(poId));
+    if (!po) return;
+    // Auto-fill supplier name
+    const supplierField = document.getElementById('iarSupplier');
+    if (supplierField && po.supplier_name) {
+      supplierField.value = po.supplier_name;
+    }
+    // Auto-fill PO date
+    const poDateField = document.getElementById('iarPODate');
+    if (poDateField && po.po_date) {
+      poDateField.value = po.po_date.split('T')[0];
+    }
+    // Fetch the full PO detail to get items
+    try {
+      const poDetail = await apiRequest('/purchase-orders/' + poId);
+      // Trace PO -> PR to get department and PPMP items
+      let prData = null;
+      if (poDetail.pr_id) {
+        prData = await apiRequest('/purchase-requests/' + poDetail.pr_id);
+      } else if (poDetail.noa_id) {
+        // Trace NOA -> RFQ -> PR
+        try {
+          const noaList = cachedNOA.length ? cachedNOA : await apiRequest('/noa');
+          const noa = noaList.find(n => String(n.id) === String(poDetail.noa_id));
+          if (noa && noa.rfq_id) {
+            const rfq = await apiRequest('/rfqs/' + noa.rfq_id);
+            if (rfq && rfq.pr_id) {
+              prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+            }
+          } else if (noa && noa.bac_resolution_id) {
+            const bacRes = await apiRequest('/bac-resolutions/' + noa.bac_resolution_id);
+            if (bacRes && bacRes.abstract_id) {
+              const abstract = await apiRequest('/abstracts/' + bacRes.abstract_id);
+              if (abstract && abstract.rfq_id) {
+                const rfq = await apiRequest('/rfqs/' + abstract.rfq_id);
+                if (rfq && rfq.pr_id) {
+                  prData = await apiRequest('/purchase-requests/' + rfq.pr_id);
+                }
+              }
+            }
+          }
+        } catch(e) { console.warn('[IAR] NOA trace failed:', e); }
+      }
+      // Auto-fill requisitioning office/dept from PR department
+      if (prData) {
+        const reqOfficeField = document.getElementById('iarReqOffice');
+        if (reqOfficeField && prData.department_code) {
+          reqOfficeField.value = prData.department_code;
+        } else if (reqOfficeField && prData.department_name) {
+          reqOfficeField.value = prData.department_name;
+        }
+      }
+      // Auto-fill items from PO items (which came from PR/PPMP catalog)
+      if (poDetail.items && poDetail.items.length > 0) {
+        window._docSelectedItems['iar'] = poDetail.items.map(item => ({
+          item_id: item.item_id || null,
+          item_name: item.item_name || '',
+          item_code: item.item_code || '',
+          item_unit: item.unit || '',
+          item_category: item.category || item.item_category || '',
+          item_description: item.item_description || '',
+          description: item.item_description || item.item_name || '',
+          unit_price: parseFloat(item.unit_price || 0),
+          quantity: parseInt(item.quantity || 1),
+          total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+        }));
+        renderDocItemsList('iar');
+      } else if (prData && prData.items && prData.items.length > 0) {
+        // Fallback: use PR items if PO has no items
+        window._docSelectedItems['iar'] = prData.items.map(item => ({
+          item_id: item.item_id || null,
+          item_name: item.item_name || '',
+          item_code: item.item_code || '',
+          item_unit: item.unit || '',
+          item_category: item.category || '',
+          item_description: item.item_description || '',
+          description: item.item_description || item.item_name || '',
+          unit_price: parseFloat(item.unit_price || 0),
+          quantity: parseInt(item.quantity || 1),
+          total: parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)
+        }));
+        renderDocItemsList('iar');
+      }
+      // Auto-fill item specifications from item descriptions
+      const itemSpecsField = document.getElementById('iarItemSpecs');
+      const currentItems = window._docSelectedItems['iar'] || [];
+      if (itemSpecsField && currentItems.length > 0 && !itemSpecsField.value.trim()) {
+        const specsLines = currentItems
+          .map(it => it.item_description || it.description || it.item_name || '')
+          .filter(s => s.trim());
+        if (specsLines.length > 0) {
+          itemSpecsField.value = specsLines.join('\n');
+        }
+      }
+    } catch(e) { console.warn('[IAR] Could not auto-fill from PO:', e); }
+  };
+
+  window.addIARItemRow = function() {
+    const tbody = document.getElementById('iarItemsBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" placeholder="Stock/Prop No." style="width: 110px;"></td>
+      <td><textarea rows="2" placeholder="Item description..." style="width: 100%;"></textarea></td>
+      <td><select class="form-select" style="width: 65px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Gal</option><option>Ltrs</option><option>Box</option><option>Ream</option><option>Set</option></select></td>
+      <td><input type="number" placeholder="0" style="width: 70px;" min="0"></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  window.showNewItemModal = function() {
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      apiRequest('/uoms').then(uoms => { cachedUOMs = uoms; }).catch(() => {});
+    }
+    const html = `
+      <form id="itemForm" onsubmit="saveNewItem(event)">
+        <!-- Procurement Source selector (always visible) -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Procurement Source</label>
+            <select class="form-select" id="itemProcurementSource" onchange="toggleItemFormMode(this.value)">
+              <option value="NON PS-DBM" selected>NON PS-DBM</option>
+              <option value="PS-DBM">PS-DBM</option>
+              <option value="PAPs">PAPs (Programs, Activities & Projects)</option>
+            </select>
+          </div>
+          <div class="form-group" id="itemCodeGroup">
+            <label>Item Code</label>
+            <input type="text" id="itemCode" placeholder="e.g., ITM-001" required>
+          </div>
+        </div>
+
+        <!-- ===== STANDARD FIELDS (PS-DBM / NON PS-DBM) ===== -->
+        <div id="itemStandardFields">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Stock No.</label>
+              <input type="text" id="itemStockNo" placeholder="e.g., STK-0001">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select class="form-select" id="itemCategory" required>
+                ${buildCategoryOptions('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>UACS Code</label>
+            <input type="text" id="itemUacsCode" placeholder="e.g., 1-07-05-010">
+          </div>
+          <div class="form-group">
+            <label>Item Name</label>
+            <input type="text" id="itemName" placeholder="Enter item name" required>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="itemDescription" rows="2" placeholder="Detailed description"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Unit of Measure</label>
+              <select class="form-select" id="itemUnit" required>
+                ${buildUOMOptions('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Unit Price</label>
+              <input type="number" id="itemPrice" placeholder="0.00" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantity on Hand</label>
+              <input type="number" id="itemQuantity" placeholder="0" min="0" value="0">
+            </div>
+            <div class="form-group">
+              <label>Reorder Point</label>
+              <input type="number" id="itemReorderPoint" placeholder="0" min="0" value="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== PAPs FIELDS ===== -->
+        <div id="itemPAPsFields" style="display:none;">
+          <div class="form-section-header" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left-color:#2e7d32;margin-bottom:12px;">
+            <i class="fas fa-project-diagram" style="color:#2e7d32;"></i> PAP Item Details
+          </div>
+          <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+            <div style="flex:2;padding:14px 18px;">
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Activity / Program Name <span class="text-danger">*</span></label>
+                <input type="text" id="itemPapName" placeholder="e.g., Pre-Migration Orientation Seminar" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Category</label>
+                <select class="form-select" id="itemPapCategory" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+                  <option value="REPRESENTATION EXPENSES">REPRESENTATION EXPENSES</option>
+                  <option value="MEALS AND SNACKS">MEALS AND SNACKS</option>
+                  <option value="TRAINING MATERIALS">TRAINING MATERIALS</option>
+                  <option value="TARPAULIN PRINTING">TARPAULIN PRINTING</option>
+                  <option value="TRANSPORTATION RENTAL">TRANSPORTATION RENTAL</option>
+                  <option value="HONORARIUM">HONORARIUM</option>
+                  <option value="PERSONALIZED TOKENS">PERSONALIZED TOKENS</option>
+                  <option value="SUPPLIES AND MATERIALS">SUPPLIES AND MATERIALS</option>
+                  <option value="PRINTED POLO/TSHIRT">PRINTED POLO/TSHIRT</option>
+                  <option value="OTHER SUPPLIES AND MATERIALS">OTHER SUPPLIES AND MATERIALS</option>
+                  <option value="FINANCIAL LITERACY">FINANCIAL LITERACY</option>
+                  <option value="CAPABILITY BUILDING">CAPABILITY BUILDING</option>
+                  <option value="PRINTING AND PUBLICATION">PRINTING AND PUBLICATION</option>
+                  <option value="CAPITAL OUTLAY">CAPITAL OUTLAY</option>
+                  <option value="OTHER PAPs EXPENSES">OTHER PAPs EXPENSES</option>
+                </select>
+              </div>
+            </div>
+            <div style="width:1px;background:#ccc;"></div>
+            <div style="flex:1;padding:14px 18px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description <span class="text-danger">*</span></label>
+              <textarea id="itemPapDescription" rows="4" placeholder="PAP expense description" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;"></textarea>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Unit of Measure</label>
+              <select class="form-select" id="itemPapUnit">
+                <option value="lot">Lot</option>
+                <option value="pax">Pax</option>
+                <option value="piece">Piece</option>
+                <option value="set">Set</option>
+                <option value="unit">Unit</option>
+                <option value="pack">Pack</option>
+                <option value="ream">Ream</option>
+                <option value="roll">Roll</option>
+                <option value="box">Box</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Estimated Unit Price (₱)</label>
+              <input type="number" id="itemPapPrice" step="0.01" min="0" placeholder="0.00" style="padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>UACS Code <small style="color:#999;">(optional)</small></label>
+            <input type="text" id="itemPapUacsCode" placeholder="e.g., 1-07-05-010">
+          </div>
+        </div>
+
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Item</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Item', html);
+  };
+
+  /** Toggle item form between standard (PS-DBM/NON PS-DBM) and PAPs layout */
+  window.toggleItemFormMode = function(source) {
+    const standardFields = document.getElementById('itemStandardFields');
+    const papsFields = document.getElementById('itemPAPsFields');
+    const codeInput = document.getElementById('itemCode');
+    
+    if (source === 'PAPs') {
+      if (standardFields) standardFields.style.display = 'none';
+      if (papsFields) papsFields.style.display = 'block';
+      // Auto-generate PAP item code
+      if (codeInput) codeInput.value = 'PAP-' + Date.now().toString(36).toUpperCase().slice(-5);
+      // Remove required from hidden standard fields
+      ['itemCategory', 'itemName', 'itemUnit', 'itemPrice'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.removeAttribute('required');
+      });
+    } else {
+      if (standardFields) standardFields.style.display = 'block';
+      if (papsFields) papsFields.style.display = 'none';
+      if (codeInput && codeInput.value.startsWith('PAP-')) codeInput.value = '';
+      // Restore required on standard fields
+      ['itemCategory', 'itemName', 'itemUnit', 'itemPrice'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+    }
+  };
+
+  // Save new item via API
+  window.saveNewItem = async function(e) {
+    e.preventDefault();
+    const source = document.getElementById('itemProcurementSource')?.value || 'NON PS-DBM';
+
+    let data;
+    if (source === 'PAPs') {
+      // PAPs item — collect from PAP fields
+      const papName = document.getElementById('itemPapName')?.value?.trim();
+      const papDesc = document.getElementById('itemPapDescription')?.value?.trim();
+      if (!papName) { alert('Activity / Program Name is required.'); return; }
+      if (!papDesc) { alert('Description is required.'); return; }
+
+      data = {
+        code: document.getElementById('itemCode').value,
+        name: papName,
+        description: papDesc,
+        category: document.getElementById('itemPapCategory')?.value || 'OTHER PAPs EXPENSES',
+        unit: document.getElementById('itemPapUnit')?.value || 'lot',
+        unit_price: parseFloat(document.getElementById('itemPapPrice')?.value) || 0,
+        stock_no: null,
+        uacs_code: document.getElementById('itemPapUacsCode')?.value || null,
+        quantity: 0,
+        reorder_point: 0,
+        procurement_source: 'PAPs'
+      };
+    } else {
+      // Standard PS-DBM / NON PS-DBM item
+      data = {
+        code: document.getElementById('itemCode').value,
+        name: document.getElementById('itemName').value,
+        description: document.getElementById('itemDescription').value,
+        category: document.getElementById('itemCategory').value,
+        unit: document.getElementById('itemUnit').value,
+        unit_price: parseFloat(document.getElementById('itemPrice').value) || 0,
+        stock_no: document.getElementById('itemStockNo').value || null,
+        uacs_code: document.getElementById('itemUacsCode').value || null,
+        quantity: parseInt(document.getElementById('itemQuantity').value) || 0,
+        reorder_point: parseInt(document.getElementById('itemReorderPoint').value) || 0,
+        procurement_source: source
+      };
+    }
+    
+    if (!confirm('Are you sure you want to save this item?')) return;
+    try {
+      await apiRequest('/items', 'POST', data);
+      alert('Item saved successfully!');
+      closeModal();
+      loadItems();
+    } catch (err) {
+      alert('Error saving item: ' + err.message);
+    }
+  };
+
+  window.showNewSupplierModal = function() {
+    const html = `
+      <form id="supplierForm" onsubmit="saveNewSupplier(event)">
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" id="supplierName" placeholder="Enter company name" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>PhilGEPS Registration No.</label>
+            <input type="text" id="supplierPhilgepsNo" placeholder="e.g., PG-123456">
+          </div>
+          <div class="form-group">
+            <label>TIN</label>
+            <input type="text" id="supplierTin" placeholder="Tax Identification Number">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Contact Person</label>
+          <input type="text" id="supplierContact" placeholder="Name of contact person" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" id="supplierPhone" placeholder="Contact number" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="supplierEmail" placeholder="Email address">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <textarea id="supplierAddress" rows="2" placeholder="Complete address" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Categories</label>
+          <select class="form-select" multiple style="height: 80px;">
+            <option value="office">Office Supplies</option>
+            <option value="it">IT Equipment</option>
+            <option value="furniture">Furniture</option>
+            <option value="services">Services</option>
+          </select>
+        </div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box box-blue" style="padding: 12px; border-radius: 6px; border: 2px dashed #2196f3; background: #e3f2fd;">
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-globe"></i> PhilGEPS Certificate of Registration</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="supplierPhilgeps" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'supplierPhilgepsLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('supplierPhilgeps').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="supplierPhilgepsLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> Business Permit / Mayor's Permit</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="supplierBusinessPermit" accept=".pdf,.jpg,.jpeg,.png" required style="display: none;" onchange="updateFileLabel(this, 'supplierBusinessPermitLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('supplierBusinessPermit').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="supplierBusinessPermitLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight: 500; margin-bottom: 5px; display: block;"><i class="fas fa-file-alt"></i> SEC/DTI Registration</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="supplierSecDti" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="updateFileLabel(this, 'supplierSecDtiLabel')">
+                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('supplierSecDti').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="supplierSecDtiLabel" style="font-size: 12px; color: #666;">Optional</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Supplier</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Supplier', html);
+  };
+
+  // Save new supplier via API
+  window.saveNewSupplier = async function(e) {
+    e.preventDefault();
+    const data = {
+      name: document.getElementById('supplierName').value,
+      contact_person: document.getElementById('supplierContact').value,
+      phone: document.getElementById('supplierPhone').value,
+      email: document.getElementById('supplierEmail')?.value || '',
+      address: document.getElementById('supplierAddress').value,
+      tin: document.getElementById('supplierTin')?.value || ''
+    };
+    
+    if (!confirm('Are you sure you want to save this supplier?')) return;
+    try {
+      const result = await apiRequest('/suppliers', 'POST', data);
+      // Upload attachments linked to the new supplier
+      const supplierId = result.id || result.supplier_id;
+      if (supplierId) {
+        await uploadAttachments('supplier', supplierId, [
+          { inputId: 'supplierPhilgeps', description: 'PhilGEPS Registration' },
+          { inputId: 'supplierBusinessPermit', description: 'Business Permit' },
+          { inputId: 'supplierSecDti', description: 'SEC/DTI Registration' }
+        ]);
+      }
+      alert('Supplier saved successfully!');
+      closeModal();
+      loadSuppliers();
+    } catch (err) {
+      alert('Error saving supplier: ' + err.message);
+    }
+  };
+
+  // ============================================================
+  // SAVE FUNCTIONS FOR ALL TRANSACTION CREATE FORMS
+  // ============================================================
+
+  // Division code to dept_id mapping
+  const deptIdMap = { 'FAD': 1, 'MWPTD': 2, 'MWPSD': 3, 'WRSD': 4, 'ORD': 5 };
+
+  // Convert full division name to short code for PPMP number generation
+  function getDivisionCode(divisionName) {
+    if (!divisionName) return '';
+    const name = divisionName.toLowerCase();
+    // Check if it's already a short code
+    if (['fad', 'wrsd', 'mwpsd', 'mwptd', 'ord'].includes(name)) return divisionName.toUpperCase();
+    // Map full names to short codes
+    if (name.includes('finance') || name.includes('administrative')) return 'FAD';
+    if (name.includes('welfare') || name.includes('reintegration')) return 'WRSD';
+    if (name.includes('protection') && name.includes('trafficking')) return 'MWPTD';
+    if (name.includes('processing') || (name.includes('service') && !name.includes('reintegration'))) return 'MWPSD';
+    if (name.includes('director')) return 'ORD';
+    // Fallback: try to extract abbreviation from first letters
+    return divisionName.split(/[\s-]+/).map(w => w[0]).join('').toUpperCase().substring(0, 6);
+  }
+
+  /**
+   * Auto-generate PPMP number based on division and fiscal year
+   */
+  window.generatePPMPNumber = async function() {
+    const divSelect = document.getElementById('ppmpDivisionSelect');
+    const fySelect = document.getElementById('ppmpFiscalYear');
+    const ppmpInput = document.getElementById('ppmpNumber');
+    if (!divSelect || !fySelect || !ppmpInput) return;
+    
+    const division = divSelect.value || document.querySelector('input[name="division"]')?.value || '';
+    const year = fySelect.value || getCurrentFiscalYear();
+    
+    if (!division) { ppmpInput.value = 'PPMP-???-' + year + '-001'; return; }
+    
+    try {
+      // Fetch existing PPMP entries to determine next sequence number
+      const plans = await apiRequest('/plans');
+      const divCode = getDivisionCode(division);
+      const prefix = 'PPMP-' + divCode + '-' + year + '-';
+      let maxSeq = 0;
+      plans.forEach(p => {
+        if (p.ppmp_no && p.ppmp_no.startsWith(prefix)) {
+          const seq = parseInt(p.ppmp_no.replace(prefix, '')) || 0;
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      });
+      const nextSeq = String(maxSeq + 1).padStart(3, '0');
+      ppmpInput.value = prefix + nextSeq;
+    } catch (err) {
+      // Fallback if API fails
+      ppmpInput.value = 'PPMP-' + division + '-' + year + '-' + String(Math.floor(Math.random() * 900) + 100);
+    }
+  };
+
+  /**
+   * Save New PPMP Entries (batch — one per selected item)
+   */
+  window.saveNewPPMP = async function(e) {
+    e.preventDefault();
+    const procSource = document.getElementById('ppmpProcurementSource')?.value || 'NON PS-DBM';
+    const isPAPs = procSource === 'PAPs';
+    
+    // --- Build unified items list based on procurement source ---
+    let items = [];
+    if (isPAPs) {
+      // PAPs: items from _papSelectedItems (manual + catalog combined)
+      items = (window._papSelectedItems || []).map(it => ({
+        item_id: it.item_id || null,
+        item_name: it.item_name || it.product_description || '',
+        item_code: it.item_code || '',
+        item_unit: it.unit || it.uom || '',
+        item_category: it.category || it.product_category || '',
+        item_description: it.description || it.product_description || '',
+        description: it.description || it.product_description || it.item_name || '',
+        unit: it.unit || it.uom || '',
+        unit_price: parseFloat(it.unit_price || 0),
+        quantity: parseInt(it.quantity || 1),
+        budget: (parseFloat(it.unit_price || 0)) * (parseInt(it.quantity || 1)),
+        procurement_source: 'PAPs',
+        is_manual: it.is_manual || false
+      }));
+    } else {
+      // PS-DBM / NON PS-DBM / MANUAL-NON-PSDBM: unified from _ppmpSelectedItems
+      items = [...(window._ppmpSelectedItems || [])];
+    }
+
+    if (items.length === 0) {
+      alert('Please add at least one item.');
+      return;
+    }
+
+    const fiscalYear = document.getElementById('ppmpFiscalYear')?.value || new Date().getFullYear();
+    const division = document.getElementById('ppmpDivisionSelect')?.value || document.querySelector('input[name="division"]')?.value || '';
+    const section = document.getElementById('ppmpSection')?.value || 'GENERAL PROCUREMENT';
+    const category = document.getElementById('ppmpCategoryFilterModal')?.value || document.getElementById('ppmpCategory')?.value || section;
+    const projectType = document.getElementById('ppmpProjectType')?.value || 'Goods';
+    const procurementMode = document.getElementById('ppmpProcMode')?.value || 'Small Value Procurement';
+    const preProc = document.getElementById('ppmpPreProc')?.value || 'NO';
+    const startDate = formatMonthYear(document.getElementById('ppmpStartDate')?.value || '');
+    const endDate = formatMonthYear(document.getElementById('ppmpEndDate')?.value || '');
+    const deliveryPeriod = formatMonthYear(document.getElementById('ppmpDeliveryPeriod')?.value || '');
+    const fundSource = document.getElementById('ppmpFundSource')?.value || 'GAA';
+    const remarks = document.getElementById('ppmpRemarks')?.value || '';
+    const isIndicative = document.getElementById('ppmpIndicative')?.checked || false;
+    const isFinal = document.getElementById('ppmpFinal')?.checked || false;
+
+    if (!division) { alert('Please select a division.'); return; }
+
+    const totalBudget = items.reduce((sum, it) => sum + it.budget, 0);
+    const itemLines = items.map((it, i) =>
+      `<div class="item-line">${i+1}. ${it.item_name || it.description} <span style="float:right;">x${it.quantity} = ₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>`
+    ).join('');
+
+    const confirmed = await govConfirm({
+      title: 'Save PPMP Entries',
+      bodyHtml: `
+        <p>You are about to save <strong>${items.length} PPMP entr${items.length > 1 ? 'ies' : 'y'}</strong> for <strong>${division}</strong> — FY ${fiscalYear}.</p>
+        <div class="item-summary">${itemLines}</div>
+        <div class="total-line">Total Estimated Budget: ₱${totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>`,
+      confirmText: 'Save Entries',
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+
+    try {
+      // Manual items will be auto-added to the Items Catalog when PPMP is fully approved
+      // (by Chief, Budget Consultant, and HOPE). For now, just save with item_id = null.
+      const manualItemsInList = items.filter(it => it.is_manual);
+      if (manualItemsInList.length > 0) {
+        const catalogSource = isPAPs ? 'PAPs' : 'NON PS-DBM';
+        manualItemsInList.forEach(it => {
+          it.item_id = null;
+          it.procurement_source = catalogSource;
+        });
+      }
+
+      // Generate PPMP numbers for the batch (use full year to match server format)
+      const year = String(fiscalYear);
+      const divCode = getDivisionCode(division);
+      const prefix = 'PPMP-' + divCode + '-' + year + '-';
+      let maxSeq = 0;
+      const existingNos = new Set();
+      try {
+        const existing = await apiRequest('/plans');
+        (existing || []).forEach(p => {
+          if (p.ppmp_no) {
+            existingNos.add(p.ppmp_no);
+            if (p.ppmp_no.startsWith(prefix)) {
+              const seq = parseInt(p.ppmp_no.replace(prefix, ''), 10);
+              if (seq > maxSeq) maxSeq = seq;
+            }
+          }
+        });
+      } catch(e) { /* fallback below */ }
+
+      const entries = items.map((it, idx) => {
+        let seqNum = maxSeq + idx + 1;
+        let ppmpNo = prefix + String(seqNum).padStart(3, '0');
+        // Ensure no duplicate — keep incrementing if number already exists
+        while (existingNos.has(ppmpNo)) {
+          seqNum++;
+          ppmpNo = prefix + String(seqNum).padStart(3, '0');
+        }
+        existingNos.add(ppmpNo); // Mark as used for next iteration
+        return {
+          ppmp_no: ppmpNo,
+          dept_id: deptIdMap[divCode] || null,
+          fiscal_year: parseInt(fiscalYear),
+          section: section,
+          category: category || it.item_category || it.category || '',
+          item_id: it.item_id || null,
+          description: isPAPs
+            ? it.item_name  // PAP Name only (for bold title display)
+            : (it.item_name || it.description),
+          item_description: isPAPs
+            ? (it.description || '')  // PAP Description only (for semi-bold detail display)
+            : (it.description || it.item_name),
+          project_type: projectType,
+          quantity_size: String(it.quantity),
+          procurement_mode: procurementMode,
+          pre_procurement: preProc,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          delivery_period: deliveryPeriod || null,
+          fund_source: fundSource,
+          total_amount: it.budget,
+          status: 'pending',
+          procurement_source: it.procurement_source || (procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource),
+          remarks: (remarks + (isIndicative ? ' [INDICATIVE]' : '') + (isFinal ? ' [FINAL]' : '')).trim(),
+          // Persist unit/price data to plan_items so Edit modal can retrieve them
+          items: [{
+            item_code: it.item_code || '',
+            item_name: it.item_name || '',
+            item_description: it.item_description || it.description || '',
+            unit: it.item_unit || it.unit || 'pc',
+            unit_price: parseFloat(it.unit_price || 0),
+            category: it.item_category || it.category || '',
+            q1_qty: it.quantity || 0,
+            q2_qty: 0, q3_qty: 0, q4_qty: 0,
+            remarks: ''
+          }]
+        };
+      });
+
+      // Try batch endpoint first, fall back to individual creates
+      let savedCount = 0;
+      let lastPlanId = null;
+      try {
+        const result = await apiRequest('/plans/batch', 'POST', { entries });
+        savedCount = result.count || entries.length;
+        lastPlanId = result.ids ? result.ids[0] : null;
+      } catch(batchErr) {
+        // Fallback: create one by one
+        for (const entry of entries) {
+          try {
+            const result = await apiRequest('/plans', 'POST', entry);
+            savedCount++;
+            if (!lastPlanId) lastPlanId = result.id || result.plan_id;
+          } catch(e) {
+            console.error('Failed to save entry:', entry.ppmp_no, e);
+          }
+        }
+      }
+
+      // Upload attachment to first entry if provided
+      if (lastPlanId) {
+        await uploadAttachments('plan', lastPlanId, [
+          { inputId: 'ppmpAttachment', description: 'PPMP Supporting Document' }
+        ]);
+      }
+
+      await govAlert({
+        title: 'PPMP Entries Saved',
+        type: 'success',
+        bodyHtml: `<p style="text-align:center;"><i class="fas fa-check-circle" style="font-size:36px;color:#28a745;display:block;margin-bottom:10px;"></i>
+          Successfully saved <strong>${savedCount}</strong> of <strong>${entries.length}</strong> PPMP entr${entries.length > 1 ? 'ies' : 'y'}.</p>
+          <p style="text-align:center;font-size:12px;color:#718096;">Entries are now pending approval by Chief, HOPE, and Budget Consultant.</p>`,
+        buttonText: 'Done'
+      });
+      closeModal();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
+    } catch (err) {
+      govAlert({
+        title: 'Error Saving PPMP',
+        type: 'error',
+        bodyHtml: `<p>Failed to save PPMP entries:</p><p style="color:#dc3545;font-weight:600;">${err.message}</p>`,
+        buttonText: 'OK'
+      });
+    }
+  };
+
+  /** Filter the items catalog dropdown by selected PPMP category (no-op, modal handles filtering) */
+  window.filterPPMPItemsByCategory = function(category) {
+    // Category filter is now applied when opening the catalog modal
+  };
+
+  // Category → Section mapping (matches migrate_ppmp_section.js)
+  const CATEGORY_TO_SECTION = {
+    'EXPENDABLE': 'OFFICE OPERATION',
+    'ICT OFFICE SUPPLIES EXPENSES': 'OFFICE OPERATION',
+    'OFFICE SUPPLIES EXPENSES': 'OFFICE OPERATION',
+    'CLEANING EQUIPMENT AND SUPPLIES': 'OFFICE OPERATION',
+    'PAPER MATERIALS AND PRODUCTS': 'OFFICE OPERATION',
+    'OFFICE EQUIPMENT AND ACCESSORIES AND SUPPLIES': 'OFFICE OPERATION',
+    'INFORMATION AND COMMUNICATION TECHNOLOGY (ICT) EQUIPMENT AND DEVICES AND ACCESSORIES': 'OFFICE OPERATION',
+    'PRINTER OR FACSIMILE OR PHOTOCOPIER SUPPLIES (CONSUMABLES)': 'OFFICE OPERATION',
+    'OTHER SUPPLIES AND MATERIALS': 'OFFICE OPERATION',
+    'OTHER MOOE': 'OFFICE OPERATION',
+    'SOFTWARE': 'OFFICE OPERATION',
+    'SEMI-ICT EQUIPMENT': 'OFFICE OPERATION',
+    'SEMI-OFFICE EQUIPMENT': 'OFFICE OPERATION',
+    'SEMI-EXPENDABLE': 'OFFICE OPERATION',
+    'ALCOHOL OR ACETONE BASED ANTISEPTICS': 'OFFICE OPERATION',
+    'BATTERIES AND CELLS AND ACCESSORIES': 'OFFICE OPERATION',
+    'COLOR COMPOUNDS AND DISPERSIONS': 'OFFICE OPERATION',
+    'CONSUMER ELECTRONICS': 'OFFICE OPERATION',
+    'FILMS': 'OFFICE OPERATION',
+    'FLAG OR ACCESSORIES': 'OFFICE OPERATION',
+    'LIGHTING AND FIXTURES AND ACCESSORIES': 'OFFICE OPERATION',
+    'MANUFACTURING COMPONENTS AND SUPPLIES': 'OFFICE OPERATION',
+    'MEASURING AND OBSERVING AND TESTING EQUIPMENT': 'OFFICE OPERATION',
+    'PERFUMES OR COLOGNES OR FRAGRANCES': 'OFFICE OPERATION',
+    'PESTICIDES OR PEST REPELLENTS': 'OFFICE OPERATION',
+    'PRINTED PUBLICATIONS': 'OFFICE OPERATION',
+    'ARTS AND CRAFTS EQUIPMENT AND ACCESSORIES AND SUPPLIES': 'OFFICE OPERATION',
+    'AUDIO AND VISUAL EQUIPMENT AND SUPPLIES': 'OFFICE OPERATION',
+    'HEATING AND VENTILATION AND AIR CIRCULATION': 'OFFICE OPERATION',
+    'FIRE FIGHTING EQUIPMENT': 'OFFICE OPERATION',
+    'CLOUD COMPUTING SERVICES': 'OFFICE OPERATION',
+    'AIRLINE TICKETS': 'OFFICE OPERATION',
+    'SEMI-FURNITURE & FIXTURES': 'SEMI- FURNITURE & FIXTURES',
+    'FURNITURE AND FURNISHINGS': 'SEMI- FURNITURE & FIXTURES',
+    'TRAININGS & ACTIVITIES': 'TRAININGS & ACTIVITIES',
+    'CAPITAL OUTLAY': 'CAPITAL OUTLAY',
+    'MOTOR VEHICLE': 'CAPITAL OUTLAY',
+  };
+
+  /**
+   * Build a formatted description from an item catalog entry.
+   * Format: HEADER\n   detail1\n   detail2\n   Unit: XYZ
+   */
+  window.buildItemDescription = function(item) {
+    if (!item) return '';
+    const name = (item.name || '').trim();
+    let header = name;
+    let details = [];
+    // Split on comma or dash to extract detail parts
+    const commaPos = name.indexOf(',');
+    const dashPos = name.indexOf(' - ');
+    if (commaPos > 0) {
+      header = name.substring(0, commaPos).trim();
+      const rest = name.substring(commaPos + 1).trim();
+      if (rest) details.push(rest);
+    } else if (dashPos > 0) {
+      header = name.substring(0, dashPos).trim();
+      const rest = name.substring(dashPos + 3).trim();
+      if (rest) details.push(rest);
+    }
+    // Add description if different from name
+    if (item.description && item.description.trim() !== name && item.description.trim() !== header) {
+      const descNorm = item.description.trim();
+      if (!details.some(d => d.toUpperCase().includes(descNorm.toUpperCase()) || descNorm.toUpperCase().includes(d.toUpperCase()))) {
+        details.push(descNorm);
+      }
+    }
+    // Add unit info
+    if (item.unit) details.push('Unit: ' + item.unit);
+    let desc = header;
+    details.forEach(d => { desc += '\n   ' + d; });
+    return desc;
+  };
+
+  /**
+   * Add a selected item from the catalog dropdown to the PPMP items list.
+   */
+  /**
+   * Toggle between Catalog Items mode (PS-DBM / NON PS-DBM) and PAPs mode.
+   * When PAPs is selected: hide catalog section + common procurement details + timeline,
+   * show PAP-style form with PAP Name, Budget, Description, Centralize, Period, manual items table.
+   */
+  window.togglePPMPSourceMode = function(source) {
+    const catalogSection = document.getElementById('ppmpCatalogSection');
+    const papsSection = document.getElementById('ppmpPAPsSection');
+    const nonPAPDetails = document.getElementById('ppmpNonPAPDetails');
+    const manualSection = document.getElementById('ppmpManualItemsSection');
+    const manualTitle = document.getElementById('ppmpManualSectionTitle');
+    
+    // Hide all optional sections first
+    if (catalogSection) catalogSection.style.display = 'none';
+    if (papsSection) papsSection.style.display = 'none';
+    if (manualSection) manualSection.style.display = 'none';
+
+    if (source === 'PAPs') {
+      // Show PAP-style form AND catalog section + common procurement details + timeline
+      if (papsSection) papsSection.style.display = 'block';
+      if (catalogSection) catalogSection.style.display = 'block';
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields (they stay visible)
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+      // Set catalog source filter to show all items
+      window._ppmpCatalogSourceFilter = 'NON PS-DBM';
+      // Initialize PAP items list if not already done
+      if (!window._papSelectedItems) window._papSelectedItems = [];
+      if (!window._ppmpManualItems) window._ppmpManualItems = [];
+      renderPAPModalItemsList();
+    } else if (source === 'MANUAL-NON-PSDBM') {
+      // Show manual items section AND catalog section for unified list
+      if (manualSection) manualSection.style.display = 'block';
+      if (catalogSection) catalogSection.style.display = 'block';
+      if (manualTitle) manualTitle.textContent = 'Manual NON-PS-DBM Item Entry';
+      // Show common procurement details + timeline
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+      // Set catalog source filter for NON PS-DBM items
+      window._ppmpCatalogSourceFilter = 'NON PS-DBM';
+      // Initialize items lists
+      if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+      if (!window._ppmpManualItems) window._ppmpManualItems = [];
+      renderPPMPItemsList();
+      renderManualCatalogItemsList();
+    } else {
+      // Show catalog section for PS-DBM / NON PS-DBM
+      if (catalogSection) catalogSection.style.display = 'block';
+      // Show common procurement details + timeline
+      if (nonPAPDetails) nonPAPDetails.style.display = 'block';
+      // Re-add required on common fields
+      ['ppmpProjectType', 'ppmpProcMode', 'ppmpStartDate', 'ppmpEndDate', 'ppmpDeliveryPeriod', 'ppmpFundSource'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('required', '');
+      });
+      // Filter the catalog item dropdown by procurement source
+      window._ppmpCatalogSourceFilter = source || 'NON PS-DBM';
+      // Update section label based on source
+      const sectionHeader = catalogSection ? catalogSection.querySelector('.form-section-header') : null;
+      if (sectionHeader) {
+        if (source === 'PS-DBM') {
+          sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> PS-DBM Items from Catalog';
+        } else {
+          sectionHeader.innerHTML = '<i class="fas fa-layer-group"></i> Items from Catalog';
+        }
+      }
+    }
+  };
+
+  /**
+   * Add a PAPs expense item to the PAPs list.
+   */
+  window.addPAPsItemToList = function() {
+    const activityName = document.getElementById('ppmpPAPsActivityName');
+    const expenseDesc = document.getElementById('ppmpPAPsExpenseDesc');
+    const unit = document.getElementById('ppmpPAPsUnit');
+    const qtySize = document.getElementById('ppmpPAPsQtySize');
+    const budget = document.getElementById('ppmpPAPsBudget');
+    const category = document.getElementById('ppmpPAPsCategory');
+
+    if (!activityName || !activityName.value.trim()) {
+      alert('Please enter the Activity / Program Name.');
+      return;
+    }
+    if (!expenseDesc || !expenseDesc.value.trim()) {
+      alert('Please enter the Expense Description.');
+      return;
+    }
+    if (!budget || !budget.value || parseFloat(budget.value) <= 0) {
+      alert('Please enter the Total Budget.');
+      return;
+    }
+
+    const entry = {
+      item_id: null,
+      item_name: activityName.value.trim(),
+      item_code: 'PAP',
+      item_unit: (unit ? unit.value.trim() : 'lot') || 'lot',
+      item_category: category ? category.value : 'OTHER PAPs EXPENSES',
+      item_description: expenseDesc.value.trim(),
+      description: expenseDesc.value.trim(),
+      unit_price: parseFloat(budget.value) || 0,
+      quantity: 1,
+      qty_size: (qtySize ? qtySize.value.trim() : ''),
+      budget: parseFloat(budget.value) || 0,
+      procurement_source: 'PAPs',
+      activity_name: activityName.value.trim()
+    };
+
+    if (!window._ppmpPAPsItems) window._ppmpPAPsItems = [];
+    window._ppmpPAPsItems.push(entry);
+    renderPAPsItemsList();
+
+    // Clear input fields but keep activity name for batch entry
+    if (expenseDesc) expenseDesc.value = '';
+    if (budget) budget.value = '';
+    if (qtySize) qtySize.value = '';
+  };
+
+  /**
+   * Remove a PAPs item from the list by index.
+   */
+  window.removePAPsItem = function(index) {
+    if (!window._ppmpPAPsItems) return;
+    window._ppmpPAPsItems.splice(index, 1);
+    renderPAPsItemsList();
+  };
+
+  /**
+   * Update the budget for a PAPs item in the list.
+   */
+  window.updatePAPsItemBudget = function(index, val) {
+    if (!window._ppmpPAPsItems || !window._ppmpPAPsItems[index]) return;
+    const b = Math.max(0, parseFloat(val) || 0);
+    window._ppmpPAPsItems[index].budget = b;
+    window._ppmpPAPsItems[index].unit_price = b;
+    renderPAPsItemsList();
+  };
+
+  /**
+   * Render the PAPs items list table.
+   */
+  window.renderPAPsItemsList = function() {
+    const tbody = document.getElementById('ppmpPAPsListBody');
+    const container = document.getElementById('ppmpPAPsListContainer');
+    const countEl = document.getElementById('ppmpPAPsItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+
+    const items = window._ppmpPAPsItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx + 1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.activity_name || it.item_name) + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description) + '</td>' +
+        '<td style="font-size:10px;text-align:center;">' + escapeHtml(it.item_category) + '</td>' +
+        '<td style="text-align:center;">' + escapeHtml(it.item_unit) + '</td>' +
+        '<td style="text-align:center;font-size:11px;">' + escapeHtml(it.qty_size || '-') + '</td>' +
+        '<td><input type="number" value="' + it.budget.toFixed(2) + '" min="0" step="0.01" ' +
+          'style="width:90px;font-size:11px;text-align:right;padding:2px 4px;" ' +
+          'onchange="updatePAPsItemBudget(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:center;">' +
+          '<button type="button" class="btn btn-sm" onclick="removePAPsItem(' + idx + ')" ' +
+            'style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove">' +
+            '<i class="fas fa-times"></i></button>' +
+        '</td></tr>';
+    }).join('');
+
+    if (countEl) countEl.textContent = items.length + ' PAPs expense' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+  };
+
+  // =====================================================
+  // PAP (Programs, Activities & Projects) MANAGEMENT
+  // =====================================================
+
+  /** Switch between PPMP tabs (PS-DBM Items, Non-PSDBM Items, PAP) */
+  window.switchPPMPTab = function(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.ppmp-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+    // Show/hide tab content
+    document.querySelectorAll('.ppmp-tab-content').forEach(content => {
+      const isTarget = content.getAttribute('data-tab') === tabName;
+      content.style.display = isTarget ? 'block' : 'none';
+      content.classList.toggle('active', isTarget);
+    });
+    // Load data for the selected tab
+    if (tabName === 'pap') {
+      loadPAPs();
+    } else if (tabName === 'non-psdbm-items') {
+      loadNonPSDBMItems();
+    } else {
+      // PS-DBM tab just uses the existing PPMP table
+    }
+  };
+
+  /** Load Non-PSDBM items (filtered view of PPMP) */
+  window.loadNonPSDBMItems = async function() {
+    const tbody = document.getElementById('ppmpNonPSDBMTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+    try {
+      const yearFilter = document.getElementById('ppmpYearFilter');
+      const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
+      const data = await apiRequest('/ppmp?fiscal_year=' + fy + '&procurement_source=NON%20PS-DBM');
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding:30px;color:#888;">No Non-PSDBM items found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(p => {
+        const statusClass = p.status || 'pending';
+        return `<tr>
+          <td>${p.ppmp_no || '-'}</td>
+          <td>${formatPPMPDescription(p)}</td>
+          <td>${p.project_type || 'Goods'}</td>
+          <td>${p.quantity_size || '-'}</td>
+          <td>${p.procurement_mode || 'Small Value Procurement'}</td>
+          <td>${p.fund_source || 'GAA'}</td>
+          <td class="text-right">₱${parseFloat(p.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+          <td><span class="status-badge ${statusClass}">${p.status || 'pending'}</span></td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon" title="View" onclick="showViewPPMPModal(${p.id})"><i class="fas fa-eye"></i></button>
+              <button class="btn-icon" title="Edit" onclick="showEditPPMPModal(${p.id})"><i class="fas fa-edit"></i></button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="color:#e53e3e;">Failed to load Non-PSDBM items</td></tr>';
+    }
+  };
+
+  window.filterNonPSDBMTable = function(searchText) {
+    const tbody = document.getElementById('ppmpNonPSDBMTableBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const text = (searchText || '').toLowerCase();
+    rows.forEach(row => {
+      row.style.display = !text || row.textContent.toLowerCase().includes(text) ? '' : 'none';
+    });
+  };
+
+  /** Load PAPs from server */
+  window.loadPAPs = async function() {
+    const tbody = document.getElementById('papTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading PAP data...</td></tr>';
+    try {
+      const yearFilter = document.getElementById('ppmpYearFilter');
+      const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
+      const paps = await apiRequest('/paps?fiscal_year=' + fy);
+      window._papsData = paps;
+      renderPAPTable(paps);
+    } catch (err) {
+      console.error('Error loading PAPs:', err);
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:#e53e3e;"><i class="fas fa-exclamation-triangle"></i> Failed to load PAP data. <button class="btn btn-sm btn-primary" onclick="loadPAPs()">Retry</button></td></tr>';
+    }
+  };
+
+  /** Render PAP table matching the reference UI */
+  window.renderPAPTable = function(paps) {
+    const tbody = document.getElementById('papTableBody');
+    if (!tbody) return;
+    if (!paps || !paps.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:30px;color:#636e78;">No PAP entries found</td></tr>';
+      const totalBadge = document.getElementById('papTotalBadge');
+      if (totalBadge) totalBadge.style.display = 'none';
+      const rangeEl = document.getElementById('papItemRange');
+      if (rangeEl) rangeEl.textContent = '0 items';
+      return;
+    }
+    let totalBudget = 0;
+    tbody.innerHTML = paps.map((p, idx) => {
+      totalBudget += parseFloat(p.estimated_budget || 0);
+      return `<tr>
+        <td style="text-align:center;">
+          <button class="btn-icon" onclick="togglePAPRow(this)" title="Expand"><i class="fas fa-chevron-right"></i></button>
+        </td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm" style="background:#2563eb;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;cursor:pointer;" onclick="showEditPAPModal(${p.id})">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-sm" style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;cursor:pointer;" onclick="removePAP(${p.id}, '${escapeHtml(p.pap_name)}')">
+              <i class="fas fa-times"></i> Remove
+            </button>
+            <button class="btn btn-sm" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;cursor:pointer;" onclick="showSetMOPModal(${p.id}, '${escapeHtml(p.mop || '')}')">
+              <i class="fas fa-plus"></i> MOP
+            </button>
+          </div>
+        </td>
+        <td style="font-weight:600;">${escapeHtml(p.pap_name)}</td>
+        <td>${escapeHtml(p.description || p.pap_name)}</td>
+        <td style="text-align:center;">${p.quarter || 0}</td>
+        <td style="text-align:right;font-weight:600;">₱${parseFloat(p.estimated_budget || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        <td>${escapeHtml(p.mop || '')}</td>
+        <td>${escapeHtml(p.account_code || '')}</td>
+      </tr>`;
+    }).join('');
+
+    // Total row
+    const totalBadge = document.getElementById('papTotalBadge');
+    if (totalBadge) {
+      totalBadge.style.display = 'block';
+      totalBadge.textContent = '₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+    }
+    const rangeEl = document.getElementById('papItemRange');
+    if (rangeEl) rangeEl.textContent = `1 - ${paps.length} of ${paps.length} items`;
+  };
+
+  /** Toggle expand/collapse PAP row */
+  window.togglePAPRow = function(btn) {
+    const icon = btn.querySelector('i');
+    if (icon.classList.contains('fa-chevron-right')) {
+      icon.classList.remove('fa-chevron-right');
+      icon.classList.add('fa-chevron-down');
+    } else {
+      icon.classList.remove('fa-chevron-down');
+      icon.classList.add('fa-chevron-right');
+    }
+  };
+
+  /** Filter PAP table by search text */
+  window.filterPAPTable = function(searchText) {
+    const tbody = document.getElementById('papTableBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const text = (searchText || '').toLowerCase();
+    rows.forEach(row => {
+      row.style.display = !text || row.textContent.toLowerCase().includes(text) ? '' : 'none';
+    });
+  };
+
+  /** Show Create PAP Modal */
+  window.showCreatePAPModal = async function() {
+    await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    const isChief = userHasAnyRole(chiefRoles);
+    const chiefDivision = currentUser.division || currentUser.department_code || '';
+    const autoDiv = isChief ? chiefDivision : '';
+    const autoDivId = autoDiv ? (deptIdMap[autoDiv] || '') : '';
+
+    const html = `
+      <form id="papForm" onsubmit="saveNewPAP(event)">
+        <!-- Hidden auto-populated fields -->
+        <input type="hidden" id="papDivision" value="${autoDivId || ''}">
+        <input type="hidden" id="papFiscalYear" value="${getCurrentFiscalYear()}">
+        <input type="hidden" id="papAccountCode" value="">
+
+        <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+          <!-- Left: PAP Name + Budget -->
+          <div style="flex:2;padding:14px 18px;">
+            <div style="margin-bottom:12px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
+              <input type="text" id="papName" required placeholder="e.g., Pantry Renovation" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <span style="color:#555;font-size:13px;">₱</span>
+                <input type="text" id="papEstimatedBudget" inputmode="decimal" placeholder="0.00" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
+            </div>
+          </div>
+          <!-- Vertical separator -->
+          <div style="width:1px;background:#ccc;"></div>
+          <!-- Right: Description -->
+          <div style="flex:1;padding:14px 18px;">
+            <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
+            <textarea id="papDescription" rows="4" placeholder="PAP description" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;"></textarea>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 18px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+            Create PAP to Centralize?
+            <input type="checkbox" id="papCentralize" style="width:16px;height:16px;">
+          </label>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 18px;flex-wrap:wrap;">
+          <span style="font-weight:600;font-size:13px;">Period:</span>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan"> Jan</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb"> Feb</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar"> Mar</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr"> Apr</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay"> May</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun"> Jun</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul"> Jul</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug"> Aug</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep"> Sep</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct"> Oct</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov"> Nov</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec"> Dec</label>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:14px 16px 10px 16px;">
+          <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="fas fa-plus"></i> Select on PSDBM
+          </button>
+          <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('NON PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="fas fa-plus"></i> Select on Non-PSDBM
+          </button>
+          <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#2b6cb0;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="fas fa-pen"></i> Add Manual Item
+          </button>
+        </div>
+
+        <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin:0 16px 8px 16px;">
+          <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
+            <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
+              <th style="padding:6px 8px;">Command</th>
+              <th style="padding:6px 8px;">Item Code</th>
+              <th style="padding:6px 8px;">Product Category</th>
+              <th style="padding:6px 8px;">UACS</th>
+              <th style="padding:6px 8px;">Product Description</th>
+              <th style="padding:6px 8px;">Available At</th>
+              <th style="padding:6px 4px;text-align:center;">Qty</th>
+              <th style="padding:6px 8px;">UOM</th>
+              <th style="padding:6px 8px;">Unit Price (₱)</th>
+              <th style="padding:6px 8px;text-align:right;">Total Amount</th>
+            </tr></thead>
+            <tbody id="papItemsListBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:0 16px 14px 16px;border-top:1px solid #ddd;padding-top:6px;">
+          <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
+          <span style="font-size:12px;color:#888;">items</span>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-start;padding:0 16px;">
+          <button type="submit" class="btn btn-primary" style="background:#1a365d;border-color:#1a365d;padding:8px 24px;font-weight:600;">
+            <i class="fas fa-save"></i> Save
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;font-weight:600;">
+            <i class="fas fa-ban"></i> Cancel
+          </button>
+        </div>
+      </form>
+    `;
+
+    openModal('Create PAP', html);
+    window._papSelectedItems = [];
+    renderPAPModalItemsList();
+  };
+
+  /** Show Edit PAP Modal */
+  window.showEditPAPModal = async function(papId) {
+    try {
+      const pap = await apiRequest('/paps/' + papId);
+      await Promise.all([ensureDivisionsLoaded(), ensureProcModesLoaded()]);
+
+      const html = `
+        <form id="papEditForm" onsubmit="updatePAP(event, ${papId})">
+          <!-- Hidden auto-populated fields -->
+          <input type="hidden" id="papDivision" value="${pap.dept_id || ''}">
+          <input type="hidden" id="papFiscalYear" value="${pap.fiscal_year || getCurrentFiscalYear()}">
+          <input type="hidden" id="papAccountCode" value="${escapeHtml(pap.account_code || '')}">
+
+          <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid #ccc;">
+            <!-- Left: PAP Name + Budget -->
+            <div style="flex:2;padding:14px 18px;">
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Name <span class="text-danger">*</span></label>
+                <input type="text" id="papName" required value="${escapeHtml(pap.pap_name || '')}" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+              </div>
+              <div style="margin-bottom:12px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">PAP Estimated Budget</label>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="color:#555;font-size:13px;">₱</span>
+                  <input type="text" id="papEstimatedBudget" inputmode="decimal" value="${parseFloat(pap.estimated_budget || 0).toFixed(2)}" maxlength="20" onkeypress="return /[0-9.]/.test(event.key)" style="flex:1;padding:6px 10px;border:1px solid #aaa;font-size:13px;">
+                </div>
+              </div>
+            </div>
+            <!-- Vertical separator -->
+            <div style="width:1px;background:#ccc;"></div>
+            <!-- Right: Description -->
+            <div style="flex:1;padding:14px 18px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">Description</label>
+              <textarea id="papDescription" rows="4" style="width:100%;padding:6px 10px;border:1px solid #aaa;font-size:13px;resize:vertical;">${escapeHtml(pap.description || '')}</textarea>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding:0 18px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+              Create PAP to Centralize?
+              <input type="checkbox" id="papCentralize" ${pap.centralize ? 'checked' : ''} style="width:16px;height:16px;">
+            </label>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 18px;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:13px;">Period:</span>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJan" ${pap.period_jan ? 'checked' : ''}> Jan</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodFeb" ${pap.period_feb ? 'checked' : ''}> Feb</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMar" ${pap.period_mar ? 'checked' : ''}> Mar</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodApr" ${pap.period_apr ? 'checked' : ''}> Apr</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodMay" ${pap.period_may ? 'checked' : ''}> May</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJun" ${pap.period_jun ? 'checked' : ''}> Jun</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodJul" ${pap.period_jul ? 'checked' : ''}> Jul</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodAug" ${pap.period_aug ? 'checked' : ''}> Aug</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodSep" ${pap.period_sep ? 'checked' : ''}> Sep</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodOct" ${pap.period_oct ? 'checked' : ''}> Oct</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodNov" ${pap.period_nov ? 'checked' : ''}> Nov</label>
+            <label style="display:flex;align-items:center;gap:3px;font-size:12px;"><input type="checkbox" id="papPeriodDec" ${pap.period_dec ? 'checked' : ''}> Dec</label>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;margin:14px 16px 10px 16px;">
+            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-plus"></i> Select on PSDBM
+            </button>
+            <button type="button" class="btn btn-sm" onclick="showSelectPAPItemModal('NON PS-DBM')" style="background:#1a365d;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-plus"></i> Select on Non-PSDBM
+            </button>
+            <button type="button" class="btn btn-sm" onclick="addManualPAPItem()" style="background:#2b6cb0;color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="fas fa-pen"></i> Add Manual Item
+            </button>
+          </div>
+
+          <div id="papItemsListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #bbb;margin:0 16px 8px 16px;">
+            <table class="data-table full-width" style="font-size:11.5px;margin:0;border-collapse:collapse;">
+              <thead><tr style="background:#e9e9e9;position:sticky;top:0;z-index:1;">
+                <th style="padding:6px 8px;">Command</th>
+                <th style="padding:6px 8px;">Item Code</th>
+                <th style="padding:6px 8px;">Product Category</th>
+                <th style="padding:6px 8px;">UACS</th>
+                <th style="padding:6px 8px;">Product Description</th>
+                <th style="padding:6px 8px;">Available At</th>
+                <th style="padding:6px 4px;text-align:center;">Qty</th>
+                <th style="padding:6px 8px;">UOM</th>
+                <th style="padding:6px 8px;">Unit Price (₱)</th>
+                <th style="padding:6px 8px;text-align:right;">Total Amount</th>
+              </tr></thead>
+              <tbody id="papItemsListBody"></tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;margin:0 16px 14px 16px;border-top:1px solid #ddd;padding-top:6px;">
+            <div id="papItemCount" style="font-size:12px;color:#666;font-weight:600;">0</div>
+            <span style="font-size:12px;color:#888;">items</span>
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-start;padding:0 16px;">
+            <button type="submit" class="btn btn-primary" style="background:#1a365d;border-color:#1a365d;padding:8px 24px;font-weight:600;">
+              <i class="fas fa-save"></i> Save
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()" style="background:#dc3545;border-color:#dc3545;color:#fff;padding:8px 24px;font-weight:600;">
+              <i class="fas fa-ban"></i> Cancel
+            </button>
+          </div>
+        </form>
+      `;
+
+      openModal('Edit PAP', html);
+
+      // Load existing items — preserve pap_item id for update integrity
+      window._papSelectedItems = (pap.items || []).map(it => ({
+        id: it.id || null,
+        item_id: it.item_id || null,
+        item_code: it.item_code || it.catalog_item_code || '',
+        product_category: it.product_category || it.catalog_category || '',
+        account_code: it.account_code || it.catalog_uacs_code || '',
+        product_description: it.product_description || it.catalog_item_name || '',
+        available_at: it.available_at || '',
+        quantity: parseFloat(it.quantity || 0),
+        uom: it.uom || it.catalog_unit || '',
+        unit_price: parseFloat(it.unit_price || it.catalog_unit_price || 0),
+        total_amount: parseFloat(it.total_amount || 0),
+        procurement_source: it.procurement_source || 'PAPs'
+      }));
+      renderPAPModalItemsList();
+    } catch (err) {
+      alert('Error loading PAP: ' + err.message);
+    }
+  };
+
+  /** Show Select Non-PSDBM Item Modal (secondary modal overlay) */
+  window.showSelectPAPItemModal = async function(sourceFilter) {
+    let allItems = [];
+    try { allItems = await apiRequest('/items'); } catch(e) {}
+    // Filter items by procurement source
+    const filteredItems = sourceFilter
+      ? allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === sourceFilter)
+      : allItems;
+
+    const itemRows = filteredItems.map(item => `
+      <tr class="pap-item-select-row" onclick="selectPAPItemFromCatalog(${item.id}, this)" style="cursor:pointer;">
+        <td>${escapeHtml(item.code || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.name || '')}</td>
+        <td>${escapeHtml(item.unit || '')}</td>
+        <td style="text-align:right;">₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        <td style="text-align:center;">${parseInt(item.quantity || 0).toLocaleString()}</td>
+      </tr>`).join('');
+
+    const modalTitle = sourceFilter === 'PS-DBM' ? 'Select PS-DBM Item' : sourceFilter === 'NON PS-DBM' ? 'Select Non-PSDBM Item' : 'Select Item';
+
+    // Create a sub-modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'papItemSelectOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:700px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;">${modalTitle}</h4>
+          <button onclick="document.getElementById('papItemSelectOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="papCatalogSearch" placeholder="Search items..." oninput="filterPAPCatalogItems(this.value)"
+            style="width:100%;padding:6px 12px;border:1px solid #ccc;border-radius:4px;">
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Unit</th>
+              <th>Unit Price</th>
+              <th>Qty Available</th>
+            </tr></thead>
+            <tbody id="papCatalogItemsBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter catalog items in sub-modal */
+  window.filterPAPCatalogItems = function(text) {
+    const tbody = document.getElementById('papCatalogItemsBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from catalog into PAP items */
+  window.selectPAPItemFromCatalog = async function(itemId, rowEl) {
+    try {
+      let allItems = window._ppmpItemsCache || [];
+      if (!allItems.length) {
+        try { allItems = await apiRequest('/items'); } catch(e) {}
+      }
+      const item = allItems.find(i => i.id === itemId);
+      if (!item) { alert('Item not found'); return; }
+
+      // Check for duplicates
+      if (window._papSelectedItems && window._papSelectedItems.some(si => si.item_id === itemId)) {
+        alert('This item is already added.');
+        return;
+      }
+
+      const entry = {
+        id: null,
+        item_id: item.id,
+        item_code: item.code || '',
+        item_name: item.name || '',
+        description: item.description || '',
+        category: item.category || '',
+        product_category: item.category || '',
+        account_code: item.uacs_code || '',
+        product_description: item.name || item.description || '',
+        available_at: item.procurement_source === 'PS-DBM' ? 'PS-DBM' : 'Non-PSDBM',
+        quantity: 1,
+        uom: item.unit || 'lot',
+        unit: item.unit || 'lot',
+        unit_price: parseFloat(item.unit_price || 0),
+        total_amount: parseFloat(item.unit_price || 0),
+        budget: parseFloat(item.unit_price || 0),
+        procurement_source: 'PAPs',
+        is_manual: false
+      };
+
+      if (!window._papSelectedItems) window._papSelectedItems = [];
+      window._papSelectedItems.push(entry);
+      renderPAPModalItemsList();
+
+      // Close sub-modal
+      const overlay = document.getElementById('papItemSelectOverlay');
+      if (overlay) overlay.remove();
+    } catch (err) {
+      alert('Error selecting item: ' + err.message);
+    }
+  };
+
+  /** Render PAP items list - manual entry style (like Manual NON-PS-DBM) */
+  window.renderPAPManualItemsList = function() {
+    const tbody = document.getElementById('papItemsListBody');
+    const container = document.getElementById('papItemsListContainer');
+    const countEl = document.getElementById('papItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+
+    const items = window._papSelectedItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      const lineBudget = (parseFloat(it.unit_price) || 0) * (parseInt(it.quantity) || 1);
+      it.budget = lineBudget;
+      it.total_amount = lineBudget;
+      totalBudget += lineBudget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name || it.product_description || '') + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description || '') + '</td>' +
+        '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit || it.uom || '') + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updatePAPManualItemUnit(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + (parseFloat(it.unit_price) || 0).toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updatePAPItemPrice(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + (parseInt(it.quantity) || 1) + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updatePAPItemQty(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:right;font-weight:600;font-size:11px;">\u20b1' + lineBudget.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;"><button type="button" class="btn btn-sm" onclick="removePAPItem(' + idx + ')" style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove"><i class="fas fa-times"></i></button></td>' +
+        '</tr>';
+    }).join('');
+
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: \u20b1' + totalBudget.toLocaleString('en-PH',{minimumFractionDigits:2});
+  };
+
+  /** Alias - keep renderPAPModalItemsList working for backward compatibility */
+  window.renderPAPModalItemsList = window.renderPAPManualItemsList;
+
+  /** Update PAP manual item unit */
+  window.updatePAPManualItemUnit = function(index, val) {
+    if (!window._papSelectedItems || !window._papSelectedItems[index]) return;
+    window._papSelectedItems[index].unit = val;
+    window._papSelectedItems[index].uom = val;
+  };
+
+  /** Add a manual PAP item row (not from catalog) */
+  window.addManualPAPItem = function() {
+    const name = document.getElementById('papManualItemName')?.value?.trim();
+    if (!name) { alert('Please enter the PAP Name.'); return; }
+    const unit = document.getElementById('papManualItemUnit')?.value || '';
+    if (!unit) { alert('Please select a unit.'); return; }
+    const unitPrice = parseFloat(document.getElementById('papManualItemPrice')?.value);
+    if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
+    const qty = Math.max(1, parseInt(document.getElementById('papManualItemQty')?.value) || 1);
+    const desc = document.getElementById('papManualItemDesc')?.value?.trim() || '';
+    const budgetOverride = parseFloat(document.getElementById('papManualEstBudget')?.value);
+    const budget = (!isNaN(budgetOverride) && budgetOverride > 0) ? budgetOverride : unitPrice * qty;
+
+    if (!window._papSelectedItems) window._papSelectedItems = [];
+    window._papSelectedItems.push({
+      id: null,
+      item_id: null,
+      item_code: '',
+      product_category: '',
+      account_code: '',
+      product_description: name + (desc ? ' - ' + desc : ''),
+      item_name: name,
+      description: desc,
+      category: '',
+      available_at: 'PAPs',
+      quantity: qty,
+      uom: unit,
+      unit: unit,
+      unit_price: unitPrice,
+      total_amount: budget,
+      budget: budget,
+      procurement_source: 'PAPs',
+      is_manual: true
+    });
+    renderPAPManualItemsList();
+
+    // Clear inputs for next entry
+    document.getElementById('papManualItemName').value = '';
+    document.getElementById('papManualItemDesc').value = '';
+    document.getElementById('papManualItemUnit').value = '';
+    document.getElementById('papManualItemPrice').value = '';
+    document.getElementById('papManualItemQty').value = '1';
+    const estBudget = document.getElementById('papManualEstBudget');
+    if (estBudget) {
+      estBudget.value = '0';
+      delete estBudget.dataset.manualEdit; // Reset manual edit flag for next entry
+    }
+    document.getElementById('papManualItemName').focus();
+  };
+
+  /** Calculate estimated budget for PAP manual entry form */
+  window.calcPAPEstBudget = function() {
+    const el = document.getElementById('papManualEstBudget');
+    // Skip auto-calculation if user manually edited the budget
+    if (el && el.dataset.manualEdit === 'true') return;
+    const price = parseFloat(document.getElementById('papManualItemPrice')?.value) || 0;
+    const qty = parseInt(document.getElementById('papManualItemQty')?.value) || 1;
+    if (el) el.value = (price * qty).toFixed(2);
+  };
+
+  /** Sync PAP price/qty when user manually edits budget */
+  window.syncPAPBudgetFromEdit = function() {
+    // Mark that user has manually edited the budget - don't auto-recalc anymore
+    const el = document.getElementById('papManualEstBudget');
+    if (el) el.dataset.manualEdit = 'true';
+  };
+
+  /** Calculate estimated budget for Non-PSDBM manual entry form */
+  window.calcManualEstBudget = function() {
+    const el = document.getElementById('manualEstBudget');
+    // Skip auto-calculation if user manually edited the budget
+    if (el && el.dataset.manualEdit === 'true') return;
+    const price = parseFloat(document.getElementById('manualItemPrice')?.value) || 0;
+    const qty = parseInt(document.getElementById('manualItemQty')?.value) || 1;
+    if (el) el.value = (price * qty).toFixed(2);
+  };
+
+  /** Sync manual budget when user manually edits budget */
+  window.syncManualBudgetFromEdit = function() {
+    // Mark that user has manually edited the budget - don't auto-recalc anymore
+    const el = document.getElementById('manualEstBudget');
+    if (el) el.dataset.manualEdit = 'true';
+  };
+
+  /** Remove a PAP item */
+  window.removePAPItem = function(index) {
+    if (!window._papSelectedItems) return;
+    window._papSelectedItems.splice(index, 1);
+    renderPAPModalItemsList();
+  };
+
+  /** Update PAP item quantity */
+  window.updatePAPItemQty = function(index, val) {
+    if (!window._papSelectedItems || !window._papSelectedItems[index]) return;
+    window._papSelectedItems[index].quantity = Math.max(0, parseFloat(val) || 0);
+    renderPAPModalItemsList();
+  };
+
+  /** Update PAP item price */
+  window.updatePAPItemPrice = function(index, val) {
+    if (!window._papSelectedItems || !window._papSelectedItems[index]) return;
+    window._papSelectedItems[index].unit_price = Math.max(0, parseFloat(val) || 0);
+    renderPAPModalItemsList();
+  };
+
+  /** Update any PAP item field (for manual items) */
+  window.updatePAPItemField = function(index, field, val) {
+    if (!window._papSelectedItems || !window._papSelectedItems[index]) return;
+    window._papSelectedItems[index][field] = val;
+  };
+
+  /** Filter PAP items in modal */
+  window.filterPAPItemsInModal = function(text) {
+    const tbody = document.getElementById('papItemsListBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Collect PAP form data */
+  function collectPAPFormData() {
+    const divSelect = document.getElementById('papDivision');
+    const divHidden = document.querySelector('input[name="pap_division"]');
+    const deptId = divSelect ? divSelect.value : (divHidden ? divHidden.value : '');
+
+    return {
+      pap_name: document.getElementById('papName')?.value?.trim() || '',
+      description: document.getElementById('papDescription')?.value?.trim() || '',
+      dept_id: deptId ? parseInt(deptId) || deptIdMap[deptId] || null : null,
+      fiscal_year: parseInt(document.getElementById('papFiscalYear')?.value) || new Date().getFullYear(),
+      estimated_budget: parseFloat(document.getElementById('papEstimatedBudget')?.value) || 0,
+      account_code: document.getElementById('papAccountCode')?.value?.trim() || null,
+      centralize: document.getElementById('papCentralize')?.checked || false,
+      period_jan: document.getElementById('papPeriodJan')?.checked || false,
+      period_feb: document.getElementById('papPeriodFeb')?.checked || false,
+      period_mar: document.getElementById('papPeriodMar')?.checked || false,
+      period_apr: document.getElementById('papPeriodApr')?.checked || false,
+      period_may: document.getElementById('papPeriodMay')?.checked || false,
+      period_jun: document.getElementById('papPeriodJun')?.checked || false,
+      period_jul: document.getElementById('papPeriodJul')?.checked || false,
+      period_aug: document.getElementById('papPeriodAug')?.checked || false,
+      period_sep: document.getElementById('papPeriodSep')?.checked || false,
+      period_oct: document.getElementById('papPeriodOct')?.checked || false,
+      period_nov: document.getElementById('papPeriodNov')?.checked || false,
+      period_dec: document.getElementById('papPeriodDec')?.checked || false,
+      items: (window._papSelectedItems || []).map(it => ({
+        id: it.id || null,
+        item_id: it.item_id || null,
+        item_code: it.item_code || null,
+        product_category: it.product_category || null,
+        account_code: it.account_code || null,
+        product_description: it.product_description || null,
+        available_at: it.available_at || null,
+        quantity: parseFloat(it.quantity || 0),
+        uom: it.uom || null,
+        unit_price: parseFloat(it.unit_price || 0),
+        total_amount: parseFloat(it.total_amount || 0),
+        procurement_source: it.procurement_source || 'PAPs'
+      }))
+    };
+  }
+
+  /** Save new PAP */
+  window.saveNewPAP = async function(e) {
+    e.preventDefault();
+    const data = collectPAPFormData();
+    if (!data.pap_name) { alert('Please enter the PAP Name.'); return; }
+    if (!confirm(`Create PAP "${data.pap_name}" with ${data.items.length} items and estimated budget of ₱${parseFloat(data.estimated_budget).toLocaleString('en-PH', {minimumFractionDigits:2})}?`)) return;
+
+    try {
+      await apiRequest('/paps', 'POST', data);
+      alert('PAP created successfully!');
+      closeModal();
+      loadPAPs();
+    } catch (err) {
+      alert('Error creating PAP: ' + err.message);
+    }
+  };
+
+  /** Update existing PAP */
+  window.updatePAP = async function(e, papId) {
+    e.preventDefault();
+    const data = collectPAPFormData();
+    if (!data.pap_name) { alert('Please enter the PAP Name.'); return; }
+    if (!confirm(`Save changes to PAP "${data.pap_name}"?`)) return;
+
+    try {
+      await apiRequest('/paps/' + papId, 'PUT', data);
+      alert('PAP updated successfully!');
+      closeModal();
+      loadPAPs();
+    } catch (err) {
+      alert('Error updating PAP: ' + err.message);
+    }
+  };
+
+  /** Remove PAP */
+  window.removePAP = async function(papId, papName) {
+    if (!confirm(`Are you sure you want to remove PAP "${papName}"?`)) return;
+    try {
+      await apiRequest('/paps/' + papId, 'DELETE');
+      alert('PAP removed.');
+      loadPAPs();
+    } catch (err) {
+      alert('Error removing PAP: ' + err.message);
+    }
+  };
+
+  /** Show Set MOP Modal */
+  window.showSetMOPModal = async function(papId, currentMOP) {
+    await ensureProcModesLoaded();
+    const html = `
+      <form onsubmit="savePAPMOP(event, ${papId})">
+        <div class="info-banner" style="margin-bottom:16px;background:#e8f5e9;border-left:4px solid #28a745;padding:10px 14px;">
+          <i class="fas fa-gavel" style="color:#28a745;"></i>
+          <strong>Set Mode of Procurement (MOP)</strong>
+        </div>
+        <div class="form-group">
+          <label>Mode of Procurement <span class="text-danger">*</span></label>
+          <select class="form-select" id="papMOPSelect" required>
+            ${buildProcModeOptions(currentMOP || 'Small Value Procurement')}
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#28a745;border-color:#28a745;">
+            <i class="fas fa-save"></i> Save MOP
+          </button>
+        </div>
+      </form>
+    `;
+    openModal('Set MOP', html);
+  };
+
+  /** Save PAP MOP */
+  window.savePAPMOP = async function(e, papId) {
+    e.preventDefault();
+    const mop = document.getElementById('papMOPSelect')?.value;
+    if (!mop) { alert('Please select a Mode of Procurement.'); return; }
+    try {
+      await apiRequest('/paps/' + papId + '/mop', 'PUT', { mop });
+      alert('MOP updated successfully!');
+      closeModal();
+      loadPAPs();
+    } catch (err) {
+      alert('Error updating MOP: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // END PAP MANAGEMENT
+  // =====================================================
+
+  // =====================================================
+  // DATE FORMAT UTILITIES — "Month YYYY" format
+  // =====================================================
+  /** Convert YYYY-MM, MM/YYYY, or text to "Month YYYY" (e.g., "June 2026"). Returns '-' for display, empty for save. */
+  window.formatMonthYear = function(val, forDisplay) {
+    if (!val) return forDisplay ? '-' : '';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    // YYYY-MM
+    if (/^\d{4}-\d{2}$/.test(val)) {
+      const [y, m] = val.split('-');
+      return months[parseInt(m) - 1] + ' ' + y;
+    }
+    // MM/YYYY
+    if (/^\d{2}\/\d{4}$/.test(val)) {
+      const [m, y] = val.split('/');
+      return months[parseInt(m) - 1] + ' ' + y;
+    }
+    return val;
+  };
+
+  /** Convert any date format to YYYY-MM for <input type="month"> */
+  window.parseMonthYearToInput = function(val) {
+    if (!val) return '';
+    if (/^\d{4}-\d{2}$/.test(val)) return val;
+    if (/^\d{2}\/\d{4}$/.test(val)) {
+      const [m, y] = val.split('/');
+      return y + '-' + m;
+    }
+    const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const short = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const parts = val.trim().split(/\s+/);
+    if (parts.length === 2) {
+      const mStr = parts[0].toLowerCase();
+      const y = parts[1];
+      let idx = months.indexOf(mStr);
+      if (idx === -1) idx = short.indexOf(mStr);
+      if (idx !== -1) return y + '-' + String(idx + 1).padStart(2, '0');
+    }
+    return '';
+  };
+
+  // =====================================================
+  // MANUAL CATALOG ITEM FUNCTIONS
+  // =====================================================
+
+  /** Toggle custom category input visibility */
+  window.toggleManualCategoryCustom = function() {
+    const sel = document.getElementById('manualItemCategory');
+    const custom = document.getElementById('manualItemCategoryCustom');
+    if (sel && custom) {
+      custom.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+    }
+  };
+  /** Toggle custom category input visibility for PAP manual items */
+  window.togglePAPManualCategoryCustom = function() {
+    const sel = document.getElementById('papManualItemCategory');
+    const custom = document.getElementById('papManualItemCategoryCustom');
+    if (sel && custom) {
+      custom.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+    }
+  };
+  // Attach onchange after DOM ready
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'manualItemCategory') toggleManualCategoryCustom();
+    if (e.target && e.target.id === 'papManualItemCategory') togglePAPManualCategoryCustom();
+  });
+
+  /** Add a manual item to the unified list (not from catalog) */
+  window.addManualCatalogItemToList = function() {
+    const name = document.getElementById('manualItemName')?.value?.trim();
+    if (!name) { alert('Please enter the item name.'); return; }
+    const unit = document.getElementById('manualItemUnit')?.value || '';
+    if (!unit) { alert('Please select a unit.'); return; }
+    const unitPrice = parseFloat(document.getElementById('manualItemPrice')?.value);
+    if (isNaN(unitPrice) || unitPrice < 0) { alert('Please enter a valid unit price.'); return; }
+    const qty = Math.max(1, parseInt(document.getElementById('manualItemQty')?.value) || 1);
+    const desc = document.getElementById('manualItemDesc')?.value?.trim() || '';
+    const budgetOverride = parseFloat(document.getElementById('manualEstBudget')?.value);
+    const budget = (!isNaN(budgetOverride) && budgetOverride > 0) ? budgetOverride : unitPrice * qty;
+    const actualSource = 'NON PS-DBM';
+
+    const entry = {
+      item_id: null,
+      item_name: name,
+      item_code: '',
+      item_unit: unit,
+      item_category: '',
+      item_description: desc,
+      description: name + (desc ? ' - ' + desc : ''),
+      unit: unit,
+      unit_price: unitPrice,
+      quantity: qty,
+      budget: budget,
+      procurement_source: actualSource,
+      is_manual: true
+    };
+
+    // Add to unified selected items list
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+    window._ppmpSelectedItems.push(entry);
+    renderPPMPItemsList();
+
+    // Clear inputs for next entry
+    document.getElementById('manualItemName').value = '';
+    document.getElementById('manualItemDesc').value = '';
+    document.getElementById('manualItemUnit').value = '';
+    document.getElementById('manualItemPrice').value = '';
+    document.getElementById('manualItemQty').value = '1';
+    const estBudget = document.getElementById('manualEstBudget');
+    if (estBudget) {
+      estBudget.value = '0';
+      delete estBudget.dataset.manualEdit; // Reset manual edit flag for next entry
+    }
+    document.getElementById('manualItemName').focus();
+  };
+
+  /** Remove a manual item */
+  window.removeManualCatalogItem = function(index) {
+    if (!window._ppmpManualItems) return;
+    window._ppmpManualItems.splice(index, 1);
+    renderManualCatalogItemsList();
+  };
+
+  /** Update manual item quantity */
+  window.updateManualItemQty = function(index, qty) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._ppmpManualItems[index].quantity = q;
+    window._ppmpManualItems[index].budget = q * window._ppmpManualItems[index].unit_price;
+    renderManualCatalogItemsList();
+  };
+
+  /** Update manual item unit */
+  window.updateManualItemUnit = function(index, val) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    window._ppmpManualItems[index].unit = val;
+  };
+
+  /** Update manual item price */
+  window.updateManualItemPrice = function(index, price) {
+    if (!window._ppmpManualItems || !window._ppmpManualItems[index]) return;
+    const p = Math.max(0, parseFloat(price) || 0);
+    window._ppmpManualItems[index].unit_price = p;
+    window._ppmpManualItems[index].budget = window._ppmpManualItems[index].quantity * p;
+    renderManualCatalogItemsList();
+  };
+
+  /** Render the manual items list */
+  window.renderManualCatalogItemsList = function() {
+    const tbody = document.getElementById('ppmpManualItemsListBody');
+    const container = document.getElementById('ppmpManualItemsListContainer');
+    const countEl = document.getElementById('ppmpManualItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+    const items = window._ppmpManualItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      if (totalEl) totalEl.textContent = '';
+      return;
+    }
+    if (container) container.style.display = 'block';
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      return '<tr>' +
+        '<td style="text-align:center;color:#888;">' + (idx+1) + '</td>' +
+        '<td style="font-weight:600;font-size:11px;">' + escapeHtml(it.item_name) + '</td>' +
+        '<td style="font-size:11px;">' + escapeHtml(it.description) + '</td>' +
+        '<td style="text-align:center;"><input type="text" value="' + escapeHtml(it.unit) + '" style="width:55px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;" onchange="updateManualItemUnit(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + it.unit_price.toFixed(2) + '" min="0" step="0.01" style="width:80px;font-size:11px;text-align:right;padding:2px 4px;" onchange="updateManualItemPrice(' + idx + ', this.value)"></td>' +
+        '<td><input type="number" value="' + it.quantity + '" min="1" step="1" style="width:60px;font-size:11px;text-align:center;padding:2px 4px;" onchange="updateManualItemQty(' + idx + ', this.value)"></td>' +
+        '<td style="text-align:right;font-weight:600;font-size:11px;">₱' + it.budget.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;"><button type="button" class="btn btn-sm" onclick="removeManualCatalogItem(' + idx + ')" style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove"><i class="fas fa-times"></i></button></td>' +
+        '</tr>';
+    }).join('');
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH',{minimumFractionDigits:2});
+  };
+
+  // =====================================================
+  // CATALOG ITEM PICKER MODAL FOR PPMP (PS-DBM / NON PS-DBM)
+  // =====================================================
+
+  /** Open a modal to select catalog items for PPMP (similar to PAP item picker) */
+  /**
+   * Quick-add an item NOT in catalog to the PPMP items list (auto-categorized as NON PS-DBM)
+   */
+  window.addPPMPQuickItem = function() {
+    const nameEl = document.getElementById('ppmpQuickAddName');
+    const descEl = document.getElementById('ppmpQuickAddDesc');
+    const unitEl = document.getElementById('ppmpQuickAddUnit');
+    const priceEl = document.getElementById('ppmpQuickAddPrice');
+    const name = (nameEl?.value || '').trim();
+    if (!name) { alert('Please enter an item name.'); nameEl?.focus(); return; }
+    const unitPrice = parseFloat(priceEl?.value || 0) || 0;
+    const unit = unitEl?.value || 'unit';
+    const desc = (descEl?.value || '').trim();
+    const entry = {
+      item_id: null,
+      item_name: name,
+      item_code: '',
+      item_unit: unit,
+      item_category: '',
+      item_description: desc,
+      description: desc || name,
+      unit_price: unitPrice,
+      quantity: 1,
+      budget: unitPrice,
+      procurement_source: 'NON PS-DBM',
+      is_quick_add: true
+    };
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+    window._ppmpSelectedItems.push(entry);
+    renderPPMPItemsList();
+    // Clear quick-add inputs
+    if (nameEl) nameEl.value = '';
+    if (descEl) descEl.value = '';
+    if (priceEl) priceEl.value = '';
+    showToast('Item added: ' + name, 'success');
+  };
+
+  window.showPPMPCatalogItemModal = function() {
+    const allItems = window._ppmpItemsCache || [];
+    const sourceFilter = window._ppmpCatalogSourceFilter || 'NON PS-DBM';
+    const catFilter = document.getElementById('ppmpCategoryFilterModal')?.value || '';
+
+    // Filter items by procurement source and optionally category
+    let filteredItems = allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === sourceFilter);
+    if (catFilter) {
+      filteredItems = filteredItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+
+    const itemRows = filteredItems.map(item => {
+      const alreadyAdded = (window._ppmpSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? ' already-added' : '') + '" onclick="' + (alreadyAdded ? '' : 'selectPPMPCatalogItem(' + item.id + ', this)') + '" style="cursor:' + (alreadyAdded ? 'default' : 'pointer') + ';' + (alreadyAdded ? 'opacity:0.5;' : '') + '">' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + parseInt(item.quantity || 0).toLocaleString() + '</td>' +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : '') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const modalTitle = sourceFilter === 'PS-DBM' ? 'Select PS-DBM Item' : 'Select NON PS-DBM Item';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ppmpCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> ${modalTitle}</h4>
+          <button onclick="document.getElementById('ppmpCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="ppmpCatalogModalSearch" placeholder="Search by item code, name, category, description..."
+            oninput="filterPPMPCatalogModalItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Unit</th>
+              <th>Unit Price</th>
+              <th>Qty Available</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="ppmpCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items in the PPMP catalog modal */
+  window.filterPPMPCatalogModalItems = function(text) {
+    const tbody = document.getElementById('ppmpCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into PPMP items list */
+  window.selectPPMPCatalogItem = function(itemId, rowEl) {
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
+
+    // Prevent duplicates
+    if ((window._ppmpSelectedItems || []).some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.');
+      return;
+    }
+
+    const description = typeof buildItemDescription === 'function' ? buildItemDescription(item) : (item.description || item.name || '');
+    const unitPrice = parseFloat(item.unit_price || 0);
+
+    // Auto-set section and category
+    const catField = document.getElementById('ppmpCategory');
+    const sectionField = document.getElementById('ppmpSection');
+    if (catField && item.category) catField.value = item.category;
+    if (sectionField && item.category) {
+      const autoSection = (typeof CATEGORY_TO_SECTION !== 'undefined' && CATEGORY_TO_SECTION[item.category]) || 'GENERAL PROCUREMENT';
+      sectionField.value = autoSection;
+    }
+
+    const sourceSelect = document.getElementById('ppmpProcurementSource');
+    const procSource = sourceSelect ? sourceSelect.value : (item.procurement_source || 'NON PS-DBM');
+
+    const entry = {
+      item_id: parseInt(itemId),
+      item_name: item.name || '',
+      item_code: item.code || '',
+      item_unit: item.unit || '',
+      item_category: item.category || '',
+      item_description: item.description || '',
+      description: description,
+      unit_price: unitPrice,
+      quantity: 1,
+      budget: unitPrice,
+      procurement_source: procSource
+    };
+    if (!window._ppmpSelectedItems) window._ppmpSelectedItems = [];
+    window._ppmpSelectedItems.push(entry);
+
+    renderPPMPItemsList();
+
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+  };
+
+  /**
+   * Remove an item from the PPMP items list by index.
+   */
+  window.removePPMPItem = function(index) {
+    window._ppmpSelectedItems.splice(index, 1);
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Update quantity for an item in the list and recalculate budget.
+   */
+  window.updatePPMPItemQty = function(index, qty) {
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._ppmpSelectedItems[index].quantity = q;
+    window._ppmpSelectedItems[index].budget = q * window._ppmpSelectedItems[index].unit_price;
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Allow manual editing of the unit price for an item in the list.
+   */
+  window.updatePPMPItemPrice = function(index, price) {
+    const p = Math.max(0, parseFloat(price) || 0);
+    window._ppmpSelectedItems[index].unit_price = p;
+    window._ppmpSelectedItems[index].budget = window._ppmpSelectedItems[index].quantity * p;
+    renderPPMPItemsList();
+  };
+
+  /**
+   * Allow editing the description/specifications for an item in the list.
+   */
+  window.updatePPMPItemDesc = function(index, desc) {
+    if (!window._ppmpSelectedItems || !window._ppmpSelectedItems[index]) return;
+    window._ppmpSelectedItems[index].item_description = desc;
+    window._ppmpSelectedItems[index].description = desc;
+  };
+
+  /**
+   * Render the selected items list table and update totals.
+   */
+  window.renderPPMPItemsList = function() {
+    const tbody = document.getElementById('ppmpItemsListBody');
+    const container = document.getElementById('ppmpItemsListContainer');
+    const countEl = document.getElementById('ppmpItemCount');
+    const totalEl = document.getElementById('ppmpTotalDisplay');
+    if (!tbody) return;
+
+    const items = window._ppmpSelectedItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      if (totalEl) totalEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+
+    let totalBudget = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      totalBudget += it.budget;
+      const descText = it.item_description || it.description || '';
+      return `<tr>
+        <td style="text-align:center; color:#888;">${idx + 1}</td>
+        <td style="font-weight:600; font-size:11px;">${it.item_code ? escapeHtml(it.item_code) + ' - ' : ''}${escapeHtml(it.item_name)}</td>
+        <td style="max-width:180px;"><textarea rows="2" style="width:100%;font-size:10px;padding:2px 4px;resize:vertical;"
+              oninput="updatePPMPItemDesc(${idx}, this.value)">${escapeHtml(descText)}</textarea></td>
+        <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
+        <td><input type="text" inputmode="decimal" value="${it.unit_price.toFixed(2)}" 
+              style="width:80px; font-size:11px; text-align:right; padding:2px 4px;"
+              oninput="updatePPMPItemPrice(${idx}, this.value)"></td>
+        <td><input type="number" value="${it.quantity}" min="1" step="1" 
+              style="width:60px; font-size:11px; text-align:center; padding:2px 4px;"
+              oninput="updatePPMPItemQty(${idx}, this.value)"></td>
+        <td style="text-align:right; font-weight:600; font-size:11px;">₱${it.budget.toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+        <td style="text-align:center;">
+          <button type="button" class="btn btn-sm" onclick="removePPMPItem(${idx})" 
+            style="color:#e53e3e; background:none; border:none; cursor:pointer; padding:2px 6px;" title="Remove">
+            <i class="fas fa-times"></i>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl) totalEl.textContent = 'Total: ₱' + totalBudget.toLocaleString('en-PH', {minimumFractionDigits:2});
+  };
+
+  // =====================================================
+  // GENERIC CATALOG ITEM PICKER (for PR, RFQ, PO, IAR)
+  // =====================================================
+  window._docSelectedItems = {};
+
+  /** Build category filter options from items array */
+  window.buildCatalogCategoryOptions = function(allItems) {
+    return [...new Set(allItems.map(i => i.category).filter(Boolean))].sort()
+      .map(c => '<option value="' + c + '">' + c + '</option>').join('');
+  };
+
+  /** Build item select options from items array with data attributes */
+  window.buildCatalogItemOptions = function(allItems) {
+    return allItems.map(i =>
+      '<option value="' + i.id + '" data-unit="' + (i.unit || '') + '" data-price="' + (i.unit_price || 0) +
+      '" data-desc="' + (i.description || '').replace(/"/g, '&quot;') +
+      '" data-name="' + (i.name || '').replace(/"/g, '&quot;') +
+      '" data-category="' + (i.category || '').replace(/"/g, '&quot;') +
+      '">' + (i.code || '') + ' - ' + (i.name || '') + ' (' + (i.unit || '') +
+      ' @ \u20b1' + parseFloat(i.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')</option>'
+    ).join('');
+  };
+
+  /** Build the complete catalog picker HTML section for a given prefix (modal-based) */
+  window.buildCatalogPickerHTML = function(prefix, categoryOptions, itemOptions, showPrice) {
+    if (showPrice === undefined) showPrice = true;
+    // Store showPrice preference per prefix for modal/render use
+    if (!window._docPrefixShowPrice) window._docPrefixShowPrice = {};
+    window._docPrefixShowPrice[prefix] = showPrice;
+    const priceHeaders = showPrice
+      ? '<th style="width:90px;">Unit Price</th><th style="width:90px;">Total</th>'
+      : '';
+    return '<div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>' +
+      '<div style="margin-bottom:12px;">' +
+        '<button type="button" class="btn btn-primary" onclick="showDocCatalogItemModal(\'' + prefix + '\')" style="width:100%;padding:10px 20px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">' +
+          '<i class="fas fa-search"></i> Select from Items Catalog</button>' +
+      '</div>' +
+      '<span id="' + prefix + 'ItemCount" style="font-size:12px; color:#4a5568;"></span>' +
+      '<div id="' + prefix + 'ItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">' +
+        '<table class="data-table full-width" style="font-size:11.5px; margin:0;">' +
+          '<thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">' +
+            '<th style="width:30px;">#</th>' +
+            '<th>Item Name</th>' +
+            '<th>Description</th>' +
+            '<th style="width:60px;">Unit</th>' +
+            priceHeaders +
+            '<th style="width:70px;">Qty</th>' +
+            '<th style="width:40px;"></th>' +
+          '</tr></thead>' +
+          '<tbody id="' + prefix + 'ItemsListBody"></tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div id="' + prefix + 'TotalDisplay" style="font-size:14px; font-weight:700; color:#1a365d; margin-bottom:10px;"></div>';
+  };
+
+  /** Build ONLY the catalog button (no items table) for inline placement */
+  window.buildCatalogButtonHTML = function(prefix) {
+    return '<button type="button" class="btn btn-primary" onclick="showDocCatalogItemModal(\'' + prefix + '\')" ' +
+      'style="width:100%;padding:10px 20px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">' +
+      '<i class="fas fa-search"></i> Select from Items Catalog</button>';
+  };
+
+  /** Build the items list table portion of the catalog picker (no button) */
+  window.buildCatalogItemsTableHTML = function(prefix, showPrice) {
+    if (showPrice === undefined) showPrice = true;
+    if (!window._docPrefixShowPrice) window._docPrefixShowPrice = {};
+    window._docPrefixShowPrice[prefix] = showPrice;
+    const priceHeaders = showPrice
+      ? '<th style="width:90px;">Unit Price</th><th style="width:90px;">Total</th>'
+      : '';
+    return '<span id="' + prefix + 'ItemCount" style="font-size:12px; color:#4a5568;"></span>' +
+      '<div id="' + prefix + 'ItemsListContainer" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px; display:none;">' +
+        '<table class="data-table full-width" style="font-size:11.5px; margin:0;">' +
+          '<thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">' +
+            '<th style="width:30px;">#</th>' +
+            '<th>Item Name</th>' +
+            '<th>Description</th>' +
+            '<th style="width:60px;">Unit</th>' +
+            priceHeaders +
+            '<th style="width:70px;">Qty</th>' +
+            '<th style="width:40px;"></th>' +
+          '</tr></thead>' +
+          '<tbody id="' + prefix + 'ItemsListBody"></tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div id="' + prefix + 'TotalDisplay" style="font-size:14px; font-weight:700; color:#1a365d; margin-bottom:10px;"></div>';
+  };
+
+  /** Show a modal catalog item picker for PR, RFQ, PO, IAR (any doc prefix) */
+  window.showDocCatalogItemModal = function(prefix) {
+    const allItems = window._ppmpItemsCache || [];
+    const selectedItems = window._docSelectedItems[prefix] || [];
+
+    const itemRows = allItems.map(item => {
+      const alreadyAdded = selectedItems.some(si => String(si.item_id) === String(item.id));
+      return '<tr class="doc-catalog-select-row' + (alreadyAdded ? ' already-added' : '') + '" ' +
+        'onclick="' + (alreadyAdded ? '' : "selectDocCatalogItem('" + prefix + "'," + item.id + ",this)") + '" ' +
+        'style="cursor:' + (alreadyAdded ? 'default' : 'pointer') + ';' + (alreadyAdded ? 'opacity:0.5;' : '') + '">' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td style="max-width:180px;font-size:11px;color:#4a5568;">' + escapeHtml(item.description || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + parseInt(item.quantity || 0).toLocaleString() + '</td>' +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : '') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'docCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:920px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Item from Catalog</h4>
+          <button onclick="document.getElementById('docCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="docCatalogModalSearch" placeholder="Search by item code, name, category, description..."
+            oninput="filterDocCatalogModalItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Unit</th>
+              <th>Unit Price</th>
+              <th>Stock</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="docCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items in the document catalog modal */
+  window.filterDocCatalogModalItems = function(text) {
+    const tbody = document.getElementById('docCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into a document's item list */
+  window.selectDocCatalogItem = function(prefix, itemId, rowEl) {
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
+    if (!window._docSelectedItems[prefix]) window._docSelectedItems[prefix] = [];
+    if (window._docSelectedItems[prefix].some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.'); return;
+    }
+    const description = typeof buildItemDescription === 'function' ? buildItemDescription(item) : (item.description || item.name || '');
+    const unitPrice = parseFloat(item.unit_price || 0);
+    window._docSelectedItems[prefix].push({
+      item_id: parseInt(itemId),
+      item_name: item.name || '',
+      item_code: item.code || '',
+      item_unit: item.unit || '',
+      item_category: item.category || '',
+      item_description: item.description || '',
+      description: description,
+      unit_price: unitPrice,
+      quantity: 1,
+      total: unitPrice
+    });
+    renderDocItemsList(prefix);
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+  };
+
+  /** Ensure items catalog is loaded into cache */
+  window.ensureItemsCatalogLoaded = async function() {
+    if (window._ppmpItemsCache && window._ppmpItemsCache.length > 0) return window._ppmpItemsCache;
+    try {
+      const allItems = await apiRequest('/items');
+      window._ppmpItemsCache = allItems;
+      return allItems;
+    } catch(e) {
+      console.warn('Could not load items catalog:', e);
+      return [];
+    }
+  };
+
+  /** Filter catalog dropdown by category for any document prefix */
+  window.filterDocItemsByCategory = function(prefix, category) {
+    const itemSelect = document.getElementById(prefix + 'ItemSelect');
+    if (!itemSelect) return;
+    const allItems = window._ppmpItemsCache || [];
+    const filtered = category ? allItems.filter(i => (i.category || '').toUpperCase() === category.toUpperCase()) : allItems;
+    const items = filtered.length > 0 ? filtered : allItems;
+    itemSelect.innerHTML = '<option value="">-- Select Item --</option>' + buildCatalogItemOptions(items);
+  };
+
+  /** Add selected catalog item to a document's item list */
+  window.addDocItemToList = function(prefix) {
+    const itemSelect = document.getElementById(prefix + 'ItemSelect');
+    if (!itemSelect || !itemSelect.value) { alert('Please select an item from the catalog first.'); return; }
+    const itemId = itemSelect.value;
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => String(i.id) === String(itemId));
+    if (!item) { alert('Item not found in catalog.'); return; }
+    if (!window._docSelectedItems[prefix]) window._docSelectedItems[prefix] = [];
+    if (window._docSelectedItems[prefix].some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.'); return;
+    }
+    const description = buildItemDescription(item);
+    const unitPrice = parseFloat(item.unit_price || 0);
+    window._docSelectedItems[prefix].push({
+      item_id: parseInt(itemId),
+      item_name: item.name || '',
+      item_code: item.code || '',
+      item_unit: item.unit || '',
+      item_category: item.category || '',
+      item_description: item.description || '',
+      description: description,
+      unit_price: unitPrice,
+      quantity: 1,
+      total: unitPrice
+    });
+    renderDocItemsList(prefix);
+    itemSelect.value = '';
+  };
+
+  /** Remove item from a document's item list */
+  window.removeDocItem = function(prefix, idx) {
+    if (!window._docSelectedItems[prefix]) return;
+    window._docSelectedItems[prefix].splice(idx, 1);
+    renderDocItemsList(prefix);
+  };
+
+  /** Update quantity for a document item */
+  window.updateDocItemQty = function(prefix, idx, qty) {
+    if (!window._docSelectedItems[prefix]) return;
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._docSelectedItems[prefix][idx].quantity = q;
+    window._docSelectedItems[prefix][idx].total = q * window._docSelectedItems[prefix][idx].unit_price;
+    renderDocItemsList(prefix);
+  };
+
+  /** Update unit price for a document item */
+  window.updateDocItemPrice = function(prefix, idx, price) {
+    if (!window._docSelectedItems[prefix]) return;
+    const p = Math.max(0, parseFloat(price) || 0);
+    window._docSelectedItems[prefix][idx].unit_price = p;
+    window._docSelectedItems[prefix][idx].total = window._docSelectedItems[prefix][idx].quantity * p;
+    renderDocItemsList(prefix);
+  };
+
+  /** Render the catalog items list table for a given document prefix */
+  window.renderDocItemsList = function(prefix) {
+    const tbody = document.getElementById(prefix + 'ItemsListBody');
+    const container = document.getElementById(prefix + 'ItemsListContainer');
+    const countEl = document.getElementById(prefix + 'ItemCount');
+    const totalEl = document.getElementById(prefix + 'TotalDisplay');
+    if (!tbody) return;
+    const items = window._docSelectedItems[prefix] || [];
+    const showPrice = (prefix !== 'iar');
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (countEl) countEl.textContent = '';
+      if (totalEl) totalEl.textContent = '';
+      return;
+    }
+    if (container) container.style.display = 'block';
+    let grandTotal = 0;
+    tbody.innerHTML = items.map((it, idx) => {
+      grandTotal += (it.total || 0);
+      const descLines = (it.description || '').split('\n');
+      const descDisplay = descLines.map((line, li) => {
+        const trimmed = line.trim();
+        if (li === 0) return '<strong style="font-size:11px;">' + escapeHtml(trimmed) + '</strong>';
+        return '<div style="font-size:10px; color:#4a5568; font-style:italic; padding-left:8px;">' + escapeHtml(trimmed) + '</div>';
+      }).join('');
+      const priceCols = showPrice
+        ? '<td><input type="number" value="' + it.unit_price.toFixed(2) + '" min="0" step="0.01" style="width:80px; font-size:11px; text-align:right; padding:2px 4px;" onchange="updateDocItemPrice(\'' + prefix + '\', ' + idx + ', this.value)"></td>' +
+          '<td style="text-align:right; font-weight:600; font-size:11px;">\u20b1' + (it.total || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>'
+        : '';
+      return '<tr>' +
+        '<td style="text-align:center; color:#888;">' + (idx + 1) + '</td>' +
+        '<td style="font-weight:600; font-size:11px;">' + escapeHtml(it.item_code) + ' - ' + escapeHtml(it.item_name) + '</td>' +
+        '<td style="max-width:180px;">' + descDisplay + '</td>' +
+        '<td style="text-align:center;">' + escapeHtml(it.item_unit) + '</td>' +
+        priceCols +
+        '<td><input type="number" value="' + it.quantity + '" min="1" step="1" style="width:60px; font-size:11px; text-align:center; padding:2px 4px;" onchange="updateDocItemQty(\'' + prefix + '\', ' + idx + ', this.value)"></td>' +
+        '<td style="text-align:center;"><button type="button" class="btn btn-sm" onclick="removeDocItem(\'' + prefix + '\', ' + idx + ')" style="color:#e53e3e; background:none; border:none; cursor:pointer; padding:2px 6px;" title="Remove"><i class="fas fa-times"></i></button></td>' +
+      '</tr>';
+    }).join('');
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+    if (totalEl && showPrice) totalEl.textContent = 'Total: \u20b1' + grandTotal.toLocaleString('en-PH', {minimumFractionDigits:2});
+    // Update document-specific total fields
+    if (prefix === 'pr') {
+      const prTotal = document.getElementById('prTotalAmount');
+      if (prTotal) prTotal.textContent = '\u20b1' + grandTotal.toLocaleString('en-PH', {minimumFractionDigits:2});
+      // Auto-populate item specifications from catalog item descriptions
+      const prItemSpecs = document.getElementById('prItemSpecs');
+      if (prItemSpecs && items.length > 0) {
+        const specsLines = items.map(it => it.item_description || it.description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0 && !prItemSpecs.value.trim()) {
+          prItemSpecs.value = specsLines.join('\n');
+        }
+      }
+    } else if (prefix === 'po') {
+      const poTotal = document.getElementById('poTotalAmount');
+      if (poTotal) poTotal.value = grandTotal.toFixed(2);
+    } else if (prefix === 'iar') {
+      // Auto-populate IAR item specifications from catalog item descriptions
+      const iarItemSpecs = document.getElementById('iarItemSpecs');
+      if (iarItemSpecs && items.length > 0) {
+        const specsLines = items.map(it => it.item_description || it.description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0 && !iarItemSpecs.value.trim()) {
+          iarItemSpecs.value = specsLines.join('\n');
+        }
+      }
+    }
+  };
+  // =====================================================
+  // END GENERIC CATALOG ITEM PICKER
+  // =====================================================
+
+  /** Auto-fill description, budget, and category from selected item (for edit modal single-item mode). */
+  window.autofillFromItem = function(itemId) {
+    if (!itemId) return;
+    const allItems = window._ppmpItemsCache || [];
+    const item = allItems.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+    const descField = document.getElementById('ppmpDescription');
+    const budgetField = document.getElementById('ppmpBudget');
+    const catField = document.getElementById('ppmpCategory');
+    const sectionField = document.getElementById('ppmpSection');
+
+    // Auto-fill category from item catalog category
+    if (catField && item.category) {
+      // Handle both <select> and <input type="hidden">
+      if (catField.tagName === 'SELECT') {
+        let found = false;
+        for (let i = 0; i < catField.options.length; i++) {
+          if (catField.options[i].value === item.category) { found = true; break; }
+        }
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = item.category;
+          opt.textContent = item.category;
+          catField.appendChild(opt);
+        }
+      }
+      catField.value = item.category;
+    }
+    // Auto-fill section from category→section mapping
+    if (sectionField && item.category) {
+      const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+      sectionField.value = autoSection;
+    }
+    // Build description in Excel PPMP bullet format
+    if (descField) {
+      descField.value = buildItemDescription(item);
+    }
+    if (budgetField && (!budgetField.value || budgetField.value === '0' || budgetField.value === '0.00')) {
+      budgetField.value = parseFloat(item.unit_price || 0).toFixed(2);
+    }
+  };
+
+  /**
+   * Save New Purchase Request
+   */
+  window.saveNewPR = async function(e) {
+    e.preventDefault();
+    const prNumber = document.getElementById('prNumber')?.value || '';
+    const prDate = document.getElementById('prDate')?.value || '';
+    const purpose = document.getElementById('prPurpose')?.value || '';
+
+    if (!purpose) { alert('Please enter the purpose.'); return; }
+
+    // Read items from catalog selection
+    const selectedItems = window._docSelectedItems['pr'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price,
+      category: si.item_category || 'general'
+    }));
+
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Are you sure you want to save this Purchase Request as Draft?')) return;
+
+    try {
+      const data = {
+        pr_number: prNumber,
+        purpose: purpose,
+        total_amount: totalAmount,
+        status: 'draft',
+        item_specifications: document.getElementById('prItemSpecs')?.value.trim() || null,
+        items: items
+      };
+      const result = await apiRequest('/purchase-requests', 'POST', data);
+      const prId = result.id || result.pr_id;
+      if (prId) {
+        await uploadAttachments('purchase_request', prId, [
+          { inputId: 'prRouteSlip', description: 'Route Slip / Annex 1' },
+          { inputId: 'prTechSpecs', description: 'Technical Specifications / TOR' }
+        ]);
+      }
+      showToast('Purchase Request saved as Draft!', 'success');
+      closeModal();
+      if (typeof loadPR === 'function') loadPR();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-requests');
+    } catch (err) {
+      alert('Error saving PR: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New RFQ
+   */
+  window.saveNewRFQ = async function(e) {
+    e.preventDefault();
+    const rfqNumber = document.getElementById('rfqNumber')?.value || '';
+    const rfqDate = document.getElementById('rfqDate')?.value || '';
+    const prId = document.getElementById('rfqLinkedPR')?.value || '';
+    const deadline = document.getElementById('rfqDeadline')?.value || '';
+    const supplierId = document.getElementById('rfqSupplierId')?.value || '';
+    const isManualSupplier = document.getElementById('rfqSupplierId')?.value === '__manual__';
+    const manualSupplierName = document.getElementById('rfqManualSupplierName')?.value?.trim() || '';
+    const manualSupplierAddress = document.getElementById('rfqCompanyAddress')?.value?.trim() || '';
+    const manualSupplierTin = document.getElementById('rfqTIN')?.value?.trim() || '';
+
+    // Read items from catalog selection
+    const selectedItems = window._docSelectedItems['rfq'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'RFQ-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      abc_unit_cost: si.unit_price
+    }));
+    const abcAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Save this RFQ as draft?')) return;
+
+    try {
+      const data = {
+        rfq_number: rfqNumber,
+        pr_id: prId ? parseInt(prId) : null,
+        date_prepared: rfqDate || null,
+        submission_deadline: deadline || null,
+        abc_amount: abcAmount,
+        status: 'draft',
+        item_specifications: document.getElementById('rfqItemSpecs')?.value.trim() || null,
+        items: items,
+        suppliers: !isManualSupplier && supplierId ? [{ supplier_id: parseInt(supplierId) }] : [],
+        manual_supplier_name: isManualSupplier ? manualSupplierName : null,
+        manual_supplier_address: isManualSupplier ? manualSupplierAddress : null,
+        manual_supplier_tin: isManualSupplier ? manualSupplierTin : null
+      };
+      const result = await apiRequest('/rfqs', 'POST', data);
+      const rfqId = result.id || result.rfq_id;
+      if (rfqId) {
+        await uploadAttachments('rfq', rfqId, [
+          { inputId: 'rfqDocument', description: 'RFQ Document (Signed)' },
+          { inputId: 'rfqTechSpecs', description: 'Technical Specifications / TOR' }
+        ]);
+      }
+      alert('RFQ saved as draft!');
+      closeModal();
+      if (typeof loadRFQ === 'function') loadRFQ();
+      else if (typeof loadPageData === 'function') loadPageData('rfq');
+    } catch (err) {
+      alert('Error saving RFQ: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New Abstract of Quotations
+   */
+  window.saveNewAbstract = async function(e) {
+    e.preventDefault();
+    const abstractNumber = document.getElementById('abstractNumber')?.value || '';
+    const abstractDate = document.getElementById('abstractDate')?.value || '';
+    const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
+    const purpose = document.getElementById('abstractPurpose')?.value || '';
+
+    // Gather supplier names from text inputs
+    const supplier1Name = document.getElementById('absSupplier1Id')?.value.trim() || '';
+    const supplier2Name = document.getElementById('absSupplier2Id')?.value.trim() || '';
+    const supplier3Name = document.getElementById('absSupplier3Id')?.value.trim() || '';
+
+    // Gather items from table rows
+    const itemRows = document.querySelectorAll('#abstractItemsBody tr');
+    const itemsData = [];
+    itemRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 10) return;
+      const qty = parseFloat(cells[0]?.querySelector('input')?.value) || 0;
+      const unit = cells[1]?.querySelector('select')?.value || '';
+      const desc = cells[2]?.querySelector('input')?.value || '';
+      const abc = parseFloat(cells[3]?.querySelector('input')?.value) || 0;
+      const s1UnitPrice = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
+      const s1Total = parseFloat(cells[5]?.querySelector('input')?.value) || 0;
+      const s2UnitPrice = parseFloat(cells[6]?.querySelector('input')?.value) || 0;
+      const s2Total = parseFloat(cells[7]?.querySelector('input')?.value) || 0;
+      const s3UnitPrice = parseFloat(cells[8]?.querySelector('input')?.value) || 0;
+      const s3Total = parseFloat(cells[9]?.querySelector('input')?.value) || 0;
+      if (desc.trim()) {
+        itemsData.push({ qty, unit, desc, abc, s1UnitPrice, s1Total, s2UnitPrice, s2Total, s3UnitPrice, s3Total });
+      }
+    });
+
+    // Calculate totals per supplier
+    let s1Total = 0, s2Total = 0, s3Total = 0;
+    itemsData.forEach(it => { s1Total += it.s1Total; s2Total += it.s2Total; s3Total += it.s3Total; });
+
+    // Build quotations array (only for selected suppliers)
+    const quotations = [];
+    const supplierBids = [];
+    const supplierSlots = [
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+    ];
+    supplierSlots.forEach((slot, idx) => {
+      if (slot.name) {
+        const qItems = slot.items.map(it => ({
+          item_description: it.desc,
+          quantity: it.qty,
+          unit: it.unit,
+          unit_price: it[slot.priceKey]
+        }));
+        quotations.push({
+          supplier_name: slot.name,
+          bid_amount: slot.total,
+          is_compliant: true,
+          remarks: null,
+          rank_no: idx + 1,
+          items: qItems
+        });
+        supplierBids.push({ name: slot.name, total: slot.total });
+      }
+    });
+
+    // Determine recommended (lowest total) supplier
+    supplierBids.sort((a, b) => a.total - b.total);
+    const recommendedSupplier = supplierBids.length > 0 ? supplierBids[0] : null;
+
+    // Update rank_no based on bid amount (lowest = 1)
+    const sortedQuotations = [...quotations].sort((a, b) => a.bid_amount - b.bid_amount);
+    sortedQuotations.forEach((q, idx) => { q.rank_no = idx + 1; });
+
+    if (!confirm('Save this Abstract of Quotations as draft?')) return;
+
+    try {
+      const data = {
+        abstract_number: abstractNumber,
+        rfq_id: rfqId ? parseInt(rfqId) : null,
+        date_prepared: abstractDate || null,
+        purpose: purpose,
+        status: 'draft',
+        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
+        recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
+        recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+        vice_chairperson_id: document.getElementById('absViceChairpersonId')?.value || null,
+        bac_member1_id: document.getElementById('absBacMember1Id')?.value || null,
+        bac_member2_id: document.getElementById('absBacMember2Id')?.value || null,
+        bac_member3_id: document.getElementById('absBacMember3Id')?.value || null,
+        bac_secretariat_id: document.getElementById('absBacSecretariatId')?.value || null,
+        bac_chairperson_id: document.getElementById('absBacChairpersonId')?.value || null,
+        regional_director_id: document.getElementById('absRegionalDirectorId')?.value || null,
+        bac_secretariat2_id: document.getElementById('absBacSecretariat2Id')?.value || null,
+        quotations: sortedQuotations
+      };
+      const result = await apiRequest('/abstracts', 'POST', data);
+      const absId = result.id || result.abstract_id;
+      if (absId) {
+        await uploadAttachments('abstract', absId, [
+          { inputId: 'abstractDocument', description: 'Abstract of Quotations (Signed)' },
+          { inputId: 'supplierQuotations', description: 'Supplier Quotations (Scanned)' }
+        ]);
+      }
+      alert('Abstract of Quotations saved as draft!');
+      closeModal();
+      if (typeof loadAbstract === 'function') loadAbstract();
+      else if (typeof loadPageData === 'function') loadPageData('abstract');
+    } catch (err) {
+      alert('Error saving Abstract: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New Notice of Award
+   */
+  window.saveNewNOA = async function(e) {
+    e.preventDefault();
+    const noaNumber = document.getElementById('noaNumber')?.value || '';
+    const noaDate = document.getElementById('noaDate')?.value || '';
+    const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
+    const rfqId = document.getElementById('noaRFQRef')?.value || '';
+    const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
+    const supplierAddress = document.getElementById('noaAddress')?.value.trim() || '';
+    const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
+
+    if (!confirm('Save this Notice of Award as draft?')) return;
+
+    try {
+      const data = {
+        noa_number: noaNumber,
+        bac_resolution_id: bacResId ? parseInt(bacResId) : null,
+        rfq_id: rfqId ? parseInt(rfqId) : null,
+        supplier_name: supplierName,
+        address: supplierAddress,
+        contract_amount: contractAmount,
+        date_issued: noaDate || null,
+        status: 'draft'
+      };
+      const result = await apiRequest('/notices-of-award', 'POST', data);
+      const noaId = result.id || result.noa_id;
+      if (noaId) {
+        await uploadAttachments('notice_of_award', noaId, [
+          { inputId: 'noaDocument', description: 'NOA Document (Signed by HoPE)' }
+        ]);
+      }
+      alert('Notice of Award saved as draft!');
+      closeModal();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
+    } catch (err) {
+      alert('Error issuing NOA: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New Purchase Order
+   */
+  window.saveNewPO = async function(e) {
+    e.preventDefault();
+    const poNumber = document.getElementById('poNumber')?.value || '';
+    const poDate = document.getElementById('poDate')?.value || '';
+    const supplierId = document.getElementById('poSupplierId')?.value || '';
+    const procMode = document.getElementById('poProcMode')?.value || '';
+    const placeDelivery = document.getElementById('poPlaceDelivery')?.value || '';
+    const deliveryTerm = document.getElementById('poDeliveryTerm')?.value || '';
+    const deliveryDate = document.getElementById('poDeliveryDate')?.value || '';
+    const paymentTerm = document.getElementById('poPaymentTerm')?.value || 'Government Terms';
+    const noaId = document.getElementById('poLinkedNOA')?.value || '';
+    const purpose = document.getElementById('poPurpose')?.value || '';
+
+    // Read items from catalog selection
+    const selectedItems = window._docSelectedItems['po'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'PO-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_price: si.unit_price
+    }));
+    const totalAmount = selectedItems.reduce((sum, si) => sum + (si.total || 0), 0);
+
+    if (!confirm('Save this Purchase Order as draft?')) return;
+
+    try {
+      const data = {
+        po_number: poNumber,
+        supplier_id: supplierId ? parseInt(supplierId) : null,
+        noa_id: noaId ? parseInt(noaId) : null,
+        total_amount: totalAmount,
+        payment_terms: paymentTerm,
+        delivery_address: placeDelivery,
+        status: 'draft',
+        workflow_status: 'pending',
+        expected_delivery_date: deliveryDate || null,
+        po_date: poDate || null,
+        purpose: purpose,
+        mode_of_procurement: procMode,
+        place_of_delivery: placeDelivery,
+        items: items
+      };
+      const result = await apiRequest('/purchase-orders', 'POST', data);
+      const poId = result.id || result.po_id;
+      if (poId) {
+        await uploadAttachments('purchase_order', poId, [
+          { inputId: 'poDocument', description: 'Purchase Order Document (Signed)' },
+          { inputId: 'poSupplierConforme', description: 'Supplier Conforme / Signed PO' }
+        ]);
+      }
+      alert('Purchase Order saved as draft!');
+      closeModal();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
+    } catch (err) {
+      alert('Error saving PO: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New IAR
+   */
+  window.saveNewIAR = async function(e) {
+    e.preventDefault();
+    const iarNumber = document.getElementById('iarNumber')?.value || '';
+    const iarDate = document.getElementById('iarDate')?.value || '';
+    const poId = document.getElementById('iarLinkedPO')?.value || '';
+    const invoiceNo = document.getElementById('iarInvoiceNo')?.value || '';
+    const inspectionDate = document.getElementById('iarInspectionDate')?.value || '';
+    const acceptance = document.querySelector('input[name="acceptanceType"]:checked')?.value || 'complete';
+    const reqOffice = document.getElementById('iarReqOffice')?.value || '';
+    const dateReceived = document.getElementById('iarDateReceived')?.value || '';
+    const propertyCustodian = document.getElementById('iarPropertyCustodian')?.value || '';
+    const inspector = document.getElementById('iarInspector')?.value || '';
+
+    // Read items from catalog selection
+    const selectedItems = window._docSelectedItems['iar'] || [];
+    const items = selectedItems.map((si, idx) => ({
+      item_id: si.item_id,
+      item_code: si.item_code || 'IAR-ITEM-' + (idx + 1),
+      item_name: si.item_name,
+      item_description: si.description || si.item_description || si.item_name,
+      unit: si.item_unit,
+      quantity: si.quantity,
+      unit_cost: si.unit_price || 0,
+      category: si.item_category || 'general'
+    }));
+
+    if (!confirm('Are you sure you want to complete this IAR?')) return;
+
+    try {
+      const data = {
+        iar_number: iarNumber,
+        po_id: poId ? parseInt(poId) : null,
+        inspection_date: inspectionDate || null,
+        delivery_date: iarDate || null,
+        date_received: dateReceived || null,
+        invoice_number: invoiceNo,
+        acceptance: acceptance,
+        requisitioning_office: reqOffice || null,
+        property_custodian: propertyCustodian || null,
+        inspector_name: inspector || null,
+        item_specifications: document.getElementById('iarItemSpecs')?.value.trim() || null,
+        items: items
+      };
+      const result = await apiRequest('/iars', 'POST', data);
+      const iarId = result.id || result.iar_id;
+      if (iarId) {
+        await uploadAttachments('iar', iarId, [
+          { inputId: 'iarDocument', description: 'IAR Document (Appendix 62)' },
+          { inputId: 'iarInvoice', description: 'Supplier Invoice' },
+          { inputId: 'iarDeliveryReceipt', description: 'Delivery Receipt' }
+        ]);
+      }
+      alert('IAR completed successfully!');
+      closeModal();
+      if (typeof loadIAR === 'function') loadIAR();
+      else if (typeof loadPageData === 'function') loadPageData('iar');
+    } catch (err) {
+      alert('Error saving IAR: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New BAC Resolution
+   */
+  window.saveNewBACResolution = async function(e) {
+    e.preventDefault();
+    const resNumber = document.getElementById('bacResNumber')?.value || '';
+    const series = document.getElementById('bacResSeries')?.value || String(getCurrentFiscalYear());
+    const subject = document.getElementById('bacResSubject')?.value || '';
+    const description = document.getElementById('bacResDescription')?.value || '';
+    const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
+    const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
+    const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
+    const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+
+    // BAC member employee IDs
+    const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
+    const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
+    const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
+    const bacMember2Id = document.getElementById('bacMember2Id')?.value || null;
+    const bacMember3Id = document.getElementById('bacMember3Id')?.value || null;
+    const hopeId = document.getElementById('bacHopeId')?.value || null;
+
+    if (!subject) { alert('Please enter the resolution subject.'); return; }
+    if (!confirm('Save this BAC Resolution as draft?')) return;
+
+    // Collect bidders from the table
+    const bidderRows = document.querySelectorAll('#bacBiddersBody tr');
+    const bidders = [];
+    bidderRows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || '';
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || '';
+        if (name) bidders.push({ name, amount, remarks });
+      }
+    });
+
+    // Get recommended awardee from linked abstract
+    const linkedAbstract = window._bacLinkedAbstract || null;
+    const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
+
+    // Map procurement mode to DB-compatible short codes
+    const rawPM = (linkedAbstract?.procurement_mode || 'SVP').trim();
+    const pmMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const draftProcMode = pmMap[rawPM.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawPM) ? rawPM : 'SVP');
+
+    try {
+      const data = {
+        resolution_number: resNumber,
+        abstract_id: abstractId ? parseInt(abstractId) : null,
+        resolution_date: new Date().toISOString().split('T')[0],
+        procurement_mode: draftProcMode,
+        abc_amount: abcAmount,
+        bid_amount: contractPrice,
+        bidder_type: bidderType,
+        status: 'draft',
+        subject: subject,
+        description: description,
+        recommended_awardee_name: recommendedAwardeeName,
+        bidders: bidders,
+        bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
+        bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
+        bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
+        bac_member2_id: bacMember2Id ? parseInt(bacMember2Id) : null,
+        bac_member3_id: bacMember3Id ? parseInt(bacMember3Id) : null,
+        hope_id: hopeId ? parseInt(hopeId) : null
+      };
+      const result = await apiRequest('/bac-resolutions', 'POST', data);
+      const bacId = result.id || result.bac_resolution_id;
+      if (bacId) {
+        await uploadAttachments('bac_resolution', bacId, [
+          { inputId: 'bacResDocument', description: 'BAC Resolution Document (Signed)' },
+          { inputId: 'bacResPostQual', description: 'Post-Qualification Report' }
+        ]);
+      }
+      alert('BAC Resolution saved as draft!');
+      closeModal();
+      if (typeof loadBACResolution === 'function') loadBACResolution();
+      else if (typeof loadPageData === 'function') loadPageData('bac-resolution');
+    } catch (err) {
+      alert('Error saving BAC Resolution: ' + err.message);
+    }
+  };
+
+  /**
+   * Save New Post-Qualification / TWG Report
+   */
+  window.saveNewPostQual = async function(e) {
+    e.preventDefault();
+    const postQualNumber = document.getElementById('postQualNumber')?.value || '';
+    const postQualDate = document.getElementById('postQualDate')?.value || '';
+    const subject = document.getElementById('postQualSubject')?.value || '';
+    const abstractId = document.getElementById('postQualLinkedAbstract')?.value || '';
+
+    const twgHeadId = document.getElementById('twgHeadId')?.value || null;
+    const twgMember1Id = document.getElementById('twgMember1Id')?.value || null;
+    const twgMember2Id = document.getElementById('twgMember2Id')?.value || null;
+    const twgMember3Id = document.getElementById('twgMember3Id')?.value || null;
+    const twgMember4Id = document.getElementById('twgMember4Id')?.value || null;
+
+    const bidder1SupplierId = document.getElementById('twgBidder1')?.value || null;
+    const bidder2SupplierId = document.getElementById('twgBidder2')?.value || null;
+    const bidder3SupplierId = document.getElementById('twgBidder3')?.value || null;
+
+    if (!subject) { alert('Please enter the subject.'); return; }
+    if (!confirm('Save this TWG Report as draft?')) return;
+
+    try {
+      const data = {
+        postqual_number: postQualNumber,
+        abstract_id: abstractId ? parseInt(abstractId) : null,
+        bidder_name: subject,
+        status: 'draft',
+        twg_head_id: twgHeadId ? parseInt(twgHeadId) : null,
+        twg_member1_id: twgMember1Id ? parseInt(twgMember1Id) : null,
+        twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
+        twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
+        twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
+        bidder1_supplier_id: bidder1SupplierId ? parseInt(bidder1SupplierId) : null,
+        bidder2_supplier_id: bidder2SupplierId ? parseInt(bidder2SupplierId) : null,
+        bidder3_supplier_id: bidder3SupplierId ? parseInt(bidder3SupplierId) : null
+      };
+      const result = await apiRequest('/post-qualifications', 'POST', data);
+      const pqId = result.id || result.postqual_id;
+      if (pqId) {
+        await uploadAttachments('post_qualification', pqId, [
+          { inputId: 'postQualReport', description: 'TWG Report Document' },
+          { inputId: 'postQualBidderDocs', description: 'Bidder Documents' }
+        ]);
+      }
+      alert('TWG Report saved as draft!');
+      closeModal();
+      if (typeof loadPostQual === 'function') loadPostQual();
+      else if (typeof loadPageData === 'function') loadPageData('post-qual');
+    } catch (err) {
+      alert('Error saving TWG Report: ' + err.message);
+    }
+  };
+
+  // ============================================================
+  // SUBMIT (NON-DRAFT) HANDLER FUNCTIONS
+  // ============================================================
+
+  window.submitAbstract = async function() {
+    const abstractNumber = document.getElementById('abstractNumber')?.value || '';
+    const abstractDate = document.getElementById('abstractDate')?.value || '';
+    const rfqId = document.getElementById('abstractLinkedRFQ')?.value || '';
+    const purpose = document.getElementById('abstractPurpose')?.value || '';
+    const supplier1Name = document.getElementById('absSupplier1Id')?.value.trim() || '';
+    const supplier2Name = document.getElementById('absSupplier2Id')?.value.trim() || '';
+    const supplier3Name = document.getElementById('absSupplier3Id')?.value.trim() || '';
+    const itemRows = document.querySelectorAll('#abstractItemsBody tr');
+    const itemsData = [];
+    itemRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 10) return;
+      const qty = parseFloat(cells[0]?.querySelector('input')?.value) || 0;
+      const unit = cells[1]?.querySelector('select')?.value || '';
+      const desc = cells[2]?.querySelector('input')?.value || '';
+      const abc = parseFloat(cells[3]?.querySelector('input')?.value) || 0;
+      const s1UnitPrice = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
+      const s1Total = parseFloat(cells[5]?.querySelector('input')?.value) || 0;
+      const s2UnitPrice = parseFloat(cells[6]?.querySelector('input')?.value) || 0;
+      const s2Total = parseFloat(cells[7]?.querySelector('input')?.value) || 0;
+      const s3UnitPrice = parseFloat(cells[8]?.querySelector('input')?.value) || 0;
+      const s3Total = parseFloat(cells[9]?.querySelector('input')?.value) || 0;
+      if (desc.trim()) { itemsData.push({ qty, unit, desc, abc, s1UnitPrice, s1Total, s2UnitPrice, s2Total, s3UnitPrice, s3Total }); }
+    });
+    let s1Total = 0, s2Total = 0, s3Total = 0;
+    itemsData.forEach(it => { s1Total += it.s1Total; s2Total += it.s2Total; s3Total += it.s3Total; });
+    const quotations = [];
+    const supplierBids = [];
+    const supplierSlots = [
+      { name: supplier1Name, total: s1Total, items: itemsData, priceKey: 's1UnitPrice' },
+      { name: supplier2Name, total: s2Total, items: itemsData, priceKey: 's2UnitPrice' },
+      { name: supplier3Name, total: s3Total, items: itemsData, priceKey: 's3UnitPrice' }
+    ];
+    supplierSlots.forEach((slot, idx) => {
+      if (slot.name) {
+        const qItems = slot.items.map(it => ({ item_description: it.desc, quantity: it.qty, unit: it.unit, unit_price: it[slot.priceKey] }));
+        quotations.push({ supplier_name: slot.name, bid_amount: slot.total, is_compliant: true, remarks: null, rank_no: idx + 1, items: qItems });
+        supplierBids.push({ name: slot.name, total: slot.total });
+      }
+    });
+    supplierBids.sort((a, b) => a.total - b.total);
+    const recommendedSupplier = supplierBids.length > 0 ? supplierBids[0] : null;
+    const sortedQuotations = [...quotations].sort((a, b) => a.bid_amount - b.bid_amount);
+    sortedQuotations.forEach((q, idx) => { q.rank_no = idx + 1; });
+    if (!confirm('Are you sure you want to submit this Abstract of Quotations?')) return;
+    try {
+      const data = {
+        abstract_number: abstractNumber, rfq_id: rfqId ? parseInt(rfqId) : null,
+        date_prepared: abstractDate || null, purpose: purpose, status: 'on_going',
+        item_specifications: document.getElementById('abstractItemSpecs')?.value.trim() || null,
+        recommended_supplier_name: recommendedSupplier ? recommendedSupplier.name : null,
+        recommended_amount: recommendedSupplier ? recommendedSupplier.total : null,
+        vice_chairperson_id: document.getElementById('absViceChairpersonId')?.value || null,
+        bac_member1_id: document.getElementById('absBacMember1Id')?.value || null,
+        bac_member2_id: document.getElementById('absBacMember2Id')?.value || null,
+        bac_member3_id: document.getElementById('absBacMember3Id')?.value || null,
+        bac_secretariat_id: document.getElementById('absBacSecretariatId')?.value || null,
+        bac_chairperson_id: document.getElementById('absBacChairpersonId')?.value || null,
+        regional_director_id: document.getElementById('absRegionalDirectorId')?.value || null,
+        bac_secretariat2_id: document.getElementById('absBacSecretariat2Id')?.value || null,
+        quotations: sortedQuotations
+      };
+      const result = await apiRequest('/abstracts', 'POST', data);
+      const absId = result.id || result.abstract_id;
+      if (absId) {
+        await uploadAttachments('abstract', absId, [
+          { inputId: 'abstractDocument', description: 'Abstract of Quotations (Signed)' },
+          { inputId: 'supplierQuotations', description: 'Supplier Quotations (Scanned)' }
+        ]);
+      }
+      alert('Abstract of Quotations submitted successfully!');
+      closeModal();
+      if (typeof loadAbstract === 'function') loadAbstract();
+      else if (typeof loadPageData === 'function') loadPageData('abstract');
+    } catch (err) { alert('Error submitting Abstract: ' + err.message); }
+  };
+
+  window.issueNOA = async function() {
+    const noaNumber = document.getElementById('noaNumber')?.value || '';
+    const noaDate = document.getElementById('noaDate')?.value || '';
+    const bacResId = document.getElementById('noaLinkedBAC')?.value || '';
+    const rfqId = document.getElementById('noaRFQRef')?.value || '';
+    const supplierName = document.getElementById('noaSupplierName')?.value.trim() || '';
+    const supplierAddress = document.getElementById('noaAddress')?.value.trim() || '';
+    const contractAmount = parseFloat(document.getElementById('noaContractAmount')?.value) || 0;
+    if (!confirm('Are you sure you want to issue this Notice of Award?')) return;
+    try {
+      const data = {
+        noa_number: noaNumber, bac_resolution_id: bacResId ? parseInt(bacResId) : null,
+        rfq_id: rfqId ? parseInt(rfqId) : null, supplier_name: supplierName,
+        address: supplierAddress,
+        contract_amount: contractAmount, date_issued: noaDate || null, status: 'issued'
+      };
+      const result = await apiRequest('/notices-of-award', 'POST', data);
+      const noaId = result.id || result.noa_id;
+      if (noaId) {
+        await uploadAttachments('notice_of_award', noaId, [
+          { inputId: 'noaDocument', description: 'NOA Document (Signed by HoPE)' }
+        ]);
+      }
+      alert('Notice of Award issued successfully!');
+      closeModal();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
+    } catch (err) { alert('Error issuing NOA: ' + err.message); }
+  };
+
+  window.submitBACResolution = async function() {
+    const resNumber = document.getElementById('bacResNumber')?.value || '';
+    const series = document.getElementById('bacResSeries')?.value || String(getCurrentFiscalYear());
+    const subject = document.getElementById('bacResSubject')?.value || '';
+    const description = document.getElementById('bacResDescription')?.value || '';
+    const abstractId = document.getElementById('bacResLinkedAbstract')?.value || '';
+    const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
+    const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
+    const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+    const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
+    const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
+    const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
+    const bacMember2Id = document.getElementById('bacMember2Id')?.value || null;
+    const bacMember3Id = document.getElementById('bacMember3Id')?.value || null;
+    const hopeId = document.getElementById('bacHopeId')?.value || null;
+    if (!subject) { alert('Please enter the resolution subject.'); return; }
+    if (!confirm('Are you sure you want to submit this BAC Resolution?')) return;
+
+    // Collect bidders from the table
+    const bidderRows = document.querySelectorAll('#bacBiddersBody tr');
+    const bidders = [];
+    bidderRows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || '';
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || '';
+        if (name) bidders.push({ name, amount, remarks });
+      }
+    });
+
+    const linkedAbstract = window._bacLinkedAbstract || null;
+    const recommendedAwardeeName = linkedAbstract?.recommended_supplier_name || '';
+
+    // Map procurement mode to short codes that the DB constraint expects
+    const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
+    const rawProcMode = (linkedAbstract?.procurement_mode || 'SVP').trim();
+    const mappedProcMode = procModeMap[rawProcMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawProcMode) ? rawProcMode : 'SVP');
+
+    try {
+      const data = {
+        resolution_number: resNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
+        resolution_date: new Date().toISOString().split('T')[0], procurement_mode: mappedProcMode,
+        abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
+        subject: subject, description: description,
+        recommended_awardee_name: recommendedAwardeeName, bidders: bidders,
+        bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
+        bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
+        bac_member1_id: bacMember1Id ? parseInt(bacMember1Id) : null,
+        bac_member2_id: bacMember2Id ? parseInt(bacMember2Id) : null,
+        bac_member3_id: bacMember3Id ? parseInt(bacMember3Id) : null,
+        hope_id: hopeId ? parseInt(hopeId) : null
+      };
+      const result = await apiRequest('/bac-resolutions', 'POST', data);
+      const bacId = result.id || result.bac_resolution_id;
+      if (bacId) {
+        await uploadAttachments('bac_resolution', bacId, [
+          { inputId: 'bacResDocument', description: 'BAC Resolution Document (Signed)' },
+          { inputId: 'bacResPostQual', description: 'Post-Qualification Report' }
+        ]);
+      }
+      alert('BAC Resolution submitted successfully!');
+      closeModal();
+      if (typeof loadBACResolution === 'function') loadBACResolution();
+      else if (typeof loadPageData === 'function') loadPageData('bac-resolution');
+    } catch (err) { alert('Error submitting BAC Resolution: ' + err.message); }
+  };
+
+  window.submitPostQual = async function() {
+    const postQualNumber = document.getElementById('postQualNumber')?.value || '';
+    const postQualDate = document.getElementById('postQualDate')?.value || '';
+    const subject = document.getElementById('postQualSubject')?.value || '';
+    const abstractId = document.getElementById('postQualLinkedAbstract')?.value || '';
+    const twgHeadId = document.getElementById('twgHeadId')?.value || null;
+    const twgMember1Id = document.getElementById('twgMember1Id')?.value || null;
+    const twgMember2Id = document.getElementById('twgMember2Id')?.value || null;
+    const twgMember3Id = document.getElementById('twgMember3Id')?.value || null;
+    const twgMember4Id = document.getElementById('twgMember4Id')?.value || null;
+    const bidder1Name = document.getElementById('twgBidder1')?.value.trim() || null;
+    const bidder2Name = document.getElementById('twgBidder2')?.value.trim() || null;
+    const bidder3Name = document.getElementById('twgBidder3')?.value.trim() || null;
+    if (!subject) { alert('Please enter the subject.'); return; }
+    if (!confirm('Are you sure you want to submit this TWG Report?')) return;
+    try {
+      const data = {
+        postqual_number: postQualNumber, abstract_id: abstractId ? parseInt(abstractId) : null,
+        bidder_name: subject, status: 'on_going',
+        twg_head_id: twgHeadId ? parseInt(twgHeadId) : null,
+        twg_member1_id: twgMember1Id ? parseInt(twgMember1Id) : null,
+        twg_member2_id: twgMember2Id ? parseInt(twgMember2Id) : null,
+        twg_member3_id: twgMember3Id ? parseInt(twgMember3Id) : null,
+        twg_member4_id: twgMember4Id ? parseInt(twgMember4Id) : null,
+        bidder1_name: bidder1Name,
+        bidder2_name: bidder2Name,
+        bidder3_name: bidder3Name
+      };
+      const result = await apiRequest('/post-qualifications', 'POST', data);
+      const pqId = result.id || result.postqual_id;
+      if (pqId) {
+        await uploadAttachments('post_qualification', pqId, [
+          { inputId: 'postQualReport', description: 'TWG Report Document' },
+          { inputId: 'postQualBidderDocs', description: 'Bidder Documents' }
+        ]);
+      }
+      alert('TWG Report submitted successfully!');
+      closeModal();
+      if (typeof loadPostQual === 'function') loadPostQual();
+      else if (typeof loadPageData === 'function') loadPageData('post-qual');
+    } catch (err) { alert('Error submitting TWG Report: ' + err.message); }
+  };
+
+  // ============================================================
+  // WORKFLOW MODAL HANDLERS (Upload Files to Existing Entities)
+  // ============================================================
+
+  /**
+   * Handle Accept PO — upload conforme attachment
+   */
+  window.handleAcceptPO = async function(e) {
+    e.preventDefault();
+    const acceptedAt = document.getElementById('acceptedAt')?.value || '';
+    if (!acceptedAt) { alert('Please select the accepted date/time.'); return; }
+    if (!confirm('Mark this PO as accepted?')) return;
+    try {
+      // Upload conforme attachment if provided
+      const conformeInput = document.getElementById('conformeAttachment');
+      if (conformeInput && conformeInput.files && conformeInput.files.length > 0) {
+        await uploadAttachments('purchase_order_conforme', 0, [
+          { inputId: 'conformeAttachment', description: 'PO Conforme / Acceptance' }
+        ]);
+      }
+      alert('PO marked as accepted!');
+      closeModal();
+      if (typeof loadPO === 'function') loadPO();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-orders');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Compile Packet — upload merged PDF
+   */
+  window.handleCompilePacket = async function(e) {
+    e.preventDefault();
+    if (!confirm('Compile this PO packet?')) return;
+    try {
+      const mergedInput = document.getElementById('mergedPacket');
+      if (mergedInput && mergedInput.files && mergedInput.files.length > 0) {
+        await uploadAttachments('purchase_order_packet', 0, [
+          { inputId: 'mergedPacket', description: 'Merged PO Packet PDF' }
+        ]);
+      }
+      alert('PO Packet compiled successfully!');
+      closeModal();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Chief Sign — upload signed page
+   */
+  window.handleChiefSign = async function(e) {
+    e.preventDefault();
+    if (!confirm('Record Chief signature?')) return;
+    try {
+      const signedPage = document.getElementById('chiefSignedPage');
+      if (signedPage && signedPage.files && signedPage.files.length > 0) {
+        await uploadAttachments('purchase_order_chief_sign', 0, [
+          { inputId: 'chiefSignedPage', description: 'Chief Signed Page' }
+        ]);
+      }
+      alert('Chief signature recorded!');
+      closeModal();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Director Sign — upload signed page
+   */
+  window.handleDirectorSign = async function(e) {
+    e.preventDefault();
+    if (!confirm('Record Director signature?')) return;
+    try {
+      const signedPage = document.getElementById('directorSignedPage');
+      if (signedPage && signedPage.files && signedPage.files.length > 0) {
+        await uploadAttachments('purchase_order_director_sign', 0, [
+          { inputId: 'directorSignedPage', description: 'Director Signed Page' }
+        ]);
+      }
+      alert('Director signature recorded!');
+      closeModal();
+      if (typeof loadPOPacket === 'function') loadPOPacket();
+      else if (typeof loadPageData === 'function') loadPageData('po-packet');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Attach Annex 1 — upload annex files to PR
+   */
+  window.handleAttachAnnex1 = async function(e) {
+    e.preventDefault();
+    const annex1Input = document.getElementById('annex1File');
+    if (!annex1Input || !annex1Input.files || annex1Input.files.length === 0) {
+      alert('Please select the Annex 1 file.'); return;
+    }
+    if (!confirm('Attach these documents?')) return;
+    try {
+      await uploadAttachments('purchase_request_annex', 0, [
+        { inputId: 'annex1File', description: 'Annex 1 / APP Reference' },
+        { inputId: 'techSpecsFile', description: 'Technical Specifications' }
+      ]);
+      alert('Documents attached successfully!');
+      closeModal();
+      if (typeof loadPR === 'function') loadPR();
+      else if (typeof loadPageData === 'function') loadPageData('purchase-requests');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Add Quotation — upload quotation to RFQ
+   */
+  window.handleAddQuotation = async function(e) {
+    e.preventDefault();
+    if (!confirm('Add this quotation?')) return;
+    try {
+      const quotationInput = document.getElementById('quotationFile');
+      if (quotationInput && quotationInput.files && quotationInput.files.length > 0) {
+        await uploadAttachments('rfq_quotation', 0, [
+          { inputId: 'quotationFile', description: 'Supplier Quotation' }
+        ]);
+      }
+      alert('Quotation added successfully!');
+      closeModal();
+      if (typeof loadRFQ === 'function') loadRFQ();
+      else if (typeof loadPageData === 'function') loadPageData('rfq');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  /**
+   * Handle Mark NOA Received — upload receipt
+   */
+  window.handleMarkNOAReceived = async function(e) {
+    e.preventDefault();
+    if (!confirm('Mark this NOA as received by the bidder?')) return;
+    try {
+      const receiptInput = document.getElementById('noaReceiptFile');
+      if (receiptInput && receiptInput.files && receiptInput.files.length > 0) {
+        await uploadAttachments('notice_of_award_receipt', 0, [
+          { inputId: 'noaReceiptFile', description: 'NOA Receipt Confirmation' }
+        ]);
+      }
+      alert('NOA marked as received!');
+      closeModal();
+      if (typeof loadNOA === 'function') loadNOA();
+      else if (typeof loadPageData === 'function') loadPageData('noa');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  window.showNewUserModal = async function() {
+    // Load employees for linking and ensure divisions cached
+    let employees = [];
+    try { [employees] = await Promise.all([apiRequest('/employees'), ensureDivisionsLoaded()]); } catch(e) {}
+    const empOptions = employees.map(e => `<option value="${e.id}">${e.full_name} (${e.employee_code || 'N/A'})</option>`).join('');
+    
+    const allRoles = [
+      { value: 'end_user', label: 'End User' },
+      { value: 'requester', label: 'Requester' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
+      { value: 'division_head', label: 'Division Head' },
+      { value: 'bac_secretariat', label: 'BAC Secretariat' },
+      { value: 'bac_chair', label: 'BAC Chairperson' },
+      { value: 'twg_member', label: 'TWG Member' },
+      { value: 'supply_officer', label: 'Supply/Procurement Officer' },
+      { value: 'inspector', label: 'Inspection/Property Custodian' },
+      { value: 'hope', label: 'HoPE (Regional Director)' },
+      { value: 'ord_manager', label: 'ORD Manager' },
+      { value: 'chief_fad', label: 'Chief FAD' },
+      { value: 'chief_wrsd', label: 'Chief WRSD' },
+      { value: 'chief_mwpsd', label: 'Chief MWPSD' },
+      { value: 'chief_mwptd', label: 'Chief MWPTD' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'officer', label: 'Officer' },
+      { value: 'viewer', label: 'Viewer' },
+      { value: 'auditor', label: 'Auditor' },
+      { value: 'admin', label: 'System Administrator' }
+    ];
+    const roleOpts = allRoles.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+    
+    const html = `
+      <form id="userForm" onsubmit="saveNewUser(event)">
+        <div class="form-section-header"><i class="fas fa-user-shield"></i> Account Information</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Username <span class="text-danger">*</span></label>
+            <input type="text" id="newUsername" placeholder="e.g., john.doe" required>
+          </div>
+          <div class="form-group">
+            <label>Password <span class="text-danger">*</span></label>
+            <input type="password" id="newPassword" placeholder="Minimum 6 characters" required minlength="6">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name <span class="text-danger">*</span></label>
+            <input type="text" id="newFullName" placeholder="Full name" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="newEmail" placeholder="Email address">
+          </div>
+        </div>
+        <div class="form-section-header blue"><i class="fas fa-building"></i> Role & Division</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Role <span class="text-danger">*</span></label>
+            <select class="form-select" id="newRole" required>${roleOpts}</select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="newDivision">
+              <option value="">None</option>
+              ${buildDivisionOptionsById('', false, 'long')}
+            </select>
+          </div>
+        </div>
+        <div class="form-section-header green"><i class="fas fa-link"></i> Link to Employee Record (Optional)</div>
+        <div class="form-group">
+          <label>Employee</label>
+          <select class="form-select" id="newEmployeeId">
+            <option value="">-- No linked employee --</option>
+            ${empOptions}
+          </select>
+          <small style="color:#666;margin-top:4px;display:block;">Link this user account to an existing employee record for property accountability.</small>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
+        </div>
+      </form>
+    `;
+    openModal('Create New User', html);
+  };
+
+  // Save new user via API
+  window.saveNewUser = async function(e) {
+    e.preventDefault();
+    const data = {
+      username: document.getElementById('newUsername').value.trim(),
+      password: document.getElementById('newPassword').value,
+      full_name: document.getElementById('newFullName').value.trim(),
+      email: document.getElementById('newEmail')?.value || '',
+      role: document.getElementById('newRole').value,
+      dept_id: parseInt(document.getElementById('newDivision').value) || null,
+      employee_id: parseInt(document.getElementById('newEmployeeId')?.value) || null
+    };
+    
+    if (!data.username || !data.password || !data.full_name) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+    
+    if (!confirm(`Create user "${data.username}" with role: ${formatRole(data.role)}?`)) return;
+    try {
+      await apiRequest('/users', 'POST', data);
+      showToast('User created successfully!', 'success');
+      closeModal();
+      loadUsers();
+    } catch (err) {
+      alert('Error creating user: ' + err.message);
+    }
+  };
+
+  // ==================== INVENTORY MODULE MODALS ====================
+
+  // Stock Card Entry Modal
+  window.showNewStockCardModal = function() {
+    const html = `
+      <form id="stockCardForm" onsubmit="saveNewStockCard(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transaction No.</label>
+            <input type="text" id="scTransNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="scDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item</label>
+            <select class="form-select" id="scItemId" required>
+              <option value="">-- Select Item --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Reference</label>
+            <input type="text" id="scReference" placeholder="e.g., IAR-${getCurrentFiscalYear()}-001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Receipt Qty</label>
+            <input type="number" id="scReceiptQty" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Receipt Unit Cost</label>
+            <input type="number" id="scReceiptUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issue Qty</label>
+            <input type="number" id="scIssueQty" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Issue Unit Cost</label>
+            <input type="number" id="scIssueUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea id="scRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Stock Card Entry</button>
+        </div>
+      </form>
+    `;
+    openModal('New Stock Card Entry', html);
+    // Populate items dropdown
+    loadItemsDropdown('scItemId');
+  };
+
+  window.saveNewStockCard = async function(e) {
+    e.preventDefault();
+    const data = {
+      item_id: parseInt(document.getElementById('scItemId').value),
+      date: document.getElementById('scDate').value,
+      reference: document.getElementById('scReference').value,
+      receipt_qty: parseInt(document.getElementById('scReceiptQty').value) || 0,
+      receipt_unit_cost: parseFloat(document.getElementById('scReceiptUnitCost').value) || 0,
+      issue_qty: parseInt(document.getElementById('scIssueQty').value) || 0,
+      issue_unit_cost: parseFloat(document.getElementById('scIssueUnitCost').value) || 0,
+      remarks: document.getElementById('scRemarks').value
+    };
+    if (!confirm('Are you sure you want to save this stock card entry?')) return;
+    try {
+      await apiRequest('/stock-cards', 'POST', data);
+      alert('Stock card entry saved!');
+      closeModal();
+      loadStockCards();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Property Card Modal
+  window.showNewPropertyCardModal = async function() {
+    await ensureDivisionsLoaded();
+    const html = `
+      <form id="propertyCardForm" onsubmit="saveNewPropertyCard(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="pcPropertyNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Acquisition Date</label>
+            <input type="date" id="pcAcqDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="pcDescription" rows="2" placeholder="Property description" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item (from Catalog)</label>
+            <select class="form-select" id="pcItemId">
+              <option value="">-- Select Item --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Serial No.</label>
+            <input type="text" id="pcSerialNo" placeholder="e.g., SN-12345">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Acquisition Cost</label>
+            <input type="number" id="pcAcqCost" placeholder="0.00" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Estimated Useful Life (yrs)</label>
+            <input type="number" id="pcUsefulLife" placeholder="5" min="1" value="5">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issued To (Employee)</label>
+            <select class="form-select" id="pcIssuedTo">
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select class="form-select" id="pcDepartment">
+              <option value="">-- Select --</option>
+              <option value="1">FAD</option>
+              <option value="2">WRSD</option>
+              <option value="3">MWPSD</option>
+              <option value="4">MWPTD</option>
+              ${buildDivisionOptionsById('', false)}
+          <label>Remarks</label>
+          <textarea id="pcRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Property Card</button>
+        </div>
+      </form>
+    `;
+    openModal('Create Property Card', html);
+    loadItemsDropdown('pcItemId');
+    loadEmployeesDropdown('pcIssuedTo');
+  };
+
+  window.saveNewPropertyCard = async function(e) {
+    e.preventDefault();
+    const data = {
+      description: document.getElementById('pcDescription').value,
+      item_id: parseInt(document.getElementById('pcItemId').value) || null,
+      serial_no: document.getElementById('pcSerialNo').value,
+      acquisition_date: document.getElementById('pcAcqDate').value,
+      acquisition_cost: parseFloat(document.getElementById('pcAcqCost').value) || 0,
+      estimated_useful_life: parseInt(document.getElementById('pcUsefulLife').value) || 5,
+      issued_to: parseInt(document.getElementById('pcIssuedTo').value) || null,
+      department_id: parseInt(document.getElementById('pcDepartment').value) || null,
+      remarks: document.getElementById('pcRemarks').value
+    };
+    if (!confirm('Are you sure you want to save this property card?')) return;
+    try {
+      await apiRequest('/property-cards', 'POST', data);
+      alert('Property card created!');
+      closeModal();
+      loadPropertyCards();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // ICS Modal
+  window.showNewICSModal = function() {
+    const html = `
+      <form id="icsForm" onsubmit="saveNewICS(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>ICS No.</label>
+            <input type="text" id="icsNo" placeholder="Auto-generated" readonly>
+          </div>
+          <div class="form-group">
+            <label>Date of Issue</label>
+            <input type="date" id="icsDateOfIssue" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Card</label>
+            <select class="form-select" id="icsPropertyId" required>
+              <option value="">-- Select Property --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Inventory Item No.</label>
+            <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Issued To (Employee)</label>
+            <select class="form-select" id="icsIssuedTo" required>
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Received By</label>
+            <select class="form-select" id="icsReceivedBy">
+              <option value="">-- Select Employee --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="icsDescription" rows="2" placeholder="Item description"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="icsQty" placeholder="1" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label>Unit Cost</label>
+            <input type="number" id="icsUnitCost" placeholder="0.00" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea id="icsRemarks" rows="2" placeholder="Optional remarks"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Issue ICS</button>
+        </div>
+      </form>
+    `;
+    openModal('Issue Inventory Custodian Slip (ICS)', html);
+    loadPropertyCardsDropdown('icsPropertyId');
+    loadEmployeesDropdown('icsIssuedTo');
+    loadEmployeesDropdown('icsReceivedBy');
+  };
+
+  window.saveNewICS = async function(e) {
+    e.preventDefault();
+    const data = {
+      property_card_id: parseInt(document.getElementById('icsPropertyId').value),
+      date_of_issue: document.getElementById('icsDateOfIssue').value,
+      inventory_no: document.getElementById('icsInventoryNo').value,
+      description: document.getElementById('icsDescription').value,
+      quantity: parseInt(document.getElementById('icsQty').value) || 1,
+      unit_cost: parseFloat(document.getElementById('icsUnitCost').value) || 0,
+      issued_to: parseInt(document.getElementById('icsIssuedTo').value),
+      received_by: parseInt(document.getElementById('icsReceivedBy').value) || null,
+      remarks: document.getElementById('icsRemarks').value
+    };
+    if (!confirm('Are you sure you want to issue this ICS?')) return;
+    try {
+      await apiRequest('/ics', 'POST', data);
+      alert('ICS issued successfully!');
+      closeModal();
+      loadICS();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Employee Modal
+  window.showNewEmployeeModal = async function() {
+    await ensureDivisionsLoaded();
+    const html = `
+      <form id="employeeForm" onsubmit="saveNewEmployee(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Employee Code</label>
+            <input type="text" id="empCode" placeholder="e.g., EMP-001" required>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="empStatus">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="empFullName" placeholder="Enter full name" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="empEmail" placeholder="Email address">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="empPhone" placeholder="Contact number">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Designation</label>
+            <select class="form-select" id="empDesignation">
+              <option value="">-- Select Designation --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select class="form-select" id="empDepartment">
+              <option value="">-- Select --</option>
+              <option value="1">FAD</option>
+              <option value="2">WRSD</option>
+              <option value="3">MWPSD</option>
+              <option value="4">MWPTD</option>
+              <option value="5">ORD</option>
+            </select>
+          </div>
+        </div>${buildDivisionOptionsById('', false)}
+      </form>
+    `;
+    openModal('Add New Employee', html);
+    loadDesignationsDropdown('empDesignation');
+  };
+
+  window.saveNewEmployee = async function(e) {
+    e.preventDefault();
+    const data = {
+      employee_code: document.getElementById('empCode').value,
+      full_name: document.getElementById('empFullName').value,
+      email: document.getElementById('empEmail').value,
+      phone: document.getElementById('empPhone').value,
+      designation_id: parseInt(document.getElementById('empDesignation').value) || null,
+      dept_id: parseInt(document.getElementById('empDepartment').value) || null,
+      status: document.getElementById('empStatus').value
+    };
+    if (!confirm('Are you sure you want to save this employee?')) return;
+    try {
+      await apiRequest('/employees', 'POST', data);
+      alert('Employee saved!');
+      closeModal();
+      loadEmployees();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Dropdown helper functions for inventory modals
+  window.loadItemsDropdown = async function(selectId) {
+    try {
+      const items = await apiRequest('/items');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      items.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = `${item.code} - ${item.name}`;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading items dropdown:', err); }
+  };
+
+  window.loadEmployeesDropdown = async function(selectId, selectedId) {
+    try {
+      const employees = await apiRequest('/employees');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      employees.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.id;
+        opt.textContent = emp.full_name;
+        if (selectedId && emp.id == selectedId) opt.selected = true;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading employees dropdown:', err); }
+  };
+
+  window.loadPropertyCardsDropdown = async function(selectId) {
+    try {
+      const cards = await apiRequest('/property-cards');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      cards.forEach(card => {
+        const opt = document.createElement('option');
+        opt.value = card.id;
+        opt.textContent = `${card.property_number} - ${card.description}`;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading property cards dropdown:', err); }
+  };
+
+  window.loadDesignationsDropdown = async function(selectId) {
+    try {
+      const designations = await apiRequest('/designations');
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      designations.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        select.appendChild(opt);
+      });
+    } catch (err) { console.error('Error loading designations dropdown:', err); }
+  };
+
+  // Placeholder functions for inventory actions
+  window.showViewPropertyLedgerModal = async function(id) {
+    openModal('Property Card Details', '<div class="view-details"><p>Loading property card...</p></div>');
+    try {
+      const pc = await apiRequest('/property-cards/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-id-card"></i> <strong>Property Card: ${pc.property_number || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">Property Number</span><span class="value">${pc.property_number || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Description</span><span class="value">${pc.description || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Acquisition Cost</span><span class="value">₱${parseFloat(pc.acquisition_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Acquisition Date</span><span class="value">${pc.acquisition_date ? new Date(pc.acquisition_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Custodian</span><span class="value">${pc.custodian_name || pc.issued_to || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Department</span><span class="value">${pc.department_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">ICS No.</span><span class="value">${pc.ics_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${(pc.status || 'active').replace('_', ' ')}</span></div>
+            <div class="detail-item"><span class="label">Item ID</span><span class="value">${pc.item_id || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Created At</span><span class="value">${pc.created_at ? new Date(pc.created_at).toLocaleDateString() : 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('Property Card Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading property card: ' + err.message + '</p></div>');
+    }
+  };
+  window.showNewICSFromPropertyModal = function(propertyNo) {
+    showNewICSModal();
+  };
+  window.showEditPropertyCardModal = async function(id) {
+    let pc = {};
+    try { pc = await apiRequest('/property-cards/' + id); } catch (err) { alert('Could not load property card'); return; }
+    const html = `
+      <form id="editPCForm" onsubmit="saveEditPropertyCard(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Property Card #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Property Number</label><input type="text" id="editPCPropNo" value="${pc.property_number || ''}"></div>
+          <div class="form-group"><label>Description</label><input type="text" id="editPCDesc" value="${(pc.description || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Acquisition Cost</label><input type="number" step="0.01" id="editPCAcqCost" value="${pc.acquisition_cost || 0}"></div>
+          <div class="form-group"><label>Acquisition Date</label><input type="date" id="editPCAcqDate" value="${pc.acquisition_date ? pc.acquisition_date.split('T')[0] : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Issued To</label><select class="form-select" id="editPCIssuedTo"><option value="">-- Select Employee --</option></select></div>
+          <div class="form-group"><label>ICS No.</label><input type="text" id="editPCICS" value="${pc.ics_no || ''}"></div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="editPCStatus">
+            <option value="active" ${pc.status==='active'?'selected':''}>Active</option>
+            <option value="transferred" ${pc.status==='transferred'?'selected':''}>Transferred</option>
+            <option value="disposed" ${pc.status==='disposed'?'selected':''}>Disposed</option>
+            <option value="lost" ${pc.status==='lost'?'selected':''}>Lost</option>
+          </select>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Property Card', html);
+    loadEmployeesDropdown('editPCIssuedTo', pc.issued_to_employee_id);
+  };
+  window.saveEditPropertyCard = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    const empSel = document.getElementById('editPCIssuedTo');
+    const empName = empSel.options[empSel.selectedIndex]?.textContent || '';
+    try {
+      await apiRequest('/property-cards/' + id, 'PUT', {
+        property_number: document.getElementById('editPCPropNo').value,
+        description: document.getElementById('editPCDesc').value,
+        acquisition_cost: parseFloat(document.getElementById('editPCAcqCost').value) || 0,
+        acquisition_date: document.getElementById('editPCAcqDate').value || null,
+        issued_to: empName !== '-- Select Employee --' ? empName : null,
+        issued_to_employee_id: parseInt(empSel.value) || null,
+        ics_no: document.getElementById('editPCICS').value,
+        status: document.getElementById('editPCStatus').value
+      });
+      showToast('Property Card updated!', 'success'); closeModal(); loadPropertyCards();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewICSModal = async function(id) {
+    openModal('ICS Details', '<div class="view-details"><p>Loading ICS...</p></div>');
+    try {
+      const ics = await apiRequest('/ics/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-exchange-alt"></i> <strong>ICS No: ${ics.ics_no || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">ICS No.</span><span class="value">${ics.ics_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Issue</span><span class="value">${ics.date_of_issue ? new Date(ics.date_of_issue).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Property Number</span><span class="value">${ics.property_number || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Description</span><span class="value">${ics.description || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Inventory No.</span><span class="value">${ics.inventory_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Quantity</span><span class="value">${ics.quantity || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit</span><span class="value">${ics.unit || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Unit Cost</span><span class="value">₱${parseFloat(ics.unit_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Total Cost</span><span class="value">₱${parseFloat(ics.total_cost || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+            <div class="detail-item"><span class="label">Issued To</span><span class="value">${ics.issued_to_name || ics.issued_to || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Received By</span><span class="value">${ics.received_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">IAR Ref</span><span class="value">${ics.iar_reference || 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('ICS Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading ICS: ' + err.message + '</p></div>');
+    }
+  };
+  window.showEditEmployeeModal = async function(id) {
+    let emp = {};
+    try { emp = await apiRequest('/employees/' + id); } catch (err) { alert('Could not load employee'); return; }
+    const html = `
+      <form id="editEmpForm" onsubmit="saveEditEmployee(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Employee #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Employee Code</label><input type="text" id="editEmpCode" value="${emp.employee_code || ''}"></div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="editEmpName" value="${(emp.full_name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Designation</label><select class="form-select" id="editEmpDesig"><option value="">-- Select --</option></select></div>
+          <div class="form-group"><label>Division/Dept</label><select class="form-select" id="editEmpDept"><option value="">-- Select --</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Email</label><input type="email" id="editEmpEmail" value="${emp.email || ''}"></div>
+          <div class="form-group"><label>Phone</label><input type="text" id="editEmpPhone" value="${emp.phone || ''}"></div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="editEmpStatus">
+            <option value="active" ${emp.status==='active'?'selected':''}>Active</option>
+            <option value="inactive" ${emp.status==='inactive'?'selected':''}>Inactive</option>
+            <option value="resigned" ${emp.status==='resigned'?'selected':''}>Resigned</option>
+          </select>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Employee', html);
+    // Load designations dropdown
+    try {
+      const desigs = await apiRequest('/designations');
+      const desigSel = document.getElementById('editEmpDesig');
+      desigs.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name; if (emp.designation_id == d.id) o.selected = true; desigSel.appendChild(o); });
+    } catch(e) {}
+    // Load departments dropdown
+    try {
+      const depts = await apiRequest('/departments');
+      const deptSel = document.getElementById('editEmpDept');
+      depts.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name; if (emp.dept_id == d.id) o.selected = true; deptSel.appendChild(o); });
+    } catch(e) {}
+  };
+  window.saveEditEmployee = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/employees/' + id, 'PUT', {
+        employee_code: document.getElementById('editEmpCode').value,
+        full_name: document.getElementById('editEmpName').value,
+        designation_id: parseInt(document.getElementById('editEmpDesig').value) || null,
+        dept_id: parseInt(document.getElementById('editEmpDept').value) || null,
+        email: document.getElementById('editEmpEmail').value,
+        phone: document.getElementById('editEmpPhone').value,
+        status: document.getElementById('editEmpStatus').value
+      });
+      showToast('Employee updated!', 'success'); closeModal(); loadEmployees();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewEmployeeModal = async function(id) {
+    let emp = {};
+    try { emp = await apiRequest('/employees/' + id); } catch(e) { alert('Could not load employee'); return; }
+    const statusClass = { active: 'approved', inactive: 'rejected', retired: 'draft', resigned: 'rejected' };
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Employee Code:</label><span>${emp.employee_code || '-'}</span></div>
+        <div class="detail-row"><label>Full Name:</label><span>${emp.full_name || '-'}</span></div>
+        <div class="detail-row"><label>Designation:</label><span>${emp.designation_name || '-'}</span></div>
+        <div class="detail-row"><label>Division:</label><span>${emp.department_name || '-'}</span></div>
+        <div class="detail-row"><label>Email:</label><span>${emp.email || '-'}</span></div>
+        <div class="detail-row"><label>Phone:</label><span>${emp.phone || '-'}</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge ${statusClass[emp.status] || 'draft'}">${emp.status || 'active'}</span></span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showEditEmployeeModal(${id});"><i class="fas fa-edit"></i> Edit</button>
+      </div>
+    `;
+    openModal('View Employee Profile', html);
+  };
+  window.viewEmployeeProperty = function(id) {
+    openModal('Employee Property Accountability', '<div class="view-details"><p>Loading property accountability for employee ID: ' + id + '...</p></div>');
+  };
+  window.viewItemStockCard = function(itemId) {
+    openModal('Stock Card History', '<div class="view-details"><p>Loading stock card for item ID: ' + itemId + '...</p></div>');
+  };
+  window.viewItemPropertyCard = function(itemId) {
+    openModal('Property Card', '<div class="view-details"><p>Loading property card for item ID: ' + itemId + '...</p></div>');
+  };
+
+  // ==================== NEW MODULE MODAL FUNCTIONS ====================
+
+  // PAR Modals
+  window.showNewPARModal = function() {
+    const html = `
+      <form id="parForm" onsubmit="saveNewPAR(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date Issued</label>
+            <input type="date" id="parDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Fund Cluster</label>
+            <input type="text" id="parFundCluster" placeholder="e.g., 01">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="parPropertyNo" placeholder="Property number" required>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="parDescription" placeholder="Item description" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="parQty" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label>Unit Cost</label>
+            <input type="number" id="parUnitCost" step="0.01" placeholder="0.00" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Received By</label>
+            <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Issued By</label>
+            <select class="form-select" id="parIssuedBy"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PAR</button>
+        </div>
+      </form>
+    `;
+    openModal('New Property Acknowledgement Receipt', html);
+    loadEmployeesDropdown('parReceivedBy');
+    loadEmployeesDropdown('parIssuedBy');
+  };
+  window.saveNewPAR = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_issued: document.getElementById('parDate').value,
+      fund_cluster: document.getElementById('parFundCluster').value,
+      property_number: document.getElementById('parPropertyNo').value,
+      description: document.getElementById('parDescription').value,
+      quantity: parseInt(document.getElementById('parQty').value),
+      unit_cost: parseFloat(document.getElementById('parUnitCost').value),
+      total_cost: parseInt(document.getElementById('parQty').value) * parseFloat(document.getElementById('parUnitCost').value),
+      received_by: parseInt(document.getElementById('parReceivedBy').value) || null,
+      issued_by: parseInt(document.getElementById('parIssuedBy').value) || null
+    };
+    try { if (!confirm('Are you sure you want to save this PAR?')) return; await apiRequest('/pars', 'POST', data); alert('PAR saved!'); closeModal(); loadPAR(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewPARModal = function(id) { openModal('PAR Details', '<div class="view-details"><p>Loading PAR #' + id + '...</p></div>'); };
+  window.showEditPARModal = async function(id) {
+    let par = {};
+    try { par = await apiRequest('/pars/' + id); } catch (err) { alert('Could not load PAR'); return; }
+    const html = `
+      <form id="editPARForm" onsubmit="saveEditPAR(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit PAR #${par.par_no || id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>PAR No.</label><input type="text" id="editPARNo" value="${par.par_no || ''}"></div>
+          <div class="form-group"><label>Date Issued</label><input type="date" id="editPARDate" value="${par.date_of_issue ? par.date_of_issue.split('T')[0] : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>PPE No.</label><input type="text" id="editPARPPE" value="${par.ppe_no || ''}"></div>
+          <div class="form-group"><label>Description</label><input type="text" id="editPARDesc" value="${(par.description || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Issued To</label><select class="form-select" id="editPARIssuedTo"><option value="">-- Select Employee --</option></select></div>
+          <div class="form-group"><label>Received By</label><select class="form-select" id="editPARReceivedBy"><option value="">-- Select Employee --</option></select></div>
+        </div>
+        <div class="form-group"><label>Other Info</label><textarea id="editPAROther" rows="2">${par.other_info || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit PAR', html);
+    loadEmployeesDropdown('editPARIssuedTo', par.issued_to_employee_id);
+    loadEmployeesDropdown('editPARReceivedBy', par.received_by_id);
+  };
+  window.saveEditPAR = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    const issuedSel = document.getElementById('editPARIssuedTo');
+    const issuedName = issuedSel.options[issuedSel.selectedIndex]?.textContent || '';
+    try {
+      await apiRequest('/pars/' + id, 'PUT', {
+        par_no: document.getElementById('editPARNo').value,
+        date_of_issue: document.getElementById('editPARDate').value || null,
+        ppe_no: document.getElementById('editPARPPE').value,
+        description: document.getElementById('editPARDesc').value,
+        issued_to: issuedName !== '-- Select Employee --' ? issuedName : null,
+        issued_to_employee_id: parseInt(issuedSel.value) || null,
+        received_by_id: parseInt(document.getElementById('editPARReceivedBy').value) || null,
+        other_info: document.getElementById('editPAROther').value
+      });
+      showToast('PAR updated!', 'success'); closeModal(); loadPAR();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // PTR Modals
+  window.showNewPTRModal = function() {
+    const html = `
+      <form id="ptrForm" onsubmit="saveNewPTR(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="ptrDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Property Number</label>
+            <input type="text" id="ptrPropertyNo" placeholder="Property number" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="ptrDescription" placeholder="Property description" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transfer From</label>
+            <select class="form-select" id="ptrFrom"><option value="">-- Select Employee --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Transfer To</label>
+            <select class="form-select" id="ptrTo"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reason for Transfer</label>
+          <textarea id="ptrReason" rows="3" placeholder="Reason for property transfer"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save PTR</button>
+        </div>
+      </form>
+    `;
+    openModal('New Property Transfer Report', html);
+    loadEmployeesDropdown('ptrFrom');
+    loadEmployeesDropdown('ptrTo');
+  };
+  window.saveNewPTR = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_issued: document.getElementById('ptrDate').value,
+      property_number: document.getElementById('ptrPropertyNo').value,
+      description: document.getElementById('ptrDescription').value,
+      from_officer: parseInt(document.getElementById('ptrFrom').value) || null,
+      to_officer: parseInt(document.getElementById('ptrTo').value) || null,
+      reason: document.getElementById('ptrReason').value
+    };
+    try { if (!confirm('Are you sure you want to save this PTR?')) return; await apiRequest('/ptrs', 'POST', data); alert('PTR saved!'); closeModal(); loadPTR(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewPTRModal = function(id) { openModal('PTR Details', '<div class="view-details"><p>Loading PTR #' + id + '...</p></div>'); };
+  window.showEditPTRModal = async function(id) {
+    let ptr = {};
+    try { ptr = await apiRequest('/ptrs/' + id); } catch (err) { alert('Could not load PTR'); return; }
+    const html = `
+      <form id="editPTRForm" onsubmit="saveEditPTR(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit PTR #${ptr.ptr_no || id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>PTR No.</label><input type="text" id="editPTRNo" value="${ptr.ptr_no || ''}"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="editPTRDate" value="${ptr.date ? ptr.date.split('T')[0] : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Property Number</label><input type="text" id="editPTRPropNo" value="${ptr.property_number || ''}"></div>
+          <div class="form-group"><label>Description</label><input type="text" id="editPTRDesc" value="${(ptr.description || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Acquisition Cost</label><input type="number" step="0.01" id="editPTRCost" value="${ptr.acquisition_cost || 0}"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="editPTRStatus">
+              <option value="Pending" ${ptr.status==='Pending'?'selected':''}>Pending</option>
+              <option value="Completed" ${ptr.status==='Completed'?'selected':''}>Completed</option>
+              <option value="Cancelled" ${ptr.status==='Cancelled'?'selected':''}>Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Transfer From</label><select class="form-select" id="editPTRFrom"><option value="">-- Select Employee --</option></select></div>
+          <div class="form-group"><label>Transfer To</label><select class="form-select" id="editPTRTo"><option value="">-- Select Employee --</option></select></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit PTR', html);
+    loadEmployeesDropdown('editPTRFrom', ptr.from_accountable_officer_id);
+    loadEmployeesDropdown('editPTRTo', ptr.to_accountable_officer_id);
+  };
+  window.saveEditPTR = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    const fromSel = document.getElementById('editPTRFrom');
+    const toSel = document.getElementById('editPTRTo');
+    const fromName = fromSel.options[fromSel.selectedIndex]?.textContent || '';
+    const toName = toSel.options[toSel.selectedIndex]?.textContent || '';
+    try {
+      await apiRequest('/ptrs/' + id, 'PUT', {
+        ptr_no: document.getElementById('editPTRNo').value,
+        date: document.getElementById('editPTRDate').value || null,
+        property_number: document.getElementById('editPTRPropNo').value,
+        description: document.getElementById('editPTRDesc').value,
+        acquisition_cost: parseFloat(document.getElementById('editPTRCost').value) || 0,
+        status: document.getElementById('editPTRStatus').value,
+        from_accountable_officer_id: parseInt(fromSel.value) || null,
+        from_accountable_officer_name: fromName !== '-- Select Employee --' ? fromName : null,
+        to_accountable_officer_id: parseInt(toSel.value) || null,
+        to_accountable_officer_name: toName !== '-- Select Employee --' ? toName : null
+      });
+      showToast('PTR updated!', 'success'); closeModal(); loadPTR();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // RIS Modals
+  // =====================================================
+  // RIS CATALOG ITEM PICKER (similar to PPMP)
+  // =====================================================
+
+  window.showNewRISModal = async function() {
+    await ensureDivisionsLoaded();
+    // Load items cache
+    try {
+      window._risItemsCache = await apiRequest('/items');
+    } catch (e) {
+      window._risItemsCache = [];
+    }
+    // Initialize selected items
+    window._risSelectedItems = [];
+
+    const html = `
+      <form id="risForm" onsubmit="saveNewRIS(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="risDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="risDivision" onchange="updateRISApproverByDivision()" required>
+              ${buildDivisionOptions('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="align-items:stretch;">
+          <div class="form-group">
+            <label>Purpose</label>
+            <textarea id="risPurpose" placeholder="Purpose of requisition" rows="3" style="resize:vertical;min-height:60px;flex:1;" required></textarea>
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;">
+            <label>Items</label>
+            <button type="button" class="btn btn-primary" onclick="showRISCatalogItemModal()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <i class="fas fa-search"></i> Select Items from Catalog
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Requested By</label>
+          <select class="form-select" id="risRequestedBy"><option value="">-- Select Employee --</option></select>
+        </div>
+
+        <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <p style="font-size:11px;color:#718096;margin:0 0 10px;"><i class="fas fa-info-circle"></i> Signatories will be automatically set upon approval.</p>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:12px;color:#4a5568;">Approved By</label>
+              <input type="text" id="risApproverName" value="REGIENALD S. ESPALDON" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
+              <input type="hidden" id="risApprovedByName" value="REGIENALD S. ESPALDON">
+              <input type="hidden" id="risApprovedByDesignation" value="Chief Administrative Officer">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:12px;color:#4a5568;">Issued By</label>
+              <input type="text" value="MARK E. MARASIGAN" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
+              <input type="hidden" id="risIssuedByName" value="MARK E. MARASIGAN">
+              <input type="hidden" id="risIssuedByDesignation" value="Administrative Aide IV">
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px;margin-bottom:10px;">
+          <h4 style="margin:0;"><i class="fas fa-boxes"></i> Items</h4>
+        </div>
+
+        <div id="risItemsListContainer" style="display:none;margin-bottom:15px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span id="risItemCount" style="font-size:12px;color:#4a5568;"></span>
+          </div>
+          <div style="max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+            <table class="data-table full-width" style="font-size:12px;margin-bottom:0;">
+              <thead style="position:sticky;top:0;background:#f7fafc;z-index:1;">
+                <tr>
+                  <th style="width:30px;">#</th>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th style="width:80px;">Unit</th>
+                  <th style="width:80px;">Qty</th>
+                  <th style="width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="risItemsListBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="risNoItemsMsg" style="padding:20px;text-align:center;color:#718096;background:#f7fafc;border-radius:6px;font-size:13px;">
+          <i class="fas fa-info-circle"></i> No items added yet. Click "Select Items from Catalog" to add items.
+        </div>
+
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save RIS</button>
+        </div>
+      </form>
+    `;
+    openModal('New Requisition & Issue Slip', html, { preventOutsideClose: true });
+    loadEmployeesDropdown('risRequestedBy');
+    // Update approver based on initial division
+    setTimeout(() => updateRISApproverByDivision(), 100);
+  };
+
+  /** Update RIS approver name based on selected division */
+  window.updateRISApproverByDivision = function() {
+    const divisionSelect = document.getElementById('risDivision') || document.getElementById('editRISDivision');
+    const approverNameEl = document.getElementById('risApproverName') || document.getElementById('editRISApproverName');
+    const approverHiddenEl = document.getElementById('risApprovedByName') || document.getElementById('editRISApprovedByName');
+    const approverDesigEl = document.getElementById('risApprovedByDesignation') || document.getElementById('editRISApprovedByDesignation');
+    if (!divisionSelect || !approverNameEl) return;
+
+    const division = (divisionSelect.value || '').toUpperCase();
+    // WRSD → MAKINANO, all others → ESPALDON
+    if (division === 'WRSD') {
+      approverNameEl.value = 'EVAL B. MAKINANO';
+      if (approverHiddenEl) approverHiddenEl.value = 'EVAL B. MAKINANO';
+      if (approverDesigEl) approverDesigEl.value = 'Chief WRSD';
+    } else {
+      approverNameEl.value = 'REGIENALD S. ESPALDON';
+      if (approverHiddenEl) approverHiddenEl.value = 'REGIENALD S. ESPALDON';
+      if (approverDesigEl) approverDesigEl.value = 'Chief Administrative Officer';
+    }
+  };
+
+  /** Open a modal to select catalog items for RIS */
+  window.showRISCatalogItemModal = function() {
+    const allItems = window._risItemsCache || [];
+    const catFilter = document.getElementById('risCategoryFilter')?.value || '';
+
+    // Filter items by category if set
+    let filteredItems = allItems;
+    if (catFilter) {
+      filteredItems = allItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+
+    // Get unique categories for filter dropdown
+    const categories = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+    const categoryOptions = categories.map(c => `<option value="${c}" ${catFilter === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    const itemRows = filteredItems.map(item => {
+      const alreadyAdded = (window._risSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return `<tr class="ris-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+                  onclick="${alreadyAdded ? '' : 'selectRISCatalogItem(' + item.id + ', this)'}"
+                  style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td>${escapeHtml(item.code || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.name || '')}</td>
+        <td>${escapeHtml(item.description || '').substring(0, 50)}${(item.description || '').length > 50 ? '...' : ''}</td>
+        <td>${escapeHtml(item.unit || '')}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'risCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:850px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Items from Catalog</h4>
+          <button onclick="document.getElementById('risCatalogItemOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;display:flex;gap:10px;flex-wrap:wrap;">
+          <select class="form-select" id="risCategoryFilter" onchange="filterRISCatalogByCategory()" style="width:180px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+            <option value="">-- All Categories --</option>
+            ${categoryOptions}
+          </select>
+          <input type="text" id="risCatalogModalSearch" placeholder="Search by item code, name, description..."
+            oninput="filterRISCatalogModalItems(this.value)"
+            style="flex:1;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to add the item. Items already added are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Item Code</th>
+              <th>Category</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Unit</th>
+              <th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="risCatalogModalBody">${itemRows}</tbody>
+          </table>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid #e2e8f0;text-align:right;">
+          <button type="button" onclick="document.getElementById('risCatalogItemOverlay').remove()" class="btn btn-primary" style="padding:8px 24px;">
+            <i class="fas fa-check"></i> Done
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter items by category in RIS catalog modal */
+  window.filterRISCatalogByCategory = function() {
+    const catFilter = document.getElementById('risCategoryFilter')?.value || '';
+    const searchText = document.getElementById('risCatalogModalSearch')?.value || '';
+    const allItems = window._risItemsCache || [];
+
+    let filteredItems = allItems;
+    if (catFilter) {
+      filteredItems = filteredItems.filter(i => (i.category || '').toUpperCase() === catFilter.toUpperCase());
+    }
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      filteredItems = filteredItems.filter(i =>
+        (i.code || '').toLowerCase().includes(search) ||
+        (i.name || '').toLowerCase().includes(search) ||
+        (i.description || '').toLowerCase().includes(search) ||
+        (i.category || '').toLowerCase().includes(search)
+      );
+    }
+
+    const tbody = document.getElementById('risCatalogModalBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = filteredItems.map(item => {
+      const alreadyAdded = (window._risSelectedItems || []).some(si => String(si.item_id) === String(item.id));
+      return `<tr class="ris-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+                  onclick="${alreadyAdded ? '' : 'selectRISCatalogItem(' + item.id + ', this)'}"
+                  style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td>${escapeHtml(item.code || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td>${escapeHtml(item.name || '')}</td>
+        <td>${escapeHtml(item.description || '').substring(0, 50)}${(item.description || '').length > 50 ? '...' : ''}</td>
+        <td>${escapeHtml(item.unit || '')}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  /** Filter items in the RIS catalog modal by search text */
+  window.filterRISCatalogModalItems = function(text) {
+    const tbody = document.getElementById('risCatalogModalBody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    const search = (text || '').toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+  };
+
+  /** Select an item from the catalog modal into RIS items list */
+  window.selectRISCatalogItem = function(itemId, rowEl) {
+    const allItems = window._risItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) { alert('Item not found.'); return; }
+
+    // Prevent duplicates
+    if ((window._risSelectedItems || []).some(si => String(si.item_id) === String(itemId))) {
+      alert('This item is already in the list.');
+      return;
+    }
+
+    const entry = {
+      item_id: parseInt(itemId),
+      item_code: item.code || '',
+      item_name: item.name || '',
+      item_unit: item.unit || '',
+      item_description: item.description || '',
+      quantity: 1
+    };
+    if (!window._risSelectedItems) window._risSelectedItems = [];
+    window._risSelectedItems.push(entry);
+
+    renderRISItemsList();
+
+    // Mark the row as added
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.setAttribute('onclick', '');
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+  };
+
+  /** Render the selected items list for RIS */
+  window.renderRISItemsList = function() {
+    const tbody = document.getElementById('risItemsListBody');
+    const container = document.getElementById('risItemsListContainer');
+    const noItemsMsg = document.getElementById('risNoItemsMsg');
+    const countEl = document.getElementById('risItemCount');
+    if (!tbody) return;
+
+    const items = window._risSelectedItems || [];
+    if (items.length === 0) {
+      tbody.innerHTML = '';
+      if (container) container.style.display = 'none';
+      if (noItemsMsg) noItemsMsg.style.display = 'block';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    if (container) container.style.display = 'block';
+    if (noItemsMsg) noItemsMsg.style.display = 'none';
+
+    tbody.innerHTML = items.map((it, idx) => `
+      <tr>
+        <td style="text-align:center;color:#888;">${idx + 1}</td>
+        <td style="font-weight:600;font-size:11px;">${escapeHtml(it.item_code)}</td>
+        <td>${escapeHtml(it.item_name)}</td>
+        <td style="text-align:center;">${escapeHtml(it.item_unit)}</td>
+        <td>
+          <input type="number" value="${it.quantity}" min="1" step="1"
+            style="width:60px;font-size:11px;text-align:center;padding:2px 4px;border:1px solid #ccc;border-radius:3px;"
+            onchange="updateRISItemQty(${idx}, this.value)">
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="btn btn-sm" onclick="removeRISItem(${idx})"
+            style="color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Remove">
+            <i class="fas fa-times"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    if (countEl) countEl.textContent = items.length + ' item' + (items.length > 1 ? 's' : '') + ' added';
+  };
+
+  /** Remove an item from the RIS items list by index */
+  window.removeRISItem = function(index) {
+    window._risSelectedItems.splice(index, 1);
+    renderRISItemsList();
+  };
+
+  /** Update quantity for an item in the RIS list */
+  window.updateRISItemQty = function(index, qty) {
+    const q = Math.max(1, parseInt(qty) || 1);
+    window._risSelectedItems[index].quantity = q;
+    renderRISItemsList();
+  };
+
+  window.saveNewRIS = async function(e) {
+    e.preventDefault();
+    const selectedItems = window._risSelectedItems || [];
+    if (selectedItems.length === 0) {
+      alert('Please add at least one item to the RIS.');
+      return;
+    }
+    const items = selectedItems.map(it => ({
+      item_id: it.item_id,
+      quantity: it.quantity,
+      description: it.item_name || '',
+      uom: it.unit || ''
+    }));
+
+    // Get requested by from dropdown
+    const reqSel = document.getElementById('risRequestedBy');
+    const reqName = reqSel && reqSel.selectedIndex > 0 ? reqSel.options[reqSel.selectedIndex].textContent : null;
+
+    const data = {
+      ris_date: document.getElementById('risDate').value,
+      division: document.getElementById('risDivision').value,
+      purpose: document.getElementById('risPurpose').value,
+      requested_by_id: parseInt(reqSel?.value) || null,
+      requested_by_name: reqName,
+      // Signatories will be set upon approval
+      approved_by_name: null,
+      approved_by_designation: null,
+      issued_by_name: null,
+      issued_by_designation: null,
+      items: items
+    };
+    try {
+      if (!confirm('Are you sure you want to save this RIS?')) return;
+      await apiRequest('/ris', 'POST', data);
+      showToast('RIS saved successfully!', 'success');
+      closeModal();
+      loadRIS();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  window.showViewRISModal = async function(id) {
+    openModal('RIS Details', '<div class="view-details"><p>Loading RIS...</p></div>', { preventOutsideClose: true });
+    try {
+      const ris = await apiRequest('/ris/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-clipboard-list"></i> <strong>RIS No: ${ris.ris_no || 'N/A'}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">RIS No.</span><span class="value">${ris.ris_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date</span><span class="value">${ris.ris_date ? new Date(ris.ris_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Division</span><span class="value">${ris.division || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Purpose</span><span class="value">${ris.purpose || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Requested By</span><span class="value">${ris.requested_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Approved By</span><span class="value">${ris.approved_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Issued By</span><span class="value">${ris.issued_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Received By</span><span class="value">${ris.received_by_name || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${ris.status || 'draft'}</span></div>
+          </div>
+        </div>`;
+      openModal('RIS Details', content, { preventOutsideClose: true });
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading RIS: ' + err.message + '</p></div>', { preventOutsideClose: true });
+    }
+  };
+  window.showEditRISModal = async function(id) {
+    await ensureDivisionsLoaded();
+    let ris = {};
+    try { ris = await apiRequest('/ris/' + id); } catch (err) { alert('Could not load RIS'); return; }
+
+    // Determine initial approver based on division
+    const division = (ris.division || '').toUpperCase();
+    const isWRSD = division === 'WRSD';
+    const defaultApprover = isWRSD ? 'EVAL B. MAKINANO' : 'REGIENALD S. ESPALDON';
+    const defaultApproverDesig = isWRSD ? 'Chief WRSD' : 'Chief Administrative Officer';
+    const approverName = ris.approved_by_name || defaultApprover;
+    const approverDesig = ris.approved_by_designation || defaultApproverDesig;
+    const issuedName = ris.issued_by_name || 'MARK E. MARASIGAN';
+    const issuedDesig = ris.issued_by_designation || 'Administrative Aide IV';
+
+    const html = `
+      <form id="editRISForm" onsubmit="saveEditRIS(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit RIS #${ris.ris_no || id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>RIS No.</label><input type="text" id="editRISNo" value="${ris.ris_no || ''}"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="editRISDate" value="${ris.ris_date ? ris.ris_date.split('T')[0] : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="editRISDivision" onchange="updateRISApproverByDivision()" required>
+              ${buildDivisionOptions(ris.division || '')}
+            </select>
+          </div>
+          <div class="form-group"><label>Requested By</label><select class="form-select" id="editRISRequestedBy"><option value="">-- Select Employee --</option></select></div>
+        </div>
+        <div class="form-group">
+          <label>Purpose</label>
+          <textarea id="editRISPurpose" rows="3" style="resize:vertical;min-height:60px;">${ris.purpose || ''}</textarea>
+        </div>
+
+        <div style="margin:15px 0;padding:12px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-user-check"></i> RIS Signatories</h4>
+          <p style="font-size:11px;color:#718096;margin:0 0 10px;"><i class="fas fa-info-circle"></i> Signatories will be automatically set upon approval.</p>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:12px;color:#4a5568;">Approved By</label>
+              <input type="text" id="editRISApproverName" value="${approverName}" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
+              <input type="hidden" id="editRISApprovedByName" value="${approverName}">
+              <input type="hidden" id="editRISApprovedByDesignation" value="${approverDesig}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:12px;color:#4a5568;">Issued By</label>
+              <input type="text" value="${issuedName}" disabled style="background:#e2e8f0;color:#718096;font-size:12px;padding:8px;border:1px solid #cbd5e0;border-radius:4px;">
+              <input type="hidden" id="editRISIssuedByName" value="${issuedName}">
+              <input type="hidden" id="editRISIssuedByDesignation" value="${issuedDesig}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group"><label>Received By</label><select class="form-select" id="editRISReceivedBy"><option value="">-- Select Employee --</option></select></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="editRISStatus">
+              <option value="PENDING" ${ris.status==='PENDING'?'selected':''}>Pending</option>
+              <option value="POSTED" ${ris.status==='POSTED'?'selected':''}>Posted</option>
+              <option value="CANCELLED" ${ris.status==='CANCELLED'?'selected':''}>Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit RIS', html, { preventOutsideClose: true });
+    loadEmployeesDropdown('editRISRequestedBy', ris.requested_by_id);
+    loadEmployeesDropdown('editRISReceivedBy', ris.received_by_id);
+  };
+  window.saveEditRIS = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    const reqSel = document.getElementById('editRISRequestedBy');
+    const recSel = document.getElementById('editRISReceivedBy');
+    const getName = sel => { const t = sel.options[sel.selectedIndex]?.textContent; return t && t !== '-- Select Employee --' ? t : null; };
+
+    try {
+      await apiRequest('/ris/' + id, 'PUT', {
+        ris_no: document.getElementById('editRISNo').value,
+        ris_date: document.getElementById('editRISDate').value || null,
+        division: document.getElementById('editRISDivision').value,
+        purpose: document.getElementById('editRISPurpose').value,
+        status: document.getElementById('editRISStatus').value,
+        requested_by_id: parseInt(reqSel.value) || null,
+        requested_by_name: getName(reqSel),
+        received_by_id: parseInt(recSel.value) || null,
+        received_by_name: getName(recSel)
+      });
+      showToast('RIS updated!', 'success'); closeModal(); loadRIS();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.postRIS = async function(id) {
+    if (!confirm('Post this RIS? Stock balances will be deducted.')) return;
+    try { await apiRequest('/ris/' + id + '/post', 'PUT'); alert('RIS posted!'); loadRIS(); } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Trip Ticket Modals
+  window.showNewTripTicketModal = function() {
+    const html = `
+      <form id="tripForm" onsubmit="saveNewTripTicket(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Trip</label>
+            <input type="date" id="tripDate" value="${new Date().toISOString().split('T')[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Driver</label>
+            <select class="form-select" id="tripDriver"><option value="">-- Select Employee --</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Destination</label>
+            <input type="text" id="tripDest" placeholder="Destination" required>
+          </div>
+          <div class="form-group">
+            <label>Purpose</label>
+            <input type="text" id="tripPurpose" placeholder="Purpose of trip" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Departure Time</label>
+            <input type="time" id="tripDepart">
+          </div>
+          <div class="form-group">
+            <label>Arrival Time</label>
+            <input type="time" id="tripArrive">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>KM Before</label>
+            <input type="number" id="tripKmBefore" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>KM After</label>
+            <input type="number" id="tripKmAfter" step="0.1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Passengers</label>
+          <textarea id="tripPassengers" rows="2" placeholder="List of passengers"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Trip Ticket</button>
+        </div>
+      </form>
+    `;
+    openModal('New Trip Ticket', html);
+    loadEmployeesDropdown('tripDriver');
+  };
+  window.saveNewTripTicket = async function(e) {
+    e.preventDefault();
+    const data = {
+      date_of_trip: document.getElementById('tripDate').value,
+      driver_id: parseInt(document.getElementById('tripDriver').value) || null,
+      destination: document.getElementById('tripDest').value,
+      purpose: document.getElementById('tripPurpose').value,
+      departure_time: document.getElementById('tripDepart').value,
+      arrival_time: document.getElementById('tripArrive').value,
+      km_before: parseFloat(document.getElementById('tripKmBefore').value) || null,
+      km_after: parseFloat(document.getElementById('tripKmAfter').value) || null,
+      passengers: document.getElementById('tripPassengers').value
+    };
+    try { if (!confirm('Are you sure you want to save this trip ticket?')) return; await apiRequest('/trip-tickets', 'POST', data); alert('Trip ticket saved!'); closeModal(); loadTripTickets(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showViewTripTicketModal = async function(id) {
+    openModal('Trip Ticket Details', '<div class="view-details"><p>Loading trip ticket #' + id + '...</p></div>');
+    try {
+      const tt = await apiRequest('/trip-tickets/' + id);
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-car"></i> <strong>Trip Ticket #${tt.trip_ticket_no || id}</strong></div>
+          <div class="detail-grid">
+            <div class="detail-item"><span class="label">Trip Ticket No.</span><span class="value">${tt.trip_ticket_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Requesting Party</span><span class="value">${tt.requesting_party || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Request</span><span class="value">${tt.date_of_request ? new Date(tt.date_of_request).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Date of Travel</span><span class="value">${tt.date_of_travel ? new Date(tt.date_of_travel).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Return Date</span><span class="value">${tt.return_date ? new Date(tt.return_date).toLocaleDateString() : 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Time of Departure</span><span class="value">${tt.time_of_departure || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Destination</span><span class="value">${tt.destination || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Purpose</span><span class="value">${tt.purpose || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Contact No.</span><span class="value">${tt.contact_no || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Passengers</span><span class="value">${typeof tt.passengers === 'object' ? JSON.stringify(tt.passengers) : (tt.passengers || 'N/A')}</span></div>
+            <div class="detail-item"><span class="label">Requested By</span><span class="value">${tt.requested_by_employee || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Approved By</span><span class="value">${tt.approved_by_employee || 'N/A'}</span></div>
+            <div class="detail-item"><span class="label">Status</span><span class="value">${tt.status || 'N/A'}</span></div>
+          </div>
+        </div>`;
+      openModal('Trip Ticket Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p>Error loading trip ticket: ' + err.message + '</p></div>');
+    }
+  };
+  window.showEditTripTicketModal = async function(id) {
+    let tt = {};
+    try { tt = await apiRequest('/trip-tickets/' + id); } catch (err) { alert('Could not load trip ticket'); return; }
+    const html = `
+      <form id="editTTForm" onsubmit="saveEditTripTicket(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Trip Ticket #${tt.trip_ticket_no || id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Trip Ticket No.</label><input type="text" id="editTTNo" value="${tt.trip_ticket_no || ''}"></div>
+          <div class="form-group"><label>Requesting Party</label><input type="text" id="editTTParty" value="${(tt.requesting_party || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Date of Request</label><input type="date" id="editTTReqDate" value="${tt.date_of_request ? tt.date_of_request.split('T')[0] : ''}"></div>
+          <div class="form-group"><label>Date of Travel</label><input type="date" id="editTTTravelDate" value="${tt.date_of_travel ? tt.date_of_travel.split('T')[0] : ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Return Date</label><input type="date" id="editTTReturnDate" value="${tt.return_date ? tt.return_date.split('T')[0] : ''}"></div>
+          <div class="form-group"><label>Contact No.</label><input type="text" id="editTTContact" value="${tt.contact_no || ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Time of Departure</label><input type="time" id="editTTDepart" value="${tt.time_of_departure || ''}"></div>
+          <div class="form-group"><label>Destination</label><input type="text" id="editTTDest" value="${(tt.destination || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-group"><label>Purpose</label><input type="text" id="editTTPurpose" value="${(tt.purpose || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Passengers</label><textarea id="editTTPassengers" rows="2">${typeof tt.passengers === 'object' ? JSON.stringify(tt.passengers) : (tt.passengers || '')}</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Requested By</label><input type="text" id="editTTReqBy" value="${(tt.requested_by_employee || '').replace(/"/g, '&quot;')}"></div>
+          <div class="form-group"><label>Approved By</label><input type="text" id="editTTAppBy" value="${(tt.approved_by_employee || '').replace(/"/g, '&quot;')}"></div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="editTTStatus">
+            <option value="pending" ${tt.status==='pending'?'selected':''}>Pending</option>
+            <option value="approved" ${tt.status==='approved'?'selected':''}>Approved</option>
+            <option value="completed" ${tt.status==='completed'?'selected':''}>Completed</option>
+            <option value="cancelled" ${tt.status==='cancelled'?'selected':''}>Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Trip Ticket', html);
+  };
+  window.saveEditTripTicket = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    let passengers = document.getElementById('editTTPassengers').value;
+    try { passengers = JSON.parse(passengers); } catch(e) { /* keep as string */ }
+    try {
+      await apiRequest('/trip-tickets/' + id, 'PUT', {
+        trip_ticket_no: document.getElementById('editTTNo').value,
+        requesting_party: document.getElementById('editTTParty').value,
+        date_of_request: document.getElementById('editTTReqDate').value || null,
+        date_of_travel: document.getElementById('editTTTravelDate').value || null,
+        return_date: document.getElementById('editTTReturnDate').value || null,
+        contact_no: document.getElementById('editTTContact').value,
+        time_of_departure: document.getElementById('editTTDepart').value,
+        destination: document.getElementById('editTTDest').value,
+        purpose: document.getElementById('editTTPurpose').value,
+        passengers: passengers,
+        requested_by_employee: document.getElementById('editTTReqBy').value,
+        approved_by_employee: document.getElementById('editTTAppBy').value,
+        status: document.getElementById('editTTStatus').value
+      });
+      showToast('Trip Ticket updated!', 'success'); closeModal(); loadTripTickets();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Semi-Expendable & Capital Outlay View Modals
+  window.showViewSemiExpModal = function(id) { openModal('Semi-Expendable Item', '<div class="view-details"><p>Loading semi-expendable item #' + id + '...</p></div>'); };
+  window.showViewCapitalOutlayModal = function(id) { openModal('Capital Outlay Item', '<div class="view-details"><p>Loading capital outlay item #' + id + '...</p></div>'); };
+
+  // Office Modals
+  window.showNewOfficeModal = async function() {
+    await ensureDivisionsLoaded();
+    const html = `
+      <form id="officeForm" onsubmit="saveNewOffice(event)">
+        <div class="form-group"><label>Office Name</label><input type="text" id="officeName" placeholder="Office name" required></div>
+        <div class="form-group"><label>Division</label>
+          <select class="form-select" id="officeDivision">
+            <option value="">-- Select Division --</option>
+            ${buildDivisionOptionsById('', false)}
+          </select>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="officeDesc" rows="2" placeholder="Description"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Office</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Office', html);
+  };
+  window.saveNewOffice = async function(e) {
+    e.preventDefault();
+    const data = { name: document.getElementById('officeName').value, division_id: parseInt(document.getElementById('officeDivision').value) || null, description: document.getElementById('officeDesc').value };
+    try { if (!confirm('Are you sure you want to save this office?')) return; await apiRequest('/offices', 'POST', data); alert('Office saved!'); closeModal(); loadOffices(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditOfficeModal = async function(id) {
+    let o = {};
+    try { o = await apiRequest('/offices/' + id); } catch (err) { alert('Could not load office'); return; }
+    const html = `
+      <form id="editOfficeForm" onsubmit="saveEditOffice(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Office #${id}</strong></div>
+        <div class="form-group"><label>Office Name</label><input type="text" id="editOfficeName" value="${(o.name || '').replace(/"/g, '&quot;')}" required></div>
+        <div class="form-group"><label>Description</label><textarea id="editOfficeDesc" rows="2">${o.description || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Office', html);
+  };
+  window.saveEditOffice = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/offices/' + id, 'PUT', { name: document.getElementById('editOfficeName').value, description: document.getElementById('editOfficeDesc').value });
+      showToast('Office updated!', 'success'); closeModal(); loadOffices();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Designation Modals
+  window.showNewDesignationModal = function() {
+    const html = `
+      <form id="designationForm" onsubmit="saveNewDesignation(event)">
+        <div class="form-group"><label>Designation Title</label><input type="text" id="desigTitle" placeholder="e.g., Administrative Officer V" required></div>
+        <div class="form-group"><label>Description</label><textarea id="desigDesc" rows="2" placeholder="Description"></textarea></div>
+        <div class="form-group"><label>Salary Grade</label><input type="text" id="desigSG" placeholder="e.g., SG-18"></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Designation</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Designation', html);
+  };
+  window.saveNewDesignation = async function(e) {
+    e.preventDefault();
+    const data = { title: document.getElementById('desigTitle').value, description: document.getElementById('desigDesc').value, salary_grade: document.getElementById('desigSG').value };
+    try { if (!confirm('Are you sure you want to save this designation?')) return; await apiRequest('/designations', 'POST', data); alert('Designation saved!'); closeModal(); loadDesignations(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditDesignationModal = async function(id) {
+    let d = {};
+    try { d = await apiRequest('/designations/' + id); } catch (err) { alert('Could not load designation'); return; }
+    const html = `
+      <form id="editDesigForm" onsubmit="saveEditDesignation(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Designation #${id}</strong></div>
+        <div class="form-group"><label>Code</label><input type="text" id="editDesigCode" value="${d.code || ''}"></div>
+        <div class="form-group"><label>Designation Title</label><input type="text" id="editDesigName" value="${(d.name || '').replace(/"/g, '&quot;')}" required></div>
+        <div class="form-group"><label>Description</label><textarea id="editDesigDesc" rows="2">${d.description || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Designation', html);
+  };
+  window.saveEditDesignation = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/designations/' + id, 'PUT', { code: document.getElementById('editDesigCode').value, name: document.getElementById('editDesigName').value, description: document.getElementById('editDesigDesc').value });
+      showToast('Designation updated!', 'success'); closeModal(); loadDesignations();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Division Modals
+  window.showNewDivisionModal = function() {
+    const html = `
+      <form id="divisionForm" onsubmit="saveNewDivision(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="divAbbr" placeholder="e.g., FAD" maxlength="20" required></div>
+          <div class="form-group"><label>Division Name</label><input type="text" id="divName" placeholder="Full name" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="divDesc" rows="2"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Division</button>
+        </div>
+      </form>
+    `;
+    openModal('Add New Division', html);
+  };
+  window.saveNewDivision = async function(e) {
+    e.preventDefault();
+    const data = { abbreviation: document.getElementById('divAbbr').value, name: document.getElementById('divName').value, description: document.getElementById('divDesc').value };
+    try { if (!confirm('Are you sure you want to save this division?')) return; await apiRequest('/divisions', 'POST', data); alert('Division saved!'); closeModal(); loadDivisions(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditDivisionModal = async function(id) {
+    let d = {};
+    try { d = await apiRequest('/divisions/' + id); } catch (err) { alert('Could not load division'); return; }
+    const html = `
+      <form id="editDivForm" onsubmit="saveEditDivision(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Division #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="editDivAbbr" value="${(d.abbreviation || '').replace(/"/g, '&quot;')}" maxlength="20" required></div>
+          <div class="form-group"><label>Division Name</label><input type="text" id="editDivName" value="${(d.name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="editDivDesc" rows="2">${d.description || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Division', html);
+  };
+  window.saveEditDivision = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/divisions/' + id, 'PUT', { abbreviation: document.getElementById('editDivAbbr').value, name: document.getElementById('editDivName').value, description: document.getElementById('editDivDesc').value });
+      showToast('Division updated!', 'success'); closeModal(); loadDivisions();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Fund Cluster Modals
+  window.showNewFundClusterModal = function() {
+    const html = `
+      <form id="fcForm" onsubmit="saveNewFundCluster(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="fcCode" placeholder="e.g., 01" required></div>
+          <div class="form-group"><label>Name</label><input type="text" id="fcName" placeholder="e.g., Regular Agency Fund" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="fcDesc" rows="2"></textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Fund Cluster</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Fund Cluster', html);
+  };
+  window.saveNewFundCluster = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('fcCode').value, name: document.getElementById('fcName').value, description: document.getElementById('fcDesc').value };
+    try { if (!confirm('Are you sure you want to save this fund cluster?')) return; await apiRequest('/fund-clusters', 'POST', data); alert('Fund cluster saved!'); closeModal(); loadFundClusters(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditFundClusterModal = async function(id) {
+    let fc = {};
+    try { fc = await apiRequest('/fund-clusters/' + id); } catch (err) { alert('Could not load fund cluster'); return; }
+    const html = `
+      <form id="editFCForm" onsubmit="saveEditFundCluster(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Fund Cluster #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="editFCCode" value="${fc.code || ''}" required></div>
+          <div class="form-group"><label>Name</label><input type="text" id="editFCName" value="${(fc.name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="editFCDesc" rows="2">${fc.description || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Fund Cluster', html);
+  };
+  window.saveEditFundCluster = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/fund-clusters/' + id, 'PUT', { code: document.getElementById('editFCCode').value, name: document.getElementById('editFCName').value, description: document.getElementById('editFCDesc').value });
+      showToast('Fund Cluster updated!', 'success'); closeModal(); loadFundClusters();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Procurement Mode Modals
+  window.showNewProcurementModeModal = function() {
+    const html = `
+      <form id="pmForm" onsubmit="saveNewProcurementMode(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="pmCode" placeholder="e.g., SVP" required></div>
+          <div class="form-group"><label>Mode Name</label><input type="text" id="pmName" placeholder="e.g., Small Value Procurement" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="pmDesc" rows="2"></textarea></div>
+        <div class="form-group"><label>Threshold Amount</label><input type="number" id="pmThreshold" step="0.01" placeholder="e.g., 1000000.00"></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Mode</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Procurement Mode', html);
+  };
+  window.saveNewProcurementMode = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('pmCode').value, name: document.getElementById('pmName').value, description: document.getElementById('pmDesc').value, threshold: parseFloat(document.getElementById('pmThreshold').value) || null };
+    try { if (!confirm('Are you sure you want to save this procurement mode?')) return; await apiRequest('/procurement-modes', 'POST', data); alert('Procurement mode saved!'); closeModal(); loadProcurementModes(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditProcurementModeModal = async function(id) {
+    let pm = {};
+    try { pm = await apiRequest('/procurement-modes/' + id); } catch (err) { alert('Could not load procurement mode'); return; }
+    const html = `
+      <form id="editPMForm" onsubmit="saveEditProcurementMode(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Procurement Mode #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="editPMCode" value="${pm.code || ''}" required></div>
+          <div class="form-group"><label>Mode Name</label><input type="text" id="editPMName" value="${(pm.name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea id="editPMDesc" rows="2">${pm.description || ''}</textarea></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Procurement Mode', html);
+  };
+  window.saveEditProcurementMode = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/procurement-modes/' + id, 'PUT', { code: document.getElementById('editPMCode').value, name: document.getElementById('editPMName').value, description: document.getElementById('editPMDesc').value });
+      showToast('Procurement Mode updated!', 'success'); closeModal(); loadProcurementModes();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // UACS Code Modals
+  window.showNewUACSCodeModal = function() {
+    const html = `
+      <form id="uacsForm" onsubmit="saveNewUACSCode(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="uacsCode" placeholder="e.g., 5020301000" required></div>
+          <div class="form-group"><label>Category</label>
+            <select class="form-select" id="uacsCategory">
+              <option value="">-- Select --</option>
+              <option value="MOOE">MOOE</option>
+              <option value="CO">Capital Outlay</option>
+              <option value="PS">Personal Services</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Description</label><input type="text" id="uacsDesc" placeholder="e.g., Office Supplies Expenses" required></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save UACS Code</button>
+        </div>
+      </form>
+    `;
+    openModal('Add UACS Code', html);
+  };
+  window.saveNewUACSCode = async function(e) {
+    e.preventDefault();
+    const data = { code: document.getElementById('uacsCode').value, description: document.getElementById('uacsDesc').value, category: document.getElementById('uacsCategory').value };
+    try { if (!confirm('Are you sure you want to save this UACS code?')) return; await apiRequest('/uacs-codes', 'POST', data); alert('UACS code saved!'); closeModal(); loadUACSCodes(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditUACSCodeModal = async function(id) {
+    let u = {};
+    try { u = await apiRequest('/uacs-codes/' + id); } catch (err) { alert('Could not load UACS code'); return; }
+    const html = `
+      <form id="editUACSForm" onsubmit="saveEditUACSCode(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit UACS Code #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Code</label><input type="text" id="editUACSCode" value="${u.code || ''}" required></div>
+          <div class="form-group"><label>Category</label>
+            <select class="form-select" id="editUACSCategory">
+              <option value="">-- Select --</option>
+              <option value="MOOE" ${u.category==='MOOE'?'selected':''}>MOOE</option>
+              <option value="CO" ${u.category==='CO'?'selected':''}>Capital Outlay</option>
+              <option value="PS" ${u.category==='PS'?'selected':''}>Personal Services</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Name/Description</label><input type="text" id="editUACSName" value="${(u.name || u.description || '').replace(/"/g, '&quot;')}" required></div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit UACS Code', html);
+  };
+  window.saveEditUACSCode = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/uacs-codes/' + id, 'PUT', { code: document.getElementById('editUACSCode').value, category: document.getElementById('editUACSCategory').value, name: document.getElementById('editUACSName').value });
+      showToast('UACS Code updated!', 'success'); closeModal(); loadUACSCodes();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // UOM Modals
+  window.showNewUOMModal = function() {
+    const html = `
+      <form id="uomForm" onsubmit="saveNewUOM(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="uomAbbr" placeholder="e.g., pc" required></div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="uomName" placeholder="e.g., piece" required></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save UOM</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Unit of Measure', html);
+  };
+  window.saveNewUOM = async function(e) {
+    e.preventDefault();
+    const data = { abbreviation: document.getElementById('uomAbbr').value, name: document.getElementById('uomName').value };
+    try { if (!confirm('Are you sure you want to save this unit of measure?')) return; await apiRequest('/uoms', 'POST', data); alert('UOM saved!'); closeModal(); loadUOMs(); } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.showEditUOMModal = async function(id) {
+    let u = {};
+    try { u = await apiRequest('/uoms/' + id); } catch (err) { alert('Could not load UOM'); return; }
+    const html = `
+      <form id="editUOMForm" onsubmit="saveEditUOM(event, ${id})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Unit of Measure #${id}</strong></div>
+        <div class="form-row">
+          <div class="form-group"><label>Abbreviation</label><input type="text" id="editUOMAbbr" value="${u.abbreviation || ''}" required></div>
+          <div class="form-group"><label>Full Name</label><input type="text" id="editUOMName" value="${(u.name || '').replace(/"/g, '&quot;')}" required></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>`;
+    openModal('Edit Unit of Measure', html);
+  };
+  window.saveEditUOM = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes?')) return;
+    try {
+      await apiRequest('/uoms/' + id, 'PUT', { abbreviation: document.getElementById('editUOMAbbr').value, name: document.getElementById('editUOMName').value });
+      showToast('UOM updated!', 'success'); closeModal(); loadUOMs();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Settings
+  window.saveSetting = async function(id) {
+    const kvList = document.querySelector(`.settings-kv-list[data-id="${id}"]`);
+    if (!kvList) return;
+    if (!confirm('Save setting "' + id + '"?')) return;
+    const data = {};
+    kvList.querySelectorAll('.settings-kv-input').forEach(input => {
+      const key = input.dataset.key;
+      let val = input.value.trim();
+      try { val = JSON.parse(val); } catch(e) { if (!isNaN(val) && val !== '') val = Number(val); }
+      data[key] = val;
+    });
+    try {
+      await apiRequest('/settings/' + id, 'PUT', { data });
+      showToast('Setting "' + id + '" saved successfully!', 'success');
+      loadSettings();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+  window.saveAllSettings = async function() {
+    if (!confirm('Save all settings?')) return;
+    const kvLists = document.querySelectorAll('.settings-kv-list');
+    let saved = 0;
+    for (const kvList of kvLists) {
+      const id = kvList.dataset.id;
+      const data = {};
+      kvList.querySelectorAll('.settings-kv-input').forEach(input => {
+        const key = input.dataset.key;
+        let val = input.value.trim();
+        try { val = JSON.parse(val); } catch(e) { if (!isNaN(val) && val !== '') val = Number(val); }
+        data[key] = val;
+      });
+      try { await apiRequest('/settings/' + id, 'PUT', { data }); saved++; } catch (err) { console.error(err); }
+    }
+    showToast(saved + ' settings saved!', 'success');
+    loadSettings();
+  };
+
+  // BAC Resolution Modal
+  window.showNewBACResolutionModal = async function() {
+    // Load employees from DB for BAC member dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    const empOptions = employees.filter(e => e.status === 'active' || !e.status).map(e => `<option value="${e.id}">${e.full_name}${e.designation_name ? ' — ' + e.designation_name : ''}</option>`).join('');
+
+    // Load abstracts for linking
+    let abstracts = [];
+    try { abstracts = cachedAbstract && cachedAbstract.length > 0 ? cachedAbstract : await apiRequest('/abstracts'); } catch(e) {}
+    const abstractOptions = abstracts.map(a => `<option value="${a.id}">${a.abstract_number || 'AOQ-' + a.id}${a.recommended_supplier_name ? ' — ' + a.recommended_supplier_name : ''}${a.recommended_amount ? ' (₱' + Number(a.recommended_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`).join('');
+
+    const html = `
+      <form id="bacResForm" onsubmit="saveNewBACResolution(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-gavel"></i>
+          <strong>BAC RESOLUTION</strong> — Declaring Winning Bidder
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Resolution No.</label>
+            <input type="text" id="bacResNumber" value="${generateDocNumber('BAC-RES')}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Series of</label>
+            <input type="text" id="bacResSeries" value="${getCurrentFiscalYear()}" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Subject / Title</label>
+          <textarea rows="2" id="bacResSubject" placeholder="Auto-generated when bidder type and abstract are selected..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Linked Abstract of Quotation</label>
+          <select class="form-select" id="bacResLinkedAbstract" required onchange="onBACLinkedAbstractChange(this.value)">
+            <option value="">-- Select Abstract of Quotation --</option>
+            ${abstractOptions}
+          </select>
+        </div>
+        <div class="form-section-header"><i class="fas fa-gavel"></i> Whereas Clauses</div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="the Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII conducted a procurement through Small Value Procurement...">the Bids and Awards Committee (BAC) of the Department of Migrant Workers - Regional Office XIII conducted a procurement through Small Value Procurement (SVP) for the above-mentioned requirement;</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="the BAC invited suppliers and received quotations...">the BAC sent Request for Quotations (RFQ) to prospective suppliers and received sealed quotations;</textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">WHEREAS,</label>
+            <textarea rows="2" placeholder="after evaluation of the quotations...">after opening and evaluation of the quotations received, the following are the results:</textarea>
+          </div>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-chart-bar"></i> Bidders Comparison</div>
+        <div class="form-items-section">
+        <table class="data-table" style="font-size: 12px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th style="width: 40px;">No.</th>
+              <th>Name of Bidder</th>
+              <th style="width: 130px;">Total Bid Amount</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="bacBiddersBody">
+            <tr>
+              <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
+            </tr>
+            <tr>
+              <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+            </tr>
+            <tr>
+              <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addBACBidderRow()"><i class="fas fa-plus"></i> Add Bidder</button>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-award"></i> Award Details</div>
+        <div class="form-group">
+          <label>Bidder Type Classification</label>
+          <select class="form-select" id="bacResBidderType" required onchange="updateBACResSubject()">
+            <option value="LOWEST CALCULATED AND RESPONSIVE (LCRB)">LOWEST CALCULATED AND RESPONSIVE (LCRB)</option>
+            <option value="HIGHEST RATED AND RESPONSIVE (HRRB)">HIGHEST RATED AND RESPONSIVE (HRRB)</option>
+            <option value="MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)">MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)</option>
+            <option value="MOST ADVANTAGEOUS AND RESPONSIVE (MARB)">MOST ADVANTAGEOUS AND RESPONSIVE (MARB)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ABC (Approved Budget for the Contract)</label>
+            <input type="number" id="bacResABC" placeholder="0.00" step="0.01" required onchange="togglePhilGEPSFields()">
+          </div>
+          <div class="form-group">
+            <label>Contract Price (Winning Bid Amount)</label>
+            <input type="number" id="bacResContractPrice" placeholder="0.00" step="0.01" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description of Procurement</label>
+          <textarea rows="2" id="bacResDescription" placeholder="Brief description of items/services procured" required></textarea>
+        </div>
+
+        <!-- PhilGEPS Posting Dates (shown only when ABC > 200,000) -->
+        <div id="philgepsFieldsSection" style="display: none; background: #fff3e0; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 2px dashed #ff9800;">
+          <div style="font-weight: 600; margin-bottom: 10px; color: #e65100;"><i class="fas fa-globe"></i> PhilGEPS Posting (Required for ABC > ₱200,000)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size: 12px;">Posting Start Date</label>
+              <input type="date" id="bacResPhilgepsFrom" class="form-control">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px;">Posting End Date</label>
+              <input type="date" id="bacResPhilgepsUntil" class="form-control">
+            </div>
+          </div>
+          <small style="color: #666;"><i class="fas fa-info-circle"></i> Posting period must be at least 3 calendar days as per RA 12009 IRR Section 34.3(b)</small>
+        </div>
+
+        <div class="form-section-header section-signatories"><i class="fas fa-users"></i> BAC Members (Signatories)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">BAC Chairperson</label>
+              <select id="bacChairpersonId" class="form-select" required>
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">Vice-Chairperson</label>
+              <select id="bacViceChairpersonId" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <select id="bacMember1Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <select id="bacMember2Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            <select id="bacMember3Id" class="form-select">
+              <option value="">-- Select Employee --</option>
+              ${empOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-section-header section-signatories"><i class="fas fa-user-tie"></i> Head of Procuring Entity (HoPE)</div>
+        <div style="background: #bbdefb; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">Head of Procuring Entity</label>
+            <select id="bacHopeId" class="form-select" required>
+              <option value="">-- Select Employee --</option>
+              ${empOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; display: block;"><i class="fas fa-gavel"></i> BAC Resolution Document (Signed by BAC Members)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="bacResDocument" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'bacResDocumentLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('bacResDocument').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="bacResDocumentLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight: 500; display: block;"><i class="fas fa-file-alt"></i> Post-Qualification Report (if applicable)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="bacResPostQual" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'bacResPostQualLabel')">
+                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('bacResPostQual').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="bacResPostQualLabel" style="font-size: 12px; color: #666;">Optional</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="submitBACResolution()"><i class="fas fa-gavel"></i> Submit Resolution</button>
+        </div>
+      </form>
+    `;
+    openModal('Create BAC Resolution', html, { preventOutsideClose: true });
+  };
+
+  // Toggle PhilGEPS fields based on ABC amount
+  window.togglePhilGEPSFields = function() {
+    const abcInput = document.getElementById('bacResABC');
+    const philgepsSection = document.getElementById('philgepsFieldsSection');
+    const editAbcInput = document.getElementById('editBacResABC');
+    const editPhilgepsSection = document.getElementById('editPhilgepsFieldsSection');
+
+    if (abcInput && philgepsSection) {
+      const abcAmount = parseFloat(abcInput.value) || 0;
+      philgepsSection.style.display = abcAmount > 200000 ? 'block' : 'none';
+    }
+    if (editAbcInput && editPhilgepsSection) {
+      const abcAmount = parseFloat(editAbcInput.value) || 0;
+      editPhilgepsSection.style.display = abcAmount > 200000 ? 'block' : 'none';
+    }
+  };
+
+  window.addBACBidderRow = function() {
+    const tbody = document.getElementById('bacBiddersBody');
+    const nextNum = tbody.rows.length + 1;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
+      <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+      <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
+      <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
+    `;
+    tbody.appendChild(row);
+  };
+
+  /** Auto-fill BAC Resolution from linked Abstract data (bidders, ABC, supplier, description) */
+  window.onBACLinkedAbstractChange = async function(abstractId) {
+    if (!abstractId) return;
+    try {
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) return;
+      // Auto-fill ABC amount from abstract's recommended amount or total
+      const abcField = document.getElementById('bacResABC');
+      if (abcField && abs.recommended_amount) abcField.value = parseFloat(abs.recommended_amount).toFixed(2);
+      // Auto-fill contract price from recommended supplier's bid
+      const contractField = document.getElementById('bacResContractPrice');
+      if (contractField && abs.recommended_amount) contractField.value = parseFloat(abs.recommended_amount).toFixed(2);
+      // Auto-fill description from purpose
+      const descField = document.getElementById('bacResDescription');
+      if (descField && abs.purpose) descField.value = abs.purpose;
+      // Auto-fill bidders from abstract quotations
+      const quotations = abs.quotations || [];
+      if (quotations.length > 0) {
+        const tbody = document.getElementById('bacBiddersBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          quotations.forEach((q, idx) => {
+            const row = document.createElement('tr');
+            const bidAmount = parseFloat(q.bid_amount || 0);
+            const isRecommended = abs.recommended_supplier_name && q.supplier_name === abs.recommended_supplier_name;
+            row.innerHTML = `
+              <td><input type="text" value="${idx + 1}" style="width: 35px; text-align: center;"></td>
+              <td><input type="text" value="${escapeHtml(q.supplier_name || '')}" style="width: 100%;"></td>
+              <td><input type="number" value="${bidAmount.toFixed(2)}" step="0.01" style="width: 120px;"></td>
+              <td><input type="text" value="${isRecommended ? 'LCRB / Responsive' : 'Responsive'}" style="width: 100%;"></td>
+            `;
+            tbody.appendChild(row);
+          });
+        }
+      }
+      // Store abstract data for subject generation
+      window._bacLinkedAbstract = abs;
+      // Toggle PhilGEPS if ABC was set
+      togglePhilGEPSFields();
+      // Update subject
+      updateBACResSubject();
+    } catch(e) { console.error('Error loading abstract for BAC:', e); }
+  };
+
+  /** Update BAC Resolution subject based on bidder type and linked abstract */
+  window.updateBACResSubject = function() {
+    const bidderType = document.getElementById('bacResBidderType')?.value || '';
+    const abs = window._bacLinkedAbstract;
+    const subjectField = document.getElementById('bacResSubject');
+    if (!subjectField) return;
+    const supplierName = abs ? (abs.recommended_supplier_name || '') : '';
+    const description = document.getElementById('bacResDescription')?.value || (abs ? abs.purpose || '' : '');
+    if (bidderType && (supplierName || description)) {
+      const bidderLabel = bidderType.split('(')[0].trim();
+      subjectField.value = `RESOLUTION DECLARING ${supplierName ? supplierName.toUpperCase() + ' AS THE ' : ''}${bidderLabel} BIDDER FOR ${description.toUpperCase()}`;
+    }
+  };
+
+  // Post-Qualification / TWG Report Modal
+  window.showNewPostQualModal = async function() {
+    // Load employees from DB for TWG member dropdowns
+    let employees = [];
+    try { employees = await apiRequest('/employees'); } catch(e) {}
+    function buildEmpOpts() {
+      return employees.filter(e => e.status === 'active' || !e.status).map(e =>
+        `<option value="${e.id}">${e.full_name}${e.designation_name ? ' — ' + e.designation_name : ''}</option>`
+      ).join('');
+    }
+    const empOptions = buildEmpOpts();
+
+    // Load abstracts for linking dropdown
+    let abstracts = [];
+    try { abstracts = cachedAbstract && cachedAbstract.length > 0 ? cachedAbstract : await apiRequest('/abstracts'); } catch(e) {}
+    const abstractOptions = abstracts.map(a => `<option value="${a.id}">${a.abstract_number || 'AOQ-' + a.id}${a.recommended_supplier_name ? ' — ' + a.recommended_supplier_name : ''}${a.recommended_amount ? ' (₱' + Number(a.recommended_amount).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')' : ''}</option>`).join('');
+
+    const html = `
+      <form id="postQualForm" onsubmit="saveNewPostQual(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-users"></i>
+          <strong>TWG REPORT</strong> — Technical Working Group Evaluation Report
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px; font-weight: 600;">TO:</label>
+              <input type="text" value="BAC Chairperson" placeholder="BAC Chairperson" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 5px;">
+              <label style="font-size: 12px; font-weight: 600;">DATE:</label>
+              <input type="date" id="postQualDate" value="${new Date().toISOString().split('T')[0]}" required>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; font-weight: 600;">SUBJECT:</label>
+            <input type="text" id="postQualSubject" placeholder="e.g., Procurement of Security Guard Services" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TWG Report No.</label>
+            <input type="text" id="postQualNumber" value="${generateDocNumber('TWG')}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Linked Abstract</label>
+            <select class="form-select" id="postQualLinkedAbstract" required onchange="onPostQualLinkedAbstractChange(this.value)">
+              <option value="">-- Select Abstract --</option>
+              ${abstractOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reference Text</label>
+          <textarea rows="2">In reference to the above-subject procurement, the Technical Working Group (TWG) hereby submits the following evaluation report on the submitted quotations and eligibility documents:</textarea>
+        </div>
+        <div class="form-section-header section-inspection"><i class="fas fa-tasks"></i> Required Documents Verification</div>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Mark as Pass or N/A for each bidder</p>
+        <div style="overflow-x: auto;">
+          <table id="twgDocsTable" class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 700px;">
+            <thead>
+              <tr>
+                <th>Required Documents</th>
+                <th style="width: 120px; background: #e3f2fd;">Bidder 1</th>
+                <th style="width: 120px; background: #d0e8ff;">Bidder 2</th>
+                <th style="width: 120px; background: #bbdefb;">Bidder 3</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" style="padding: 4px;"><strong>Bidder Names:</strong></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
+                <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
+                <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
+              </tr>
+              <tr>
+                <td>Latest Income Tax Return (ITR)</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>Omnibus Sworn Statement</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>Valid Mayor's/Business Permit</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>PhilGEPS Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>BIR Certificate of Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+              <tr>
+                <td>SEC/DTI Registration</td>
+                <td style="background: #f5f9ff;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #dce9fc;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+                <td style="background: #cddff5;"><select class="form-select" style="font-size: 11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="form-section-header section-items"><i class="fas fa-balance-scale"></i> Price Comparison</div>
+        <table class="data-table" style="font-size: 11px; margin-bottom: 10px;">
+          <thead>
+            <tr>
+              <th>Particulars</th>
+              <th style="width: 100px;">ABC</th>
+              <th style="width: 100px; background: #e3f2fd;">Bidder 1</th>
+              <th style="width: 100px; background: #d0e8ff;">Bidder 2</th>
+              <th style="width: 100px; background: #bbdefb;">Bidder 3</th>
+            </tr>
+          </thead>
+          <tbody id="twgPriceBody">
+            <tr>
+              <td><input type="text" placeholder="Item/Service" style="width: 100%; font-size: 11px;"></td>
+              <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+              <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;"></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addTWGPriceRow()"><i class="fas fa-plus"></i> Add Item Row</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addTWGBidderCol()" style="margin-left:8px;"><i class="fas fa-user-plus"></i> Add Bidder</button>
+        <div class="form-section-header section-signatories"><i class="fas fa-users"></i> TWG Members (Signatories)</div>
+        <div style="background: #e8eaf6; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600;">TWG Head</label>
+              <select id="twgHeadId" class="form-select" required>
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <select id="twgMember1Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <select id="twgMember2Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label style="font-size: 12px;">Member</label>
+              <select id="twgMember3Id" class="form-select">
+                <option value="">-- Select Employee --</option>
+                ${empOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">Member</label>
+            <select id="twgMember4Id" class="form-select">
+              <option value="">-- Select Employee --</option>
+              ${empOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments <small style="font-weight:400;color:#999;">(Optional)</small></div>
+        <div class="form-attachment-section">
+          <div class="attachment-box" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border: 2px dashed #2196f3;">
+            <div style="margin-bottom: 12px;">
+              <label style="font-weight: 600; display: block;"><i class="fas fa-user-check"></i> TWG Report (Signed)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="postQualReport" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'postQualReportLabel')">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('postQualReport').click()"><i class="fas fa-upload"></i> Upload</button>
+                <span id="postQualReportLabel" style="font-size: 12px; color: #666;">No file selected</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block;"><i class="fas fa-folder-open"></i> Bidder Documents (Scanned)</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" id="postQualBidderDocs" accept=".pdf,.jpg,.jpeg,.png" multiple style="display: none;" onchange="updateFileLabel(this, 'postQualBidderDocsLabel', true)">
+                <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('postQualBidderDocs').click()"><i class="fas fa-upload"></i> Upload Multiple</button>
+                <span id="postQualBidderDocsLabel" style="font-size: 12px; color: #666;">No files selected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
+          <button type="button" class="btn btn-primary" onclick="submitPostQual()"><i class="fas fa-user-check"></i> Submit TWG Report</button>
+        </div>
+      </form>
+    `;
+    openModal('TWG Evaluation Report / Post-Qualification', html, { preventOutsideClose: true });
+  };
+
+  // Track current bidder count for Post-Qual / TWG
+  window._twgBidderCount = 3;
+
+  /** Add a new bidder column to both TWG tables (Required Documents + Price Comparison) */
+  window.addTWGBidderCol = function() {
+    window._twgBidderCount++;
+    const n = window._twgBidderCount;
+    const bgHeader = _absBgColors[(n - 1) % _absBgColors.length];
+    const bgCell = _absBgColorsCell[(n - 1) % _absBgColorsCell.length];
+
+    // === Required Documents Verification table ===
+    const docsTable = document.getElementById('twgDocsTable');
+    if (docsTable) {
+      const headerRow = docsTable.querySelector('thead tr');
+      if (headerRow) {
+        const th = document.createElement('th');
+        th.style.cssText = 'width:120px;background:' + bgHeader + ';';
+        th.textContent = 'Bidder ' + n;
+        headerRow.appendChild(th);
+      }
+      const tbody = docsTable.querySelector('tbody');
+      if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, idx) => {
+          const td = document.createElement('td');
+          td.style.background = bgCell;
+          if (idx === 0) {
+            // "Bidder Names:" label row — update colspan
+            const labelCell = row.querySelector('td[colspan]');
+            if (labelCell) labelCell.setAttribute('colspan', n + 1);
+          } else if (idx === 1) {
+            // Bidder name input row
+            td.innerHTML = '<input type="text" id="twgBidder' + n + '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' + n + ' name">';
+            row.appendChild(td);
+          } else {
+            // Document check rows
+            td.innerHTML = '<select class="form-select" style="font-size:11px;"><option>Pass</option><option>N/A</option><option>Fail</option></select>';
+            row.appendChild(td);
+          }
+        });
+      }
+    }
+
+    // === Price Comparison table ===
+    const priceTable = document.getElementById('twgPriceBody')?.closest('table');
+    if (priceTable) {
+      const priceHeader = priceTable.querySelector('thead tr');
+      if (priceHeader) {
+        const th = document.createElement('th');
+        th.style.cssText = 'width:100px;background:' + bgHeader + ';';
+        th.textContent = 'Bidder ' + n;
+        priceHeader.appendChild(th);
+      }
+      const priceBody = document.getElementById('twgPriceBody');
+      if (priceBody) {
+        Array.from(priceBody.rows).forEach(row => {
+          const td = document.createElement('td');
+          td.style.background = bgCell;
+          td.innerHTML = '<input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;">';
+          row.appendChild(td);
+        });
+      }
+    }
+  };
+
+  window.addTWGPriceRow = function() {
+    const tbody = document.getElementById('twgPriceBody');
+    const count = window._twgBidderCount || 3;
+    const row = document.createElement('tr');
+    let bidderCells = '';
+    for (let i = 0; i < count; i++) {
+      const bg = _absBgColorsCell[i % _absBgColorsCell.length];
+      bidderCells += '<td style="background:' + bg + ';"><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;"></td>';
+    }
+    row.innerHTML =
+      '<td><input type="text" placeholder="Item/Service" style="width:100%;font-size:11px;"></td>' +
+      '<td><input type="number" placeholder="0.00" step="0.01" style="width:90px;font-size:11px;"></td>' +
+      bidderCells;
+    tbody.appendChild(row);
+  };
+
+  /** Auto-fill post-qual form when linked abstract is selected */
+  window.onPostQualLinkedAbstractChange = async function(abstractId) {
+    if (!abstractId) return;
+    try {
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) return;
+
+      // Auto-fill subject
+      const subjectField = document.getElementById('postQualSubject');
+      if (subjectField && abs.purpose) subjectField.value = abs.purpose;
+
+      // Auto-fill bidder names from abstract quotations
+      const quotations = abs.quotations || [];
+      quotations.forEach((q, i) => {
+        const bidderInput = document.getElementById('twgBidder' + (i + 1));
+        if (bidderInput && q.supplier_name) bidderInput.value = q.supplier_name;
+      });
+
+      // Auto-fill price comparison - first row Particulars and ABC
+      const priceBody = document.getElementById('twgPriceBody');
+      if (priceBody && priceBody.rows.length > 0) {
+        const firstRow = priceBody.rows[0];
+        const inputs = firstRow.querySelectorAll('input');
+        // Particulars (first input)
+        if (inputs[0] && abs.purpose) inputs[0].value = abs.purpose;
+        // ABC (second input)
+        if (inputs[1] && abs.recommended_amount) inputs[1].value = abs.recommended_amount;
+        // Bidder amounts
+        quotations.forEach((q, i) => {
+          if (inputs[i + 2] && q.bid_amount) inputs[i + 2].value = q.bid_amount;
+        });
+      }
+
+      // Store for later use
+      window._postQualLinkedAbstract = abs;
+    } catch (e) {
+      console.warn('Error loading abstract for post-qual:', e);
+    }
+  };
+
+  // =====================================================
+  // COA SUBMISSION – Document Hub with Standard Print Previews
+  // =====================================================
+  // State object for the COA wizard
+  window._coaWizard = { step: 1, poData: null, iarData: null, submissionNumber: '', dates: {} };
+
+  /**
+   * Main entry point: open the COA submission wizard
+   */
+  window.showNewCOASubmissionModal = async function() {
+    // Load PO and IAR data
+    if (!cachedPO || cachedPO.length === 0) { try { cachedPO = await apiRequest('/po'); } catch(e) {} }
+    if (!cachedIAR || cachedIAR.length === 0) { try { cachedIAR = await apiRequest('/iar'); } catch(e) {} }
+
+    const poOpts = (cachedPO || []).map(p =>
+      `<option value="${p.id}" data-po='${JSON.stringify({ id:p.id, po_number:p.po_number||'', supplier_name:p.supplier_name||'', purpose:p.purpose||'', place_of_delivery:p.place_of_delivery||p.delivery_address||'', delivery_date:p.delivery_date||p.expected_delivery_date||'', total_amount:p.total_amount||0 }).replace(/'/g, '&#39;')}'>${p.po_number || ''} — ${(p.supplier_name || '').substring(0,30)} — ${(p.purpose || '').substring(0,40)}</option>`
+    ).join('');
+    const iarOpts = (cachedIAR || []).map(i =>
+      `<option value="${i.id}">${i.iar_number || ''}</option>`
+    ).join('');
+
+    const html = `
+      <div style="margin-bottom:16px;">
+        <div class="info-banner warning-banner" style="margin-bottom:12px;">
+          <i class="fas fa-clock"></i>
+          <strong>Deadline:</strong> Submit within 5 calendar days from PO approval date.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Linked Purchase Order <span style="color:red;">*</span></label>
+            <select id="coaWizardPOSelect" class="form-select" style="font-size:12px;" onchange="coaWizardPOChanged()">
+              <option value="">-- Select PO --</option>
+              ${poOpts}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Linked IAR (optional)</label>
+            <select id="coaWizardIARSelect" class="form-select" style="font-size:12px;">
+              <option value="">-- Select IAR --</option>
+              ${iarOpts}
+            </select>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:10px;">
+          <button type="button" class="btn btn-primary" onclick="coaWizardStart()"><i class="fas fa-play"></i> Start COA Wizard</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>
+    `;
+    openModal('COA Submission – Select Transaction', html);
+  };
+
+  /**
+   * Called when PO dropdown changes – cache selected PO data
+   */
+  window.coaWizardPOChanged = function() {
+    const sel = document.getElementById('coaWizardPOSelect');
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.po) {
+      try { window._coaWizard.poData = JSON.parse(opt.dataset.po); } catch(e) {}
+    }
+  };
+
+  /**
+   * Start the wizard after PO is selected – show document hub
+   */
+  window.coaWizardStart = function() {
+    const sel = document.getElementById('coaWizardPOSelect');
+    if (!sel || !sel.value) {
+      showNotification('Please select a Purchase Order first.', 'warning');
+      return;
+    }
+    const iarSel = document.getElementById('coaWizardIARSelect');
+    window._coaWizard.iarId = iarSel ? iarSel.value : null;
+    window._coaWizard.poId = sel.value;
+    window._coaWizard.step = 1;
+    window._coaWizard.submissionNumber = generateDocNumber('COA');
+    window._coaWizard.dates = { step1: new Date().toISOString().split('T')[0], step2: new Date().toISOString().split('T')[0], step3: new Date().toISOString().split('T')[0] };
+    // Parse PO data from the selected option
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.po) {
+      try { window._coaWizard.poData = JSON.parse(opt.dataset.po); } catch(e) {}
+    }
+    // Show document hub in modal
+    coaRenderHub();
+  };
+
+  /**
+   * Render the COA document hub — shows 3 document preview buttons + submit
+   */
+  function coaRenderHub() {
+    const w = window._coaWizard;
+    const po = w.poData || {};
+    const poLabel = po.po_number || 'N/A';
+    const supplierLabel = (po.supplier_name || 'N/A').substring(0, 40);
+
+    const html = `
+      <div style="padding:4px 0;">
+        <div style="background:#f0f4ff;border:1px solid #c5d5f5;border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-file-contract" style="font-size:20px;color:#1565c0;"></i>
+          <div>
+            <div style="font-weight:700;color:#1565c0;">COA Submission – ${w.submissionNumber}</div>
+            <div style="color:#555;margin-top:2px;">PO: <strong>${poLabel}</strong> &nbsp;|&nbsp; Supplier: <strong>${supplierLabel}</strong></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Documents to Submit</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(1)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-file-export" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 1: Transmittal – Purchase Order</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Letter submitting PO documents (9 enclosures)</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(2)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-search" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 2: Notice of Inspection</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Invitation letter for COA to witness inspection</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewStep(3)">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-clipboard-check" style="color:#1565c0;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Step 3: Transmittal – IAR</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Letter submitting IAR documents (4 enclosures)</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaPreviewAll()">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-print" style="color:#388e3c;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Print All 3 Documents</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Open all documents in one print preview with page breaks</div>
+            </div>
+            <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
+          </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #ddd;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" style="background:#388e3c;" onclick="coaWizardSubmit()"><i class="fas fa-file-export"></i> Submit to COA</button>
+        </div>
+      </div>`;
+
+    if (modalTitle) modalTitle.textContent = 'COA Submission Wizard';
+    if (modalBody) modalBody.innerHTML = html;
+  }
+
+  /**
+   * DMW contact footer for COA letters (used as page footer in print)
+   */
+  function coaFooterHTML() {
+    return `<div style="border-top:2px solid #1565c0;padding-top:4px;font-size:7.5px;line-height:1.5;text-align:center;color:#333;">
+      <div>Website: www.dmw.gov.ph | Email: butuan@dmw.gov.ph | Landline: (085)815-1708</div>
+      <div>Finance &amp; Administrative Division: 0921-846 5934</div>
+      <div>Migrant Workers Processing Division: 0993-279 8082</div>
+      <div>Migrant Workers Protection Division: 0907-694 3525</div>
+      <div>Welfare &amp; Reintegration Services Division: 0948-475 6812 / 0950-305 7533</div>
+    </div>`;
+  }
+
+  /**
+   * Build a static print-ready letter body for a given step (no input fields)
+   */
+  function coaBuildWizardLetter(step) {
+    const w = window._coaWizard;
+    const po = w.poData || {};
+    const today = new Date().toISOString().split('T')[0];
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+    const dateStr = fmtDate(w.dates['step' + step] || today);
+    const supplier = po.supplier_name || '';
+    const purpose = po.purpose || '';
+    const location = po.place_of_delivery || po.delivery_address || '';
+    const poNum = po.po_number || '';
+    const delivDate = fmtDate(po.delivery_date || po.expected_delivery_date || '');
+
+    const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:30px;font-size:12px;">Thank you and best regards</div><div style="margin-top:50px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+
+    if (step === 1) {
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
+    } else if (step === 2) {
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${purpose}</strong> / PO No.: <strong>${poNum}</strong>, on <strong>${delivDate}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+    } else {
+      return `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${dateStr}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${supplier}</strong> for the <strong>${purpose}</strong> at <strong>${location}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div style="font-size:12px;margin-bottom:10px;">Hope you find the attached documents in order.</div>${sig}`;
+    }
+  }
+
+  /**
+   * Open a single COA step letter in the standard editable print preview
+   */
+  window.coaPreviewStep = function(step) {
+    const stepNames = { 1: 'Transmittal_PO', 2: 'Notice_of_Inspection', 3: 'Transmittal_IAR' };
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const title = stepNames[step] + ' - ' + (window._coaWizard.poData?.po_number || '');
+    const letterBody = coaBuildWizardLetter(step);
+    const printHTML = buildPrintHTML(title, letterBody, coaFooterHTML());
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Open all 3 COA documents in one print preview with page breaks
+   */
+  window.coaPreviewAll = function() {
+    const poNum = window._coaWizard.poData?.po_number || '';
+    const title = 'COA_Documents_' + poNum;
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const body = [1,2,3].map((s,i) => {
+      const letterBody = coaBuildWizardLetter(s);
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}${letterBody}`;
+    }).join('');
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Final submit: create the COA submission record
+   */
+  window.coaWizardSubmit = async function() {
+    const w = window._coaWizard;
+    if (!w.poId) { showNotification('No Purchase Order selected.', 'warning'); return; }
+
+    if (!confirm('Submit all 3 documents to COA?\n\n\u2022 Transmittal \u2013 PO\n\u2022 Notice of Inspection\n\u2022 Transmittal \u2013 IAR\n\nThis will create the COA submission record and open Gmail to send.')) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const payload = {
+        submission_number: w.submissionNumber,
+        po_id: parseInt(w.poId) || null,
+        iar_id: parseInt(w.iarId) || null,
+        submission_date: w.dates.step1 || today,
+        status: 'pending_email',
+        documents_included: JSON.stringify({
+          transmittal_po: { date: w.dates.step1 || today, supplier: w.poData?.supplier_name, purpose: w.poData?.purpose, location: w.poData?.place_of_delivery },
+          notice_inspection: { date: w.dates.step2 || today, purpose: w.poData?.purpose, po_number: w.poData?.po_number, delivery_date: w.poData?.delivery_date },
+          transmittal_iar: { date: w.dates.step3 || today, supplier: w.poData?.supplier_name, purpose: w.poData?.purpose, location: w.poData?.place_of_delivery }
+        })
+      };
+      await apiRequest('/coa-submissions', 'POST', payload);
+
+      // Build Gmail compose URL with pre-filled template
+      const poNum = w.poData?.po_number || w.submissionNumber;
+      const supplier = w.poData?.supplier_name || '';
+      const purpose = w.poData?.purpose || '';
+      const subject = encodeURIComponent('COA Submission — ' + poNum + (supplier ? ' — ' + supplier : ''));
+      const body = encodeURIComponent(
+        'Good day,\n\n' +
+        'Please find attached the following documents for COA submission:\n\n' +
+        '1. Transmittal – Purchase Order (' + poNum + ')\n' +
+        '2. Notice of Inspection\n' +
+        '3. Transmittal – IAR\n\n' +
+        'Supplier: ' + supplier + '\n' +
+        'Purpose: ' + purpose + '\n' +
+        'Submission No.: ' + w.submissionNumber + '\n\n' +
+        'Respectfully,\n' +
+        'DMW Procurement Unit'
+      );
+      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&su=' + subject + '&body=' + body;
+      window.open(gmailUrl, '_blank');
+
+      showNotification('COA Submission record created! Gmail opened for sending.', 'success');
+      closeModal();
+      loadCOA();
+    } catch (err) {
+      showNotification('Failed to submit: ' + (err.message || err), 'error');
+    }
+  };
+
+  // PO Accept Modal (NEW - per spec v1.2)
+  window.showAcceptPOModal = function() {
+    const html = `
+      <form id="acceptPoForm" onsubmit="handleAcceptPO(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-info-circle"></i>
+          Mark PO as accepted by supplier. This will update workflow status to <strong>Awaiting Delivery</strong>.
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Accepted Date/Time <span class="text-danger">*</span></label>
+            <input type="datetime-local" id="acceptedAt" required>
+          </div>
+          <div class="form-group">
+            <label>Accepted By</label>
+            <input type="text" placeholder="Supplier representative name">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Supplier Conforme Attachment</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="conformeAttachment" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'conformeLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('conformeAttachment').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="conformeLabel" style="font-size: 12px; color: #666;">Optional - signed conforme</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Mark Accepted</button>
+        </div>
+      </form>
+    `;
+    openModal('Accept Purchase Order', html, { preventOutsideClose: true });
+  };
+
+  // Mark Delivered Modal (NEW - per spec v1.2)
+  window.showMarkDeliveredModal = function() {
+    const html = `
+      <form id="deliveredForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-truck"></i>
+          Mark delivery received. This will update workflow status to <strong>For Payment</strong>.
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Delivered Date <span class="text-danger">*</span></label>
+            <input type="date" id="deliveryDate" required>
+          </div>
+          <div class="form-group">
+            <label>Delivered At (Time)</label>
+            <input type="time" id="deliveredTime">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Delivery Receipt Number</label>
+          <input type="text" placeholder="DR Number">
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea rows="2" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-truck"></i> Mark Delivered</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark Delivery Received', html);
+  };
+
+  // Mark Paid (ADA) Modal (NEW - per spec v1.2)
+  window.showMarkPaidModal = function() {
+    const html = `
+      <form id="paidForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-money-check-alt"></i>
+          Record payment completion via ADA (Advice to Debit Account).
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Payment Date <span class="text-danger">*</span></label>
+            <input type="date" id="paymentDate" required>
+          </div>
+          <div class="form-group">
+            <label>ADA Reference Number <span class="text-danger">*</span></label>
+            <input type="text" id="adaReference" placeholder="ADA-XXXX-XXXX" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Amount Paid</label>
+          <input type="text" placeholder="₱0.00" readonly>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check-circle"></i> Mark Paid (ADA)</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark Payment Complete', html);
+  };
+
+  // Compile Packet Modal (NEW - per spec v1.2)
+  window.showCompilePacketModal = async function() {
+    // Load PO data dynamically
+    if (!cachedPO || cachedPO.length === 0) { try { cachedPO = await apiRequest('/po'); } catch(e) {} }
+    const poOpts = (cachedPO || []).map(p => `<option value="${p.id}">${p.po_number || ''} - ${p.purpose || ''} (${p.workflow_status || p.status || ''})</option>`).join('');
+    const html = `
+      <form id="compilePacketForm" onsubmit="handleCompilePacket(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-folder-open"></i>
+          Compile supporting documents for Chief + Director signing before COA submission.
+        </div>
+        <div class="form-group">
+          <label>Select Purchase Order <span class="text-danger">*</span></label>
+          <select class="form-select" required>
+            <option value="">-- Select PO --</option>
+            ${poOpts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label><strong>Supporting Documents Checklist</strong></label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; background: var(--bg-color); border-radius: 8px; font-size: 12px;">
+            <label><input type="checkbox" checked disabled> Purchase Request (PR)</label>
+            <label><input type="checkbox" checked disabled> RFQ</label>
+            <label><input type="checkbox" checked disabled> Abstract of Quotation</label>
+            <label><input type="checkbox" checked disabled> Post-Qualification Report</label>
+            <label><input type="checkbox" checked disabled> BAC Resolution</label>
+            <label><input type="checkbox" checked disabled> Notice of Award</label>
+            <label><input type="checkbox" checked disabled> Purchase Order</label>
+            <label><input type="checkbox" checked disabled> Supplier Conforme</label>
+            <label><input type="checkbox" checked disabled> IAR (Appendix 62)</label>
+            <label><input type="checkbox" checked disabled> Delivery Receipt</label>
+            <label><input type="checkbox" checked disabled> Supplier Invoice</label>
+            <label><input type="checkbox"> Other Supporting Docs</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Upload Merged Packet (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="mergedPacket" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'mergedPacketLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('mergedPacket').click()"><i class="fas fa-upload"></i> Upload PDF</button>
+            <span id="mergedPacketLabel" style="font-size: 12px; color: #666;">Optional - single merged PDF</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea rows="2" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> Compile Packet</button>
+        </div>
+      </form>
+    `;
+    openModal('Compile PO Packet', html, { preventOutsideClose: true });
+  };
+
+  // Chief Sign Modal (NEW - per spec v1.2)
+  window.showChiefSignModal = function() {
+    const html = `
+      <form id="chiefSignForm" onsubmit="handleChiefSign(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-signature"></i>
+          Record Chief's signature on the PO packet.
+        </div>
+        <div class="form-group">
+          <label>Signed Date/Time <span class="text-danger">*</span></label>
+          <input type="datetime-local" id="chiefSignedAt" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Page (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="chiefSignedPage" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'chiefSignedLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('chiefSignedPage').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="chiefSignedLabel" style="font-size: 12px; color: #666;">Scanned signed page</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Record Chief Signature</button>
+        </div>
+      </form>
+    `;
+    openModal('Chief Signature', html);
+  };
+
+  // Director Sign Modal (NEW - per spec v1.2)
+  window.showDirectorSignModal = function() {
+    const html = `
+      <form id="directorSignForm" onsubmit="handleDirectorSign(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-signature"></i>
+          Record Director's (HoPE) signature on the PO packet. Both Chief + Director signatures are required before COA submission.
+        </div>
+        <div class="form-group">
+          <label>Signed Date/Time <span class="text-danger">*</span></label>
+          <input type="datetime-local" id="directorSignedAt" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Page (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="directorSignedPage" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'directorSignedLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('directorSignedPage').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="directorSignedLabel" style="font-size: 12px; color: #666;">Scanned signed page</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Record Director Signature</button>
+        </div>
+      </form>
+    `;
+    openModal('Director Signature', html);
+  };
+
+  // APP Consolidation function
+  window.consolidateAPP = async function() {
+    if (!confirm('Consolidate all PPMP entries into APP for FY ' + getCurrentFiscalYear() + '?\n\nThis will transform PPMP codes into APP codes and display all entries.')) return;
+    
+    try {
+      // Call server consolidation endpoint
+      const result = await apiRequest('/plan-items/consolidate', 'POST', { fiscal_year: getCurrentFiscalYear() });
+      
+      // Reload APP data to reflect current state
+      await loadAPP();
+      
+      // Show summary using server-provided department breakdown
+      let summary = 'APP Consolidation Complete!\n\n';
+      summary += 'PPMP entries consolidated into APP with codes transformed (PPMP → APP).\n\n';
+      summary += 'Breakdown by Division:\n';
+      if (result.by_department) {
+        result.by_department.forEach(dept => {
+          const name = dept.department_name || 'Unknown';
+          summary += '  ' + name + ': ' + dept.count + ' items — ₱' + parseFloat(dept.total).toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n';
+        });
+      }
+      summary += '\nTotal: ' + result.total_items + ' active items | Active ABC: ₱' + result.total_abc.toLocaleString('en-PH', {minimumFractionDigits:2});
+      if (result.available_budget > 0) {
+        summary += '\nAvailable Budget (from removed items): ₱' + result.available_budget.toLocaleString('en-PH', {minimumFractionDigits:2});
+        summary += '\nTotal Approved Budget: ₱' + result.total_approved.toLocaleString('en-PH', {minimumFractionDigits:2});
+      }
+      alert(summary);
+      
+      // Navigate to APP page to show results
+      if (typeof navigateTo === 'function') navigateTo('app');
+    } catch (err) {
+      alert('Consolidation failed: ' + err.message);
+    }
+  };
+
+  // Set APP Status Modal
+  window.showSetAPPStatusModal = function() {
+    const st = window._appStatus || { app_type: 'indicative', update_count: 0 };
+    const currentLabel = st.app_type === 'updated' ? 'Updated (v' + (st.update_count||1) + ')' : st.app_type.charAt(0).toUpperCase() + st.app_type.slice(1);
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Fiscal Year:</label><span>FY ${getCurrentFiscalYear()}</span></div>
+        <div class="detail-row"><label>Current Status:</label><span><span class="version-tag ${st.app_type}" style="font-size:11px;">${currentLabel}</span></span></div>
+        ${st.set_by_name ? '<div class="detail-row"><label>Last Set By:</label><span>' + st.set_by_name + '</span></div>' : ''}
+        ${st.set_at ? '<div class="detail-row"><label>Last Set On:</label><span>' + new Date(st.set_at).toLocaleDateString('en-PH', {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) + '</span></div>' : ''}
+      </div>
+      <form id="setAPPStatusForm" onsubmit="submitAPPStatus(event)">
+        <div class="form-group">
+          <label>Set APP Status To <span class="text-danger">*</span></label>
+          <select class="form-select" name="app_type" required>
+            <option value="indicative" ${st.app_type === 'indicative' ? 'selected' : ''}>Indicative — Initial APP before budget approval</option>
+            <option value="final" ${st.app_type === 'final' ? 'selected' : ''}>Final — APP after GAA/budget approval</option>
+            <option value="updated" ${st.app_type === 'updated' ? 'selected' : ''}>Updated — Revised APP (currently v${st.update_count || 0})</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea name="remarks" rows="2" placeholder="e.g., Updated per BAC Resolution No. ${getCurrentFiscalYear()}-005">${st.remarks || ''}</textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Set Status</button>
+        </div>
+      </form>
+    `;
+    openModal('Set APP Status — FY ' + getCurrentFiscalYear(), html, { preventOutsideClose: true });
+  };
+
+  // Submit APP Status
+  window.submitAPPStatus = async function(e) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to update the APP status?')) return;
+    const form = e.target;
+    const appType = form.app_type.value;
+    const remarks = form.remarks.value;
+    try {
+      const result = await apiRequest(`/app-settings/${getCurrentFiscalYear()}`, 'PUT', { app_type: appType, remarks: remarks });
+      alert('APP status set to ' + appType.charAt(0).toUpperCase() + appType.slice(1) + (appType === 'updated' ? ' (v' + result.update_count + ')' : ''));
+      closeModal();
+      loadAPP();
+    } catch (err) {
+      alert('Failed to update APP status: ' + err.message);
+    }
+  };
+
+  // APP Version Filter Change (dropdown sync)
+  window.onAPPVersionFilterChange = function(value) {
+    // When user selects a version filter, open the set status modal so they can officially change it
+    showSetAPPStatusModal();
+  };
+
+  // =====================================================
+  // VIEW MODALS - Display record details
+  // =====================================================
+
+  // View PPMP Details
+  window.showViewPPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(p) {
+        if (p.department_code) return p.department_code;
+        const name = p.department_name;
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan);
+      const ppmpNo = plan.ppmp_no || ('PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0'));
+      const totalAmt = parseFloat(plan.total_amount || 0);
+      const statusClass = plan.status === 'approved' ? 'approved' : plan.status === 'submitted' ? 'submitted' : 'draft';
+      const items = plan.items || [];
+      const procSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
+      const sourceBadgeClass = procSource === 'PS-DBM' ? 'psdbm' : procSource === 'PAPs' ? 'paps' : 'non-psdbm';
+      const isAdmin = userHasRole('admin');
+
+      // Build items table
+      let itemsHtml = '';
+      if (items.length > 0) {
+        itemsHtml = `
+          <div class="form-section-header"><i class="fas fa-layer-group"></i> Plan Items (${items.length})</div>
+          <div style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px;">
+            <table class="data-table full-width" style="font-size:11.5px; margin:0;">
+              <thead><tr style="background:#f7fafc; position:sticky; top:0; z-index:1;">
+                <th style="width:30px;">#</th>
+                <th>Item Name</th>
+                <th>Description</th>
+                <th style="width:60px;">Unit</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:50px;">Q1</th>
+                <th style="width:50px;">Q2</th>
+                <th style="width:50px;">Q3</th>
+                <th style="width:50px;">Q4</th>
+                <th style="width:60px;">Total Qty</th>
+                <th style="width:90px;">Category</th>
+              </tr></thead>
+              <tbody>
+                ${items.map((it, idx) => `<tr>
+                  <td>${idx+1}</td>
+                  <td>${it.item_name||'-'}</td>
+                  <td>${it.item_description||it.description||'-'}</td>
+                  <td>${it.unit||'-'}</td>
+                  <td style="text-align:right;">₱${parseFloat(it.unit_price||0).toLocaleString('en-PH',{minimumFractionDigits:2})}</td>
+                  <td style="text-align:center;">${it.q1_qty||0}</td>
+                  <td style="text-align:center;">${it.q2_qty||0}</td>
+                  <td style="text-align:center;">${it.q3_qty||0}</td>
+                  <td style="text-align:center;">${it.q4_qty||0}</td>
+                  <td style="text-align:center;">${it.total_qty||0}</td>
+                  <td>${it.category||'-'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }
+
+      const html = `
+        <div style="padding:0;">
+          <div class="info-banner" style="margin-bottom: 16px; background: #ebf5fb; border-left: 4px solid #1a365d; padding: 10px 14px;">
+            <i class="fas fa-info-circle" style="color: #1a365d;"></i>
+            <strong>PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</strong><br>
+            <small style="color: #555;">Per NGPA Form — RA 12009 IRR Section 7.7.2</small>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>PPMP No.</label>
+              <input type="text" value="${ppmpNo}" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+            </div>
+            <div class="form-group">
+              <label>Fiscal Year</label>
+              <input type="text" value="${plan.fiscal_year || '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>End-User / Division</label>
+              <input type="text" value="${deptCode} - ${plan.department_name || ''}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Plan Type</label>
+              <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555;">
+                  <input type="checkbox" disabled ${(plan.plan_type||'').toLowerCase().includes('indicative') ? 'checked' : ''}> INDICATIVE
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555;">
+                  <input type="checkbox" disabled ${(plan.plan_type||'').toLowerCase().includes('final') ? 'checked' : ''}> FINAL
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Procurement Source</label>
+              <div style="padding:6px 0;">
+                <span class="source-badge ${sourceBadgeClass}" style="font-size:12px;padding:3px 12px;border-radius:10px;font-weight:600;">${procSource}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Procurement Details</div>
+
+          ${plan.item_name ? `
+          <div class="form-row">
+            <div class="form-group">
+              <label>Linked Item</label>
+              <input type="text" value="${plan.item_name} (${plan.item_unit || ''} @ ₱${parseFloat(plan.item_unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2})})" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+            </div>
+          </div>` : ''}
+
+          ${plan.item_description ? `
+          <div class="form-row">
+            <div class="form-group">
+              <label>Item Description</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.item_description}</textarea>
+            </div>
+          </div>` : ''}
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Section</label>
+              <input type="text" value="${plan.section || '-'}" readonly style="background:#f0f0f0; color:#b8860b; font-weight:700; text-transform:uppercase;">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" value="${plan.item_category || plan.category || '-'}" readonly style="background:#f0f0f0; color:#1565c0; font-weight:600;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>General Description</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.description || plan.remarks || '-'}</textarea>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type of Project</label>
+              <input type="text" value="${plan.project_type || 'Goods'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Quantity / Size</label>
+              <input type="text" value="${plan.quantity_size || '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mode of Procurement</label>
+              <input type="text" value="${plan.procurement_mode || 'Small Value Procurement'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Pre-Procurement Conference</label>
+              <input type="text" value="${plan.pre_procurement || 'NO'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Source of Funds</label>
+              <input type="text" value="${plan.fund_source || 'GAA'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Start of Procurement</label>
+              <input type="text" value="${formatMonthYear(plan.start_date, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>End of Procurement</label>
+              <input type="text" value="${formatMonthYear(plan.end_date, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery</label>
+              <input type="text" value="${formatMonthYear(plan.delivery_period, true)}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          ${itemsHtml}
+
+          <div class="form-section-header"><i class="fas fa-info-circle"></i> Status & Summary</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Total ABC</label>
+              <input type="text" value="₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}" readonly style="background:#f0f0f0; color:#1a365d; font-weight:700; font-size:14px;">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <div style="padding:6px 0;"><span class="status-badge ${statusClass}">${plan.status}</span></div>
+            </div>
+            <div class="form-group">
+              <label>Date Created</label>
+              <input type="text" value="${plan.created_at ? new Date(plan.created_at).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}) : '-'}" readonly style="background:#f0f0f0; color:#555;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Remarks</label>
+              <textarea rows="2" readonly style="background:#f0f0f0; color:#555; resize:none;">${plan.remarks || '-'}</textarea>
+            </div>
+          </div>
+
+          <div class="form-group" style="text-align: right; margin-top: 20px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            ${isAdmin ? `<button type="button" class="btn btn-primary" onclick="closeModal(); showEditPPMPModal(${planId});"><i class="fas fa-edit"></i> Edit</button>` : ''}
+          </div>
+        </div>
+      `;
+      openModal('View PPMP Details', html, { preventOutsideClose: false });
+    } catch (err) {
+      alert('Failed to load PPMP details: ' + err.message);
+    }
+  };
+
+  // Approve PPMP Modal (dual approval: HOPE + Chief FAD)
+  window.showApprovePPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(p) {
+        if (p.department_code) return p.department_code;
+        const name = p.department_name;
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan);
+      const ppmpNo = plan.ppmp_no || ('PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0'));
+      const totalAmt = parseFloat(plan.total_amount || 0);
+      const userRole = window.currentUser?.role || '';
+      const userRoles = currentUser.roles || [userRole];
+      
+      // Determine what this user can approve
+      const chiefApproved = !!plan.approved_by_chief;
+      const hopeApproved = !!plan.approved_by_hope;
+      const budgetApproved = !!plan.approved_by_budget;
+      const isWRSD = deptCode === 'WRSD';
+      const chiefLabel = isWRSD ? 'Chief WRSD' : 'Chief FAD';
+      let canUserApprove = false;
+      let approveLabel = '';
+      if (isWRSD) {
+        if (userHasRole('chief_wrsd') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as Chief WRSD'; }
+      } else {
+        if (userHasRole('chief_fad') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as Chief FAD'; }
+        if (userHasRole('bac_chair') && !chiefApproved) { canUserApprove = true; approveLabel = 'Approve as BAC Chair'; }
+      }
+      if (userHasRole('hope') && !hopeApproved) { canUserApprove = true; approveLabel = 'Approve as HOPE'; }
+      if (userHasRole('budget_consultant') && !budgetApproved) { canUserApprove = true; approveLabel = 'Approve as Budget Consultant'; }
+      if (userHasRole('admin')) { canUserApprove = true; approveLabel = 'Approve (Admin)'; }
+
+      const chiefStatus = chiefApproved 
+        ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by ${chiefLabel}${plan.chief_approver_name ? ' (' + plan.chief_approver_name + ')' : ''}</span>` 
+        : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting ${chiefLabel}</span>`;
+      const hopeStatus = hopeApproved 
+        ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${plan.hope_approver_name ? ' (' + plan.hope_approver_name + ')' : ''}</span>` 
+        : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
+      const budgetStatus = budgetApproved 
+        ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Budget Consultant${plan.budget_approver_name ? ' (' + plan.budget_approver_name + ')' : ''}</span>` 
+        : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
+
+      const html = `
+        <div class="view-details">
+          <div class="detail-row"><label>PPMP No.:</label><span>${ppmpNo}</span></div>
+          <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
+          <div class="detail-row"><label>Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
+          <div class="detail-row"><label>Mode of Procurement:</label><span>${plan.procurement_mode || '-'}</span></div>
+          <div class="detail-row"><label>Total ABC:</label><span style="font-weight:bold;color:#1a365d;">₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          <div class="detail-row"><label>Status:</label><span><span class="status-badge pending">${plan.status}</span></span></div>
+        </div>
+        <div style="margin-top:20px;padding:15px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
+          <div style="display:flex;gap:15px;flex-wrap:wrap;">
+            ${chiefStatus}
+            ${hopeStatus}
+            ${budgetStatus}
+          </div>
+          ${chiefApproved && hopeApproved && budgetApproved ? '<p style="margin-top:12px;color:#2196f3;font-weight:bold;"><i class="fas fa-check-double"></i> Fully approved — will appear in APP</p>' : ''}
+        </div>
+        <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button type="button" class="btn" onclick="closeModal();showDeclinePPMPModal(${planId})" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Decline</button>
+          ${canUserApprove ? `<button type="button" class="btn btn-primary" onclick="approvePPMP(${planId})" style=""><i class="fas fa-check"></i> ${approveLabel}</button>` : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PPMP with your current role.</p>`}
+        </div>
+      `;
+      openModal('Approve PPMP', html);
+    } catch (err) {
+      alert('Failed to load PPMP for approval: ' + err.message);
+    }
+  };
+
+  // Execute PPMP approval
+  window.approvePPMP = async function(planId) {
+    if (!confirm('Are you sure you want to approve this PPMP entry?')) return;
+    try {
+      const result = await apiRequest('/plans/' + planId + '/approve', 'PUT');
+      alert(result.message);
+      closeModal();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
+    } catch (err) {
+      alert('Approval failed: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // DECLINE PPMP — Send back for revision
+  // =====================================================
+
+  // Show Decline PPMP modal with reason input
+  window.showDeclinePPMPModal = async function(planId) {
+    try {
+      const plan = await apiRequest('/plans/' + planId);
+      function getDeptCode(p) {
+        if (p.department_code) return p.department_code;
+        const name = p.department_name;
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = getDeptCode(plan);
+      const ppmpNo = plan.ppmp_no || ('PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0'));
+      const totalAmt = parseFloat(plan.total_amount || 0);
+
+      const html = `
+        <div style="padding:5px 0;">
+          <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
+            <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;"><i class="fas fa-exclamation-triangle"></i> Decline PPMP Entry</div>
+            <p style="color:#742a2a;font-size:12px;margin:0;">This will send the PPMP back to the encoder for revision. All existing approvals will be cleared and the entry will require a full re-approval cycle after revision.</p>
+          </div>
+          <div class="view-details" style="margin-bottom:16px;">
+            <div class="detail-row"><label>PPMP No.:</label><span style="font-weight:bold;">${ppmpNo}</span></div>
+            <div class="detail-row"><label>Division:</label><span>${deptCode} - ${plan.department_name || ''}</span></div>
+            <div class="detail-row"><label>Description:</label><span>${plan.description || plan.remarks || '-'}</span></div>
+            <div class="detail-row"><label>Total ABC:</label><span style="font-weight:bold;color:#1a365d;">₱${totalAmt.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;"><i class="fas fa-comment-alt"></i> Reason for Declining <span style="color:#e53e3e;">*</span></label>
+            <textarea id="declineReasonInput" rows="4" placeholder="Please provide a detailed reason for declining this PPMP entry (e.g., budget needs adjustment, incorrect items, missing information)..." style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+          </div>
+          <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="button" class="btn" onclick="declinePPMP(${planId})" style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Decline PPMP</button>
+          </div>
+        </div>
+      `;
+      openModal('Decline PPMP — Needs Revision', html);
+      // Focus the textarea
+      setTimeout(() => { const ta = document.getElementById('declineReasonInput'); if (ta) ta.focus(); }, 200);
+    } catch (err) {
+      alert('Failed to load PPMP: ' + err.message);
+    }
+  };
+
+  // Execute PPMP decline
+  window.declinePPMP = async function(planId) {
+    const reasonEl = document.getElementById('declineReasonInput');
+    const reason = (reasonEl?.value || '').trim();
+    if (!reason) {
+      reasonEl.style.border = '2px solid #e53e3e';
+      reasonEl.focus();
+      showNotification('Please provide a reason for declining this PPMP.', 'error');
+      return;
+    }
+    if (!confirm('Are you sure you want to decline this PPMP entry? The encoder will be notified to revise and resubmit.')) return;
+    try {
+      const result = await apiRequest('/plans/' + planId + '/decline', 'PUT', { reason });
+      showNotification(result.message, 'success');
+      closeModal();
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
+    } catch (err) {
+      alert('Decline failed: ' + err.message);
+    }
+  };
+
+  // Resubmit a declined PPMP for fresh approval
+  window.resubmitPPMP = async function(planId) {
+    if (!confirm('Resubmit this PPMP entry for approval? All approvers will be notified.')) return;
+    try {
+      const result = await apiRequest('/plans/' + planId + '/resubmit', 'PUT');
+      showNotification(result.message, 'success');
+      if (typeof loadPPMP === 'function') loadPPMP();
+      else if (typeof loadPageData === 'function') loadPageData('ppmp');
+    } catch (err) {
+      alert('Resubmit failed: ' + err.message);
+    }
+  };
+
+  // View APP Project Details
+  window.showViewAPPModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    function getDeptCode(name) {
+      if (!name) return 'DMW';
+      const lower = name.toLowerCase();
+      if (lower.includes('finance')) return 'FAD';
+      if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+      if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+      if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+      if (lower.includes('director')) return 'ORD';
+      return name.substring(0,3).toUpperCase();
+    }
+    function getProcMode(item) {
+      const mode = item.procurement_mode || item.remarks || '';
+      if (!mode) return { label: 'Small Value Procurement', css: 'svp' };
+      const r = mode.toLowerCase();
+      if (r.includes('competitive bidding')) return { label: 'Competitive Bidding', css: 'cb' };
+      if (r.includes('direct contracting')) return { label: 'Direct Contracting', css: 'dc' };
+      if (r.includes('shopping')) return { label: 'Shopping', css: 'shopping' };
+      if (r.includes('small value')) return { label: 'Small Value Procurement', css: 'svp' };
+      if (r.includes('agency-to-agency') || r.includes('agency to agency')) return { label: 'Agency-To-Agency', css: 'others' };
+      if (r.includes('negotiated')) return { label: 'Negotiated Procurement', css: 'others' };
+      return { label: mode, css: 'svp' };
+    }
+
+    const deptCode = getDeptCode(item.department_name);
+    const mode = getProcMode(item);
+    const unitPrice = parseFloat(item.unit_price || 0);
+    const totalQty = parseInt(item.total_qty || 0);
+    const totalPrice = parseFloat(item.total_price || (unitPrice * totalQty));
+
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
+        <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
+        <div class="detail-row"><label>Description:</label><span>${item.item_description || '-'}</span></div>
+        <div class="detail-row"><label>End-User:</label><span>${deptCode} - ${item.department_name || ''}</span></div>
+        <div class="detail-row"><label>Category:</label><span>${item.category || '-'}</span></div>
+        <div class="detail-row"><label>Unit:</label><span>${item.unit || '-'}</span></div>
+        <div class="detail-row"><label>Unit Price:</label><span>₱${unitPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        <div class="detail-row"><label>Quarterly Qty:</label><span>Q1: ${item.q1_qty||0} | Q2: ${item.q2_qty||0} | Q3: ${item.q3_qty||0} | Q4: ${item.q4_qty||0}</span></div>
+        <div class="detail-row"><label>Total Quantity:</label><span>${totalQty} ${item.unit || ''}</span></div>
+        <div class="detail-row"><label>Total Price:</label><span>₱${totalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        <div class="detail-row"><label>Procurement Mode:</label><span><span class="mode-badge ${mode.css}">${mode.label}</span></span></div>
+        <div class="detail-row"><label>Funding Source:</label><span>GAA ${item.fiscal_year || String(getCurrentFiscalYear())}</span></div>
+        <div class="detail-row"><label>Remarks:</label><span>${item.remarks || '-'}</span></div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showCreatePRFromAPPModal(${item.id});"><i class="fas fa-file-signature"></i> Create PR</button>
+      </div>
+    `;
+    openModal('View APP Project', html, { preventOutsideClose: true });
+  };
+
+  // Adjust APP Budget Modal
+  window.showAdjustAPPBudgetModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    const currentBudget = parseFloat(item.total_price || item.unit_price || 0);
+    const html = `
+      <div style="margin-bottom:18px;">
+        <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i class="fas fa-coins" style="color:#d69e2e;font-size:18px;"></i>
+            <strong style="color:#744210;">Adjust APP Budget</strong>
+          </div>
+          <div style="font-size:13px;color:#744210;">Modify the estimated budget for this APP entry. This will update the total amount in the procurement plan.</div>
+        </div>
+        <div class="view-details" style="margin-bottom:16px;">
+          <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
+          <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
+          <div class="detail-row"><label>Department:</label><span>${item.department_name || '-'}</span></div>
+          <div class="detail-row"><label>Current Budget:</label><span style="font-weight:bold;color:#2b6cb0;">₱${currentBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+        </div>
+        <div class="form-group">
+          <label for="adjustBudgetAmount" style="font-weight:600;">New Budget Amount (₱)</label>
+          <input type="number" id="adjustBudgetAmount" class="form-control" value="${currentBudget.toFixed(2)}" min="0" step="0.01" style="font-size:16px;font-weight:bold;padding:10px;" />
+        </div>
+        <div class="form-group">
+          <label for="adjustBudgetReason" style="font-weight:600;">Reason for Adjustment</label>
+          <textarea id="adjustBudgetReason" class="form-control" rows="3" placeholder="Enter reason for budget adjustment..." style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="adjustAPPBudget(${item.id})" style="background:#d69e2e;border-color:#d69e2e;">
+          <i class="fas fa-save"></i> Save Budget
+        </button>
+      </div>
+    `;
+    openModal('Adjust APP Budget', html, { preventOutsideClose: true });
+  };
+
+  // Adjust APP Budget API call
+  window.adjustAPPBudget = async function(itemId) {
+    const amountInput = document.getElementById('adjustBudgetAmount');
+    const reasonInput = document.getElementById('adjustBudgetReason');
+    if (!amountInput) return;
+    const newAmount = parseFloat(amountInput.value);
+    if (isNaN(newAmount) || newAmount < 0) {
+      alert('Please enter a valid budget amount.');
+      return;
+    }
+    const reason = reasonInput ? reasonInput.value.trim() : '';
+    try {
+      const res = await fetch(getApiUrl() + '/api/plan-items/' + itemId + '/adjust-budget', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+        body: JSON.stringify({ total_amount: newAmount, reason: reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to adjust budget');
+      closeModal();
+      showNotification('Budget adjusted successfully — ₱' + data.old_amount.toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + data.new_amount.toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
+      // Refresh APP table
+      if (typeof loadAPP === 'function') loadAPP();
+      else if (typeof navigateTo === 'function') navigateTo('app');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // DYNAMIC VIEW MODALS — fetch real data + show attachments
+  // =====================================================
+
+  function viewStatusBadge(status) {
+    if (!status) return '<span class="status-badge draft">N/A</span>';
+    const s = status.toLowerCase().replace(/_/g, ' ');
+    const css = status.toLowerCase().replace(/\s+/g, '-');
+    return '<span class="status-badge ' + css + '">' + s.charAt(0).toUpperCase() + s.slice(1) + '</span>';
+  }
+  function viewDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  function viewCurrency(v) {
+    return '₱' + (parseFloat(v) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+  }
+
+  // View PR Details — dynamic
+  window.showViewPRModal = function(id) {
+    const p = cachedPR.find(r => r.id === id);
+    if (!p) { alert('Purchase Request not found'); return; }
+    // Build specs display
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (p.item_specifications) {
+      const specs = p.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>PR No.:</label><span><strong>${p.pr_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>Date:</label><span>${viewDate(p.pr_date || p.created_at)}</span></div>
+        <div class="detail-row"><label>Division:</label><span>${p.department_name || p.department_code || '-'}</span></div>
+        <div class="detail-row"><label>Purpose:</label><span>${p.purpose || '-'}</span></div>
+        <div class="detail-row"><label>Amount:</label><span>${viewCurrency(p.total_amount)}</span></div>
+        <div class="detail-row"><label>Qty / Unit / Unit Cost:</label><span>${p.item_qty || '-'} ${p.item_unit || ''} @ ${p.item_unit_price ? viewCurrency(p.item_unit_price) : '-'}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(p.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
+      </div>
+      ${getViewAttachmentSectionHTML('purchase_request', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View Purchase Request', html, { preventOutsideClose: true });
+  };
+
+  // View RFQ Details — dynamic
+  window.showViewRFQModal = function(id) {
+    const r = cachedRFQ.find(x => x.id === id);
+    if (!r) { alert('RFQ not found'); return; }
+
+    // Get PR qty/unit from server data or cachedPR
+    let prQty = '-', prUnit = '-';
+    if (r.pr_id) {
+      if (r.pr_item_quantity) {
+        prQty = r.pr_item_quantity;
+        prUnit = r.pr_item_unit || '-';
+      } else {
+        const linkedPR = (cachedPR || []).find(p => p.id == r.pr_id);
+        if (linkedPR) { prQty = linkedPR.item_quantity || '-'; prUnit = linkedPR.item_unit || '-'; }
+      }
+    }
+
+    // Get item specifications directly from rfqs.item_specifications column
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (r.item_specifications) {
+      const specs = r.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>RFQ No.:</label><span><strong>${r.rfq_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>PR Reference:</label><span>${r.pr_number || '-'}</span></div>
+        <div class="detail-row"><label>Date Prepared:</label><span>${viewDate(r.date_prepared)}</span></div>
+        <div class="detail-row"><label>Submission Deadline:</label><span>${viewDate(r.submission_deadline)}</span></div>
+        <div class="detail-row"><label>ABC Amount:</label><span>${viewCurrency(r.abc_amount)}</span></div>
+        <div class="detail-row"><label>Quantity:</label><span>${prQty}</span></div>
+        <div class="detail-row"><label>Unit:</label><span>${prUnit}</span></div>
+        ${r.manual_supplier_name ? `
+        <div class="detail-row"><label>Supplier (Manual):</label><span><strong>${r.manual_supplier_name}</strong></span></div>
+        <div class="detail-row"><label>Company Address:</label><span>${r.manual_supplier_address || '-'}</span></div>
+        <div class="detail-row"><label>TIN:</label><span>${r.manual_supplier_tin || '-'}</span></div>
+        ` : ''}
+        <div class="detail-row"><label>PhilGEPS Required:</label><span>${r.philgeps_required ? '<i class="fas fa-check text-success"></i> Yes' : 'No'}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(r.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
+      </div>
+      ${getViewAttachmentSectionHTML('rfq', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRFQ(${id});"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View RFQ Details', html, { preventOutsideClose: true });
+  };
+
+  // View Abstract Details — dynamic
+  window.showViewAbstractModal = function(id) {
+    const a = cachedAbstract.find(x => x.id === id);
+    if (!a) { alert('Abstract not found'); return; }
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (a.item_specifications) {
+      const specs = a.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Abstract No.:</label><span><strong>${a.abstract_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>RFQ Reference:</label><span>${a.rfq_number || '-'}</span></div>
+        <div class="detail-row"><label>Date Prepared:</label><span>${viewDate(a.date_prepared)}</span></div>
+        <div class="detail-row"><label>Purpose:</label><span>${a.purpose || '-'}</span></div>
+        <div class="detail-row"><label>Recommended Supplier:</label><span>${a.recommended_supplier_name || a.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>Recommended Amount:</label><span>${viewCurrency(a.recommended_amount)}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(a.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
+      </div>
+      ${getViewAttachmentSectionHTML('abstract', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    `;
+    openModal('View Abstract of Quotations', html, { preventOutsideClose: true });
+  };
+
+  // View Post-Qual Details — dynamic
+  window.showViewPostQualModal = function(id) {
+    const p = cachedPostQual.find(x => x.id === id);
+    if (!p) { alert('Post-Qualification not found'); return; }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Post-Qual No.:</label><span><strong>${p.postqual_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>Abstract Reference:</label><span>${p.abstract_number || '-'}</span></div>
+        <div class="detail-row"><label>Subject / Bidder:</label><span>${p.bidder_name || p.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>TWG Result:</label><span>${p.twg_result || '-'}</span></div>
+        <div class="detail-row"><label>Findings:</label><span>${p.findings || '-'}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(p.status)}</span></div>
+      </div>
+      <div style="margin-top:15px; background:#e8eaf6; padding:12px; border-radius:6px;">
+        <div style="font-weight:600; margin-bottom:8px; font-size:13px;"><i class="fas fa-users"></i> TWG Members (Signatories)</div>
+        <div class="view-details" style="margin:0;">
+          <div class="detail-row"><label>TWG Head:</label><span>${p.twg_head_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${p.twg_member1_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${p.twg_member2_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${p.twg_member3_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${p.twg_member4_name || '-'}</span></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; background:#e3f2fd; padding:12px; border-radius:6px;">
+        <div style="font-weight:600; margin-bottom:8px; font-size:13px;"><i class="fas fa-store"></i> Bidders (Suppliers)</div>
+        <div class="view-details" style="margin:0;">
+          <div class="detail-row"><label>Bidder 1:</label><span>${p.bidder1_name || 'NO BIDDER'}</span></div>
+          <div class="detail-row"><label>Bidder 2:</label><span>${p.bidder2_name || 'NO BIDDER'}</span></div>
+          <div class="detail-row"><label>Bidder 3:</label><span>${p.bidder3_name || 'NO BIDDER'}</span></div>
+        </div>
+      </div>
+      ${getViewAttachmentSectionHTML('post_qualification', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    `;
+    openModal('View Post-Qualification', html, { preventOutsideClose: true });
+  };
+
+  // View BAC Resolution Details — dynamic
+  window.showViewBACResolutionModal = function(id) {
+    const b = cachedBACRes.find(x => x.id === id);
+    if (!b) { alert('BAC Resolution not found'); return; }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Resolution No.:</label><span><strong>${b.resolution_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>Abstract Reference:</label><span>${b.abstract_number || '-'}</span></div>
+        <div class="detail-row"><label>Date:</label><span>${viewDate(b.resolution_date || b.date_prepared)}</span></div>
+        <div class="detail-row"><label>Procurement Mode:</label><span>${b.procurement_mode || '-'}</span></div>
+        <div class="detail-row"><label>ABC Amount:</label><span>${viewCurrency(b.abc_amount)}</span></div>
+        <div class="detail-row"><label>Recommended Awardee:</label><span>${b.recommended_awardee_name || b.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>Bid Amount:</label><span>${viewCurrency(b.bid_amount)}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(b.status)}</span></div>
+      </div>
+      <div style="margin-top:15px; background:#e3f2fd; padding:12px; border-radius:6px;">
+        <div style="font-weight:600; margin-bottom:8px; font-size:13px;"><i class="fas fa-users"></i> BAC Members (Signatories)</div>
+        <div class="view-details" style="margin:0;">
+          <div class="detail-row"><label>BAC Chairperson:</label><span>${b.chairperson_name || '-'}</span></div>
+          <div class="detail-row"><label>Vice-Chairperson:</label><span>${b.vice_chairperson_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${b.member1_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${b.member2_name || '-'}</span></div>
+          <div class="detail-row"><label>Member:</label><span>${b.member3_name || '-'}</span></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; background:#bbdefb; padding:12px; border-radius:6px;">
+        <div style="font-weight:600; margin-bottom:8px; font-size:13px;"><i class="fas fa-user-tie"></i> Head of Procuring Entity (HoPE)</div>
+        <div class="view-details" style="margin:0;">
+          <div class="detail-row"><label>HoPE:</label><span>${b.hope_name || '-'}</span></div>
+        </div>
+      </div>
+      ${getViewAttachmentSectionHTML('bac_resolution', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printBACResolution(${id});"><i class="fas fa-print"></i> Print BAC Resolution</button>
+      </div>
+    `;
+    openModal('View BAC Resolution', html, { preventOutsideClose: true });
+  };
+
+  // View NOA Details — dynamic
+  window.showViewNOAModal = function(id) {
+    const n = cachedNOA.find(x => x.id === id);
+    if (!n) { alert('NOA not found'); return; }
+    const html = `
+      <div class="view-details">
+        <div class="form-section-header section-items"><i class="fas fa-award"></i> Award Details</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="detail-row"><label>NOA No.:</label><span><strong>${n.noa_number || '-'}</strong></span></div>
+          <div class="detail-row"><label>Date Issued:</label><span>${viewDate(n.date_issued)}</span></div>
+          <div class="detail-row"><label>Linked BAC Resolution:</label><span>${n.resolution_number || '-'}</span></div>
+          <div class="detail-row"><label>RFQ Reference No.:</label><span>${n.rfq_number || '-'}</span></div>
+          <div class="detail-row"><label>Contract Amount:</label><span>${viewCurrency(n.contract_amount)}</span></div>
+        </div>
+
+        <div class="form-section-header"><i class="fas fa-user-tie"></i> Addressee (Winning Bidder)</div>
+        <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="detail-row"><label>Supplier:</label><span>${n.supplier_name || '-'}</span></div>
+        </div>
+
+        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+        <div style="background: #fffde7; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div class="detail-row"><label>HoPE:</label><span><strong>RITCHEL M. BUTAO</strong></span></div>
+          <div class="detail-row"><label>Designation:</label><span>Regional Director</span></div>
+        </div>
+
+        <div class="detail-row"><label>Bidder Receipt Date:</label><span>${viewDate(n.bidder_receipt_date)}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(n.status)}</span></div>
+      </div>
+      ${getViewAttachmentSectionHTML('notice_of_award', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    `;
+    openModal('View Notice of Award', html, { preventOutsideClose: true });
+  };
+
+  // View PO Details — dynamic
+  window.showViewPOModal = function(id) {
+    const p = cachedPO.find(x => x.id === id);
+    if (!p) { alert('Purchase Order not found'); return; }
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (p.item_specifications) {
+      const specs = p.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>PO No.:</label><span><strong>${p.po_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>PO Date:</label><span>${viewDate(p.po_date || p.created_at)}</span></div>
+        <div class="detail-row"><label>Supplier:</label><span>${p.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>Total Amount:</label><span>${viewCurrency(p.total_amount)}</span></div>
+        <div class="detail-row"><label>Mode of Procurement:</label><span>${p.mode_of_procurement || '-'}</span></div>
+        <div class="detail-row"><label>Place of Delivery:</label><span>${p.place_of_delivery || '-'}</span></div>
+        <div class="detail-row"><label>Delivery Date:</label><span>${viewDate(p.delivery_date)}</span></div>
+        <div class="detail-row"><label>Purpose:</label><span>${p.purpose || '-'}</span></div>
+        <div class="detail-row"><label>Payment Terms:</label><span>${p.payment_terms || '-'}</span></div>
+        <div class="detail-row"><label>Doc Status:</label><span>${viewStatusBadge(p.status)}</span></div>
+        <div class="detail-row"><label>Workflow:</label><span>${viewStatusBadge(p.workflow_status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
+      </div>
+      ${getViewAttachmentSectionHTML('purchase_order', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printPurchaseOrder(${p.id});"><i class="fas fa-print"></i> Print</button>
+      </div>
+    `;
+    openModal('View Purchase Order', html, { preventOutsideClose: true });
+  };
+
+  // View IAR Details — dynamic
+  window.showViewIARModal = async function(id) {
+    let i = cachedIAR.find(x => x.id === id);
+    if (!i) { alert('IAR not found'); return; }
+    // Fetch full IAR detail (includes items with procurement_source)
+    let iarItems = [];
+    try {
+      const detail = await apiRequest('/iars/' + id);
+      if (detail) {
+        i = { ...i, ...detail };
+        iarItems = detail.items || [];
+      }
+    } catch(e) { console.warn('Could not load full IAR details:', e); }
+    
+    let specsHtml = '<span style="color:#999;">None</span>';
+    if (i.item_specifications) {
+      const specs = i.item_specifications.split('\n').filter(l => l.trim());
+      if (specs.length > 0) {
+        specsHtml = '<ul style="margin:0;padding-left:18px;">' + specs.map(s => `<li>${s.trim()}</li>`).join('') + '</ul>';
+      }
+    }
+
+    // Build items table if items exist
+    let itemsTableHtml = '';
+    if (iarItems.length > 0) {
+      itemsTableHtml = '<div style="margin-top:15px;"><h4 style="margin-bottom:8px;"><i class="fas fa-box-open"></i> IAR Items (' + iarItems.length + ')</h4>' +
+        '<table class="data-table full-width" style="font-size:12px;"><thead><tr>' +
+        '<th>Item</th><th>Description</th><th>Unit</th><th>Qty</th><th>Unit Price</th><th>Amount</th><th>Source</th>' +
+        '</tr></thead><tbody>' +
+        iarItems.map(it => {
+          const src = it.procurement_source || it.item_procurement_source || 'NON PS-DBM';
+          const srcClass = src === 'PS-DBM' ? 'psdbm' : src === 'PAPs' ? 'paps' : 'non-psdbm';
+          return '<tr>' +
+            '<td>' + (it.item_name || it.name || '-') + '</td>' +
+            '<td>' + (it.description || '-') + '</td>' +
+            '<td>' + (it.unit || '-') + '</td>' +
+            '<td>' + (it.quantity || 0) + '</td>' +
+            '<td>₱' + parseFloat(it.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td>₱' + parseFloat(it.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+            '<td><span class="source-badge ' + srcClass + '">' + src + '</span></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>IAR No.:</label><span><strong>${i.iar_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>Date:</label><span>${viewDate(i.iar_date || i.created_at)}</span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>${i.po_number || '-'}</span></div>
+        <div class="detail-row"><label>Supplier:</label><span>${i.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>Invoice No.:</label><span>${i.invoice_number || '-'}</span></div>
+        <div class="detail-row"><label>Req. Office:</label><span>${i.requisitioning_office || '-'}</span></div>
+        <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(i.status)}</span></div>
+        <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
+      </div>
+      ${itemsTableHtml}
+      ${getViewAttachmentSectionHTML('iar', id)}
+      <div class="form-group" style="text-align:right;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('IAR', '${i.iar_number}');"><i class="fas fa-print"></i> Print Appendix 62</button>
+      </div>
+    `;
+    openModal('View IAR (Appendix 62)', html, { preventOutsideClose: true });
+  };
+
+  // View PO Packet Details with Attachment Table
+  window.showViewPacketModal = async function(rowKey) {
+    const data = window._poPacketData || [];
+    // rowKey is 'prN' or 'poN' string — match accordingly
+    const r = data.find(d => {
+      const id = d.pr_id ? 'pr' + d.pr_id : 'po' + d.po_id;
+      return id === String(rowKey);
+    });
+    if (!r) { alert('Transaction data not found.'); return; }
+
+    // Define document steps with entity types for attachments
+    const docSteps = [
+      { key: 'pr', label: 'Purchase Request (PR)', entityType: 'purchase_request', id: r.pr_id, number: r.pr_number, status: r.pr_status, signer: r.pr_approved_by_name || r.pr_requested_by_name },
+      { key: 'rfq', label: 'Request for Quotation (RFQ)', entityType: 'rfq', id: r.rfq_id, number: r.rfq_number, status: r.rfq_status, signer: r.rfq_created_by_name },
+      { key: 'abstract', label: 'Abstract of Quotation', entityType: 'abstract', id: r.abstract_id, number: r.abstract_number, status: r.abstract_status, signer: r.abstract_created_by_name },
+      { key: 'bac', label: 'BAC Resolution', entityType: 'bac_resolution', id: r.bac_res_id, number: r.resolution_number, status: r.bac_res_status, signer: r.bac_res_approved_by_name },
+      { key: 'pq', label: 'Post-Qualification', entityType: 'post_qualification', id: r.postqual_id, number: r.postqual_number, status: r.postqual_status, signer: r.postqual_created_by_name },
+      { key: 'noa', label: 'Notice of Award (NOA)', entityType: 'notice_of_award', id: r.noa_id, number: r.noa_number, status: r.noa_status, signer: r.noa_created_by_name },
+      { key: 'po', label: 'Purchase Order (PO)', entityType: 'purchase_order', id: r.po_id, number: r.po_number, status: r.po_status, signer: r.po_approved_by_name || r.po_created_by_name },
+      { key: 'iar', label: 'Inspection & Acceptance (IAR)', entityType: 'iar', id: r.iar_id, number: r.iar_number, status: r.iar_status, signer: r.iar_inspected_by_name || r.iar_received_by_name }
+    ];
+
+    function statusIcon(exists, status) {
+      if (!exists) return '<i class="fas fa-times-circle" style="color:var(--danger-color)"></i> Not Created';
+      const st = (status || '').toLowerCase();
+      if (['approved','completed','signed','received','accepted','processed'].includes(st))
+        return '<i class="fas fa-check-circle" style="color:var(--success-color)"></i> ' + st.replace(/_/g,' ');
+      if (['rejected','cancelled'].includes(st))
+        return '<i class="fas fa-ban" style="color:var(--danger-color)"></i> ' + st.replace(/_/g,' ');
+      return '<i class="fas fa-clock" style="color:var(--warning-color)"></i> ' + (st || 'pending').replace(/_/g,' ');
+    }
+
+    const html = `
+      <div class="view-details" style="margin-bottom: 14px;">
+        <div class="detail-row"><label>PR Number:</label><span><strong>${r.pr_number || '-'}</strong></span></div>
+        <div class="detail-row"><label>Office/Section:</label><span>${r.division_name || r.division_code || 'DMW Caraga'}</span></div>
+        <div class="detail-row"><label>PO Number:</label><span>${r.po_number || 'Not yet created'}</span></div>
+        <div class="detail-row"><label>Supplier:</label><span>${r.supplier_name || '-'}</span></div>
+        <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(r.total_amount || r.pr_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+      </div>
+
+      <h4 style="margin: 14px 0 8px; border-bottom: 2px solid var(--primary-color); padding-bottom: 4px;">
+        <i class="fas fa-paperclip"></i> Compiled Documents — Attachments
+      </h4>
+      <table class="data-table full-width pkt-attach-table" style="font-size: 12px;">
+        <thead>
+          <tr>
+            <th style="width:22%;">Document</th>
+            <th style="width:13%;">Ref. No.</th>
+            <th style="width:12%;">Status</th>
+            <th style="width:14%;">Signed By</th>
+            <th style="width:24%;">Attached File(s)</th>
+            <th style="width:15%;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${docSteps.map(d => `
+            <tr>
+              <td style="font-weight:600;">${d.label}</td>
+              <td>${d.number || '-'}</td>
+              <td>${statusIcon(d.id, d.status)}</td>
+              <td>${d.signer || '-'}</td>
+              <td>
+                <div id="pktAtt_${d.key}" style="min-height:28px;">
+                  ${d.id ? '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
+                </div>
+              </td>
+              <td>
+                ${d.id ? `
+                  <div style="display:flex; gap:4px; align-items:center;">
+                    <input type="file" id="pktFile_${d.key}" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onchange="pktUploadFile('${d.entityType}', ${d.id}, '${d.key}', this)">
+                    <button class="btn-icon" title="Upload File" onclick="document.getElementById('pktFile_${d.key}').click()" style="padding:3px 6px;">
+                      <i class="fas fa-upload" style="font-size:11px;"></i>
+                    </button>
+                  </div>
+                ` : '<span style="color:#ccc; font-size:11px;">—</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <h4 style="margin: 18px 0 8px; border-bottom: 2px solid var(--primary-color); padding-bottom: 4px;">
+        <i class="fas fa-signature"></i> Packet Signing Status
+      </h4>
+      <div class="view-details">
+        <div class="detail-row">
+          <label>Chief Signed:</label>
+          <span>${r.chief_signed_at 
+            ? '<span class="status-badge approved"><i class="fas fa-check"></i> ' + new Date(r.chief_signed_at).toLocaleDateString() + '</span> by ' + (r.chief_signed_by_name || '-')
+            : '<span class="status-badge pending">Pending</span>'}</span>
+        </div>
+        <div class="detail-row">
+          <label>Director Signed:</label>
+          <span>${r.director_signed_at 
+            ? '<span class="status-badge approved"><i class="fas fa-check"></i> ' + new Date(r.director_signed_at).toLocaleDateString() + '</span> by ' + (r.director_signed_by_name || '-')
+            : '<span class="status-badge pending">Pending</span>'}</span>
+        </div>
+        <div class="detail-row">
+          <label>Packet Status:</label>
+          <span>${r.packet_status 
+            ? '<span class="status-badge ' + (r.packet_status === 'signed' ? 'approved' : r.packet_status === 'submitted_to_coa' ? 'coa-submitted' : r.packet_status === 'for_signing' ? 'for-signing' : 'draft') + '">' + r.packet_status.replace(/_/g, ' ') + '</span>'
+            : '<span class="status-badge draft">No Packet</span>'}</span>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printRecord('Packet', '${r.pr_number}')"><i class="fas fa-print"></i> Print</button>
+        ${r.po_id && !r.packet_id ? '<button type="button" class="btn btn-primary" onclick="closeModal(); compilePacketForPO(' + r.po_id + ');"><i class="fas fa-folder-plus"></i> Compile Packet</button>' : ''}
+        ${r.packet_id && !r.chief_signed_at ? '<button type="button" class="btn btn-primary" onclick="closeModal(); handleChiefSignAction(' + r.packet_id + ');"><i class="fas fa-signature"></i> Chief Sign</button>' : ''}
+        ${r.packet_id && !r.director_signed_at ? '<button type="button" class="btn btn-primary" onclick="closeModal(); handleDirectorSignAction(' + r.packet_id + ');"><i class="fas fa-signature"></i> Director Sign</button>' : ''}
+      </div>
+    `;
+    openModal('Document Monitoring — ' + (r.pr_number || r.po_number || 'Transaction'), html);
+
+    // Load attachments for each document step that exists
+    for (const d of docSteps) {
+      if (d.id) {
+        pktLoadAttachments(d.entityType, d.id, d.key);
+      }
+    }
+  };
+
+  // Load & render attachments for a document step inside the packet modal
+  window.pktLoadAttachments = async function(entityType, entityId, key) {
+    const container = document.getElementById('pktAtt_' + key);
+    if (!container) return;
+    try {
+      const atts = await getAttachments(entityType, entityId);
+      if (!atts || atts.length === 0) {
+        container.innerHTML = '<span style="color:#999; font-size:11px;">No files attached</span>';
+        return;
+      }
+      container.innerHTML = atts.map(att => {
+        const icon = att.mime_type === 'application/pdf' ? 'fa-file-pdf' 
+          : (att.mime_type && att.mime_type.startsWith('image/')) ? 'fa-file-image'
+          : (att.mime_type && att.mime_type.includes('word')) ? 'fa-file-word'
+          : (att.mime_type && (att.mime_type.includes('excel') || att.mime_type.includes('spreadsheet'))) ? 'fa-file-excel'
+          : 'fa-file';
+        const color = att.mime_type === 'application/pdf' ? '#e74c3c'
+          : (att.mime_type && att.mime_type.startsWith('image/')) ? '#f39c12'
+          : (att.mime_type && att.mime_type.includes('word')) ? '#2b5797'
+          : (att.mime_type && (att.mime_type.includes('excel') || att.mime_type.includes('spreadsheet'))) ? '#217346'
+          : '#666';
+        const sizeStr = att.file_size_bytes < 1048576 ? (att.file_size_bytes / 1024).toFixed(1) + ' KB' : (att.file_size_bytes / 1048576).toFixed(1) + ' MB';
+        return `
+          <div class="pkt-att-row">
+            <i class="fas ${icon}" style="color:${color}; font-size:13px;"></i>
+            <span class="pkt-att-name" title="${att.original_name}">${att.original_name}</span>
+            <span class="pkt-att-size">${sizeStr}</span>
+            <button class="btn-icon" title="Download" onclick="window.open(authAttUrl('${API_URL}/attachments/download/${att.id}'),'_blank')" style="padding:2px 4px;"><i class="fas fa-download" style="font-size:10px;"></i></button>
+            <button class="btn-icon" title="View" onclick="previewAttachment(${att.id}, '${(att.original_name || '').replace(/'/g, "\\'")}', '${att.mime_type}')" style="padding:2px 4px;"><i class="fas fa-eye" style="font-size:10px;"></i></button>
+            <button class="btn-icon danger" title="Delete" onclick="pktDeleteAttachment(${att.id},'${entityType}',${entityId},'${key}')" style="padding:2px 4px;"><i class="fas fa-trash" style="font-size:10px;"></i></button>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = '<span style="color:var(--danger-color); font-size:11px;">Error loading</span>';
+    }
+  };
+
+  // Upload file for a document step
+  window.pktUploadFile = async function(entityType, entityId, key, input, rowId) {
+    if (!input.files || input.files.length === 0) return;
+    // Show uploading indicator in either modal or table cell container
+    const modalContainer = document.getElementById('pktAtt_' + key);
+    const cellContainer = document.getElementById('pktCell_' + key);
+    if (modalContainer) modalContainer.innerHTML = '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+    if (cellContainer) cellContainer.innerHTML = '<span class="pkt-cell-loading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+
+    const formData = new FormData();
+    formData.append('entity_type', entityType);
+    formData.append('entity_id', entityId);
+    // Only upload the FIRST file (one document per cell)
+    formData.append('files', input.files[0]);
+
+    try {
+      const response = await fetch(API_URL + '/attachments/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Upload failed');
+      }
+      showToast('File uploaded successfully!', 'success');
+      if (modalContainer) pktLoadAttachments(entityType, entityId, key);
+      if (cellContainer) pktLoadCellAttachments(entityType, entityId, key, rowId);
+    } catch (err) {
+      showToast('Upload error: ' + err.message, 'error');
+      if (modalContainer) pktLoadAttachments(entityType, entityId, key);
+      if (cellContainer) pktLoadCellAttachments(entityType, entityId, key, rowId);
+    }
+    input.value = ''; // reset file input
+  };
+
+  // Delete attachment and refresh the row
+  window.pktDeleteAttachment = async function(attachmentId, entityType, entityId, key) {
+    const deleted = await deleteAttachment(attachmentId);
+    if (deleted) {
+      pktLoadAttachments(entityType, entityId, key);
+    }
+  };
+
+  // Compile packet for a specific PO
+  window.compilePacketForPO = async function(poId) {
+    if (!confirm('Compile a PO Packet for this Purchase Order? This marks all supporting documents as compiled for signing.')) return;
+    try {
+      await apiRequest('/po-packets', 'POST', { po_id: poId, status: 'for_signing', remarks: 'Compiled via Document Monitoring' });
+      showToast('PO Packet compiled successfully!', 'success');
+      loadPOPacket();
+    } catch (err) {
+      showToast(err.message || 'Failed to compile packet', 'error');
+    }
+  };
+
+  // Chief Sign action
+  window.handleChiefSignAction = async function(packetId) {
+    if (!confirm('Record Chief signature on this PO Packet?')) return;
+    try {
+      await apiRequest('/po-packets/' + packetId + '/chief-sign', 'PUT');
+      showToast('Chief signature recorded!', 'success');
+      loadPOPacket();
+    } catch (err) {
+      showToast(err.message || 'Failed to record signature', 'error');
+    }
+  };
+
+  // Director Sign action
+  window.handleDirectorSignAction = async function(packetId) {
+    if (!confirm('Record Director signature on this PO Packet?')) return;
+    try {
+      await apiRequest('/po-packets/' + packetId + '/director-sign', 'PUT');
+      showToast('Director signature recorded!', 'success');
+      loadPOPacket();
+    } catch (err) {
+      showToast(err.message || 'Failed to record signature', 'error');
+    }
+  };
+
+  // View COA Submission Details with 3 Document Templates
+  window.showViewCOAModal = async function(coaId) {
+    let coa = {};
+    try { coa = await apiRequest('/coa/' + coaId); } catch(e) {
+      // fallback to cached
+      const allCoa = window._cachedCOA || [];
+      coa = allCoa.find(c => c.id === coaId || c.submission_number === coaId) || {};
+    }
+
+    // Parse documents_included JSON
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+
+    // Build read-only letter previews
+    function viewLetterHeader() {
+      const dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
+      return `<div style="text-align:center;margin-bottom:14px;">
+        ${dmwLogo ? `<img src="${dmwLogo}" style="width:60px;height:60px;margin-bottom:4px;" alt="DMW">` : ''}
+        <div style="font-size:10px;"><em>Republic of the Philippines</em></div>
+        <div style="font-size:11px;font-weight:bold;">DEPARTMENT OF MIGRANT WORKERS</div>
+        <div style="font-size:10px;">Regional Office No. XIII</div>
+      </div>`;
+    }
+    function viewAddressee() {
+      return `<div style="font-size:10px;line-height:1.4;margin-bottom:10px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV / Audit Team Leader<br>Commission on Audit, Regional Office No. XIII, Butuan City</div>
+      <div style="font-size:10px;margin-bottom:8px;">Dear Auditor, Greetings!</div>`;
+    }
+    function viewSignatory() {
+      return `<div style="margin-top:12px;font-size:10px;">Thank you and best regards</div>
+      <div style="margin-top:18px;font-size:10px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>
+      <div style="margin-top:14px;border-top:1.5px solid #1565c0;padding-top:4px;font-size:7px;line-height:1.4;text-align:center;color:#333;"><div>Website: www.dmw.gov.ph | Email: butuan@dmw.gov.ph | Landline: (085)815-1708</div><div>Finance &amp; Administrative Division: 0921-846 5934 | Migrant Workers Processing Division: 0993-279 8082</div><div>Migrant Workers Protection Division: 0907-694 3525 | Welfare &amp; Reintegration Services Division: 0948-475 6812 / 0950-305 7533</div></div>`;
+    }
+
+    const tp = docs.transmittal_po || {};
+    const ni = docs.notice_inspection || {};
+    const ti = docs.transmittal_iar || {};
+
+    const card = (title, icon, body) => `
+      <div style="border:1px solid #ddd;border-radius:6px;margin-bottom:12px;overflow:hidden;">
+        <div style="background:#e3f2fd;padding:8px 12px;font-size:11px;font-weight:700;color:#1565c0;"><i class="fas ${icon}"></i> ${title}</div>
+        <div style="padding:12px 16px;font-size:10px;line-height:1.5;">${body}</div>
+      </div>`;
+
+    const letter1 = card('Step 1: Transmittal – PO', 'fa-file-export',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(tp.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;margin-bottom:8px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${tp.supplier || coa.po_number || ''}</strong> for the <strong>${tp.purpose || ''}</strong> at <strong>${tp.location || ''}</strong>, to wit:</div>
+      <ol style="margin:0 0 8px 18px;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div>Hope you find the attached documents in order.</div>${viewSignatory()}`
+    );
+
+    const letter2 = card('Step 2: Notice of Inspection', 'fa-search',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ni.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ''}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(ni.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`
+    );
+
+    const letter3 = card('Step 3: Transmittal – IAR', 'fa-clipboard-check',
+      `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ti.date || coa.submission_date)}</div>${viewAddressee()}
+      <div style="text-align:justify;margin-bottom:8px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${ti.supplier || ''}</strong> for the <strong>${ti.purpose || ''}</strong> at <strong>${ti.location || ''}</strong>, to wit:</div>
+      <ol style="margin:0 0 8px 18px;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div>Hope you find the attached documents in order.</div>${viewSignatory()}`
+    );
+
+    const html = `
+      <div class="view-details" style="margin-bottom:14px;">
+        <div class="detail-row"><label>Submission No.:</label><span><strong>${coa.submission_number || coaId || ''}</strong></span></div>
+        <div class="detail-row"><label>PO Reference:</label><span>${coa.po_number || 'N/A'}</span></div>
+        <div class="detail-row"><label>Submitted:</label><span>${coa.submission_date ? new Date(coa.submission_date).toLocaleDateString('en-PH') : 'N/A'}</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge ${coa.status}">${coa.status || 'N/A'}</span></span></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;"><i class="fas fa-file-alt"></i> Submitted Documents</div>
+      ${letter1}${letter2}${letter3}
+      <div class="form-group" style="text-align: right; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="showCOAPrintMenu(${coaId})"><i class="fas fa-print"></i> Print Documents</button>
+      </div>
+    `;
+    openModal('View COA Submission', html);
+  };
+
+  /**
+   * Print menu for COA submissions – lets user choose which document to print
+   */
+  window.showCOAPrintMenu = function(coaId) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+
+    const html = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;">Select document to print for ${coa.submission_number || ''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 1)">
+          <i class="fas fa-file-export" style="color:#1565c0;margin-right:8px;"></i> Step 1: Transmittal – Purchase Order
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 2)">
+          <i class="fas fa-search" style="color:#1565c0;margin-right:8px;"></i> Step 2: Notice of Inspection
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 3)">
+          <i class="fas fa-clipboard-check" style="color:#1565c0;margin-right:8px;"></i> Step 3: Transmittal – IAR
+        </button>
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintAllDocs(${coaId})">
+          <i class="fas fa-print" style="color:#388e3c;margin-right:8px;"></i> Print All 3 Documents
+        </button>
+      </div>
+      <div style="text-align:right;margin-top:16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    `;
+    openModal('Print COA Documents', html);
+  };
+
+  /**
+   * Helper: build printable letter HTML from saved COA data
+   */
+  function coaBuildPrintLetter(coa, stepNum) {
+    let docs = {};
+    try { docs = typeof coa.documents_included === 'string' ? JSON.parse(coa.documents_included) : (coa.documents_included || {}); } catch(e) {}
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+    // No separate header needed — buildPrintHTML already provides the official DMW header with logos
+    const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
+    <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
+    const sig = `<div style="margin-top:30px;font-size:12px;">Thank you and best regards</div><div style="margin-top:50px;font-size:12px;"><strong>RITCHEL M. BUTAO</strong><br>Regional Director</div>`;
+
+    let body = '';
+    if (stepNum === 1) {
+      const d = docs.transmittal_po || {};
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Purchase Order for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Purchase Order</li><li>Notice of Award</li><li>BAC Resolution</li><li>Abstract of Quotations</li><li>Request for Quotations</li><li>Purchase Request</li><li>Project Document</li><li>PPMP</li><li>APP</li></ol>
+      <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
+    } else if (stepNum === 2) {
+      const d = docs.notice_inspection || {};
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ''}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ''}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+    } else if (stepNum === 3) {
+      const d = docs.transmittal_iar || {};
+      body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In compliance with Section 6.06 of COA Circular No.2012-001 dated June 14, 2012, we are submitting herewith a copy of Inspection and Acceptance Report for the procurement of goods and services delivered by <strong>${d.supplier || ''}</strong> for the <strong>${d.purpose || ''}</strong> at <strong>${d.location || ''}</strong>, to wit:</div>
+      <ol style="font-size:12px;margin:0 0 14px 40px;line-height:1.8;"><li>Statement of Account</li><li>Charge Invoice</li><li>Inspection and Acceptance Report</li><li>Purchase Order</li></ol>
+      <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
+    }
+    return body;
+  }
+
+  /**
+   * Print a single COA document step
+   */
+  window.coaPrintCOADoc = function(coaId, stepNum) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    const stepNames = { 1: 'Transmittal_PO', 2: 'Notice_of_Inspection', 3: 'Transmittal_IAR' };
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const title = stepNames[stepNum] + ' - ' + (coa.submission_number || '');
+    const body = coaBuildPrintLetter(coa, stepNum);
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Print all 3 COA documents in one print job
+   */
+  window.coaPrintAllDocs = function(coaId) {
+    const allCoa = window._cachedCOA || [];
+    const coa = allCoa.find(c => c.id === coaId) || {};
+    const title = 'COA_Documents_' + (coa.submission_number || '');
+    const stepTitles = ['Transmittal \u2013 Purchase Order', 'Notice of Inspection', 'Transmittal \u2013 IAR'];
+    const body = [1,2,3].map((s,i) => {
+      const letterBody = coaBuildPrintLetter(coa, s);
+      return `${i > 0 ? '<div style="page-break-before:always;"></div>' : ''}${letterBody}`;
+    }).join('');
+    const printHTML = buildPrintHTML(title, body, coaFooterHTML());
+    openPrintPreview(printHTML, { title: toFilename(title), editable: true });
+  };
+
+  /**
+   * Delete a COA submission
+   */
+  window.deleteCOASubmission = async function(coaId) {
+    if (!confirm('Are you sure you want to delete this COA submission?')) return;
+    try {
+      await apiRequest('/coa-submissions/' + coaId, 'DELETE');
+      showNotification('COA Submission deleted.', 'success');
+      loadCOA();
+    } catch(err) {
+      showNotification('Delete failed: ' + (err.message || err), 'error');
+    }
+  };
+
+  // View Supplier Details
+  window.showViewSupplierModal = async function(supplierId) {
+    let s = {};
+    try { s = await apiRequest('/suppliers/' + supplierId); } catch(e) { alert('Could not load supplier'); return; }
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Supplier ID:</label><span>${s.supplier_code || supplierId}</span></div>
+        <div class="detail-row"><label>Company Name:</label><span>${s.company_name || s.name || 'N/A'}</span></div>
+        <div class="detail-row"><label>Address:</label><span>${s.address || 'N/A'}</span></div>
+        <div class="detail-row"><label>Contact:</label><span>${s.contact_number || s.phone || 'N/A'}</span></div>
+        <div class="detail-row"><label>PhilGEPS Status:</label><span><span class="status-badge">${s.philgeps_registration || 'N/A'}</span></span></div>
+        <div class="detail-row"><label>TIN:</label><span>${s.tin || 'N/A'}</span></div>
+        <div class="detail-row"><label>Email:</label><span>${s.email || 'N/A'}</span></div>
+        <div class="detail-row"><label>Contact Person:</label><span>${s.contact_person || 'N/A'}</span></div>
+      </div>
+      <h4 style="margin-top: 15px;">Transaction History</h4>
+      <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+        <thead><tr><th>PO No.</th><th>Project</th><th>Amount</th><th>Date</th></tr></thead>
+        <tbody>
+          ${(() => { const pos = (cachedPO || []).filter(p => p.supplier_id == supplierId); return pos.length ? pos.map(p => `<tr><td>${p.po_number||''}</td><td>${p.purpose||''}</td><td>₱${parseFloat(p.total_amount||0).toLocaleString('en-PH',{minimumFractionDigits:2})}</td><td>${p.po_date ? new Date(p.po_date).toLocaleDateString('en-PH') : ''}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#999;">No transactions found</td></tr>'; })()}
+        </tbody>
+      </table>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="closeModal(); showEditSupplierModal('${supplierId}');"><i class="fas fa-edit"></i> Edit</button>
+      </div>
+    `;
+    openModal('View Supplier Profile', html);
+  };
+
+  // =====================================================
+  // EDIT MODALS - Modify existing records
+  // =====================================================
+
+  // Edit PPMP Modal - Enhanced with intelligent data fetching and auto-population
+  window.showEditPPMPModal = async function(planId) {
+    try {
+      // ===== PRIMARY KEY LOOKUP AND FETCH =====
+      // Fetch the specific PPMP entry from database using planId as primary key
+      console.log('[PPMP EDIT] Fetching PPMP entry with planId:', planId);
+      const plan = await apiRequest('/plans/' + planId);
+      console.log('[PPMP EDIT] PPMP entry fetched successfully:', plan);
+
+      // ===== CREATE STRUCTURED DATA FOR SPECIFIC ENTRY =====
+      // Extract all fetched data into a structured object with comprehensive fallback logic
+      // For MANUAL-NON-PSDBM items, data is stored in plan_items table (accessed via plan.items array)
+      // For catalog items, data comes from items table JOIN (as plan.item_name, plan.item_unit, etc.)
+      // For PAPs, the PAP Name comes from plan.description (same as General Description & Objective)
+      console.log('[PPMP EDIT] Raw plan data from database:', JSON.stringify(plan, null, 2));
+
+      // Check if there are items in plan_items table (for manual/PAP entries)
+      const planItem = (plan.items && plan.items.length > 0) ? plan.items[0] : null;
+      console.log('[PPMP EDIT] Plan item from plan_items table:', planItem);
+
+      const specificEntryData = {
+        // For item_name: check plan (from items JOIN), then plan_items table, then fallbacks
+        item_name: plan.item_name || (planItem ? planItem.item_name : '') || plan.name || plan.manual_item_name || plan.pap_item_name || plan.title || '',
+        // For PAP Name: use plan.description (same source as General Description & Objective)
+        pap_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
+        // For Manual Item Name: use plan.description (same source as General Description & Objective)
+        manual_name: plan.description || (planItem ? planItem.item_name : '') || plan.item_name || '',
+        // For description: check plan_items first for detailed description, then plan.item_description
+        item_description: (planItem ? planItem.item_description : '') || plan.item_description || plan.description || plan.manual_item_desc || plan.pap_item_desc || plan.specs || '',
+        // For unit: PRIORITIZE plan_items (user-entered), then items table JOIN
+        item_unit: (planItem ? planItem.unit : '') || plan.item_unit || plan.unit || plan.manual_item_unit || plan.pap_item_unit || plan.uom || 'pc',
+        // For unit_price: PRIORITIZE plan_items (user-entered), then items table JOIN
+        unit_price: parseFloat((planItem ? planItem.unit_price : 0) || plan.item_unit_price || plan.unit_price || plan.manual_item_price || plan.pap_item_price || plan.price || 0) || 0,
+        // For quantity: check plan_items total_qty or individual quarters, then plan.quantity_size
+        quantity_size: parseFloat((planItem ? (planItem.total_qty || planItem.q1_qty || planItem.quantity) : 0) || plan.quantity_size || plan.quantity || plan.manual_item_qty || plan.pap_item_qty || plan.qty || 1) || 1,
+        // For total: check plan_items total_price, then plan.total_amount
+        total_amount: parseFloat((planItem ? planItem.total_price : 0) || plan.total_amount || plan.estimated_budget || plan.manual_est_budget || plan.pap_est_budget || plan.budget || plan.amount || 0) || 0
+      };
+      console.log('[PPMP EDIT] Structured entry data created:', specificEntryData);
+      console.log('[PPMP EDIT] Item Name:', specificEntryData.item_name);
+      console.log('[PPMP EDIT] PAP Name:', specificEntryData.pap_name);
+      console.log('[PPMP EDIT] Manual Name:', specificEntryData.manual_name);
+      console.log('[PPMP EDIT] Item Unit:', specificEntryData.item_unit);
+      console.log('[PPMP EDIT] Unit Price:', specificEntryData.unit_price);
+      
+      // Store for use in initialization block and validation
+      window._ppmpEditSpecificEntryData = specificEntryData;
+
+      // Load required data in parallel for efficiency (including PPMP sections and categories from DB)
+      const [divisionsLoaded, procModesLoaded, sectionsLoaded, categoriesLoaded, allItems, uomList] = await Promise.all([
+        ensureDivisionsLoaded().catch(() => []),
+        ensureProcModesLoaded().catch(() => []),
+        ensurePPMPSectionsLoaded().catch(() => []),
+        ensurePPMPCategoriesLoaded().catch(() => []),
+        apiRequest('/items').catch(() => []),
+        apiRequest('/uoms').catch(() => [])
+      ]);
+
+      window._ppmpItemsCache = allItems || [];
+      console.log('[PPMP EDIT] Database resources loaded.');
+      console.log('[PPMP EDIT] Sections count:', cachedPPMPSections.length);
+      console.log('[PPMP EDIT] Categories count:', cachedPPMPCategories.length);
+
+      // Build UOM options - ensure the current unit is always in the list
+      let uomOptionsRaw = (uomList || []).map(u =>
+        `<option value="${escapeHtml(u.name || u)}">${escapeHtml(u.name || u)}</option>`
+      ).join('') || '<option value="lot">lot</option><option value="set">set</option><option value="unit">unit</option>';
+      // If current unit is not in the UOM list, add it as a custom option
+      const currentUnitVal = specificEntryData.item_unit || 'unit';
+      const uomNames = (uomList || []).map(u => (u.name || u || '').toLowerCase());
+      if (currentUnitVal && !uomNames.includes(currentUnitVal.toLowerCase())) {
+        uomOptionsRaw = `<option value="${escapeHtml(currentUnitVal)}">${escapeHtml(currentUnitVal)}</option>` + uomOptionsRaw;
+      }
+      const uomOptions = uomOptionsRaw;
+
+      // Determine procurement source from DB (normalize for dropdown)
+      const dbProcSource = plan.procurement_source || plan.item_procurement_source || 'NON PS-DBM';
+      console.log('[PPMP EDIT] Procurement source determined:', dbProcSource);
+
+      // Get department info
+      function getDeptCode(name) {
+        if (!name) return 'DMW';
+        const lower = name.toLowerCase();
+        if (lower.includes('finance')) return 'FAD';
+        if (lower.includes('protection') && lower.includes('trafficking')) return 'MWPTD';
+        if (lower.includes('processing') || lower.includes('service')) return 'MWPSD';
+        if (lower.includes('welfare') || lower.includes('reintegration')) return 'WRSD';
+        if (lower.includes('director')) return 'ORD';
+        return name.substring(0,3).toUpperCase();
+      }
+      const deptCode = plan.department_code || getDeptCode(plan.department_name);
+      const ppmpNo = plan.ppmp_no || 'PPMP-' + deptCode + '-' + plan.fiscal_year + '-' + String(plan.id).padStart(3, '0');
+
+      // Parse status and section values (numeric values moved to specificEntryData block)
+      const statusVal = plan.status || 'draft';
+      const currentSection = plan.section || 'GENERAL PROCUREMENT';
+      const currentCategory = plan.category || plan.item_category || '';
+
+      // Get linked item from catalog
+      const linkedItem = allItems.find(i => String(i.id) === String(plan.item_id));
+
+      // Build section options from database using the helper function
+      const sectionOptions = buildPPMPSectionOptions(currentSection, true);
+      console.log('[PPMP EDIT] Section dropdown built with current section:', currentSection);
+
+      // Build category options from database using the helper function
+      const categoryOptionsHtml = buildPPMPCategoryOptions(currentCategory);
+      console.log('[PPMP EDIT] Category dropdown built with current category:', currentCategory);
+
+      // Determine which section to show based on procurement source
+      // NON PS-DBM items with a linked item_id are catalog items, not manual
+      const isPAPs = dbProcSource === 'PAPs';
+      const isManualCreated = dbProcSource === 'MANUAL-NON-PSDBM';
+      const isNonPSDBMFromCatalog = dbProcSource === 'NON PS-DBM' && plan.item_id;
+      const isNonPSDBMManual = dbProcSource === 'NON PS-DBM' && !plan.item_id;
+      const showCatalogSection = dbProcSource === 'PS-DBM' || isNonPSDBMFromCatalog;
+      const showManualSection = isManualCreated || isNonPSDBMManual;
+      const showPAPsSection = isPAPs;
+
+      // Populate item details using specificEntryData (with HTML escaping)
+      const itemName = escapeHtml(specificEntryData.item_name);
+      const itemDesc = escapeHtml(specificEntryData.item_description);
+      const itemUnit = escapeHtml(specificEntryData.item_unit);
+      const unitPrice = specificEntryData.unit_price;
+      const quantity = specificEntryData.quantity_size;
+      const totalAmt = specificEntryData.total_amount;
+
+      // PAP-specific values: PAP Name is in plan.description, detail is in plan.item_description
+      const papNameValue = escapeHtml(plan.description || (planItem ? planItem.item_name : '') || '');
+      const papDescValue = escapeHtml(plan.item_description || (planItem ? planItem.item_description : '') || '');
+
+      // Manual-specific values: Same logic as PAPs - Item Name is in plan.description, detail is in plan.item_description
+      const manualNameValue = escapeHtml(plan.description || (planItem ? planItem.item_name : '') || '');
+      const manualDescValue = escapeHtml(plan.item_description || (planItem ? planItem.item_description : '') || '');
+
+      console.log('[PPMP EDIT] Section determination - isPAPs:', isPAPs, 'isManualCreated:', isManualCreated, 'isNonPSDBMManual:', isNonPSDBMManual, 'showCatalog:', showCatalogSection);
+
+      // Determine plan type checkboxes
+      const isIndicative = plan.plan_type === 'INDICATIVE' || (plan.plan_type || '').includes('INDICATIVE');
+      const isFinal = plan.plan_type === 'FINAL' || (plan.plan_type || '').includes('FINAL');
+
+      const html = `
+        <form id="editPPMPForm" onsubmit="submitEditPPMP(event, ${planId})">
+          <div class="info-banner" style="margin-bottom: 16px; background: #ebf5fb; border-left: 4px solid #1a365d; padding: 10px 14px;">
+            <i class="fas fa-info-circle" style="color: #1a365d;"></i>
+            <strong>PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</strong><br>
+            <small style="color: #555;">Per NGPA Form — RA 12009 IRR Section 7.7.2</small>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>PPMP No. <span class="text-danger">*</span></label>
+              <input type="text" name="ppmp_no" id="editPpmpNo" value="${escapeHtml(ppmpNo)}" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>Fiscal Year <span class="text-danger">*</span></label>
+              <input type="number" name="fiscal_year" value="${plan.fiscal_year}" required style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>End-User / Division <span class="text-danger">*</span></label>
+              <input type="text" value="${escapeHtml(deptCode)}" readonly style="background:#f0f0f0; color:#555; font-weight:600;">
+              <input type="hidden" name="dept_id" value="${plan.dept_id || ''}">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Plan Type</label>
+              <div style="display:flex; gap:24px; align-items:center; padding: 6px 0; margin-left: 16px;">
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                  <input type="checkbox" id="editPpmpIndicative" name="plan_type_indicative" ${isIndicative ? 'checked' : ''}> INDICATIVE
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                  <input type="checkbox" id="editPpmpFinal" name="plan_type_final" ${isFinal ? 'checked' : ''}> FINAL
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Procurement Source <span class="text-danger">*</span> <small style="color:#999;">(fixed at creation)</small></label>
+              <select class="form-select" id="editPPMPProcSource" disabled style="background:#f0f0f0;cursor:not-allowed;">
+                <option value="NON PS-DBM" ${dbProcSource==='NON PS-DBM'?'selected':''}>NON PS-DBM (Items Catalog)</option>
+                <option value="PS-DBM" ${dbProcSource==='PS-DBM'?'selected':''}>PS-DBM (Items Catalog)</option>
+                <option value="PAPs" ${dbProcSource==='PAPs'?'selected':''}>PAPs (Programs, Activities & Projects)</option>
+                <option value="MANUAL-NON-PSDBM" ${dbProcSource==='MANUAL-NON-PSDBM'?'selected':''}>Create NON-PS-DBM (Manually)</option>
+              </select>
+              <input type="hidden" name="procurement_source" value="${escapeHtml(dbProcSource)}">
+            </div>
+            <div class="form-group">
+              <label>Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="status" required>
+                <option value="draft" ${statusVal==='draft'?'selected':''}>Draft</option>
+                <option value="pending" ${statusVal==='pending'?'selected':''}>Pending</option>
+                <option value="submitted" ${statusVal==='submitted'?'selected':''}>Submitted</option>
+                <option value="approved" ${statusVal==='approved'?'selected':''}>Approved</option>
+                <option value="rejected" ${statusVal==='rejected'?'selected':''}>Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ===== CATALOG ITEMS SECTION (PS-DBM / NON PS-DBM) ===== -->
+          <div id="editPPMPCatalogSection" style="display:${showCatalogSection ? 'block' : 'none'};">
+            <div class="form-section-header"><i class="fas fa-layer-group"></i> Items from Catalog</div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="ppmpEditSection" name="section" required>
+                  ${sectionOptions}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category <small style="color:#999;">(filtered by section)</small></label>
+                <select class="form-select" id="ppmpEditCategory" name="category">
+                  ${categoryOptionsHtml}
+                </select>
+              </div>
+              <div class="form-group" style="display:flex;flex:1;min-width:0;">
+                <button type="button" onclick="showEditPPMPCatalogItemModal()" class="btn btn-primary" style="font-size:13px;width:100%;height:100%;box-sizing:border-box;">
+                  <i class="fas fa-search"></i> Select Item from Catalog
+                </button>
+              </div>
+            </div>
+            <span id="ppmpEditItemCount" style="font-size:12px; color:#4a5568; margin-bottom:8px; display:block;"></span>
+            <div id="ppmpEditItemsList" style="max-height:250px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px;">
+              <!-- Selected items rendered by JS -->
+            </div>
+            <div id="ppmpEditCheckedSummary" style="font-size:12px; color:#2b6cb0; font-weight:600; margin-bottom:12px;"></div>
+          </div>
+
+          <!-- ===== MANUAL ITEMS SECTION (Create NON-PS-DBM Manually) ===== -->
+          <div id="editPPMPManualSection" style="display:${showManualSection ? 'block' : 'none'};">
+            <div class="form-section-header"><i class="fas fa-pen"></i> <span id="editPpmpManualSectionTitle">Manual Item Entry</span></div>
+            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+              <i class="fas fa-info-circle"></i> Items entered here will be <strong>automatically added to the Items Catalog</strong> once this PPMP is fully approved.
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="manualSection" name="section" style="font-size:13px;">
+                  ${sectionOptions}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category <span class="text-danger">*</span></label>
+                <select class="form-select" id="manualCategory" name="category" style="font-size:13px;">
+                  ${categoryOptionsHtml}
+                </select>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Item Name <span class="text-danger">*</span></label>
+                <input type="text" id="manualItemName" value="${manualNameValue}" placeholder="e.g., Ballpen, Black" style="font-size:13px;" oninput="syncManualNameWithDescription(this.value)">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="manualItemDesc" value="${manualDescValue}" placeholder="Specs, size, color..." style="font-size:13px;" oninput="syncManualDescWithGeneral(this.value)">
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Unit <span class="text-danger">*</span></label>
+                <select class="form-select" id="manualItemUnit" style="font-size:13px;">
+                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Unit Price (₱) <span class="text-danger">*</span></label>
+                <input type="text" inputmode="decimal" id="manualItemPrice" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="manualItemQty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditManualEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Est. Budget</label>
+                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== PAPs SECTION (Programs, Activities & Projects) ===== -->
+          <div id="editPPMPPAPsSection" style="display:${showPAPsSection ? 'block' : 'none'};">
+            <div class="form-section-header"><i class="fas fa-project-diagram"></i> PAP Details (Programs, Activities & Projects)</div>
+            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+              <i class="fas fa-info-circle"></i> Manually enter PAP items below or select from the Item Catalog. All items will be part of a unified list.
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Section <span class="text-danger">*</span></label>
+                <select class="form-select" id="papSection" name="section" style="font-size:13px;">
+                  ${sectionOptions}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category <span class="text-danger">*</span></label>
+                <select class="form-select" id="papCategory" name="category" style="font-size:13px;">
+                  ${categoryOptionsHtml}
+                </select>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>PAP Name <span class="text-danger">*</span></label>
+                <input type="text" id="papManualItemName" name="pap_manual_item_name" value="${papNameValue}" placeholder="e.g., Office Renovation" style="font-size:13px;" oninput="syncPAPNameWithDescription(this.value)">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea id="papManualItemDesc" name="pap_manual_item_desc" rows="2" placeholder="Specs, details..." style="font-size:13px;resize:vertical;" oninput="syncPAPDescWithGeneral(this.value)">${papDescValue}</textarea>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-group">
+                <label>Unit <span class="text-danger">*</span></label>
+                <select class="form-select" id="papManualItemUnit" name="pap_manual_item_unit" style="font-size:13px;">
+                  ${uomOptions.replace(`value="${itemUnit}"`, `value="${itemUnit}" selected`)}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Unit Price (₱) <span class="text-danger">*</span></label>
+                <input type="text" inputmode="decimal" id="papManualItemPrice" name="pap_manual_item_price" value="${unitPrice.toFixed(2)}" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="papManualItemQty" name="pap_manual_item_qty" value="${quantity}" min="1" step="1" style="font-size:13px;" oninput="calcEditPAPEstBudget()">
+              </div>
+              <div class="form-group">
+                <label>Est. Budget</label>
+                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+              </div>
+            </div>
+          </div>
+
+          <div id="editPpmpNonPAPDetails">
+          <div class="form-section-header"><i class="fas fa-clipboard-list"></i> Common Procurement Details</div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type of Project <span class="text-danger">*</span></label>
+              <select class="form-select" name="project_type" required>
+                <option value="Goods" ${plan.project_type==='Goods'?'selected':''}>Goods</option>
+                <option value="Infrastructure" ${plan.project_type==='Infrastructure'?'selected':''}>Infrastructure</option>
+                <option value="Consulting Services" ${plan.project_type==='Consulting Services'?'selected':''}>Consulting Services</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mode of Procurement <span class="text-danger">*</span></label>
+              <select class="form-select" name="procurement_mode" required>
+                ${buildProcModeOptions(plan.procurement_mode || 'Small Value Procurement')}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Pre-Procurement Conference</label>
+              <select class="form-select" name="pre_procurement">
+                <option value="NO" ${plan.pre_procurement!=='YES'?'selected':''}>NO</option>
+                <option value="YES" ${plan.pre_procurement==='YES'?'selected':''}>YES</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Source of Funds <span class="text-danger">*</span></label>
+              <select class="form-select" name="fund_source" required>
+                <option value="GAA ${plan.fiscal_year} - Current Appropriation" ${(plan.fund_source||'').includes('Current') ? 'selected' : ''}>GAA ${plan.fiscal_year} - Current Appropriation</option>
+                <option value="GAA ${plan.fiscal_year}" ${plan.fund_source===('GAA '+plan.fiscal_year) ? 'selected' : ''}>GAA ${plan.fiscal_year}</option>
+                <option value="GAA" ${plan.fund_source==='GAA'?'selected':''}>GAA</option>
+                <option value="Special Fund" ${plan.fund_source==='Special Fund'?'selected':''}>Special Fund</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section-header section-timeline"><i class="fas fa-calendar-alt"></i> Projected Timeline</div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label>Start of Procurement <span class="text-danger">*</span></label>
+              <input type="month" name="start_date" value="${parseMonthYearToInput(plan.start_date || '')}" required>
+            </div>
+            <div class="form-group">
+              <label>End of Procurement <span class="text-danger">*</span></label>
+              <input type="month" name="end_date" value="${parseMonthYearToInput(plan.end_date || '')}" required>
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery <span class="text-danger">*</span></label>
+              <input type="month" name="delivery_period" value="${parseMonthYearToInput(plan.delivery_period || '')}" required>
+            </div>
+          </div>
+          </div>
+
+          <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments & Remarks</div>
+          <div class="form-group">
+            <label>Supporting Documents <small style="color:#999;">(optional)</small></label>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <label class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; border:1px solid #ccc; padding:6px 12px; border-radius:4px;">
+                <i class="fas fa-paperclip"></i> Choose File
+                <input type="file" id="editPpmpAttachment" name="attachment" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none;" onchange="updateFileLabel(this, 'editPpmpFileLabel')">
+              </label>
+              <span id="editPpmpFileLabel" style="font-size:12px; color:#888;">${plan.attachment ? escapeHtml(plan.attachment) : 'No file selected'}</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Remarks</label>
+            <textarea id="ppmpRemarks" name="remarks" rows="2" placeholder="Additional remarks (optional)">${escapeHtml(plan.remarks || '')}</textarea>
+          </div>
+
+          <input type="hidden" name="description" id="ppmpEditDescription" value="${escapeHtml(plan.description || '')}">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantity/Size</label>
+              <input type="text" name="quantity_size" value="${escapeHtml(plan.quantity_size || '')}" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label>Total Amount (ABC) <span class="text-danger">*</span></label>
+              <input type="number" name="total_amount" id="ppmpEditBudget" step="0.01" value="${totalAmt.toFixed(2)}" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="text-align: right; margin-top: 20px;">
+            <div id="editPpmpTotalDisplay" style="display:inline-block; margin-right:20px; font-size:14px; font-weight:700; color:#1a365d;"></div>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+          </div>
+        </form>
+      `;
+
+      openModal('EDIT PPMP ENTRY — ' + escapeHtml(ppmpNo), html);
+
+      // Store edit context
+      window._ppmpEditPlanId = planId;
+      window._ppmpEditPlan = plan;
+      window._ppmpEditCheckedItems = {};
+
+      // Pre-check the currently linked item with its description (for catalog mode)
+      if (plan.item_id && linkedItem && !isPAPs && !isManual) {
+        // Use plan_items unit/unit_price if available, else fall back to catalog item values
+        const storedUnit = (planItem ? planItem.unit : '') || linkedItem.unit || '';
+        const storedUnitPrice = parseFloat((planItem ? planItem.unit_price : 0) || linkedItem.unit_price || 0);
+        window._ppmpEditCheckedItems[String(plan.item_id)] = {
+          item_id: plan.item_id,
+          item: { ...linkedItem, unit: storedUnit, unit_price: storedUnitPrice },
+          description: plan.item_description || plan.description || '',
+          unit: storedUnit,
+          unit_price: storedUnitPrice,
+          isOriginal: true
+        };
+      }
+
+      // Render the checkbox items list for catalog mode
+      if (showCatalogSection && !showManualSection && !showPAPsSection) {
+        renderEditPPMPItemsList();
+      }
+
+      // ===== setTimeout INITIALIZATION BLOCK =====
+      // DOM-dependent population and initialization logic
+      setTimeout(() => {
+        console.log('[PPMP EDIT] Initialization block started - DOM is ready');
+        
+        // 1. PROCUREMENT SOURCE AUTO-SELECTION
+        const procSourceSelect = document.getElementById('editPPMPProcSource');
+        if (procSourceSelect) {
+          procSourceSelect.value = dbProcSource;
+          console.log('[PPMP EDIT] Procurement source auto-selected to:', dbProcSource);
+          // Call toggle function to show/hide appropriate sections
+          toggleEditPPMPSourceMode(dbProcSource);
+          console.log('[PPMP EDIT] Section toggle called for source:', dbProcSource);
+        }
+
+        // 2. POPULATE MANUAL ITEM FIELDS (if applicable)
+        if (isManual) {
+          console.log('[PPMP EDIT] Populating manual item fields with specificEntryData:', specificEntryData);
+
+          // Populate Item Name (uses same source as General Description & Objective)
+          const manualItemNameEl = document.getElementById('manualItemName');
+          if (manualItemNameEl) {
+            manualItemNameEl.value = specificEntryData.manual_name;
+            console.log('[PPMP EDIT] Manual Item Name populated (from description):', specificEntryData.manual_name);
+          }
+
+          // Populate Description
+          const manualItemDescEl = document.getElementById('manualItemDesc');
+          if (manualItemDescEl) {
+            manualItemDescEl.value = specificEntryData.item_description;
+            console.log('[PPMP EDIT] Manual Item Desc populated:', specificEntryData.item_description);
+          }
+
+          // SYNC: General Description & Objective should have same value as Manual Item Name
+          const descriptionEl = document.getElementById('ppmpEditDescription');
+          if (descriptionEl && specificEntryData.manual_name) {
+            descriptionEl.value = specificEntryData.manual_name;
+            console.log('[PPMP EDIT] General Description synced with Manual Item Name:', specificEntryData.manual_name);
+          }
+
+          // Populate Unit Dropdown - ensure proper selection
+          const manualItemUnitEl = document.getElementById('manualItemUnit');
+          if (manualItemUnitEl) {
+            const unitValue = specificEntryData.item_unit;
+            manualItemUnitEl.value = unitValue;
+            // If exact match fails, try case-insensitive match
+            if (manualItemUnitEl.value !== unitValue) {
+              for (let i = 0; i < manualItemUnitEl.options.length; i++) {
+                if (manualItemUnitEl.options[i].value.toLowerCase() === unitValue.toLowerCase()) {
+                  manualItemUnitEl.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+            console.log('[PPMP EDIT] Manual Item Unit populated:', unitValue, '-> selected:', manualItemUnitEl.value);
+          }
+
+          // Populate Unit Price
+          const manualItemPriceEl = document.getElementById('manualItemPrice');
+          if (manualItemPriceEl) {
+            manualItemPriceEl.value = specificEntryData.unit_price.toFixed(2);
+            console.log('[PPMP EDIT] Manual Item Price populated:', specificEntryData.unit_price.toFixed(2));
+          }
+
+          // Populate Quantity
+          const manualItemQtyEl = document.getElementById('manualItemQty');
+          if (manualItemQtyEl) {
+            manualItemQtyEl.value = specificEntryData.quantity_size.toString();
+            console.log('[PPMP EDIT] Manual Item Qty populated:', specificEntryData.quantity_size);
+          }
+
+          // Populate Estimated Budget
+          const manualEstBudgetEl = document.getElementById('manualEstBudget');
+          if (manualEstBudgetEl) {
+            manualEstBudgetEl.value = specificEntryData.total_amount.toFixed(2);
+            console.log('[PPMP EDIT] Manual Est Budget populated:', specificEntryData.total_amount.toFixed(2));
+          }
+        }
+
+        // 3. POPULATE PAP FIELDS (if applicable)
+        if (isPAPs) {
+          console.log('[PPMP EDIT] Populating PAP fields with specificEntryData:', specificEntryData);
+
+          // Populate PAP Name (uses same source as General Description & Objective)
+          const papItemNameEl = document.getElementById('papManualItemName');
+          if (papItemNameEl) {
+            papItemNameEl.value = specificEntryData.pap_name;
+            console.log('[PPMP EDIT] PAP Name populated (from description):', specificEntryData.pap_name);
+          }
+
+          // Populate Description (textarea)
+          const papItemDescEl = document.getElementById('papManualItemDesc');
+          if (papItemDescEl) {
+            papItemDescEl.value = specificEntryData.item_description;
+            console.log('[PPMP EDIT] PAP Item Desc populated:', specificEntryData.item_description);
+          }
+
+          // SYNC: General Description & Objective should have same value as PAP Name
+          const descriptionEl = document.getElementById('ppmpEditDescription');
+          if (descriptionEl && specificEntryData.pap_name) {
+            descriptionEl.value = specificEntryData.pap_name;
+            console.log('[PPMP EDIT] General Description synced with PAP Name:', specificEntryData.pap_name);
+          }
+
+          // Populate Unit Dropdown - fetched from items table JOIN
+          const papItemUnitEl = document.getElementById('papManualItemUnit');
+          if (papItemUnitEl) {
+            const unitValue = specificEntryData.item_unit;
+            papItemUnitEl.value = unitValue;
+            // If exact match fails, try case-insensitive match
+            if (papItemUnitEl.value !== unitValue) {
+              for (let i = 0; i < papItemUnitEl.options.length; i++) {
+                if (papItemUnitEl.options[i].value.toLowerCase() === unitValue.toLowerCase()) {
+                  papItemUnitEl.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+            console.log('[PPMP EDIT] PAP Unit populated (from items table):', unitValue, '-> selected:', papItemUnitEl.value);
+          }
+
+          // Populate Unit Price - fetched from items table JOIN
+          const papItemPriceEl = document.getElementById('papManualItemPrice');
+          if (papItemPriceEl) {
+            papItemPriceEl.value = specificEntryData.unit_price.toFixed(2);
+            console.log('[PPMP EDIT] PAP Unit Price populated (from items table):', specificEntryData.unit_price.toFixed(2));
+          }
+
+          // Populate Quantity
+          const papItemQtyEl = document.getElementById('papManualItemQty');
+          if (papItemQtyEl) {
+            papItemQtyEl.value = specificEntryData.quantity_size.toString();
+            console.log('[PPMP EDIT] PAP Item Qty populated:', specificEntryData.quantity_size);
+          }
+
+          // Populate Estimated Budget
+          const papEstBudgetEl = document.getElementById('papManualEstBudget');
+          if (papEstBudgetEl) {
+            papEstBudgetEl.value = specificEntryData.total_amount.toFixed(2);
+            console.log('[PPMP EDIT] PAP Est Budget populated:', specificEntryData.total_amount.toFixed(2));
+          }
+        }
+
+        // 4. POPULATE REMARKS FIELD (conditional - only if remarks exist)
+        // Note: Do NOT use escapeHtml() for textarea .value - it displays as plain text, not HTML
+        const remarksField = document.getElementById('ppmpRemarks');
+        if (remarksField) {
+          if (plan.remarks) {
+            remarksField.value = plan.remarks;
+            console.log('[PPMP EDIT] Remarks field populated with database value');
+          } else {
+            remarksField.value = '';
+            console.log('[PPMP EDIT] Remarks field left blank (no remarks in database)');
+          }
+        }
+
+        console.log('[PPMP EDIT] Initialization block completed successfully');
+      }, 0);
+    } catch (err) {
+      alert('Failed to load PPMP for editing: ' + err.message);
+    }
+  };
+
+  /**
+   * Toggle Edit PPMP modal sections based on procurement source selection
+   */
+  window.toggleEditPPMPSourceMode = function(source) {
+    const catalogSection = document.getElementById('editPPMPCatalogSection');
+    const manualSection = document.getElementById('editPPMPManualSection');
+    const papsSection = document.getElementById('editPPMPPAPsSection');
+
+    // Hide all sections first
+    if (catalogSection) catalogSection.style.display = 'none';
+    if (manualSection) manualSection.style.display = 'none';
+    if (papsSection) papsSection.style.display = 'none';
+
+    // Show appropriate section based on source
+    if (source === 'PAPs') {
+      if (papsSection) papsSection.style.display = 'block';
+    } else if (source === 'MANUAL-NON-PSDBM') {
+      if (manualSection) manualSection.style.display = 'block';
+    } else {
+      // PS-DBM or NON PS-DBM - show catalog section
+      if (catalogSection) catalogSection.style.display = 'block';
+    }
+  };
+
+  /**
+   * Calculate estimated budget for manual item entry in Edit modal
+   */
+  window.calcEditManualEstBudget = function() {
+    const price = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('manualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const budgetField = document.getElementById('manualEstBudget');
+    const totalField = document.getElementById('ppmpEditBudget');
+    if (budgetField) budgetField.value = estBudget.toFixed(2);
+    if (totalField) totalField.value = estBudget.toFixed(2);
+  };
+
+  /**
+   * Calculate estimated budget for PAP entry in Edit modal
+   */
+  window.calcEditPAPEstBudget = function() {
+    const price = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('papManualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const budgetField = document.getElementById('papManualEstBudget');
+    const totalField = document.getElementById('ppmpEditBudget');
+    if (budgetField) budgetField.value = estBudget.toFixed(2);
+    if (totalField) totalField.value = estBudget.toFixed(2);
+  };
+
+  /**
+   * Sync PAP Name with General Description & Objective field
+   * Called when PAP Name input changes - combines PAP Name + PAP Description
+   */
+  window.syncPAPNameWithDescription = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in PAPs mode
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const papDescField = document.getElementById('papManualItemDesc');
+      if (descField) {
+        // Combine PAP Name + PAP Description for General Description
+        const papDesc = papDescField?.value?.trim() || '';
+        const combined = papDesc ? (value + ': ' + papDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync PAP Description with General Description & Objective field
+   * Called when PAP Description textarea changes - combines PAP Name + PAP Description
+   */
+  window.syncPAPDescWithGeneral = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in PAPs mode
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const papNameField = document.getElementById('papManualItemName');
+      if (descField) {
+        // Combine PAP Name + PAP Description for General Description
+        const papName = papNameField?.value?.trim() || '';
+        const combined = value ? (papName + ': ' + value) : papName;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync Manual Item Name with General Description & Objective field
+   * Called when Manual Item Name input changes - combines Manual Name + Manual Description
+   */
+  window.syncManualNameWithDescription = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in MANUAL-NON-PSDBM mode
+    if (procSource === 'MANUAL-NON-PSDBM') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const manualDescField = document.getElementById('manualItemDesc');
+      if (descField) {
+        // Combine Manual Item Name + Manual Description for General Description
+        const manualDesc = manualDescField?.value?.trim() || '';
+        const combined = manualDesc ? (value + ': ' + manualDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced Manual Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync Manual Item Description with General Description & Objective field
+   * Called when Manual Item Description input changes - combines Manual Name + Manual Description
+   */
+  window.syncManualDescWithGeneral = function(value) {
+    const procSource = document.getElementById('editPPMPProcSource')?.value;
+    // Only sync when in MANUAL-NON-PSDBM mode
+    if (procSource === 'MANUAL-NON-PSDBM') {
+      const descField = document.getElementById('ppmpEditDescription');
+      const manualNameField = document.getElementById('manualItemName');
+      if (descField) {
+        // Combine Manual Item Name + Manual Description for General Description
+        const manualName = manualNameField?.value?.trim() || '';
+        const combined = value ? (manualName + ': ' + value) : manualName;
+        descField.value = combined;
+        console.log('[PPMP EDIT] Synced Manual Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync General Description & Objective - NO reverse sync
+   * NOTE: Do NOT sync back from General Description to name fields
+   * General Description is auto-combined from Name + Description fields
+   */
+  window.syncDescriptionWithPAPName = function(value) {
+    // Do NOT sync back to any name field - this prevents duplication
+    // General Description is a combined output, not an input
+    console.log('[PPMP EDIT] General Description changed (no reverse sync):', value);
+  };
+
+  /**
+   * Sync PAP Name with General Description for NEW PPMP Modal
+   * Called when PAP Name input changes - combines PAP Name + PAP Description
+   */
+  window.syncNewPAPNameWithDescription = function(value) {
+    const procSource = document.getElementById('ppmpProcurementSource')?.value;
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpDescription');
+      const papDescField = document.getElementById('papManualItemDesc');
+      if (descField) {
+        const papDesc = papDescField?.value?.trim() || '';
+        const combined = papDesc ? (value + ': ' + papDesc) : value;
+        descField.value = combined;
+        console.log('[PPMP NEW] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Sync PAP Description with General Description for NEW PPMP Modal
+   * Called when PAP Description textarea changes - combines PAP Name + PAP Description
+   */
+  window.syncNewPAPDescWithGeneral = function(value) {
+    const procSource = document.getElementById('ppmpProcurementSource')?.value;
+    if (procSource === 'PAPs') {
+      const descField = document.getElementById('ppmpDescription');
+      const papNameField = document.getElementById('papManualItemName');
+      if (descField) {
+        const papName = papNameField?.value?.trim() || '';
+        const combined = value ? (papName + ': ' + value) : papName;
+        descField.value = combined;
+        console.log('[PPMP NEW] Synced PAP Name + Description to General Description:', combined);
+      }
+    }
+  };
+
+  /**
+   * Filter the edit modal items checkbox list by search text and category.
+   */
+  window.filterEditPPMPItems = function() {
+    renderEditPPMPItemsList();
+  };
+
+  /**
+   * Render compact summary table of selected items in the edit modal.
+   */
+  window.renderEditPPMPItemsList = function() {
+    const container = document.getElementById('ppmpEditItemsList');
+    const summaryEl = document.getElementById('ppmpEditCheckedSummary');
+    if (!container) return;
+
+    const checked = window._ppmpEditCheckedItems || {};
+    const checkedIds = Object.keys(checked);
+
+    if (checkedIds.length === 0) {
+      container.innerHTML = '<div style="padding:16px; text-align:center; color:#999; font-size:12px; border:1px solid #e2e8f0; border-radius:6px; background:#f9fafb;">No items selected. Click <strong>Select Items from Catalog</strong> to add items.</div>';
+      if (summaryEl) summaryEl.textContent = '';
+      return;
+    }
+
+    const unitOpts = ['lot','set','unit','pcs','pax','ltrs','gal','box','ream','pack','roll','pad','cart','bottle','can','jar','pair','length','sheet','bundle'];
+
+    const rows = checkedIds.map(id => {
+      const c = checked[id];
+      const item = c.item || {};
+      const currentUnit = (c.unit || item.unit || '').toLowerCase();
+      const price = parseFloat(c.unit_price !== undefined ? c.unit_price : (item.unit_price || 0));
+      const unitDropdown = unitOpts.map(u =>
+        '<option value="' + u + '"' + (u === currentUnit ? ' selected' : '') + '>' + u + '</option>'
+      ).join('');
+      // If stored unit isn't in standard list, add it
+      const extraOpt = (!unitOpts.includes(currentUnit) && currentUnit) ?
+        '<option value="' + escapeHtml(currentUnit) + '" selected>' + escapeHtml(currentUnit) + '</option>' : '';
+      return '<tr>' +
+        '<td style="font-weight:600;white-space:nowrap;">' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + (c.isOriginal ? ' <span style="background:#38a169;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;">current</span>' : '') + '</td>' +
+        '<td><select class="form-select" style="width:70px;font-size:11px;" onchange="updateEditPPMPItemUnit(\'' + id + '\', this.value)">' + extraOpt + unitDropdown + '</select></td>' +
+        '<td style="text-align:right;white-space:nowrap;"><input type="number" step="0.01" min="0" style="width:90px;font-size:11px;text-align:right;" value="' + price.toFixed(2) + '" onchange="updateEditPPMPItemPrice(\'' + id + '\', this.value)"></td>' +
+        '<td><textarea rows="1" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;resize:vertical;" placeholder="Item description..." oninput="updateEditPPMPItemDesc(\'' + id + '\', this.value)">' + escapeHtml(c.description || '') + '</textarea></td>' +
+        '<td style="text-align:center;"><button type="button" onclick="toggleEditPPMPItem(\'' + id + '\', false)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:14px;" title="Remove"><i class="fas fa-times-circle"></i></button></td>' +
+      '</tr>';
+    }).join('');
+
+    container.innerHTML = '<table class="data-table full-width" style="font-size:12px;">' +
+      '<thead><tr style="background:#f7fafc;"><th>Code</th><th>Name</th><th>Unit</th><th>Price</th><th>Description</th><th style="width:30px;"></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+
+    if (summaryEl) {
+      summaryEl.textContent = checkedIds.length + ' item' + (checkedIds.length > 1 ? 's' : '') + ' selected';
+    }
+  };
+
+  /**
+   * Toggle an item in the edit modal (called from summary remove or catalog modal).
+   */
+  window.toggleEditPPMPItem = function(itemId, isChecked) {
+    const allItems = window._ppmpItemsCache || [];
+    if (isChecked) {
+      const item = allItems.find(i => String(i.id) === String(itemId));
+      if (!item) return;
+      window._ppmpEditCheckedItems[itemId] = {
+        item_id: parseInt(itemId),
+        item: item,
+        description: buildItemDescription(item),
+        unit: item.unit || '',
+        unit_price: parseFloat(item.unit_price || 0),
+        isOriginal: false
+      };
+      const sectionField = document.getElementById('ppmpSection');
+      if (sectionField && item.category) {
+        const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+        sectionField.value = autoSection;
+      }
+    } else {
+      delete window._ppmpEditCheckedItems[itemId];
+    }
+    renderEditPPMPItemsList();
+  };
+
+  /**
+   * Update the item description for a checked item in the edit modal.
+   */
+  window.updateEditPPMPItemDesc = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      window._ppmpEditCheckedItems[itemId].description = value;
+    }
+  };
+
+  window.updateEditPPMPItemUnit = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      window._ppmpEditCheckedItems[itemId].unit = value;
+      if (window._ppmpEditCheckedItems[itemId].item) {
+        window._ppmpEditCheckedItems[itemId].item.unit = value;
+      }
+    }
+  };
+
+  window.updateEditPPMPItemPrice = function(itemId, value) {
+    if (window._ppmpEditCheckedItems[itemId]) {
+      const price = parseFloat(value) || 0;
+      window._ppmpEditCheckedItems[itemId].unit_price = price;
+      if (window._ppmpEditCheckedItems[itemId].item) {
+        window._ppmpEditCheckedItems[itemId].item.unit_price = price;
+      }
+    }
+  };
+
+  // syncDescToCheckedItem removed — general description and item_description are independent fields
+
+  // =====================================================
+  // CATALOG ITEM PICKER MODAL FOR EDIT PPMP
+  // =====================================================
+
+  /** Open a sub-modal to select catalog items for Edit PPMP (table-based, like create flow) */
+  window.showEditPPMPCatalogItemModal = function() {
+    const allItems = window._ppmpItemsCache || [];
+    const checked = window._ppmpEditCheckedItems || {};
+    const sourceSelect = document.querySelector('#editPPMPForm select[name="procurement_source"]');
+    let sourceFilter = sourceSelect ? sourceSelect.value : 'NON PS-DBM';
+    if (sourceFilter === 'MANUAL-NON-PSDBM') sourceFilter = 'NON PS-DBM';
+
+    let filteredItems = allItems;
+    if (sourceFilter !== 'PAPs') {
+      filteredItems = allItems.filter(i => (i.procurement_source || 'NON PS-DBM') === sourceFilter);
+    }
+
+    // Pin checked items to top
+    const checkedIds = Object.keys(checked);
+    const checkedItemsList = filteredItems.filter(i => checkedIds.includes(String(i.id)));
+    const uncheckedItemsList = filteredItems.filter(i => !checkedIds.includes(String(i.id)));
+    const sortedItems = [...checkedItemsList, ...uncheckedItemsList];
+
+    const itemRows = sortedItems.map(item => {
+      const id = String(item.id);
+      const isChecked = !!checked[id];
+      const isOrig = isChecked && checked[id].isOriginal;
+      const price = parseFloat(item.unit_price || 0);
+      return '<tr data-item-id="' + id + '" style="cursor:pointer;' + (isChecked ? 'background:#f0fff4;' : '') + '" onclick="toggleEditPPMPCatalogRow(\'' + id + '\')">' +
+        '<td style="text-align:center;"><input type="checkbox" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleEditPPMPCatalogRow(\'' + id + '\')"></td>' +
+        '<td>' + escapeHtml(item.code || '') + '</td>' +
+        '<td>' + escapeHtml(item.category || '') + '</td>' +
+        '<td>' + escapeHtml(item.name || '') + '</td>' +
+        '<td>' + escapeHtml(item.unit || '') + '</td>' +
+        '<td style="text-align:right;">\u20b1' + price.toLocaleString('en-PH', {minimumFractionDigits:2}) + '</td>' +
+        '<td style="text-align:center;">' + (isOrig ? '<span style="background:#38a169;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;">current</span>' : (isChecked ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i></span>' : '')) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ppmpEditCatalogItemOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:8px;width:820px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
+          '<h4 style="margin:0;"><i class="fas fa-layer-group"></i> Select Items from Catalog</h4>' +
+          '<button onclick="closeEditPPMPCatalogModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>' +
+        '</div>' +
+        '<div style="padding:8px 16px;">' +
+          '<input type="text" id="ppmpEditCatalogModalSearch" placeholder="Search by item code, name, category..." oninput="filterEditPPMPCatalogModalItems()" style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">' +
+        '</div>' +
+        '<div style="padding:0 16px 4px;font-size:11px;color:#718096;">' +
+          'Check items to link them. Click a row or use the checkbox.' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto;padding:0 16px;">' +
+          '<table class="data-table full-width" style="font-size:12px;">' +
+            '<thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">' +
+              '<th style="width:30px;"></th>' +
+              '<th>Code</th>' +
+              '<th>Category</th>' +
+              '<th>Name</th>' +
+              '<th>Unit</th>' +
+              '<th>Price</th>' +
+              '<th style="width:60px;">Status</th>' +
+            '</tr></thead>' +
+            '<tbody id="ppmpEditCatalogModalBody">' + itemRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #e2e8f0;">' +
+          '<span id="ppmpEditCatalogCount" style="font-size:12px;color:#2b6cb0;font-weight:600;">' + Object.keys(checked).length + ' item(s) selected</span>' +
+          '<button type="button" onclick="closeEditPPMPCatalogModal()" class="btn btn-primary" style="padding:8px 24px;"><i class="fas fa-check"></i> Done</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  };
+
+  /** Close the edit PPMP catalog modal and refresh the summary */
+  window.closeEditPPMPCatalogModal = function() {
+    const overlay = document.getElementById('ppmpEditCatalogItemOverlay');
+    if (overlay) overlay.remove();
+    renderEditPPMPItemsList();
+  };
+
+  /** Toggle a row in the edit PPMP catalog modal */
+  window.toggleEditPPMPCatalogRow = function(itemId) {
+    const isCurrentlyChecked = !!window._ppmpEditCheckedItems[itemId];
+    const allItems = window._ppmpItemsCache || [];
+
+    if (!isCurrentlyChecked) {
+      const item = allItems.find(i => String(i.id) === itemId);
+      if (!item) return;
+      window._ppmpEditCheckedItems[itemId] = {
+        item_id: parseInt(itemId),
+        item: item,
+        description: buildItemDescription(item),
+        isOriginal: false
+      };
+      const sectionField = document.getElementById('ppmpSection');
+      if (sectionField && item.category) {
+        const autoSection = CATEGORY_TO_SECTION[item.category] || 'GENERAL PROCUREMENT';
+        sectionField.value = autoSection;
+      }
+    } else {
+      delete window._ppmpEditCheckedItems[itemId];
+    }
+
+    // Re-sort rows: pinned checked items on top
+    const tbody = document.getElementById('ppmpEditCatalogModalBody');
+    if (tbody) {
+      const allRows = Array.from(tbody.querySelectorAll('tr'));
+      // Update toggled row appearance
+      const row = allRows.find(r => r.getAttribute('data-item-id') === itemId);
+      if (row) {
+        const cb = row.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = !isCurrentlyChecked;
+        row.style.background = !isCurrentlyChecked ? '#f0fff4' : '';
+        const statusCell = row.querySelector('td:last-child');
+        if (statusCell) statusCell.innerHTML = !isCurrentlyChecked ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i></span>' : '';
+      }
+      // Sort: checked rows first, then unchecked
+      const checkedNow = window._ppmpEditCheckedItems || {};
+      allRows.sort((a, b) => {
+        const aChecked = !!checkedNow[a.getAttribute('data-item-id')];
+        const bChecked = !!checkedNow[b.getAttribute('data-item-id')];
+        if (aChecked === bChecked) return 0;
+        return aChecked ? -1 : 1;
+      });
+      allRows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Update count
+    const countEl = document.getElementById('ppmpEditCatalogCount');
+    if (countEl) countEl.textContent = Object.keys(window._ppmpEditCheckedItems).length + ' item(s) selected';
+  };
+
+  /** Filter items in the edit PPMP catalog modal */
+  window.filterEditPPMPCatalogModalItems = function() {
+    const tbody = document.getElementById('ppmpEditCatalogModalBody');
+    if (!tbody) return;
+    const search = (document.getElementById('ppmpEditCatalogModalSearch')?.value || '').toLowerCase();
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(r => {
+      r.style.display = (!search || r.textContent.toLowerCase().includes(search)) ? '' : 'none';
+    });
+  };
+
+  // Submit Edit PPMP — handles multiple checked items or no items
+  // Submit Edit PPMP — handles Manual, PAPs, and Catalog modes
+  window.submitEditPPMP = async function(e, planId) {
+    e.preventDefault();
+    const form = e.target;
+    const procSource = form.procurement_source?.value || 'NON PS-DBM';
+    const deptId = form.querySelector('input[name="dept_id"]')?.value || window._ppmpEditPlan?.dept_id || null;
+
+    // Build common data from form fields
+    const commonData = {
+      dept_id: deptId ? parseInt(deptId) : null,
+      fiscal_year: parseInt(form.fiscal_year.value),
+      status: form.status.value,
+      section: document.getElementById('ppmpEditSection')?.value || form.section?.value || 'GENERAL PROCUREMENT',
+      description: form.description?.value || null,
+      project_type: form.project_type?.value || 'Goods',
+      quantity_size: form.quantity_size?.value || null,
+      procurement_mode: form.procurement_mode?.value || null,
+      pre_procurement: form.pre_procurement?.value || 'NO',
+      start_date: formatMonthYear(form.start_date?.value || '') || null,
+      end_date: formatMonthYear(form.end_date?.value || '') || null,
+      delivery_period: formatMonthYear(form.delivery_period?.value || '') || null,
+      total_amount: parseFloat(form.total_amount.value),
+      fund_source: form.fund_source?.value || 'GAA',
+      remarks: form.remarks.value,
+      category: document.getElementById('ppmpEditCategory')?.value || null,
+      procurement_source: procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource
+    };
+
+    try {
+      // Handle different procurement source modes
+      if (procSource === 'MANUAL-NON-PSDBM') {
+        // Manual item entry mode - get data from correct form field IDs
+        const itemName = document.getElementById('manualItemName')?.value?.trim() || '';
+        const itemDesc = document.getElementById('manualItemDesc')?.value?.trim() || '';
+        const itemUnit = document.getElementById('manualItemUnit')?.value || 'pc';
+        const itemPrice = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
+        const itemQty = document.getElementById('manualItemQty')?.value || '1';
+        const manualSection = document.getElementById('manualSection')?.value || commonData.section;
+        const manualCategory = document.getElementById('manualCategory')?.value || commonData.category;
+
+        console.log('[PPMP EDIT] Manual item data:', { itemName, itemDesc, itemUnit, itemPrice, itemQty });
+
+        if (!itemName) {
+          alert('Please enter an Item Name for manual entry.');
+          return;
+        }
+
+        const manualConfirmed = await govConfirm({
+          title: 'Save PPMP Changes',
+          bodyHtml: `<p>Save PPMP changes with <strong>Manual NON-PS-DBM</strong> item?</p>
+            <div class="item-summary"><div class="item-line">1. ${itemName} <span style="float:right;">₱${(itemPrice * (parseFloat(itemQty) || 1)).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div></div>`,
+          confirmText: 'Save Changes',
+          cancelText: 'Cancel'
+        });
+        if (!manualConfirmed) return;
+
+        const data = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: null, // Manual items don't have item_id
+          description: itemName, // Store Item Name as description (for bold title display)
+          item_description: itemDesc, // Store detail description separately
+          quantity_size: itemQty,
+          section: manualSection,
+          category: manualCategory,
+          total_amount: itemPrice * (parseFloat(itemQty) || 1),
+          // Include items array for plan_items table storage
+          items: [{
+            item_code: 'MANUAL-' + Date.now(),
+            item_name: itemName,
+            item_description: itemDesc,
+            unit: itemUnit,
+            unit_price: itemPrice,
+            category: manualCategory,
+            q1_qty: parseInt(itemQty) || 1,
+            q2_qty: 0,
+            q3_qty: 0,
+            q4_qty: 0,
+            remarks: commonData.remarks || ''
+          }]
+        };
+
+        await apiRequest('/plans/' + planId, 'PUT', data);
+        showNotification('PPMP entry saved successfully!', 'success');
+
+      } else if (procSource === 'PAPs') {
+        // PAPs mode - get data from correct form field IDs
+        const papName = document.getElementById('papManualItemName')?.value?.trim() || '';
+        const papDesc = document.getElementById('papManualItemDesc')?.value?.trim() || '';
+        const papUnit = document.getElementById('papManualItemUnit')?.value || 'lot';
+        const papPrice = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
+        const papQty = document.getElementById('papManualItemQty')?.value || '1';
+        const papSection = document.getElementById('papSection')?.value || commonData.section;
+        const papCategory = document.getElementById('papCategory')?.value || commonData.category;
+
+        console.log('[PPMP EDIT] PAP item data:', { papName, papDesc, papUnit, papPrice, papQty });
+
+        if (!papName) {
+          alert('Please enter a PAP Name.');
+          return;
+        }
+
+        const papConfirmed = await govConfirm({
+          title: 'Save PPMP Changes',
+          bodyHtml: `<p>Save PPMP changes with <strong>PAP</strong> entry?</p>
+            <div class="item-summary"><div class="item-line">1. ${papName} <span style="float:right;">₱${(papPrice * (parseFloat(papQty) || 1)).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div></div>`,
+          confirmText: 'Save Changes',
+          cancelText: 'Cancel'
+        });
+        if (!papConfirmed) return;
+
+        const data = {
+          ...commonData,
+          ppmp_no: form.ppmp_no?.value || undefined,
+          item_id: null,
+          item_description: papDesc, // Store detail description separately
+          description: papName, // Store PAP Name as main description (for display as title)
+          quantity_size: papQty,
+          section: papSection,
+          category: papCategory,
+          total_amount: papPrice * (parseFloat(papQty) || 1),
+          procurement_source: 'PAPs',
+          // Include items array for plan_items table storage
+          items: [{
+            item_code: 'PAP-' + Date.now(),
+            item_name: papName,
+            item_description: papDesc,
+            unit: papUnit,
+            unit_price: papPrice,
+            category: papCategory,
+            q1_qty: parseInt(papQty) || 1,
+            q2_qty: 0,
+            q3_qty: 0,
+            q4_qty: 0,
+            remarks: commonData.remarks || ''
+          }]
+        };
+
+        await apiRequest('/plans/' + planId, 'PUT', data);
+        showNotification('PPMP entry saved successfully!', 'success');
+
+      } else {
+        // Catalog mode (PS-DBM / NON PS-DBM)
+        const checked = window._ppmpEditCheckedItems || {};
+        const checkedIds = Object.keys(checked);
+
+        // Separate: the original item (update existing plan) vs new items (batch create)
+        const originalEntry = checkedIds.find(id => checked[id].isOriginal);
+        const newEntries = checkedIds.filter(id => !checked[id].isOriginal);
+
+        // Build confirmation message
+        let catalogConfirmed = false;
+        if (checkedIds.length === 0) {
+          catalogConfirmed = await govConfirm({
+            title: 'Save PPMP Changes',
+            bodyHtml: '<p>Save PPMP changes? <strong>No items linked.</strong></p>',
+            confirmText: 'Save Changes',
+            cancelText: 'Cancel'
+          });
+        } else {
+          const totalItems = checkedIds.length;
+          const itemLines = checkedIds.map((id, i) => {
+            const c = checked[id];
+            return `<div class="item-line">${i+1}. ${c.item?.name || 'Item #' + id} ${c.isOriginal ? '<span style="color:#999;">(current)</span>' : '<span style="color:#2196f3;font-weight:600;">(NEW)</span>'}</div>`;
+          }).join('');
+          catalogConfirmed = await govConfirm({
+            title: 'Save PPMP Changes',
+            bodyHtml: `<p>Save changes for <strong>${totalItems} item(s)</strong>?</p>
+              <div class="item-summary">${itemLines}</div>
+              ${newEntries.length > 0 ? '<p style="color:#1565c0;font-weight:600;margin-top:8px;">' + newEntries.length + ' new PPMP entries will be created.</p>' : '<p style="color:#555;margin-top:8px;">Updating existing entry.</p>'}`,
+            confirmText: 'Save Changes',
+            cancelText: 'Cancel'
+          });
+        }
+        if (!catalogConfirmed) return;
+
+        let savedCount = 0;
+
+        if (checkedIds.length === 0) {
+          // No items checked — update plan fields, preserve existing item linkage
+          const data = {
+            ...commonData,
+            ppmp_no: form.ppmp_no?.value || undefined,
+            item_id: window._ppmpEditPlan?.item_id || null,
+            item_description: window._ppmpEditPlan?.item_description || null,
+            // Preserve plan_items with current unit/price from the edit form
+            items: [{
+              item_code: '',
+              item_name: commonData.description || '',
+              item_description: window._ppmpEditPlan?.item_description || '',
+              unit: window._ppmpEditSpecificEntryData?.item_unit || 'pc',
+              unit_price: window._ppmpEditSpecificEntryData?.unit_price || 0,
+              category: commonData.category || '',
+              q1_qty: parseInt(commonData.quantity_size) || 1,
+              q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+            }]
+          };
+          await apiRequest('/plans/' + planId, 'PUT', data);
+          savedCount = 1;
+        } else {
+          // 1. Update the original PPMP entry
+          if (originalEntry) {
+            const origItem = checked[originalEntry].item || {};
+            const origDesc = checked[originalEntry].description || null;
+            const origData = {
+              ...commonData,
+              ppmp_no: form.ppmp_no?.value || undefined,
+              item_id: parseInt(originalEntry),
+              category: origItem.category || commonData.category,
+              item_description: origDesc,
+              items: [{
+                item_code: origItem.code || '',
+                item_name: origItem.name || commonData.description || '',
+                item_description: origDesc || '',
+                unit: origItem.unit || window._ppmpEditSpecificEntryData?.item_unit || 'pc',
+                unit_price: parseFloat(origItem.unit_price || commonData.total_amount / (parseFloat(commonData.quantity_size) || 1)) || 0,
+                category: origItem.category || commonData.category || '',
+                q1_qty: parseInt(commonData.quantity_size) || 1,
+                q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+              }]
+            };
+            await apiRequest('/plans/' + planId, 'PUT', origData);
+            savedCount++;
+          } else if (checkedIds.length > 0) {
+            // No original item — update with the first checked item
+            const firstId = checkedIds[0];
+            const firstItem = checked[firstId].item || {};
+            const firstDesc = checked[firstId].description || null;
+            const firstData = {
+              ...commonData,
+              ppmp_no: form.ppmp_no?.value || undefined,
+              item_id: parseInt(firstId),
+              category: firstItem.category || commonData.category,
+              item_description: firstDesc,
+              items: [{
+                item_code: firstItem.code || '',
+                item_name: firstItem.name || commonData.description || '',
+                item_description: firstDesc || '',
+                unit: firstItem.unit || 'pc',
+                unit_price: parseFloat(firstItem.unit_price || 0),
+                category: firstItem.category || commonData.category || '',
+                q1_qty: parseInt(commonData.quantity_size) || 1,
+                q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+              }]
+            };
+            await apiRequest('/plans/' + planId, 'PUT', firstData);
+            savedCount++;
+            // Remove from newEntries since it was used for the update
+            const idx = newEntries.indexOf(firstId);
+            if (idx > -1) newEntries.splice(idx, 1);
+          }
+
+          // 2. Batch create new PPMP entries for additional checked items
+          if (newEntries.length > 0) {
+            const entries = newEntries.map(id => {
+              const c = checked[id];
+              const itemPrice = parseFloat(c.item?.unit_price || 0);
+              const itemQty = parseFloat(commonData.quantity_size || 1);
+              const itemTotal = itemPrice * itemQty;
+              return {
+                ...commonData,
+                item_id: parseInt(id),
+                category: c.item?.category || commonData.category,
+                item_description: c.description || null,
+                description: c.description || commonData.description,
+                total_amount: itemTotal,
+                items: [{
+                  item_code: c.item?.code || '',
+                  item_name: c.item?.name || c.description || '',
+                  item_description: c.description || '',
+                  unit: c.item?.unit || 'pc',
+                  unit_price: itemPrice,
+                  category: c.item?.category || commonData.category || '',
+                  q1_qty: parseInt(commonData.quantity_size) || 1,
+                  q2_qty: 0, q3_qty: 0, q4_qty: 0, remarks: ''
+                }]
+              };
+            });
+
+            try {
+              const result = await apiRequest('/plans/batch', 'POST', { entries });
+              savedCount += result.count || entries.length;
+            } catch(batchErr) {
+              // Fallback: create one by one
+              for (const entry of entries) {
+                try {
+                  await apiRequest('/plans', 'POST', entry);
+                  savedCount++;
+                } catch(e) { console.error('Failed to save new entry:', e); }
+              }
+            }
+          }
+        }
+
+        showNotification('Successfully saved ' + savedCount + ' PPMP entr' + (savedCount > 1 ? 'ies' : 'y') + '!', 'success');
+      }
+
+      closeModal();
+      loadPPMP();
+    } catch (err) {
+      alert('Failed to update PPMP: ' + err.message);
+    }
+  };
+
+  // Edit Supplier Modal
+  window.showEditSupplierModal = async function(supplierId) {
+    let s = {};
+    try { s = await apiRequest('/suppliers/' + supplierId); } catch (err) { alert('Could not load supplier'); return; }
+    const html = `
+      <form id="editSupplierForm" onsubmit="saveEditSupplier(event, ${supplierId})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Supplier #${supplierId}</strong></div>
+        <div class="form-group">
+          <label>Company Name <span class="text-danger">*</span></label>
+          <input type="text" id="editSupName" value="${(s.name || '').replace(/"/g, '&quot;')}" required>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" id="editSupAddress" value="${(s.address || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contact Number</label>
+            <input type="text" id="editSupPhone" value="${s.phone || ''}">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="editSupEmail" value="${s.email || ''}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TIN</label>
+            <input type="text" id="editSupTIN" value="${s.tin || ''}">
+          </div>
+          <div class="form-group">
+            <label>Contact Person</label>
+            <input type="text" id="editSupContact" value="${(s.contact_person || '').replace(/"/g, '&quot;')}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Organization Type</label>
+            <select class="form-select" id="editSupOrgType">
+              <option value="">-- Select --</option>
+              <option value="sole_proprietorship" ${s.org_type==='sole_proprietorship'?'selected':''}>Sole Proprietorship</option>
+              <option value="partnership" ${s.org_type==='partnership'?'selected':''}>Partnership</option>
+              <option value="corporation" ${s.org_type==='corporation'?'selected':''}>Corporation</option>
+              <option value="cooperative" ${s.org_type==='cooperative'?'selected':''}>Cooperative</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="editSupActive">
+              <option value="true" ${s.is_active !== false?'selected':''}>Active</option>
+              <option value="false" ${s.is_active === false?'selected':''}>Inactive</option>
+            </select>
+          </div>
+        </div>
+        ${getEditAttachmentSectionHTML('supplier', supplierId, 'editSupAttachment')}
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit Supplier', html);
+  };
+  window.saveEditSupplier = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes to this supplier?')) return;
+    const data = {
+      name: document.getElementById('editSupName').value,
+      address: document.getElementById('editSupAddress').value,
+      phone: document.getElementById('editSupPhone').value,
+      email: document.getElementById('editSupEmail').value,
+      tin: document.getElementById('editSupTIN').value,
+      contact_person: document.getElementById('editSupContact').value,
+      org_type: document.getElementById('editSupOrgType').value,
+      is_active: document.getElementById('editSupActive').value === 'true'
+    };
+    try {
+      await apiRequest('/suppliers/' + id, 'PUT', data);
+      await uploadEditAttachments('supplier', id, 'editSupAttachment');
+      showToast('Supplier updated successfully!', 'success');
+      closeModal(); loadSuppliers();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // View Item Modal
+  window.showViewItemModal = async function(itemId) {
+    openModal('Item Details', '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>');
+    try {
+      const item = await apiRequest('/items/' + itemId);
+      const qty = parseInt(item.quantity) || 0;
+      const reorder = parseInt(item.reorder_point) || 0;
+      const isService = (item.category || '').toLowerCase() === 'services';
+      let stockStatus = 'N/A';
+      let stockClass = 'na';
+      if (!isService) {
+        if (qty === 0) { stockStatus = 'Out of Stock'; stockClass = 'out-of-stock'; }
+        else if (qty <= reorder) { stockStatus = 'Low Stock'; stockClass = 'low-stock'; }
+        else { stockStatus = 'In Stock'; stockClass = 'in-stock'; }
+      }
+      const source = item.procurement_source || 'NON PS-DBM';
+      const sourceBadgeClass = source === 'PS-DBM' ? 'source-badge psdbm' : source === 'PAPs' ? 'source-badge paps' : 'source-badge non-psdbm';
+      const content = `
+        <div class="view-details">
+          <div class="info-banner"><i class="fas fa-box"></i> <strong>${item.name || 'N/A'}</strong></div>
+          <div class="detail-row"><label>Item Code</label><span>${item.code || 'N/A'}</span></div>
+          <div class="detail-row"><label>Stock No.</label><span>${item.stock_no || 'N/A'}</span></div>
+          <div class="detail-row"><label>Item Name</label><span>${item.name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Description</label><span>${item.description || 'N/A'}</span></div>
+          <div class="detail-row"><label>Category</label><span>${item.category || 'N/A'}</span></div>
+          <div class="detail-row"><label>Unit</label><span>${item.unit || 'N/A'}</span></div>
+          <div class="detail-row"><label>Unit Price</label><span>₱${parseFloat(item.unit_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span></div>
+          <div class="detail-row"><label>Quantity</label><span>${isService ? 'N/A' : qty}</span></div>
+          <div class="detail-row"><label>Reorder Point</label><span>${isService ? 'N/A' : reorder}</span></div>
+          <div class="detail-row"><label>Stock Status</label><span><span class="stock-badge ${stockClass}">${stockStatus}</span></span></div>
+          <div class="detail-row"><label>Procurement Source</label><span><span class="${sourceBadgeClass}">${source}</span></span></div>
+          <div class="detail-row"><label>UACS Code</label><span>${item.uacs_code || 'N/A'}</span></div>
+          <div class="detail-row"><label>GAM Classification</label><span>${item.gam_classification || 'N/A'}</span></div>
+          <div class="detail-row"><label>Status</label><span><span class="stock-badge ${item.is_active !== false ? 'in-stock' : 'out-of-stock'}">${item.is_active !== false ? 'Active' : 'Inactive'}</span></span></div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          ${hasPermission('canEditItem') ? `<button type="button" class="btn btn-primary" onclick="closeModal(); showEditItemModal(${item.id})"><i class="fas fa-edit"></i> Edit Item</button>` : ''}
+        </div>`;
+      openModal('Item Details', content);
+    } catch (err) {
+      openModal('Error', '<div class="view-details"><p style="padding:12px;color:var(--danger-color);">Error loading item: ' + err.message + '</p></div>');
+    }
+  };
+
+  // Edit Item Modal
+  window.showEditItemModal = async function(itemId) {
+    let item = {};
+    try { item = await apiRequest('/items/' + itemId); } catch (err) { alert('Could not load item'); return; }
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      try { cachedUOMs = await apiRequest('/uoms'); } catch(e) {}
+    }
+    const html = `
+      <form id="editItemForm" onsubmit="saveEditItem(event, ${itemId})">
+        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Item #${itemId}</strong></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item Code</label>
+            <input type="text" id="editItemCode" value="${item.code || ''}" required>
+          </div>
+          <div class="form-group">
+            <label>Stock No.</label>
+            <input type="text" id="editItemStockNo" value="${item.stock_no || ''}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Item Name <span class="text-danger">*</span></label>
+          <input type="text" id="editItemName" value="${(item.name || '').replace(/"/g, '&quot;')}" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="editItemDesc" value="${(item.description || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Unit of Measure</label>
+            <select class="form-select" id="editItemUnit" required>
+              ${buildUOMOptions(item.unit)}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Unit Price</label>
+            <input type="number" step="0.01" id="editItemPrice" value="${item.unit_price || 0}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select class="form-select" id="editItemCategory">
+              ${buildCategoryOptions(item.category)}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Procurement Source</label>
+            <select class="form-select" id="editItemProcSource">
+              <option value="NON PS-DBM" ${(item.procurement_source || 'NON PS-DBM') === 'NON PS-DBM' ? 'selected' : ''}>NON PS-DBM</option>
+              <option value="PS-DBM" ${item.procurement_source === 'PS-DBM' ? 'selected' : ''}>PS-DBM</option>
+              <option value="PAPs" ${item.procurement_source === 'PAPs' ? 'selected' : ''}>PAPs (Programs, Activities & Projects)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>UACS Code</label>
+          <input type="text" id="editItemUACS" value="${item.uacs_code || ''}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="editItemQty" value="${item.quantity || 0}">
+          </div>
+          <div class="form-group">
+            <label>Reorder Point</label>
+            <input type="number" id="editItemReorder" value="${item.reorder_point || 0}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="editItemActive">
+            <option value="true" ${item.is_active !== false?'selected':''}>Active</option>
+            <option value="false" ${item.is_active === false?'selected':''}>Inactive</option>
+          </select>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit Item', html);
+  };
+  window.saveEditItem = async function(e, id) {
+    e.preventDefault();
+    if (!confirm('Save changes to this item?')) return;
+    const data = {
+      code: document.getElementById('editItemCode').value,
+      stock_no: document.getElementById('editItemStockNo').value,
+      name: document.getElementById('editItemName').value,
+      description: document.getElementById('editItemDesc').value,
+      unit: document.getElementById('editItemUnit').value,
+      unit_price: parseFloat(document.getElementById('editItemPrice').value) || 0,
+      category: document.getElementById('editItemCategory').value,
+      uacs_code: document.getElementById('editItemUACS').value,
+      quantity: parseInt(document.getElementById('editItemQty').value) || 0,
+      reorder_point: parseInt(document.getElementById('editItemReorder').value) || 0,
+      is_active: document.getElementById('editItemActive').value === 'true',
+      procurement_source: document.getElementById('editItemProcSource')?.value || 'NON PS-DBM'
+    };
+    try {
+      await apiRequest('/items/' + id, 'PUT', data);
+      showToast('Item updated successfully!', 'success');
+      closeModal(); loadItems();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  // Edit User Modal
+  window.showEditUserModal = async function(userId) {
+    // Fetch user data and employees in parallel
+    let user = {}, employees = [];
+    try {
+      [user, employees] = await Promise.all([
+        apiRequest(`/users/${userId}`),
+        apiRequest('/employees').catch(() => [])
+      ]);
+    } catch (err) {
+      console.warn('Could not fetch user, using defaults:', err);
+      user = { id: userId, username: '', full_name: '', email: '', role: 'end_user', dept_id: 1, is_active: true, employee_id: null };
+    }
+
+    const allRoles = [
+      { value: 'end_user', label: 'End User' },
+      { value: 'requester', label: 'Requester' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker' },
+      { value: 'budget_consultant', label: 'Budget Consultant' },
+      { value: 'division_head', label: 'Division Head' },
+      { value: 'bac_secretariat', label: 'BAC Secretariat' },
+      { value: 'bac_chair', label: 'BAC Chairperson' },
+      { value: 'twg_member', label: 'TWG Member' },
+      { value: 'supply_officer', label: 'Supply/Procurement Officer' },
+      { value: 'inspector', label: 'Inspection/Property Custodian' },
+      { value: 'hope', label: 'HoPE (Regional Director)' },
+      { value: 'ord_manager', label: 'ORD Manager' },
+      { value: 'chief_fad', label: 'Chief FAD' },
+      { value: 'chief_wrsd', label: 'Chief WRSD' },
+      { value: 'chief_mwpsd', label: 'Chief MWPSD' },
+      { value: 'chief_mwptd', label: 'Chief MWPTD' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'officer', label: 'Officer' },
+      { value: 'viewer', label: 'Viewer' },
+      { value: 'auditor', label: 'Auditor' },
+      { value: 'admin', label: 'System Administrator' }
+    ];
+    const roleOptions = allRoles.map(r => `<option value="${r.value}" ${user.role === r.value ? 'selected' : ''}>${r.label}</option>`).join('');
+    const empOptions = employees.map(e => `<option value="${e.id}" ${user.employee_id == e.id ? 'selected' : ''}>${e.full_name} (${e.employee_code || 'N/A'})</option>`).join('');
+
+    const html = `
+      <form id="editUserForm" onsubmit="saveEditUser(event, ${userId})">
+        <div class="form-section-header"><i class="fas fa-user-shield"></i> Account Information</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>User ID</label>
+            <input type="text" value="USR-${String(userId).padStart(3, '0')}" readonly style="background: #f5f5f5;">
+          </div>
+          <div class="form-group">
+            <label>Username <span class="text-danger">*</span></label>
+            <input type="text" id="editUsername" value="${user.username || ''}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name <span class="text-danger">*</span></label>
+            <input type="text" id="editFullName" value="${(user.full_name || '').replace(/"/g, '&quot;')}" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="editEmail" value="${user.email || ''}">
+          </div>
+        </div>
+        <div class="form-section-header blue"><i class="fas fa-building"></i> Role & Division</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Role <span class="text-danger">*</span></label>
+            <select class="form-select" id="editRole" required>
+              ${roleOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <select class="form-select" id="editDivision">
+              <option value="" ${!user.dept_id ? 'selected' : ''}>None</option>
+              <option value="1" ${user.dept_id == 1 ? 'selected' : ''}>FAD - Finance & Administrative</option>
+              <option value="2" ${user.dept_id == 2 ? 'selected' : ''}>WRSD - Welfare Reintegration Services</option>
+              <option value="3" ${user.dept_id == 3 ? 'selected' : ''}>MWPSD - Migrant Workers Protection Services</option>
+              <option value="4" ${user.dept_id == 4 ? 'selected' : ''}>MWPTD - Migrant Workers Protection Training</option>
+              <option value="5" ${user.dept_id == 5 ? 'selected' : ''}>ORD - Office of Regional Director</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="editIsActive">
+              <option value="true" ${user.is_active !== false ? 'selected' : ''}>Active</option>
+              <option value="false" ${user.is_active === false ? 'selected' : ''}>Inactive</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Linked Employee</label>
+            <select class="form-select" id="editEmployeeId">
+              <option value="">-- No linked employee --</option>
+              ${empOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-section-header orange"><i class="fas fa-key"></i> Reset Password</div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="editNewPassword" placeholder="Leave blank to keep current password" minlength="6">
+          <small style="color:#666;margin-top:4px;display:block;">Only fill this if you want to change the user's password.</small>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+      </form>
+    `;
+    openModal('Edit User — ' + (user.full_name || user.username), html);
+  };
+
+  // Save edited user via API
+  window.saveEditUser = async function(e, userId) {
+    e.preventDefault();
+    if (!confirm('Are you sure you want to save these user changes?')) return;
+    const data = {
+      username: document.getElementById('editUsername').value.trim(),
+      full_name: document.getElementById('editFullName').value.trim(),
+      email: document.getElementById('editEmail')?.value || '',
+      role: document.getElementById('editRole').value,
+      dept_id: parseInt(document.getElementById('editDivision').value) || null,
+      is_active: document.getElementById('editIsActive').value === 'true',
+      employee_id: parseInt(document.getElementById('editEmployeeId')?.value) || null
+    };
+
+    // Include password only if provided
+    const newPassword = document.getElementById('editNewPassword')?.value;
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters long.');
+        return;
+      }
+      data.password = newPassword;
+    }
+
+    try {
+      await apiRequest(`/users/${userId}`, 'PUT', data);
+      showToast('User updated successfully!', 'success');
+      closeModal();
+      loadUsers();
+    } catch (err) {
+      alert('Error updating user: ' + err.message);
+    }
+  };
+
+  // =====================================================
+  // USER MANAGEMENT - Admin Actions
+  // =====================================================
+
+  // Promote/Change Role Modal
+  window.showPromoteUserModal = function(userId, username, currentRole, fullName) {
+    const allRoles = [
+      { value: 'end_user', label: 'End User', icon: 'fa-user', color: '#6b7280' },
+      { value: 'ppmp_encoder', label: 'PPMP Entry Maker', icon: 'fa-clipboard-list', color: '#0d9488' },
+      { value: 'division_head', label: 'Division Head', icon: 'fa-user-tie', color: '#d97706' },
+      { value: 'bac_secretariat', label: 'BAC Secretariat', icon: 'fa-file-alt', color: '#0891b2' },
+      { value: 'bac_chair', label: 'BAC Chairperson', icon: 'fa-gavel', color: '#0891b2' },
+      { value: 'twg_member', label: 'TWG Member', icon: 'fa-users', color: '#059669' },
+      { value: 'supply_officer', label: 'Supply/Procurement Officer', icon: 'fa-boxes', color: '#2563eb' },
+      { value: 'inspector', label: 'Inspection/Property Custodian', icon: 'fa-search', color: '#be185d' },
+      { value: 'hope', label: 'HoPE (Regional Director)', icon: 'fa-star', color: '#7c3aed' },
+      { value: 'ord_manager', label: 'ORD Manager', icon: 'fa-user-cog', color: '#dc2626' },
+      { value: 'chief_fad', label: 'Chief FAD', icon: 'fa-building', color: '#d97706' },
+      { value: 'chief_wrsd', label: 'Chief WRSD', icon: 'fa-building', color: '#d97706' },
+      { value: 'chief_mwpsd', label: 'Chief MWPSD', icon: 'fa-building', color: '#d97706' },
+      { value: 'chief_mwptd', label: 'Chief MWPTD', icon: 'fa-building', color: '#d97706' },
+      { value: 'manager', label: 'Manager', icon: 'fa-briefcase', color: '#7c3aed' },
+      { value: 'officer', label: 'Officer', icon: 'fa-id-badge', color: '#2563eb' },
+      { value: 'viewer', label: 'Viewer', icon: 'fa-eye', color: '#6b7280' },
+      { value: 'auditor', label: 'Auditor', icon: 'fa-clipboard-check', color: '#059669' },
+      { value: 'admin', label: 'System Administrator', icon: 'fa-crown', color: '#dc2626' }
+    ];
+
+    const roleCards = allRoles.map(r => `
+      <div class="role-card ${r.value === currentRole ? 'active-role' : ''}" 
+           onclick="selectPromoteRole(this, '${r.value}')" 
+           style="display:flex;align-items:center;padding:10px 14px;margin:4px 0;border-radius:8px;cursor:pointer;border:2px solid ${r.value === currentRole ? r.color : '#e5e7eb'};background:${r.value === currentRole ? r.color + '10' : '#fff'};transition:all 0.2s;">
+        <i class="fas ${r.icon}" style="color:${r.color};width:24px;font-size:14px;"></i>
+        <span style="flex:1;font-size:13px;font-weight:${r.value === currentRole ? '700' : '500'};">${r.label}</span>
+        ${r.value === currentRole ? '<span style="font-size:10px;color:' + r.color + ';font-weight:700;">CURRENT</span>' : ''}
+      </div>
+    `).join('');
+
+    const html = `
+      <div style="margin-bottom:15px;">
+        <div style="background:#f8fafc;border-radius:10px;padding:15px;margin-bottom:15px;border:1px solid #e2e8f0;">
+          <div style="font-size:16px;font-weight:700;color:#1a365d;">${fullName || username}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px;">Username: ${username} &bull; Current Role: ${formatRole(currentRole)}</div>
+        </div>
+        <label style="font-weight:600;font-size:13px;color:#374151;margin-bottom:8px;display:block;">Select New Role:</label>
+        <div id="roleCardsList" style="max-height:340px;overflow-y:auto;padding-right:5px;">
+          ${roleCards}
+        </div>
+        <input type="hidden" id="selectedPromoteRole" value="${currentRole}">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:15px;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmPromoteUser(${userId}, '${username}')"><i class="fas fa-user-shield"></i> Change Role</button>
+      </div>
+    `;
+    openModal('Change User Role', html);
+  };
+
+  window.selectPromoteRole = function(el, role) {
+    document.querySelectorAll('#roleCardsList .role-card').forEach(c => {
+      c.style.borderColor = '#e5e7eb';
+      c.style.background = '#fff';
+    });
+    el.style.borderColor = '#2563eb';
+    el.style.background = '#eff6ff';
+    document.getElementById('selectedPromoteRole').value = role;
+  };
+
+  window.confirmPromoteUser = async function(userId, username) {
+    const newRole = document.getElementById('selectedPromoteRole').value;
+    if (!confirm(`Change role of "${username}" to ${formatRole(newRole)}?`)) return;
+    try {
+      await apiRequest(`/users/${userId}/role`, 'PATCH', { role: newRole });
+      showToast(`Role changed to ${formatRole(newRole)}!`, 'success');
+      closeModal();
+      loadUsers();
+    } catch (err) {
+      alert('Error changing role: ' + err.message);
+    }
+  };
+
+  // Deactivate User
+  window.deactivateUser = async function(userId, username) {
+    if (!confirm(`Deactivate user "${username}"?\n\nThe user will no longer be able to log in but their data will be preserved.`)) return;
+    try {
+      await apiRequest(`/users/${userId}`, 'DELETE');
+      showToast(`User "${username}" deactivated.`, 'success');
+      loadUsers();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Activate User
+  window.activateUser = async function(userId, username) {
+    if (!confirm(`Reactivate user "${username}"?\n\nThe user will be able to log in again.`)) return;
+    try {
+      await apiRequest(`/users/${userId}/activate`, 'PATCH');
+      showToast(`User "${username}" reactivated.`, 'success');
+      loadUsers();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Permanent Delete User
+  window.permanentDeleteUser = async function(userId, username) {
+    if (username === 'admin') {
+      alert('Cannot delete the primary admin account.');
+      return;
+    }
+    if (!confirm(`⚠️ PERMANENTLY DELETE user "${username}"?\n\nThis action CANNOT be undone. All user data will be lost.\n\nUse "Deactivate" instead if you want to preserve data.`)) return;
+    if (!confirm(`FINAL CONFIRMATION: Type the username to confirm.\n\nAre you absolutely sure you want to permanently delete "${username}"?`)) return;
+    try {
+      await apiRequest(`/users/${userId}?permanent=true`, 'DELETE');
+      showToast(`User "${username}" permanently deleted.`, 'success');
+      loadUsers();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Filter Users Table
+  window.filterUsersTable = function() {
+    const search = (document.getElementById('userSearchInput')?.value || '').toLowerCase();
+    const roleFilter = document.getElementById('userRoleFilter')?.value || '';
+    const statusFilter = document.getElementById('userStatusFilter')?.value || '';
+    
+    const allUsers = window._allUsers || [];
+    const filtered = allUsers.filter(u => {
+      const matchSearch = !search || 
+        (u.username || '').toLowerCase().includes(search) ||
+        (u.full_name || '').toLowerCase().includes(search) ||
+        (u.email || '').toLowerCase().includes(search) ||
+        (u.department_code || '').toLowerCase().includes(search);
+      const matchRole = !roleFilter || u.role === roleFilter;
+      const matchStatus = !statusFilter || 
+        (statusFilter === 'active' && u.is_active !== false) ||
+        (statusFilter === 'inactive' && u.is_active === false);
+      return matchSearch && matchRole && matchStatus;
+    });
+    renderUsersTable(filtered);
+    // Restore the full list for next filter
+    window._allUsers = allUsers;
+  };
+
+  // =====================================================
+  // ACTION MODALS - Workflow actions
+  // =====================================================
+
+  // Submit PPMP to APP Modal
+  window.showSubmitToAPPModal = function(ppmpNo) {
+    // Dynamically look up PPMP data
+    const ppmpList = window._ppmpData || [];
+    const ppmp = ppmpList.find(p => p.ppmp_number === ppmpNo || p.code === ppmpNo || String(p.id) === String(ppmpNo));
+    const pNo = ppmp ? (ppmp.ppmp_number || ppmp.code || ppmpNo) : (ppmpNo || '-');
+    const pDesc = ppmp ? (ppmp.description || ppmp.item_description || '-') : '-';
+    const pABC = ppmp ? '₱' + Number(ppmp.estimated_budget || ppmp.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) : '-';
+    const html = `
+      <form id="submitToAPPForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Submit this PPMP item to be included in the APP.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PPMP No.:</label><span>${pNo}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pDesc}</span></div>
+          <div class="detail-row"><label>ABC:</label><span>${pABC}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Remarks (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for BAC Secretariat"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit to APP</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit to APP', html, { preventOutsideClose: true });
+  };
+
+  // Create PR from APP Modal — Redirects to PR page with pre-populated data
+  window.showCreatePRFromAPPModal = function(itemId) {
+    const items = window._appItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) { alert('APP item not found'); return; }
+
+    // Store the APP item data for pre-population in the PR form
+    window._prFromAPPItem = item;
+
+    // Navigate to PR page
+    if (typeof navigateTo === 'function') {
+      navigateTo('purchase-requests');
+    } else {
+      // Fallback: click the PR nav link
+      const prNav = document.querySelector('[data-page="purchase-requests"]');
+      if (prNav) prNav.click();
+    }
+
+    // Open New PR modal after navigation with a small delay
+    setTimeout(() => {
+      showNewPRModal();
+    }, 300);
+  };
+
+  // Approve PR Modal
+  window.showApprovePRModal = async function(prIdOrNo) {
+    // Fetch actual PR data dynamically
+    let pr = null;
+    if (typeof prIdOrNo === 'number') {
+      pr = (cachedPR || []).find(p => p.id === prIdOrNo);
+      if (!pr) { try { pr = await apiRequest('/purchase-requests/' + prIdOrNo); } catch(e) {} }
+    } else {
+      pr = (cachedPR || []).find(p => p.pr_number === prIdOrNo);
+    }
+    if (!pr) { alert('PR not found'); return; }
+    const html = `
+      <form id="approvePRForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-check-circle"></i>
+          Approve this Purchase Request as HoPE (Head of Procuring Entity).
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ''} (${pr.department_name || pr.department_code || ''})</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Approval Remarks (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for record"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
+        </div>
+      </form>
+    `;
+    openModal('Approve Purchase Request', html, { preventOutsideClose: true });
+  };
+
+  // Return PR Modal
+  window.showReturnPRModal = async function(prIdOrNo) {
+    let pr = null;
+    if (typeof prIdOrNo === 'number') {
+      pr = (cachedPR || []).find(p => p.id === prIdOrNo);
+      if (!pr) { try { pr = await apiRequest('/purchase-requests/' + prIdOrNo); } catch(e) {} }
+    } else {
+      pr = (cachedPR || []).find(p => p.pr_number === prIdOrNo);
+    }
+    if (!pr) { alert('PR not found'); return; }
+    const html = `
+      <form id="returnPRForm">
+        <div class="info-banner warning-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-undo"></i>
+          Return this PR to the requesting division for revision.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ''} (${pr.department_name || pr.department_code || ''})</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Reason for Return <span class="text-danger">*</span></label>
+          <textarea rows="3" required placeholder="Specify the reason for returning this PR (e.g., incomplete attachments, wrong amount, etc.)"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-undo"></i> Return PR</button>
+        </div>
+      </form>
+    `;
+    openModal('Return Purchase Request', html, { preventOutsideClose: true });
+  };
+
+  // Attach Annex 1 Modal
+  window.showAttachAnnex1Modal = function(prNo) {
+    const pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo) || {};
+    const html = `
+      <form id="attachAnnex1Form" onsubmit="handleAttachAnnex1(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paperclip"></i>
+          Attach Route Slip (Annex 1) and other required documents.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || prNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Route Slip (Annex 1) <span class="text-danger">*</span></label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="annex1File" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'annex1Label')" required>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('annex1File').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="annex1Label" style="font-size: 12px; color: #666;">No file selected</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Technical Specs/SOW/TOR</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="techSpecsFile" accept=".pdf,.doc,.docx" style="display: none;" onchange="updateFileLabel(this, 'techSpecsLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('techSpecsFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="techSpecsLabel" style="font-size: 12px; color: #666;">Optional</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paperclip"></i> Attach Documents</button>
+        </div>
+      </form>
+    `;
+    openModal('Attach Annex 1 & Documents', html);
+  };
+
+  // Submit PR for Approval Modal
+  window.showSubmitPRForApprovalModal = function(prNo) {
+    const pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo) || {};
+    const html = `
+      <form id="submitPRForApprovalForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Submit this PR for HoPE approval.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || prNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Annex 1:</label><span><i class="fas fa-check-circle text-success"></i> Attached</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Submission Notes (Optional)</label>
+          <textarea rows="2" placeholder="Any notes for approver"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit for Approval</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit PR for Approval', html, { preventOutsideClose: true });
+  };
+
+  // Create RFQ from PR Modal
+  window.showCreateRFQFromPRModal = async function(prNo) {
+    // Fetch actual PR data
+    let pr = (cachedPR || []).find(p => p.pr_number === prNo || p.id === prNo);
+    if (!pr && typeof prNo === 'number') { try { pr = await apiRequest('/purchase-requests/' + prNo); } catch(e) {} }
+    if (!pr) { alert('PR not found'); return; }
+    const amt = parseFloat(pr.total_amount || 0);
+    const philgepsNote = amt >= 200000 
+      ? '<span style="color:#d32f2f;"><i class="fas fa-exclamation-triangle"></i> ABC ≥ ₱200,000 - PhilGEPS posting REQUIRED (3 calendar days)</span>'
+      : '<i class="fas fa-info-circle"></i> ABC < ₱200,000 - PhilGEPS posting not required';
+    const html = `
+      <form id="createRFQFromPRForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-paper-plane"></i>
+          Issue Request for Quotation based on this PR.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${amt.toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Division:</label><span>${pr.department_name || pr.department_code || 'N/A'}</span></div>
+        </div>
+        <div class="form-row" style="margin-top: 15px;">
+          <div class="form-group">
+            <label>RFQ Deadline <span class="text-danger">*</span></label>
+            <input type="date" required>
+          </div>
+          <div class="form-group">
+            <label>No. of Suppliers to Invite</label>
+            <input type="number" value="3" min="3">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>PhilGEPS Posting</label>
+          <div style="font-size: 13px; color: #666;">
+            ${philgepsNote}
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Issue RFQ</button>
+        </div>
+      </form>
+    `;
+    openModal('Create RFQ from PR', html, { preventOutsideClose: true });
+  };
+
+  // Add Quotation Modal
+  window.showAddQuotationModal = async function(rfqNo) {
+    // Load suppliers from DB
+    let suppliers = [];
+    try { suppliers = await apiRequest('/suppliers'); } catch(e) {}
+    const supplierOpts = suppliers.map(s => `<option value="${s.id}">${s.company_name || s.name}</option>`).join('');
+    const html = `
+      <form id="addQuotationForm" onsubmit="handleAddQuotation(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-plus"></i>
+          Add a quotation received for this RFQ.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || ''}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Supplier <span class="text-danger">*</span></label>
+          <select class="form-select" required>
+            <option value="">Select Supplier</option>
+            ${supplierOpts}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quoted Amount <span class="text-danger">*</span></label>
+            <input type="text" placeholder="₱0.00" required>
+          </div>
+          <div class="form-group">
+            <label>Date Received <span class="text-danger">*</span></label>
+            <input type="date" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Upload Quotation</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="quotationFile" accept=".pdf" style="display: none;" onchange="updateFileLabel(this, 'quotationLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('quotationFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="quotationLabel" style="font-size: 12px; color: #666;">PDF file</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Quotation</button>
+        </div>
+      </form>
+    `;
+    openModal('Add Quotation', html);
+  };
+
+  // Create Abstract from RFQ Modal
+  window.showCreateAbstractFromRFQModal = async function(rfqNo) {
+    // Load actual RFQ data with its quotations
+    let rfq = {}, quotations = [];
+    try { 
+      rfq = await apiRequest('/rfq/' + rfqNo).catch(() => ({}));
+      quotations = rfq.quotations || [];
+    } catch(e) {}
+    const quotationRows = quotations.length
+      ? quotations.map(q => `<tr><td>${q.supplier_name || 'Unknown'}</td><td>₱${(q.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td><td><input type="checkbox" ${q.compliant !== false ? 'checked' : ''}></td></tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;color:#999;">No quotations found for this RFQ</td></tr>';
+    const html = `
+      <form id="createAbstractFromRFQForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-table"></i>
+          Create Abstract of Quotations from this RFQ.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>RFQ No.:</label><span>${rfqNo || ''}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${rfq.project_name || rfq.description || 'N/A'}</span></div>
+          <div class="detail-row"><label>Quotations:</label><span>${quotations.length}</span></div>
+        </div>
+        <h4 style="margin-top: 15px;">Quotations Summary</h4>
+        <table class="data-table" style="font-size: 12px; margin-top: 8px;">
+          <thead><tr><th>Supplier</th><th>Amount</th><th>Compliant</th></tr></thead>
+          <tbody>${quotationRows}</tbody>
+        </table>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-table"></i> Create Abstract</button>
+        </div>
+      </form>
+    `;
+    openModal('Create Abstract from RFQ', html, { preventOutsideClose: true });
+  };
+
+  // Mark NOA Received Modal
+  window.showMarkNOAReceivedModal = async function(noaNo) {
+    let noa = {};
+    try { noa = await apiRequest('/noa/' + noaNo).catch(() => ({})); } catch(e) {}
+    const html = `
+      <form id="markNOAReceivedForm" onsubmit="handleMarkNOAReceived(event)">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-check"></i>
+          Record receipt of NOA by the winning bidder.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>NOA No.:</label><span>${noaNo || ''}</span></div>
+          <div class="detail-row"><label>Winning Bidder:</label><span>${noa.supplier_name || noa.winning_bidder || 'N/A'}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Date Received by Bidder <span class="text-danger">*</span></label>
+          <input type="date" required>
+        </div>
+        <div class="form-group">
+          <label>Upload Signed Receipt (Optional)</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="file" id="noaReceiptFile" accept=".pdf,.jpg,.png" style="display: none;" onchange="updateFileLabel(this, 'noaReceiptLabel')">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('noaReceiptFile').click()"><i class="fas fa-upload"></i> Upload</button>
+            <span id="noaReceiptLabel" style="font-size: 12px; color: #666;">Scanned signed receipt</span>
+          </div>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Mark Received</button>
+        </div>
+      </form>
+    `;
+    openModal('Mark NOA Received', html, { preventOutsideClose: true });
+  };
+
+  // Submit to COA Modal
+  window.showSubmitToCOAModal = async function(packetId) {
+    // Fetch actual packet data
+    let packet = {};
+    try { 
+      const packets = window._poPacketData || [];
+      packet = packets.find(p => p.id === packetId || p.packet_number === packetId) || {};
+    } catch(e) {}
+    const html = `
+      <form id="submitToCOAForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-file-export"></i>
+          Submit this PO Packet to COA.
+        </div>
+        <div class="view-details">
+          <div class="detail-row"><label>Packet ID:</label><span>${packet.packet_number || packetId || ''}</span></div>
+          <div class="detail-row"><label>PO Reference:</label><span>${packet.po_number || 'N/A'}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(packet.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</span></div>
+          <div class="detail-row"><label>Chief Signed:</label><span>${packet.chief_signed ? '<i class="fas fa-check text-success"></i> Yes' : '<i class="fas fa-times text-danger"></i> No'}</span></div>
+          <div class="detail-row"><label>Director Signed:</label><span>${packet.director_signed ? '<i class="fas fa-check text-success"></i> Yes' : '<i class="fas fa-times text-danger"></i> No'}</span></div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Submission Date <span class="text-danger">*</span></label>
+          <input type="date" required>
+        </div>
+        <div class="form-group">
+          <label>Received By (COA Personnel)</label>
+          <input type="text" placeholder="Name of COA receiving officer">
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-file-export"></i> Submit to COA</button>
+        </div>
+      </form>
+    `;
+    openModal('Submit to COA', html);
+  };
+
+  // Delete Confirmation Modal
+  window.showDeleteConfirmModal = function(recordType, recordId) {
+    const html = `
+      <div class="info-banner warning-banner" style="margin-bottom: 15px;">
+        <i class="fas fa-exclamation-triangle"></i>
+        Are you sure you want to delete this ${recordType}?
+      </div>
+      <div class="view-details">
+        <div class="detail-row"><label>${recordType} ID:</label><span>${recordId}</span></div>
+      </div>
+      <p style="margin-top: 15px; font-size: 13px; color: #666;">This action cannot be undone.</p>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="deleteRecord('${recordType}', '${recordId}'); closeModal();"><i class="fas fa-trash"></i> Delete</button>
+      </div>
+    `;
+    openModal('Confirm Delete', html);
+  };
+
+  // Export to Excel Modal
+  window.showExportToExcelModal = function(docType) {
+    const html = `
+      <div class="info-banner" style="margin-bottom: 15px;">
+        <i class="fas fa-file-excel"></i>
+        Export ${docType} with government header and logos.
+      </div>
+      <div class="form-group">
+        <label>Select Format</label>
+        <select class="form-select" id="exportFormatSelect">
+          <option value="xlsx">Excel (.xls) — with Header &amp; Logos</option>
+          <option value="csv">CSV (.csv) — data only</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Include</label>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: normal;"><input type="checkbox" checked disabled> All visible columns</label>
+          <label style="font-weight: normal;"><input type="checkbox" checked disabled> All visible records</label>
+        </div>
+      </div>
+      <div class="form-group" style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="exportToExcel('${docType}'); closeModal();"><i class="fas fa-download"></i> Export</button>
+      </div>
+    `;
+    openModal('Export to Excel', html);
+  };
+
+  // Get Print Content
+  function getPrintContent(docType, recordId, record) {
+    const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const r = record || {};
+    
+    const templates = {
+      'PR': `
+        <div class="doc-title">PURCHASE REQUEST</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>PR Number:</strong></td><td>${r.pr_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.pr_date ? new Date(r.pr_date).toLocaleDateString('en-PH') : today}</td></tr>
+          <tr><td><strong>Division:</strong></td><td>${r.department_code || r.division || 'N/A'}</td><td><strong>Fund Cluster:</strong></td><td>${r.fund_cluster || 'N/A'}</td></tr>
+          <tr><td><strong>Purpose:</strong></td><td colspan="3">${r.purpose || 'Procurement of supplies/services for agency operations'}</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Item No.</th><th>Unit</th><th>Item Description</th><th>Quantity</th><th>Unit Cost</th><th>Total Cost</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>lot</td><td>As per attached specifications</td><td>1</td><td>See attached</td><td>See attached</td></tr>
+          </tbody>
+        </table>
+        <div class="signature-box">
+          <div class="sig-line"><span>Requested by:</span><div class="sig-space"></div><p>Division Head</p></div>
+          <div class="sig-line"><span>Approved by:</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+        </div>`,
+      'PO': `
+        <div class="doc-title">PURCHASE ORDER</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>PO Number:</strong></td><td>${r.po_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.po_date ? new Date(r.po_date).toLocaleDateString('en-PH') : today}</td></tr>
+          <tr><td><strong>Supplier:</strong></td><td colspan="3">${r.supplier_name || 'N/A'}</td></tr>
+          <tr><td><strong>Address:</strong></td><td colspan="3">${r.supplier_address || r.address || 'N/A'}</td></tr>
+          <tr><td><strong>TIN:</strong></td><td>${r.tin || 'N/A'}</td><td><strong>Mode:</strong></td><td>${r.mode_of_procurement || r.procurement_mode || 'N/A'}</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Stock No.</th><th>Unit</th><th>Description</th><th>Quantity</th><th>Unit Cost</th><th>Amount</th></tr></thead>
+          <tbody><tr><td colspan="6" style="text-align:center;">See attached specifications</td></tr></tbody>
+        </table>
+        <p style="margin-top:20px;"><strong>Total Amount:</strong> (In words and figures)</p>
+        <p><strong>Delivery Period:</strong> Within 15 calendar days upon receipt of PO</p>
+        <div class="signature-box">
+          <div class="sig-line"><span>Conforme:</span><div class="sig-space"></div><p>Supplier Representative</p></div>
+          <div class="sig-line"><span>Approved:</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+        </div>`,
+      'Abstract': `
+        <div class="doc-title">ABSTRACT OF QUOTATIONS</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>Abstract No:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+          <tr><td><strong>PR Reference:</strong></td><td colspan="3">See attached</td></tr>
+          <tr><td><strong>Mode of Procurement:</strong></td><td colspan="3">Small Value Procurement (SVP)</td></tr>
+        </table>
+        <table class="items-table">
+          <thead><tr><th>Supplier</th><th>Unit Price</th><th>Total</th><th>Remarks</th></tr></thead>
+          <tbody>
+            <tr><td colspan="4" style="text-align:center;">See attached quotation details</td></tr>
+          </tbody>
+        </table>
+          </tbody>
+        </table>
+        <p style="margin-top:20px;"><strong>Award Recommendation:</strong> Award to lowest calculated responsive quotation</p>
+        <div class="signature-box">
+          <div class="sig-line"><span>Prepared by:</span><div class="sig-space"></div><p>BAC Secretariat</p></div>
+          <div class="sig-line"><span>Certified Correct:</span><div class="sig-space"></div><p>BAC Chairman</p></div>
+        </div>`,
+      'NOA': `
+        <div class="doc-title">NOTICE OF AWARD</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>NOA Number:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+        </table>
+        <p style="margin:20px 0;">This is to inform you that your quotation dated _________ for the procurement of _________ in the amount of ₱_________ has been accepted.</p>
+        <p>You are hereby required to submit the following within five (5) calendar days:</p>
+        <ul style="margin-left:20px;">
+          <li>Valid Mayor's/Business Permit</li>
+          <li>PhilGEPS Registration Number</li>
+          <li>Income/Business Tax Return</li>
+          <li>Omnibus Sworn Statement</li>
+        </ul>
+        <div class="signature-box">
+          <div class="sig-line"><span>Very truly yours,</span><div class="sig-space"></div><p>Head of Procuring Entity</p></div>
+          <div class="sig-line"><span>Conforme:</span><div class="sig-space"></div><p>Supplier Representative</p></div>
+        </div>`,
+      'IAR': `
+        <div class="doc-title">INSPECTION AND ACCEPTANCE REPORT</div>
+        <div class="doc-subtitle">(Appendix 62 - GAM for NGAs)</div>
+        <p style="text-align:center; font-size:9px; color:#888;">Use Print button from IAR table for full data.</p>`,
+      'BAC Resolution': `
+        <div class="doc-title">BAC RESOLUTION</div>
+        <table class="info-table">
+          <tr><td width="30%"><strong>Resolution No:</strong></td><td>${recordId}</td><td width="30%"><strong>Date:</strong></td><td>${today}</td></tr>
+        </table>
+        <p style="margin:20px 0;"><strong>RESOLUTION</strong> recommending the award of contract to the Lowest Calculated Responsive Quotation for the procurement of _________ in the total amount of ₱_________.</p>
+        <p><strong>WHEREAS,</strong> the Bids and Awards Committee conducted the procurement process in accordance with RA 9184;</p>
+        <p><strong>WHEREAS,</strong> after evaluation, the BAC found the quotation to be compliant;</p>
+        <p><strong>NOW THEREFORE,</strong> the BAC recommends the award to the winning supplier.</p>
+        <div class="signature-box">
+          <div class="sig-line"><span></span><div class="sig-space"></div><p>BAC Chairman</p></div>
+          <div class="sig-line"><span></span><div class="sig-space"></div><p>BAC Vice-Chairman</p></div>
+        </div>`
+    };
+    
+    return templates[recordType] || `
+      <div class="doc-title">${recordType.toUpperCase()}</div>
+      <table class="info-table">
+        <tr><td width="30%"><strong>Document No:</strong></td><td>${recordId}</td></tr>
+        <tr><td><strong>Date:</strong></td><td>${today}</td></tr>
+        <tr><td><strong>Status:</strong></td><td>For Print</td></tr>
+      </table>`;
+  }
+
+  // Print Record Function
+  // ==================== NATIVE PRINT PREVIEW SYSTEM ====================
+  const { ipcRenderer } = require('electron');
+
+  /**
+   * Open a print preview window via Electron IPC
+   */
+  function openPrintPreview(htmlContent, options = {}) {
+    ipcRenderer.invoke('show-print-preview', htmlContent, options).catch(err => {
+      console.error('Print preview error:', err);
+      showNotification('Failed to open print preview: ' + err.message, 'error');
+    });
+  }
+
+  /**
+   * Sanitize a string for use as a filename
+   */
+  function toFilename(str) {
+    return (str || 'Report').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_').substring(0, 120);
+  }
+
+  /**
+   * Read the selected text of a <select> element (not its value).
+   * Returns empty string if not found or "All" selected.
+   */
+  function getFilterText(id) {
+    const el = document.getElementById(id);
+    if (!el) return '';
+    const opt = el.options[el.selectedIndex];
+    if (!opt) return '';
+    const txt = opt.textContent.trim();
+    // treat generic "all" options as empty → will become "All" in filename
+    if (/^all\b/i.test(txt) || opt.value === '' || opt.value === 'all') return '';
+    return txt;
+  }
+
+  /**
+   * Build a descriptive filename based on the active page and its filter selections.
+   * Example outputs:
+   *   PPMP_FAD_Small_Value_Procurement_FY_${getCurrentFiscalYear()}
+   *   Purchase_Requests_WRSD_Approved
+   *   RFQ_All_Status
+   *   Annual_Procurement_Plan_FY_${getCurrentFiscalYear()}
+   */
+  function getDescriptiveFilename() {
+    const page = document.querySelector('.page.active');
+    if (!page) return 'Report';
+    const pageId = page.id;
+
+    // Map each page id → { label, filters[] }
+    // Each filter: { id, allLabel } – allLabel is the fallback when "all" is selected
+    const pageMap = {
+      'ppmp': {
+        label: 'PPMP',
+        filters: [
+          { id: 'ppmpDivisionFilter', allLabel: 'All_Divisions' },
+          { id: 'ppmpModeFilter',     allLabel: '' },
+          { id: 'ppmpYearFilter',     allLabel: '' }
+        ]
+      },
+      'app': {
+        label: 'Annual_Procurement_Plan',
+        filters: [] // APP year select has no id; we grab .form-subtitle text instead
+      },
+      'purchase-requests': {
+        label: 'Purchase_Requests',
+        filters: [
+          { id: 'prDivisionFilter', allLabel: 'All_Divisions' },
+          { id: 'prStatusFilter',   allLabel: '' }
+        ]
+      },
+      'rfq': {
+        label: 'Request_for_Quotation',
+        filters: [
+          { id: 'rfqStatusFilter', allLabel: '' }
+        ]
+      },
+      'abstract': {
+        label: 'Abstract_of_Quotation',
+        filters: [
+          { id: 'abstractStatusFilter', allLabel: '' }
+        ]
+      },
+      'bac-resolution': {
+        label: 'BAC_Resolution',
+        filters: [
+          { id: 'bacResStatusFilter', allLabel: '' }
+        ]
+      },
+      'post-qual': {
+        label: 'Post_Qualification',
+        filters: [
+          { id: 'postQualStatusFilter', allLabel: '' }
+        ]
+      },
+      'noa': {
+        label: 'Notice_of_Award',
+        filters: [
+          { id: 'noaStatusFilter', allLabel: '' }
+        ]
+      },
+      'purchase-orders': {
+        label: 'Purchase_Orders',
+        filters: [
+          { id: 'poStatusFilter', allLabel: '' }
+        ]
+      },
+      'iar': {
+        label: 'Inspection_and_Acceptance_Report',
+        filters: [
+          { id: 'iarStatusFilter', allLabel: '' }
+        ]
+      },
+      'po-packet': {
+        label: 'PO_Packet',
+        filters: []
+      },
+      'coa': {
+        label: 'Certificate_of_Acceptance',
+        filters: []
+      },
+      'items': {
+        label: 'Items_Master_List',
+        filters: [
+          { id: 'itemCategoryFilter', allLabel: '' },
+          { id: 'itemStockFilter',    allLabel: '' }
+        ]
+      },
+      'suppliers': {
+        label: 'Suppliers_Master_List',
+        filters: []
+      },
+      'employees': {
+        label: 'Employees_List',
+        filters: [
+          { id: 'employeeStatusFilter', allLabel: '' }
+        ]
+      },
+      'divisions': {
+        label: 'Divisions',
+        filters: []
+      },
+      'users': {
+        label: 'Users',
+        filters: []
+      },
+      'stock-cards': {
+        label: 'Stock_Cards',
+        filters: [
+          { id: 'stockCardItemFilter', allLabel: '' }
+        ]
+      },
+      'property-cards': {
+        label: 'Property_Cards',
+        filters: [
+          { id: 'propertyStatusFilter', allLabel: '' }
+        ]
+      },
+      'ics': {
+        label: 'Inventory_Custodian_Slip',
+        filters: []
+      },
+      'par': {
+        label: 'Property_Acknowledgement_Receipt',
+        filters: []
+      },
+      'ptr': {
+        label: 'Property_Transfer_Report',
+        filters: []
+      },
+      'ris': {
+        label: 'Requisition_and_Issue_Slip',
+        filters: [
+          { id: 'risStatusFilter', allLabel: '' }
+        ]
+      },
+      'supplies-ledger': {
+        label: 'Supplies_Ledger',
+        filters: []
+      },
+      'semi-expendable': {
+        label: 'Semi_Expendable',
+        filters: []
+      },
+      'capital-outlay': {
+        label: 'Capital_Outlay',
+        filters: []
+      },
+      'trip-tickets': {
+        label: 'Trip_Tickets',
+        filters: [
+          { id: 'tripStatusFilter', allLabel: '' }
+        ]
+      }
+    };
+
+    const cfg = pageMap[pageId];
+    if (!cfg) {
+      // Fallback: use the page title text
+      const title = page.querySelector('.form-title')?.textContent
+        || page.querySelector('h2, .page-title')?.textContent
+        || 'Report';
+      return toFilename(title);
+    }
+
+    const parts = [cfg.label];
+
+    // Collect filter texts
+    for (const f of cfg.filters) {
+      const txt = getFilterText(f.id);
+      if (txt) {
+        parts.push(txt);
+      } else if (f.allLabel) {
+        parts.push(f.allLabel);
+      }
+    }
+
+    // For APP page, try to grab year from the page's own select (has no id)
+    if (pageId === 'app') {
+      const yearSel = page.querySelector('.filter-group .form-select');
+      if (yearSel) {
+        const yTxt = yearSel.options[yearSel.selectedIndex]?.textContent.trim();
+        if (yTxt) parts.push(yTxt);
+      }
+    }
+
+    return toFilename(parts.join(' '));
+  }
+
+  /**
+   * Build a complete print-ready HTML document
+   */
+  function buildPrintHTML(title, bodyContent, footerHTML) {
+    const defaultFooter = `<p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>`;
+    const footerContent = footerHTML || defaultFooter;
+    return `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>${title}</title>
+          <style>
+            ${getPrintHeaderCSS()}
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 0; font-size: 10px; line-height: 1.4; color: #222; background: #fff; }
+            h3 { margin: 12px 0 8px; font-size: 12px; text-align: center; text-transform: uppercase; border-bottom: 1.5px solid #333; padding-bottom: 6px; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; page-break-inside: auto; table-layout: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            th, td { border: 1px solid #333; padding: 3px 4px; text-align: left; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; vertical-align: top; }
+            th { background: #e8e8e8; font-weight: bold; font-size: 7.5px; text-transform: uppercase; text-align: center; }
+            td { font-size: 8px; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .footer { margin-top: 10px; text-align: center; font-size: 8px; color: #888; padding-top: 4px; }
+            .doc-title { font-size: 14px; font-weight: bold; margin: 12px 0; text-align: center; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 8px; }
+            .doc-subtitle { text-align: center; font-style: italic; margin-bottom: 12px; font-size: 10px; }
+            .info-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            .info-table td { padding: 4px 8px; border: 1px solid #ddd; font-size: 10px; }
+            .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+            .items-table th, .items-table td { border: 1px solid #333; padding: 5px; text-align: left; font-size: 9px; }
+            .items-table th { background: #f0f0f0; font-weight: bold; }
+            .signature-box { margin-top: 30px; display: flex; justify-content: space-between; flex-wrap: wrap; }
+            .sig-line { width: 45%; margin-bottom: 25px; }
+            .sig-space { border-bottom: 1px solid #333; height: 35px; margin: 15px 0 5px; }
+            .sig-line p { text-align: center; font-size: 10px; }
+            ul { margin: 8px 0 8px 25px; font-size: 10px; }
+            .report-title { font-size: 12px; font-weight: bold; margin: 12px 0 6px; text-align: center; }
+            .report-date { text-align: center; margin-bottom: 10px; color: #666; font-size: 9px; }
+            .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
+            @page { margin: 8mm; }
+
+            /* === Repeating header on every printed page === */
+            .page-wrapper { display: table; width: 100%; }
+            .page-header-group { display: table-header-group; }
+            .page-header-group > tr > td { border: none; padding: 0 15px; }
+            .page-body-group { display: table-row-group; }
+            .page-body-group > tr > td { border: none; padding: 0 15px; }
+            .page-footer-group { display: table-footer-group; }
+            .page-footer-group > tr > td { border: none; padding: 0 15px; }
+
+            /* Reset inner tables so they keep their borders */
+            .page-body-group table th,
+            .page-body-group table td { border: 1px solid #333; }
+          </style>
+        </head>
+        <body>
+          <table class="page-wrapper">
+            <thead class="page-header-group">
+              <tr><td>${getPrintHeaderHTML()}</td></tr>
+            </thead>
+            <tfoot class="page-footer-group">
+              <tr><td>
+                <div class="footer">
+                  ${footerContent}
+                </div>
+              </td></tr>
+            </tfoot>
+            <tbody class="page-body-group">
+              <tr><td>${bodyContent}</td></tr>
+            </tbody>
+          </table>
+      </html>`;
+  }
+
+  // ==================== PRINT FUNCTIONS ====================
+
+  window.printRecord = function(recordType, recordId) {
+    const printContent = getPrintContent(recordType, recordId);
+    const title = recordType + ' - ' + recordId;
+    const html = buildPrintHTML(title, printContent);
+    openPrintPreview(html, { title: toFilename(title), editable: true });
+  };
+
+  // Print IAR with full data fetched from API
+  window.printIAR = async function(iarId) {
+    try {
+      showNotification('Loading IAR data for print...', 'info');
+      const iar = await apiRequest('/iars/' + iarId);
+      if (!iar) { showNotification('IAR not found', 'error'); return; }
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+      // Build item rows
+      let itemsRows = '';
+      const items = iar.items || [];
+      if (items.length > 0) {
+        if (iar.item_specifications && items.length > 0) {
+          items[0].item_name = (items[0].item_name || '') + '\n' + iar.item_specifications;
+        }
+        itemsRows = items.map((item, idx) => `
+          <tr>
+            <td style="text-align:center; border:1px solid #333;">${item.stock_no || item.item_code || ''}</td>
+            <td style="border:1px solid #333;">${(item.item_name || '').replace(/\n/g, '<br>')}</td>
+            <td style="text-align:center; border:1px solid #333;">${item.unit || ''}</td>
+            <td style="text-align:center; border:1px solid #333;">${item.quantity || ''}</td>
+          </tr>`).join('');
+      } else if (iar.item_specifications) {
+        itemsRows = `<tr>
+          <td style="text-align:center; border:1px solid #333;"></td>
+          <td style="border:1px solid #333;">${iar.item_specifications.replace(/\n/g, '<br>')}</td>
+          <td style="text-align:center; border:1px solid #333;"></td>
+          <td style="text-align:center; border:1px solid #333;"></td>
+        </tr>`;
+      }
+
+      // Fill empty rows so the table occupies space (minimum ~10 rows total)
+      const minRows = 10;
+      const currentRows = items.length || (iar.item_specifications ? 1 : 0);
+      for (let r = currentRows; r < minRows; r++) {
+        itemsRows += `<tr>
+          <td style="border:1px solid #333;">&nbsp;</td>
+          <td style="border:1px solid #333;">&nbsp;</td>
+          <td style="border:1px solid #333;">&nbsp;</td>
+          <td style="border:1px solid #333;">&nbsp;</td>
+        </tr>`;
+      }
+
+      // Determine checkbox states from data
+      const inspChecked = (iar.inspection_result === 'verified') ? 'checked' : '';
+      const accComplete = (iar.acceptance === 'complete') ? 'checked' : '';
+      const accPartial = (iar.acceptance === 'partial') ? 'checked' : '';
+
+      const bodyContent = `
+        <style>
+          .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+          .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
+          .iar-main-table .no-border-lr { border-left: none; border-right: none; }
+          .iar-main-table .no-border { border: none; }
+          .iar-items-table { width: 100%; border-collapse: collapse; }
+          .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
+          .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
+          .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
+          .iar-label { font-size: 9px; }
+          .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
+        </style>
+
+        <!-- Appendix 62 label -->
+        <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
+
+        <!-- Main Title -->
+        <div style="text-align:center; font-weight:bold; font-size:13px; margin-bottom:8px;">INSPECTION AND ACCEPTANCE REPORT</div>
+
+        <table class="iar-main-table">
+          <!-- Entity Name / Fund Cluster row -->
+          <tr>
+            <td colspan="2" style="font-size:9px;"><strong>Entity Name:</strong> DMW Regional Office XIII (Caraga)</td>
+            <td colspan="2" style="font-size:9px;"><strong>Fund Cluster:</strong> _______________</td>
+          </tr>
+
+          <!-- Row: Supplier | IAR No. -->
+          <tr>
+            <td style="width:15%; font-size:9px;"><strong>Supplier:</strong></td>
+            <td style="width:35%; font-size:9px;">${iar.supplier_name || ''}</td>
+            <td style="width:15%; font-size:9px;"><strong>IAR No.:</strong></td>
+            <td style="width:35%; font-size:9px;">${iar.iar_number || ''}</td>
+          </tr>
+
+          <!-- Row: PO No./Date | Date -->
+          <tr>
+            <td style="font-size:9px;"><strong>PO No./Date:</strong></td>
+            <td style="font-size:9px;">${iar.po_number || ''}${iar.po_date ? ' / ' + fmtDate(iar.po_date) : ''}</td>
+            <td style="font-size:9px;"><strong>Date:</strong></td>
+            <td style="font-size:9px;">${fmtDate(iar.inspection_date)}</td>
+          </tr>
+
+          <!-- Row: Requisitioning Office/Dept. | Invoice No. -->
+          <tr>
+            <td style="font-size:9px;"><strong>Requisitioning Office/Dept.:</strong></td>
+            <td style="font-size:9px;">${iar.purpose || ''}</td>
+            <td style="font-size:9px;"><strong>Invoice No.:</strong></td>
+            <td style="font-size:9px;">${iar.invoice_number || ''}${iar.invoice_date ? ' / ' + fmtDate(iar.invoice_date) : ''}</td>
+          </tr>
+
+          <!-- Row: Responsibility Center Code | Date -->
+          <tr>
+            <td style="font-size:9px;"><strong>Responsibility Center Code:</strong></td>
+            <td style="font-size:9px;">${iar.delivery_receipt_number || ''}</td>
+            <td style="font-size:9px;"><strong>Date:</strong></td>
+            <td style="font-size:9px;">${fmtDate(iar.delivery_date)}</td>
+          </tr>
+
+          <!-- Items Table Header + Body -->
+          <tr>
+            <td colspan="4" style="padding:0; border:none;">
+              <table class="iar-items-table">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Stock/ Property<br>No.</th>
+                    <th style="width:46%;">Description</th>
+                    <th style="width:12%;">Unit</th>
+                    <th style="width:24%;">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRows}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- INSPECTION | ACCEPTANCE header -->
+          <tr>
+            <td colspan="2" style="text-align:center; font-weight:bold; font-size:10px; background:#fff; border-bottom:1px solid #333;">INSPECTION</td>
+            <td colspan="2" style="text-align:center; font-weight:bold; font-size:10px; background:#fff; border-bottom:1px solid #333;">ACCEPTANCE</td>
+          </tr>
+
+          <!-- Date Inspected | Date Received -->
+          <tr>
+            <td colspan="2" style="font-size:9px; border-bottom:none; height:22px;">
+              <strong>Date Inspected:</strong> ${fmtDate(iar.date_inspected || iar.inspection_date)}
+            </td>
+            <td colspan="2" style="font-size:9px; border-bottom:none; height:22px;">
+              <strong>Date Received:</strong> ${fmtDate(iar.date_received || iar.delivery_date)}
+            </td>
+          </tr>
+
+          <!-- Inspection checkbox + Acceptance checkboxes (equal height) -->
+          <tr>
+            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; height:70px;">
+              <div style="margin-bottom:6px;">
+                <input type="checkbox" class="iar-check" ${inspChecked}>
+                <span class="iar-label">Inspected, verified and found in order<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;as to quantity and specifications</span>
+              </div>
+            </td>
+            <td colspan="2" style="font-size:9px; vertical-align:top; border-top:none; border-bottom:none; padding:6px 8px; height:70px;">
+              <div style="margin-bottom:6px;">
+                <input type="checkbox" class="iar-check" ${accComplete}>
+                <span class="iar-label">Complete</span>
+              </div>
+              <div style="margin-bottom:6px;">
+                <input type="checkbox" class="iar-check" ${accPartial}>
+                <span class="iar-label">Partial (Pls. specify quantity)</span>
+              </div>
+              ${iar.findings ? `<div style="font-size:8px; margin-top:4px;"><em>Findings: ${iar.findings}</em></div>` : ''}
+            </td>
+          </tr>
+
+          <!-- Signature section (equal height) -->
+          <tr>
+            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
+              <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
+                <strong>${iar.inspected_by_name || ''}</strong>
+              </div>
+              <div style="font-size:8px; margin-top:2px;">Inspection Officer/Inspection Committee</div>
+            </td>
+            <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
+              <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
+                <strong>${iar.received_by_name || ''}</strong>
+              </div>
+              <div style="font-size:8px; margin-top:2px;">Supply and/or Property Custodian</div>
+            </td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('IAR - ' + iar.iar_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('IAR_' + iar.iar_number), editable: true });
+    } catch (err) {
+      console.error('Print IAR error:', err);
+      showNotification('Failed to print IAR: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT PR (PURCHASE REQUEST) ====================
+  // Fetches full PR + items from API and renders official DMW Purchase Request form
+  window.printPR = async function(prId) {
+    try {
+      showNotification('Loading Purchase Request data for print...', 'info');
+      // Find PR from cache to get the id if prId is a pr_number
+      let id = prId;
+      if (typeof prId === 'string' && isNaN(prId)) {
+        const cached = cachedPR.find(p => p.pr_number === prId);
+        if (cached) id = cached.id;
+      }
+      const pr = await apiRequest('/purchase-requests/' + id);
+      if (!pr) { showNotification('Purchase Request not found', 'error'); return; }
+
+      // Fetch "Requested by" and "Approved by" signatories
+      // Server already returns chief_name/chief_designation based on division rules:
+      //   WRSD → WRSD chief (MAKINANO), all others → FAD chief (ESPALDON)
+      let chiefName = pr.chief_name || '', chiefDesignation = pr.chief_designation || '';
+      let hopeName = pr.hope_name || '', hopeDesignation = pr.hope_designation || 'Regional Director';
+      // Fallback: if server didn't return names, fetch from employees
+      if (!chiefName) {
+        try {
+          const allEmployees = await apiRequest('/employees');
+          const deptCode = (pr.department_code || '').toUpperCase();
+          if (deptCode === 'WRSD') {
+            const wrsdEmp = allEmployees.find(e => e.full_name && e.full_name.toUpperCase().includes('MAKINANO'));
+            if (wrsdEmp) { chiefName = wrsdEmp.full_name || ''; chiefDesignation = wrsdEmp.designation_name || ''; }
+          } else {
+            const fadEmp = allEmployees.find(e => e.full_name && e.full_name.toUpperCase().includes('ESPALDON'));
+            if (fadEmp) { chiefName = fadEmp.full_name || ''; chiefDesignation = fadEmp.designation_name || ''; }
+          }
+        } catch (e) { console.warn('Could not fetch employee fallback:', e); }
+      }
+      if (!hopeName) {
+        try {
+          const allUsers = await apiRequest('/users');
+          const hopeUser = allUsers.find(u => u.role === 'hope');
+          if (hopeUser) hopeName = hopeUser.full_name || '';
+        } catch (e) {}
+      }
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Build item rows
+      const items = pr.items || [];
+      let itemsHTML = '';
+      let grandTotal = 0;
+
+      // Inject item_specifications from purchaserequests table into the first item's description for print
+      if (pr.item_specifications && items.length > 0 && !items[0].item_description) {
+        items[0].item_description = pr.item_specifications;
+      } else if (pr.item_specifications && items.length === 0) {
+        items.push({ quantity: 1, unit: 'LOT', item_name: '', item_description: pr.item_specifications, unit_price: pr.total_amount || 0 });
+      }
+
+      if (items.length > 0) {
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity || 0);
+          const unitCost = parseFloat(item.unit_price || 0);
+          const totalCost = qty * unitCost;
+          grandTotal += totalCost;
+
+          // Main item row
+          itemsHTML += `
+            <tr>
+              <td class="pr-cell-center">${idx + 1}</td>
+              <td class="pr-cell-center">${item.unit || ''}</td>
+              <td class="pr-cell-desc"><strong>${item.item_name || ''}</strong></td>
+              <td class="pr-cell-center">${qty}</td>
+              <td class="pr-cell-right" style="padding-right:10px;">${fmtCurrency(unitCost)}</td>
+              <td class="pr-cell-right" style="padding-right:10px;">${fmtCurrency(totalCost)}</td>
+            </tr>`;
+
+          // Description/specs row (only if different from item name)
+          if (item.item_description && item.item_description.trim().toLowerCase() !== (item.item_name || '').trim().toLowerCase()) {
+            itemsHTML += `
+            <tr>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-desc pr-item-specs">${item.item_description}</td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-center"></td>
+            </tr>`;
+          }
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Use total_amount from PR if available, otherwise calculated
+      const totalAmount = parseFloat(pr.total_amount || 0) > 0 ? parseFloat(pr.total_amount) : grandTotal;
+
+      // Add empty rows to fill space (minimum ~15 visible rows for form look)
+      const minRows = 15;
+      const currentRows = items.length + items.filter(i => i.item_description && i.item_description.trim().toLowerCase() !== (i.item_name || '').trim().toLowerCase()).length;
+      for (let i = currentRows; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="pr-cell-center">&nbsp;</td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-desc"></td>
+              <td class="pr-cell-center"></td>
+              <td class="pr-cell-right"></td>
+              <td class="pr-cell-right"></td>
+            </tr>`;
+      }
+
+      const bodyContent = `
+        <style>
+          /* PR-specific print styles matching official DMW form */
+          .pr-form-title {
+            text-align: center;
+            font-size: 16pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 4px 0 2px 0;
+            letter-spacing: 1px;
+            padding: 6px 0;
+          }
+          .pr-appendix {
+            text-align: center;
+            font-size: 8pt;
+            font-style: italic;
+            font-family: Arial, sans-serif;
+            margin-bottom: 10px;
+            color: #444;
+          }
+          .pr-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-info-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .pr-info-label {
+            font-weight: normal;
+            color: #333;
+            white-space: nowrap;
+            width: 22%;
+          }
+          .pr-info-value {
+            font-weight: bold;
+          }
+          .pr-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-items-table thead th {
+            border: 1px solid #333;
+            padding: 6px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+          }
+          .pr-items-table tbody td {
+            border: 1px solid #333;
+            padding: 4px 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .pr-cell-center { text-align: center; }
+          .pr-cell-right { text-align: right; }
+          .pr-cell-desc { text-align: left; }
+          .pr-item-specs {
+            font-weight: normal;
+            font-size: 9pt;
+            color: #555;
+            padding-left: 24px !important;
+            vertical-align: top;
+            white-space: pre-line;
+          }
+          .pr-total-row td {
+            border: 1px solid #333;
+            padding: 5px 6px;
+            font-size: 10pt;
+            font-weight: bold;
+          }
+          .pr-sig-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .pr-sig-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .pr-sig-name {
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            padding-top: 60px !important;
+          }
+          .pr-sig-designation {
+            text-align: center;
+            font-size: 8pt;
+            color: #444;
+            padding-bottom: 8px !important;
+          }
+        </style>
+
+        <div class="pr-form-title">PURCHASE REQUEST</div>
+
+        <table class="pr-info-table">
+          <tr>
+            <td class="pr-info-label">Office/Section:</td>
+            <td class="pr-info-value" style="width:28%;">${pr.department_name || pr.department_code || 'DMW Caraga'}</td>
+            <td class="pr-info-label" style="width:15%;">PR No.:</td>
+            <td class="pr-info-value" style="width:20%;">${pr.pr_number || ''}</td>
+          </tr>
+          <tr>
+            <td class="pr-info-label">Responsibility Center Code:</td>
+            <td class="pr-info-value" colspan="1">${pr.department_code || ''}</td>
+            <td class="pr-info-label">Date:</td>
+            <td class="pr-info-value">${fmtDate(pr.pr_date || pr.created_at)}</td>
+          </tr>
+        </table>
+
+        <table class="pr-items-table">
+          <thead>
+            <tr>
+              <th style="width:8%;">ITEM NO.</th>
+              <th style="width:8%;">UNIT</th>
+              <th>ITEM DESCRIPTION</th>
+              <th style="width:12%;">QUANTITY</th>
+              <th style="width:14%;">UNIT COST</th>
+              <th style="width:14%;">TOTAL COST</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+            <tr class="pr-total-row">
+              <td colspan="3"></td>
+              <td colspan="2" style="text-align:center; font-weight:bold;">TOTAL AMOUNT</td>
+              <td style="text-align:center;">₱${fmtCurrency(totalAmount)}</td>
+            </tr>
+            <tr>
+              <td colspan="6" style="padding:6px 8px; font-size:10pt;"><span style="font-weight:bold; color:red;">Purpose: </span><span style="color:red; font-weight:bold;">${pr.purpose || ''}</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="pr-sig-table">
+          <tr>
+            <td style="width:18%;"></td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Requested by:</td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Approved by:</td>
+          </tr>
+          <tr>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:bottom;">Printed Name</td>
+            <td class="pr-sig-name">${chiefName}</td>
+            <td class="pr-sig-name">${hopeName}</td>
+          </tr>
+          <tr>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:top;">Designation</td>
+            <td class="pr-sig-designation">${chiefDesignation}</td>
+            <td class="pr-sig-designation">${hopeDesignation}</td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('PR - ' + pr.pr_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('PR_' + pr.pr_number), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print PR error:', err);
+      showNotification('Failed to print Purchase Request: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT TWG REPORT (POST-QUALIFICATION) ====================
+  // Exact replica of: TWG Report_Revised_Camera and Lens_Mid-Town - template.docx
+  window.printTWGReport = async function(pqId) {
+    try {
+      showNotification('Loading TWG Report data for print...', 'info');
+
+      // Resolve id from cache if string
+      let id = pqId;
+      if (typeof pqId === 'string' && isNaN(pqId)) {
+        const cached = cachedPostQual.find(x => x.postqual_number === pqId || x.twg_number === pqId);
+        if (cached) id = cached.id;
+      }
+
+      // Fetch post-qualification record
+      const pq = cachedPostQual.find(x => x.id === id) || await apiRequest('/post-qualifications/' + id);
+      if (!pq) { showNotification('TWG Report not found', 'error'); return; }
+
+      // Fetch linked abstract for bidder/price details
+      let abstract = null, quotations = [];
+      if (pq.abstract_id) {
+        try {
+          abstract = await apiRequest('/abstracts/' + pq.abstract_id);
+          quotations = abstract?.quotations || [];
+        } catch (e) { console.warn('Could not load abstract:', e); }
+      }
+
+      // BAC members and TWG members from employee records
+      let employees = [];
+      try { employees = await apiRequest('/employees'); } catch(e) {}
+
+      const getEmpName = (empId) => {
+        if (!empId) return '_______________';
+        const emp = employees.find(e => e.id === parseInt(empId));
+        return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+      };
+
+      let bacChairName = '_______________', bacChairDesignation = 'Chairperson';
+      let bacSecName = '_______________', bacSecTitle = 'BAC-Secretariat';
+      try {
+        const allUsers = await apiRequest('/users');
+        const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
+        if (bacChairUser) bacChairName = (bacChairUser.full_name || bacChairName).toUpperCase();
+        const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
+        if (bacSecUser) bacSecName = (bacSecUser.full_name || bacSecName).toUpperCase();
+      } catch(e) {}
+
+      // TWG members from DB selections (not hardcoded)
+      const twgHead = getEmpName(pq.twg_head_id);
+      const twgMembers = [
+        getEmpName(pq.twg_member1_id),
+        getEmpName(pq.twg_member2_id),
+        getEmpName(pq.twg_member3_id),
+        getEmpName(pq.twg_member4_id)
+      ];
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase() : '_______________';
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      const today = fmtDate(pq.created_at || new Date());
+      const subject = abstract?.purpose || pq.bidder_name || 'Procurement Activity';
+      const abcAmount = abstract?.recommended_amount || 0;
+
+      // Build bidder list from abstract quotations or single bidder
+      const bidders = quotations.length > 0
+        ? quotations.map(q => ({ name: q.supplier_name || 'Bidder', amount: q.bid_amount || 0, items: q.items || [], compliant: q.is_compliant }))
+        : (pq.bidder_name ? [{ name: pq.bidder_name, amount: 0, items: [], compliant: true }] : []);
+      const numBidders = Math.min(bidders.length, 3);
+
+      // Parse documents_verified JSONB
+      let docsVerified = {};
+      if (pq.documents_verified) {
+        try { docsVerified = typeof pq.documents_verified === 'string' ? JSON.parse(pq.documents_verified) : pq.documents_verified; }
+        catch(e) {}
+      }
+
+      // Determine winning bidder (lowest amount among compliant, or first bidder)
+      let winningBidder = bidders[0] || { name: '_______________', amount: 0 };
+      if (bidders.length > 1) {
+        const compliantBidders = bidders.filter(b => b.compliant !== false && parseFloat(b.amount) > 0);
+        if (compliantBidders.length > 0) {
+          winningBidder = compliantBidders.reduce((min, b) => parseFloat(b.amount) < parseFloat(min.amount) ? b : min, compliantBidders[0]);
+        }
+      }
+
+      // ====== Documents from the exact template ======
+      const requiredDocs = [
+        "Business Permit/Mayor's Permit",
+        'PhilGEPS Certificate of Registration',
+        'Omnibus Sworn Statement',
+        'Tax Clearance Certificate (During Payment)',
+        'Quotation'
+      ];
+
+      // Build bidders numbered list for Reference section
+      let biddersListHtml = '';
+      bidders.forEach((b, i) => {
+        biddersListHtml += `<li style="margin-bottom:2px;"><strong>${b.name}</strong></li>`;
+      });
+
+      // ====== Docs Verification Table ======
+      let docsTableHeader = '<th style="text-align:left; font-weight:bold;">Required Documents</th>';
+      for (let b = 0; b < numBidders; b++) {
+        docsTableHeader += `<th style="text-align:center; font-weight:bold;">${bidders[b].name}</th>`;
+      }
+
+      let docsTableRows = '';
+      requiredDocs.forEach(doc => {
+        docsTableRows += '<tr>';
+        docsTableRows += `<td>${doc}</td>`;
+        for (let b = 0; b < numBidders; b++) {
+          // Try multiple key formats for matching
+          const key1 = doc.replace(/[^a-zA-Z]/g, '').toLowerCase();
+          const key2 = doc;
+          const val = docsVerified[key1] || docsVerified[key2] || docsVerified[doc.toLowerCase()] || 'Pass';
+          docsTableRows += `<td style="text-align:center;">${val}</td>`;
+        }
+        docsTableRows += '</tr>';
+      });
+
+      // ====== Price/Quotation Table (exact template: Particulars | ABC for the Project | Suppliers) ======
+      let priceSupplierHeaders = '';
+      for (let b = 0; b < numBidders; b++) {
+        priceSupplierHeaders += `<th style="text-align:center; font-weight:bold;">${bidders[b].name}</th>`;
+      }
+
+      let priceDataRow = '';
+      // Particulars cell
+      priceDataRow += `<td style="vertical-align:top;">
+        ${subject}.<br><br>
+        <em style="font-size:10pt;">Please see attached RFQ/TOR for the specifications.</em>
+      </td>`;
+      // ABC cell
+      priceDataRow += `<td style="text-align:right; vertical-align:top; font-weight:bold;">${fmtCurrency(abcAmount)}</td>`;
+      // Supplier price cells
+      for (let b = 0; b < numBidders; b++) {
+        const amt = parseFloat(bidders[b].amount || 0);
+        const isLowest = bidders[b] === winningBidder;
+        priceDataRow += `<td style="text-align:right; vertical-align:top; font-weight:bold;${isLowest ? ' color:#0070C0;' : ''}">${fmtCurrency(amt)}</td>`;
+      }
+
+      // Amount in words helper
+      const amountInWords = (num) => {
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+          'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const scales = ['', 'Thousand', 'Million', 'Billion'];
+        if (num === 0) return 'Zero';
+        const n = Math.floor(Math.abs(num));
+        if (n === 0) return 'Zero';
+        let words = [];
+        let scaleIdx = 0;
+        let remaining = n;
+        while (remaining > 0) {
+          const chunk = remaining % 1000;
+          if (chunk > 0) {
+            let chunkWords = [];
+            const h = Math.floor(chunk / 100);
+            const t = chunk % 100;
+            if (h > 0) chunkWords.push(ones[h] + ' Hundred');
+            if (t >= 20) {
+              chunkWords.push(tens[Math.floor(t / 10)] + (t % 10 > 0 ? '-' + ones[t % 10] : ''));
+            } else if (t > 0) {
+              chunkWords.push(ones[t]);
+            }
+            if (scales[scaleIdx]) chunkWords.push(scales[scaleIdx]);
+            words.unshift(chunkWords.join(' '));
+          }
+          remaining = Math.floor(remaining / 1000);
+          scaleIdx++;
+        }
+        return words.join(' ');
+      };
+
+      const winAmount = parseFloat(winningBidder.amount || 0);
+      const winAmountWords = amountInWords(winAmount) + ' Pesos';
+      const winAmountFormatted = fmtCurrency(winAmount);
+
+      const findings = pq.findings || '';
+      const twgResult = pq.twg_result || '';
+
+      // ====== Build the full template - exact replica of the .docx ======
+      const bodyContent = `
+        <style>
+          .twg-body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.3; color: #000; }
+          .twg-body table.memo-fields { width: 100%; border-collapse: collapse; margin: 0 0 5px 0; }
+          .twg-body table.memo-fields td { padding: 2px 0; font-size: 11pt; vertical-align: top; border: none; }
+          .twg-body .memo-label { width: 80px; font-size: 11pt; }
+          .twg-body .memo-colon { width: 15px; text-align: center; }
+          .twg-body .section-num { font-weight: bold; font-size: 12pt; margin: 14px 0 6px 36px; }
+          .twg-body .section-body { margin: 0 0 8px 72px; font-size: 12pt; text-align: justify; line-height: 1.4; }
+          .twg-body table.doc-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-family: 'Times New Roman', Times, serif; }
+          .twg-body table.doc-table th,
+          .twg-body table.doc-table td { border: 1px solid #000; padding: 4px 6px; font-size: 12pt; }
+          .twg-body table.doc-table th { font-weight: bold; }
+          .twg-body table.price-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-family: 'Times New Roman', Times, serif; }
+          .twg-body table.price-table th,
+          .twg-body table.price-table td { border: 1px solid #000; padding: 4px 6px; font-size: 12pt; }
+          .twg-body table.price-table th { font-weight: bold; }
+          .twg-body .twg-sig-row { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 8px; }
+          .twg-body .twg-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 14px; }
+          .twg-body .twg-sb-full { width: 100%; text-align: center; margin-bottom: 14px; }
+          .twg-body .twg-sn { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 30px; }
+          .twg-body .twg-st { font-size: 11pt; font-style: italic; }
+          .twg-body .bidder-list { margin: 4px 0 4px 72px; padding-left: 20px; }
+          .twg-body .bidder-list li { font-size: 12pt; font-weight: bold; margin-bottom: 2px; }
+        </style>
+
+        <div class="twg-body">
+
+          <!-- Memo header fields (FOR / SUBJECT / DATE) -->
+          <table class="memo-fields">
+            <tr>
+              <td class="memo-label">FOR</td>
+              <td class="memo-colon">&nbsp;</td>
+              <td class="memo-colon">:</td>
+              <td><strong>OIC-ARD ${bacChairName}</strong></td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>&nbsp;</td>
+              <td></td>
+              <td>${bacChairDesignation}</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>&nbsp;</td>
+              <td></td>
+              <td>DMW Bids and Awards Committee</td>
+            </tr>
+          </table>
+
+          <table class="memo-fields" style="margin-top:8px;">
+            <tr>
+              <td class="memo-label">SUBJECT</td>
+              <td class="memo-colon">&nbsp;</td>
+              <td class="memo-colon">:</td>
+              <td><strong>${subject}</strong></td>
+            </tr>
+          </table>
+
+          <table class="memo-fields" style="margin-top:8px; border-bottom: 2px solid #000; padding-bottom: 4px;">
+            <tr>
+              <td class="memo-label">DATE</td>
+              <td class="memo-colon">&nbsp;</td>
+              <td class="memo-colon">:</td>
+              <td><strong>${today}</strong></td>
+            </tr>
+          </table>
+
+          <!-- Intro paragraph -->
+          <p style="margin: 12px 0 10px 0; text-indent: 36px; text-align: justify; font-size: 12pt; line-height: 1.4;">
+            This pertains to the submitted quotations of the three (3) suppliers for the above-mentioned subject to the DMW &ndash; Caraga Technical Working Group for evaluation.
+          </p>
+
+          <!-- I. Reference -->
+          <div class="section-num">I. Reference</div>
+          <div class="section-body">
+            Pursuant to Section 34 of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, otherwise known as the New Government Procurement Act, the Technical Working Group (TWG) of the DMW&ndash;Caraga Bids and Awards Committee conducted a post-qualification review on <strong>${today}</strong>, for the purpose of determining the compliance and responsiveness of the bidder/s with all the requirements and conditions prescribed under the law and by the end-user.
+          </div>
+
+          ${bidders.length > 0 ? `<ol class="bidder-list">${biddersListHtml}</ol>` : ''}
+
+          <!-- II. Verification of the Documents Submitted by the Bidders -->
+          <div class="section-num">II. Verification of the Documents Submitted by the Bidders.</div>
+          <div class="section-body">
+            Upon verification against the original copies, the submitted documents were found to conform with the prescribed requirements, as they are true and faithful reproductions of the original documents presented during the post-qualification review.
+          </div>
+
+          <table class="doc-table">
+            <thead>
+              <tr>${docsTableHeader}</tr>
+            </thead>
+            <tbody>${docsTableRows}</tbody>
+          </table>
+
+          <!-- III. Compliance to the Technical Requirements of the End-User -->
+          <div class="section-num">III. Compliance to the Technical Requirements of the End-User</div>
+          <div class="section-body">
+            Based on the evaluation of the submitted documents and the verification undertaken by the DMW-Caraga TWG, <strong>${winningBidder.name}</strong> was found to have satisfactorily complied with all the prescribed technical specifications and documentary requirements in accordance with applicable laws and the end-user's standards.
+          </div>
+
+          <!-- IV. Quotation of three (3) suppliers -->
+          <div class="section-num">IV. Quotation of three (3) suppliers.</div>
+
+          <table class="price-table">
+            <thead>
+              <tr>
+                <th rowspan="2" style="text-align:left; vertical-align:middle;">Particulars</th>
+                <th rowspan="2" style="text-align:center; vertical-align:middle;">ABC for the Project</th>
+                <th colspan="${numBidders}" style="text-align:center;">Suppliers</th>
+              </tr>
+              <tr>
+                ${priceSupplierHeaders}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>${priceDataRow}</tr>
+            </tbody>
+          </table>
+
+          <!-- V. Findings and Recommendations -->
+          <div class="section-num">V. Findings and Recommendations</div>
+          <div class="section-body">
+            <strong>The Lowest Calculated and Responsive Bidder (LCRB)</strong> which is the <strong>${winningBidder.name}</strong> has complied and is responsive with all our Legal, Technical, Financial and Post-Qualification requirements. In view of the foregoing, WE, the DMW-Caraga TWG recommend:
+          </div>
+
+          <ol style="margin: 6px 0 6px 72px; padding-left: 20px; font-size: 12pt; line-height: 1.5;">
+            <li>To declare the award of contract for the <strong>${subject}</strong> amounting to <strong>${winAmountWords} (₱${winAmountFormatted})</strong> to <strong>${winningBidder.name}.</strong></li>
+          </ol>
+
+          <div class="section-body" style="margin-top: 10px;">
+            For the BAC's consideration, information, and appropriate action, please.
+          </div>
+
+          <!-- Signature Section: "Prepared and recommended by:" -->
+          <div style="margin-top: 40px; font-size: 12pt; font-style: italic;">Prepared and recommended by:</div>
+
+          <!-- Head, BAC-TWG (centered, full width) -->
+          <div class="twg-sig-row">
+            <div class="twg-sb-full">
+              <div class="twg-sn">${twgHead}</div>
+              <div class="twg-st">Head, BAC-TWG</div>
+            </div>
+          </div>
+
+          <!-- 2x2 grid for Members -->
+          <div class="twg-sig-row">
+            <div class="twg-sb">
+              <div class="twg-sn">${twgMembers[0]}</div>
+              <div class="twg-st">Member, BAC-TWG</div>
+            </div>
+            <div class="twg-sb">
+              <div class="twg-sn">${twgMembers[1]}</div>
+              <div class="twg-st">Member, BAC-TWG</div>
+            </div>
+          </div>
+          <div class="twg-sig-row">
+            <div class="twg-sb">
+              <div class="twg-sn">${twgMembers[2]}</div>
+              <div class="twg-st">Member, BAC-TWG</div>
+            </div>
+            <div class="twg-sb">
+              <div class="twg-sn">${twgMembers[3]}</div>
+              <div class="twg-st">Member, BAC-TWG</div>
+            </div>
+          </div>
+
+          <!-- Copy Furnished -->
+          <div style="margin-top: 40px;">
+            <em style="font-size: 11pt;">Copy Furnished:</em><br>
+            <strong style="font-size: 12pt;">Mr. ${bacSecName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</strong><br>
+            <span style="font-size: 11pt;">${bacSecTitle}</span>
+          </div>
+
+        </div>
+      `;
+
+      const html = buildPrintHTML('TWG Report - ' + (pq.postqual_number || ''), bodyContent);
+      openPrintPreview(html, { title: toFilename('TWG_Report_' + (pq.postqual_number || '')), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print TWG Report error:', err);
+      showNotification('Failed to print TWG Report: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT NOTICE OF AWARD (NOA) ====================
+  // Exact replica of the official DMW NOA letter template
+  window.printNoticeOfAward = async function(noaId) {
+    try {
+      showNotification('Loading Notice of Award data for print...', 'info');
+
+      // Find NOA record - fetch full details from API for supplier_address
+      let noa = null;
+      try { noa = await apiRequest('/notices-of-award/' + noaId); } catch(e) {}
+      if (!noa) { noa = cachedNOA.find(x => x.id === noaId); }
+      if (!noa) { showNotification('NOA not found', 'error'); return; }
+
+      // Fetch supplier details for address/contact
+      let supplier = null;
+      if (noa.supplier_id) {
+        try { supplier = await apiRequest('/suppliers/' + noa.supplier_id); } catch(e) {}
+      }
+
+      // Trace the full chain: NOA -> BAC Resolution -> Abstract -> RFQ
+      let rfqNumber = '';
+      let purpose = '';
+      try {
+        // Step 1: Get BAC Resolution — fetch from API if cache is empty
+        let bacRes = null;
+        if (noa.bac_resolution_id) {
+          let allBacRes = cachedBACRes || [];
+          if (allBacRes.length === 0) {
+            try { allBacRes = await apiRequest('/bac-resolutions'); } catch(e) {}
+          }
+          bacRes = (allBacRes || []).find(b => b.id === noa.bac_resolution_id);
+        }
+
+        // Step 2: Get Abstract from BAC Resolution
+        if (bacRes && bacRes.abstract_id) {
+          const abs = await apiRequest('/abstracts/' + bacRes.abstract_id);
+          if (abs) {
+            purpose = abs.purpose || '';
+            // Step 3: Get RFQ from Abstract
+            if (abs.rfq_id) {
+              const rfq = await apiRequest('/rfqs/' + abs.rfq_id);
+              if (rfq) rfqNumber = rfq.rfq_number || '';
+            }
+          }
+        }
+
+        // Fallback: fetch abstracts from API and match by supplier
+        if (!rfqNumber) {
+          let allAbstracts = cachedAbstract || [];
+          if (allAbstracts.length === 0) {
+            try { allAbstracts = await apiRequest('/abstracts'); } catch(e) {}
+          }
+          for (const abs of allAbstracts) {
+            if (abs.recommended_supplier_name && noa.supplier_name &&
+                abs.recommended_supplier_name.toLowerCase() === noa.supplier_name.toLowerCase()) {
+              if (abs.rfq_number) { rfqNumber = abs.rfq_number; purpose = purpose || abs.purpose || ''; break; }
+              if (abs.rfq_id) {
+                try {
+                  const rfq = await apiRequest('/rfqs/' + abs.rfq_id);
+                  if (rfq) { rfqNumber = rfq.rfq_number || ''; purpose = purpose || abs.purpose || ''; break; }
+                } catch(e) {}
+              }
+            }
+          }
+        }
+      } catch(e) { console.warn('Could not trace RFQ chain:', e); }
+
+      // Regional Director from employees table (ORD dept_id=5, designation_id=16 Director IV)
+      let rdName = 'RITCHEL M. BUTAO';
+      try {
+        const allEmployees = await apiRequest('/employees');
+        const rdEmployee = allEmployees.find(e => e.dept_id === 5 && e.designation_id === 16)
+          || allEmployees.find(e => (e.designation_name || '').toLowerCase().includes('director'))
+          || allEmployees.find(e => e.dept_id === 5);
+        if (rdEmployee && rdEmployee.full_name) rdName = rdEmployee.full_name.toUpperCase();
+      } catch(e) {}
+
+      const supplierName = (noa.supplier_name || supplier?.name || '_______________').toUpperCase();
+      const contactPerson = supplier?.contact_person || '';
+      const supplierAddress = noa.supplier_address || supplier?.address || '_______________';
+      const subjectText = purpose || 'Procurement Activity';
+      const rfqRef = rfqNumber ? `(${rfqNumber})` : '(RFQ No. _______________)';
+
+      // Parse address into lines
+      const addressLines = supplierAddress.split(',').map(s => s.trim());
+      const streetAddress = addressLines.slice(0, -1).join(', ') || supplierAddress;
+      const cityAddress = addressLines[addressLines.length - 1] || '';
+
+      const bodyContent = `
+        <style>
+          .noa-body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 680px; margin: 0 auto; padding: 0 20px; }
+          .noa-title { text-align: center; font-size: 14pt; font-weight: bold; margin: 20px 0 30px 0; letter-spacing: 1px; }
+          .noa-addressee { margin-bottom: 8px; font-size: 12pt; line-height: 1.4; }
+          .noa-addressee .name { font-weight: bold; text-transform: uppercase; }
+          .noa-addressee .company { font-weight: bold; }
+          .noa-body p { margin: 14px 0; text-align: justify; font-size: 12pt; line-height: 1.5; }
+          .noa-sig { margin-top: 30px; font-size: 12pt; }
+          .noa-sig .closing { margin-bottom: 50px; }
+          .noa-sig .sig-name { font-weight: bold; text-transform: uppercase; font-size: 12pt; }
+          .noa-sig .sig-title { font-size: 12pt; }
+          .noa-receipt { margin-top: 40px; font-size: 12pt; }
+          .noa-receipt .label { margin-bottom: 30px; }
+          .noa-receipt .bidder-name { font-weight: bold; text-transform: uppercase; }
+          .noa-receipt .bidder-company { font-weight: bold; }
+          .noa-footer-contact { margin-top: 40px; border-top: 1px solid #000; padding-top: 8px; text-align: center; font-size: 7.5pt; line-height: 1.4; color: #000; font-family: Arial, sans-serif; }
+        </style>
+
+        <div class="noa-body">
+
+          <div class="noa-title">NOTICE OF AWARD</div>
+
+          <!-- Addressee -->
+          <div class="noa-addressee">
+            <div class="name">${supplierName}</div>
+            ${contactPerson ? `<div>${contactPerson}</div>` : ''}
+            <div>${streetAddress}</div>
+            ${cityAddress ? `<div>${cityAddress}</div>` : ''}
+          </div>
+
+          <!-- Body paragraphs -->
+          <p>We are pleased to inform you that your bid for the <strong><u>${subjectText} ${rfqRef}</u></strong> has been ACCEPTED.</p>
+
+          <p>Kindly signify your conformity to the award and return a duplicate original of this notice to the office.</p>
+
+          <!-- Closing & Signature -->
+          <div class="noa-sig">
+            <div class="closing">Very truly yours,</div>
+
+            <div class="sig-name">${rdName}</div>
+            <div class="sig-title">OIC \u2013 Regional Director</div>
+            <div class="sig-title">Head of the Procuring Entity</div>
+          </div>
+
+          <!-- Received by the Bidder -->
+          <div class="noa-receipt">
+            <div class="label">Received by the Bidder:</div>
+
+            <div class="bidder-name">${supplierName}</div>
+            ${contactPerson ? `<div class="bidder-company">${contactPerson}</div>` : ''}
+            <div>Date: ______________</div>
+          </div>
+
+          <!-- Footer with contact information -->
+          <div class="noa-footer-contact">
+            Website: www.dmw.gov.ph | Email: butuan@dmw.gov.ph | Landline: (085)815-1706<br>
+            Finance & Administrative Division: 0921-845 5924<br>
+            Migrant Workers Processing Division: 0962-276 8082<br>
+            Migrant Workers Protection Division: 0927-064 3252<br>
+            Welfare & Reintegration Services Division:0948-473 6512 / 0950-305 7533
+          </div>
+
+        </div>
+      `;
+
+      const html = buildPrintHTML('Notice of Award - ' + (noa.noa_number || ''), bodyContent);
+      openPrintPreview(html, { title: toFilename('NOA_' + (noa.noa_number || '')), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print NOA error:', err);
+      showNotification('Failed to print Notice of Award: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT BAC RESOLUTION ====================
+  // Based on new templates: Declaring Winner (no posting <=200k, with posting >200k) + Recommending Approval
+  window.printBACResolution = async function(bacResId, options = {}) {
+    try {
+      showNotification('Loading BAC Resolution data for print...', 'info');
+
+      // Resolve id
+      let id = bacResId;
+      if (typeof bacResId === 'string' && isNaN(bacResId)) {
+        const cached = cachedBACRes.find(b => b.resolution_number === bacResId);
+        if (cached) id = cached.id;
+      }
+
+      // Fetch full BAC Resolution
+      let bacRes = await apiRequest('/bac-resolutions/' + id);
+      if (!bacRes) {
+        bacRes = cachedBACRes.find(b => b.id === id);
+        if (!bacRes) { showNotification('BAC Resolution not found', 'error'); return; }
+      }
+
+      // Fetch linked abstract for additional data
+      let abstract = null;
+      if (bacRes.abstract_id) {
+        try { abstract = await apiRequest('/abstracts/' + bacRes.abstract_id); } catch(e) {}
+      }
+
+      // Fetch employees for signatories
+      let employees = [];
+      try { employees = await apiRequest('/employees'); } catch(e) {}
+
+      // Fetch RFQ items for detail table
+      let rfqItems = [];
+      const rfqId = bacRes.rfq_id || abstract?.rfq_id;
+      if (rfqId) {
+        try {
+          const rfq = await apiRequest('/rfqs/' + rfqId);
+          if (rfq && rfq.items) rfqItems = rfq.items;
+        } catch(e) {}
+      }
+
+      // Helper: format currency
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return '\u20b1' + num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Helper: ordinal date "6th day of March 2026"
+      const fmtOrdinalDate = (d) => {
+        if (!d) return '______ day of __________ ______';
+        const dt = new Date(d);
+        const day = dt.getDate();
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const suffix = (day === 1 || day === 21 || day === 31) ? 'st' : (day === 2 || day === 22) ? 'nd' : (day === 3 || day === 23) ? 'rd' : 'th';
+        return day + '<sup>' + suffix + '</sup> day of ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+      };
+
+      const fmtDate = (d) => {
+        if (!d) return '_______________';
+        const dt = new Date(d);
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+
+      // Number to words helper
+      function numberToWords(num) {
+        if (num === 0) return 'Zero';
+        const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                      'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                      'Seventeen','Eighteen','Nineteen'];
+        const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+        const scales = ['','Thousand','Million','Billion'];
+        function convertGroup(n) {
+          let str = '';
+          if (n >= 100) { str += ones[Math.floor(n/100)] + ' Hundred '; n %= 100; }
+          if (n >= 20) { str += tens[Math.floor(n/10)] + ' '; n %= 10; }
+          if (n > 0) { str += ones[n] + ' '; }
+          return str.trim();
+        }
+        const wholePart = Math.floor(Math.abs(num));
+        const centsPart = Math.round((Math.abs(num) - wholePart) * 100);
+        if (wholePart === 0) return 'Zero Pesos Only (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
+        let words = '';
+        let tempNum = wholePart;
+        let scaleIdx = 0;
+        while (tempNum > 0) {
+          const group = tempNum % 1000;
+          if (group > 0) {
+            const groupWords = convertGroup(group);
+            words = groupWords + (scales[scaleIdx] ? ' ' + scales[scaleIdx] : '') + (words ? ' ' : '') + words;
+          }
+          tempNum = Math.floor(tempNum / 1000);
+          scaleIdx++;
+        }
+        if (centsPart > 0) {
+          return words.trim() + ' Pesos and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100 (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
+        }
+        return words.trim() + ' Pesos Only (\u20b1' + parseFloat(num).toLocaleString('en-PH', {minimumFractionDigits:2}) + ')';
+      }
+
+      // Get employee details
+      const getEmployeeName = (empId) => {
+        if (!empId) return '_______________';
+        const emp = employees.find(e => e.id === parseInt(empId));
+        return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+      };
+
+      // Core data
+      const abcAmount = parseFloat(bacRes.abc_amount || 0);
+      const requiresPosting = abcAmount > 200000;
+      const bidderTypeOptions = [
+        'LOWEST CALCULATED AND RESPONSIVE (LCRB)',
+        'HIGHEST RATED AND RESPONSIVE (HRRB)',
+        'MOST ECONOMICALLY ADVANTAGEOUS AND RESPONSIVE (MEARB)',
+        'MOST ADVANTAGEOUS AND RESPONSIVE (MARB)'
+      ];
+      const selectedBidderType = bacRes.bidder_type || options.bidderType || bidderTypeOptions[0];
+      const parseBidderType = (fullType) => {
+        const match = fullType.match(/^(.+?)\s*\(([A-Z]+)\)$/);
+        return match ? { name: match[1].trim(), abbrev: match[2] } : { name: fullType, abbrev: '' };
+      };
+      const bidderTypeParts = parseBidderType(selectedBidderType);
+      const toTitleCase = (str) => str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      const bidderTypeForTitle = bidderTypeParts.name.toUpperCase();
+      const bidderTypeForResolve = toTitleCase(bidderTypeParts.name) + ' Bidder' + (bidderTypeParts.abbrev ? ' (' + bidderTypeParts.abbrev + ')' : '');
+
+      const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________');
+      const bidAmount = parseFloat(bacRes.bid_amount || bacRes.contract_price || abstract?.recommended_amount || 0);
+      const procurementDescription = bacRes.description || bacRes.subject || abstract?.description || '';
+      const procurementMode = bacRes.procurement_mode || abstract?.procurement_mode || 'SVP';
+      const procModeFullName = {'SVP': 'Small Value Procurement', 'SVPDC': 'Small Value Procurement / Direct Contracting', 'DC_SHOPPING': 'Shopping', 'OTHERS': 'Competitive Bidding'}[procurementMode] || 'Small Value Procurement';
+      const resolutionDate = bacRes.resolution_date || bacRes.date_prepared || new Date();
+      const seriesYear = bacRes.series_year || new Date(resolutionDate).getFullYear();
+      const philgepsStartDate = bacRes.philgeps_posted_from || options.philgepsStartDate || null;
+      const philgepsEndDate = bacRes.philgeps_posted_until || options.philgepsEndDate || null;
+
+      // BAC Members
+      const chairpersonName = bacRes.chairperson_name ? bacRes.chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_chairperson_id);
+      const viceChairName = bacRes.vice_chairperson_name ? bacRes.vice_chairperson_name.toUpperCase() : getEmployeeName(bacRes.bac_vice_chairperson_id);
+      const member1Name = bacRes.member1_name ? bacRes.member1_name.toUpperCase() : getEmployeeName(bacRes.bac_member1_id);
+      const member2Name = bacRes.member2_name ? bacRes.member2_name.toUpperCase() : getEmployeeName(bacRes.bac_member2_id);
+      const member3Name = bacRes.member3_name ? bacRes.member3_name.toUpperCase() : getEmployeeName(bacRes.bac_member3_id);
+      const hopeName = bacRes.hope_name ? bacRes.hope_name.toUpperCase() : getEmployeeName(bacRes.hope_id);
+
+      // Bidders table — prefer abstract quotations for names/amounts
+      let bidders = bacRes.bidders || [];
+      if (typeof bidders === 'string') { try { bidders = JSON.parse(bidders); } catch(e) { bidders = []; } }
+      const quotations = (abstract && abstract.quotations) ? abstract.quotations : [];
+      let mergedBidders = [];
+      if (quotations.length > 0) {
+        quotations.forEach((q, idx) => {
+          const fb = bidders[idx] || {};
+          mergedBidders.push({
+            name: q.supplier_name || fb.name || fb.supplier_name || '',
+            amount: parseFloat(q.bid_amount || q.total_price || fb.amount || fb.bid_amount || 0),
+            remarks: fb.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')
+          });
+        });
+      } else if (bidders.length > 0) {
+        bidders.forEach((b, idx) => {
+          const nm = b.name || b.supplier_name || b.bidder_name || '';
+          const isNumeric = /^\d+$/.test(String(nm).trim());
+          mergedBidders.push({
+            name: isNumeric ? '' : nm,
+            amount: parseFloat(b.amount || b.bid_amount || b.total_bid_amount || 0),
+            remarks: b.remarks || (idx === 0 ? 'Complying/responsive/lowest calculated' : 'Complying/responsive')
+          });
+        });
+      }
+      let biddersTableRows = '';
+      if (mergedBidders.length > 0) {
+        mergedBidders.forEach((b, idx) => {
+          const isBold = idx === 0;
+          const st = isBold ? 'font-weight:bold;' : '';
+          const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+          biddersTableRows += '<tr>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
+            '</tr>';
+        });
+      } else {
+        for (let i = 1; i <= 3; i++) {
+          biddersTableRows += '<tr>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;">' + i + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '</tr>';
+        }
+      }
+      const bidderCount = mergedBidders.length || bidders.length;
+
+      // ABC / Contract Price detail table
+      let detailTableRows = '';
+      if (rfqItems.length > 0) {
+        rfqItems.forEach(item => {
+          const qty = parseFloat(item.quantity || 0);
+          const abcUnitCost = parseFloat(item.abc_unit_cost || item.unit_price || 0);
+          const abcTotalCost = qty > 0 ? qty * abcUnitCost : abcAmount;
+          const contractUnitCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
+          const contractTotalCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) : bidAmount;
+          detailTableRows += '<tr>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcTotalCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' + qty + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' + (item.unit || '') + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(contractUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(contractTotalCost) + '</td>' +
+            '</tr>';
+        });
+      } else {
+        detailTableRows = '<tr>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">Lot</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' + procurementDescription + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '</tr>';
+      }
+
+      // Number of bidders in words
+      const bidderCountWords = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'][Math.min(bidderCount, 10)] || bidderCount;
+
+      // Build posting-specific WHEREAS clause
+      let postingClause = '';
+      if (requiresPosting) {
+        postingClause = `
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be <strong>posted for a period of three (3) calendar days</strong> on the <strong>PhilGEPS website</strong>, the <strong>website of the Procuring Entity</strong>, if available, and at any conspicuous place reserved for this purpose within the premises of the Procuring Entity;
+          </p>
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC <strong>posted the RFQ on the PhilGEPS website,</strong> starting <strong><span contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span></strong> until <strong><span contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span></strong>;
+          </p>`;
+      } else {
+        postingClause = `
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, procurement projects with ABCs of \u20b1200,000.00 and below are not subject to mandatory posting requirements;
+          </p>
+          <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+            <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of known qualifications, in accordance with the IRR;
+          </p>`;
+      }
+
+      // SIGNATURE BLOCK (shared across pages)
+      const signaturesHTML = `
+        <div style="text-align:center;margin-top:30px;">
+          <p style="margin:0;font-weight:bold;font-style:italic;">Bids and Awards Committee</p>
+        </div>
+        <div style="text-align:center;margin:30px 0 15px 0;">
+          <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${chairpersonName}</p>
+          <p style="margin:0;">BAC Chairperson</p>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin:25px 0;">
+          <div style="text-align:left;width:45%;">
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${viceChairName}</p>
+            <p style="margin:0;">BAC Vice-Chairperson</p>
+          </div>
+          <div style="text-align:right;width:45%;">
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member1Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin:25px 0;">
+          <div style="text-align:left;width:45%;">
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member2Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+          <div style="text-align:right;width:45%;">
+            <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${member3Name}</p>
+            <p style="margin:0;">BAC Member</p>
+          </div>
+        </div>
+        <div style="text-align:center;margin:30px 0 10px 0;">
+          <p style="margin:0;font-weight:bold;font-style:italic;">Approved by:</p>
+        </div>
+        <div style="text-align:center;margin:25px 0;">
+          <p style="margin:0;font-weight:bold;text-decoration:underline;" contenteditable="true">${hopeName}</p>
+          <p style="margin:0;">Head of Procuring Entity</p>
+        </div>`;
+
+      // ========== PAGE 1-2: BAC RESOLUTION DECLARING WINNER ==========
+      const declaringWinnerHTML = `
+        <div style="font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;padding:0 10px;">
+          <div style="text-align:center;margin-bottom:15px;">
+            <p style="margin:0;font-weight:bold;font-size:13pt;">BIDS AND AWARDS COMMITTEE</p>
+          </div>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;">BAC RESOLUTION</p>
+            <p style="margin:0;">No. <u><span contenteditable="true">${bacRes.resolution_number || '___'}</span></u>, Series of ${seriesYear}</p>
+          </div>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;text-transform:uppercase;">
+              A RESOLUTION DECLARING THE <span style="background:#ffff00;">${bidderTypeForTitle}</span> BIDDER FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+            </p>
+          </div>
+
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> Section 26.1, Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, otherwise known as the <em>New Government Procurement Act</em>, provides that the Procuring Entity shall adopt a fit-for-purpose approach in selecting the appropriate procurement modality, ensuring responsiveness to the nature, complexity, and funding of the requirement, and consistent with the principles of economy, efficiency, and value for money, in accordance with the conditions and thresholds prescribed under the Act;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> Section 34, Rule IV of the IRR authorizes the use of <em>${procModeFullName}</em> (${procurementMode}) for goods, infrastructure projects, and consulting services not available in the Procurement Service\u2013DBM, where the amount involved does not exceed Two Million Pesos (\u20b12,000,000.00), subject to prescribed conditions;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure <strong><u contenteditable="true">${procurementDescription}</u></strong> with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
+            </p>
+
+            ${postingClause}
+
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> in response to the RFQ, <strong>${bidderCountWords} (${bidderCount})</strong> bidders submitted a quotation, namely:
+            </p>
+          </div>
+
+          <!-- Bidders Table -->
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:10px 0;font-size:11pt;">
+            <colgroup>
+              <col style="width:8%;">
+              <col style="width:35%;">
+              <col style="width:22%;">
+              <col style="width:35%;">
+            </colgroup>
+            <thead>
+              <tr>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">No.</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Name of the Bidder</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Total Bid Amount</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>${biddersTableRows}</tbody>
+          </table>
+
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC through the Technical Working Group, conducted a formal evaluation of the submitted quotation in accordance with Section 34.3, Rule IV of the IRR of RA 12009, ensuring compliance with the legal, technical, and financial requirements, and determined that the bid of <strong>${supplierName}</strong> was responsive and aligned with the end-user\u2019s specifications with details as follows:
+            </p>
+          </div>
+
+          <!-- ABC / Contract Price Detail Table -->
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;">
+            <thead>
+              <tr>
+                <th colspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">ABC</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Qty.</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Unit</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Description</th>
+                <th colspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Contract Price</th>
+              </tr>
+              <tr>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Total Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${detailTableRows}
+              <tr>
+                <td colspan="5" style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;font-weight:bold;">Total Contract Price</td>
+                <td style="border:1px solid #000;padding:3px 2px;"></td>
+                <td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- NOW THEREFORE / RESOLVE -->
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing, <strong>WE,</strong> the Members of the Bids and Awards Committee, hereby RESOLVE, as it is RESOLVED:
+            </p>
+            <ol style="margin:10px 0 10px 40px;">
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
+              </li>
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong><span style="background:#ffff00;">${bidderTypeForResolve}</span></strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
+              </li>
+            </ol>
+          </div>
+
+          <p style="text-align:justify;text-indent:40px;margin:15px 0;">
+            <strong>RESOLVED</strong>, at the 3rd Floor, Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City, Agusan del Norte, this <strong><u>${fmtOrdinalDate(resolutionDate)}</u></strong>.
+          </p>
+
+          ${signaturesHTML}
+        </div>
+      `;
+
+      // ========== PAGE 2: BAC RESOLUTION RECOMMENDING APPROVAL ==========
+      const recommendingApprovalHTML = `
+        <div style="page-break-before:always;font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;padding:0 10px;">
+          <div style="text-align:center;margin-bottom:15px;">
+            <p style="margin:0;font-weight:bold;font-size:13pt;">BIDS AND AWARDS COMMITTEE</p>
+          </div>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;">BAC RESOLUTION</p>
+            <p style="margin:0;">No. <u><span contenteditable="true">${bacRes.resolution_number || '___'}-A</span></u>, Series of ${seriesYear}</p>
+          </div>
+          <div style="text-align:center;margin:15px 0;">
+            <p style="margin:0;font-weight:bold;text-transform:uppercase;">
+              A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+            </p>
+          </div>
+
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC, after conducting the procurement process in accordance with Section 34.3, Rule IV of the IRR of RA 12009, evaluated the quotation submitted and determined that <strong><u>${supplierName}</u></strong> offered the <strong><u>${bidderTypeForResolve}</u></strong> in the amount of <strong><u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC finds the quotation of <strong><u>${supplierName}</u></strong> to be compliant with all the legal, technical, and financial requirements set forth in the procurement documents and the provisions of RA 12009 and its IRR;
+            </p>
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>WHEREAS,</strong> the BAC, after due deliberation, resolved to recommend to the Head of the Procuring Entity (HoPE) the award of contract to <strong><u>${supplierName}</u></strong> for the above-mentioned project;
+            </p>
+          </div>
+
+          <div style="margin:15px 0;">
+            <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+              <strong>NOW, THEREFORE,</strong> for and in consideration of the foregoing, <strong>WE,</strong> the Members of the Bids and Awards Committee, hereby RESOLVE, as it is hereby RESOLVED:
+            </p>
+            <ol style="margin:10px 0 10px 40px;">
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
+              </li>
+              <li style="margin:8px 0;text-align:justify;">
+                <strong>To authorize</strong> the issuance of the corresponding Notice of Award to the said supplier.
+              </li>
+            </ol>
+          </div>
+
+          <p style="text-align:justify;text-indent:40px;margin:15px 0;">
+            <strong>RESOLVED</strong>, at the 3rd Floor, Esquina Dos Building, J.C. Aquino Avenue corner Doongan Road, Butuan City, Agusan del Norte, this <strong><u>${fmtOrdinalDate(resolutionDate)}</u></strong>.
+          </p>
+
+          ${signaturesHTML}
+        </div>
+      `;
+
+      const fullContent = declaringWinnerHTML + recommendingApprovalHTML;
+
+      const customStyles = `
+        <style>
+          @page { size: A4 portrait; margin: 15mm 20mm; }
+          [contenteditable="true"] { background: #fffde7; padding: 1px 4px; border-radius: 2px; min-width: 50px; display: inline-block; }
+          [contenteditable="true"]:hover { background: #fff9c4; }
+          [contenteditable="true"]:focus { background: #fff59d; outline: 2px solid #ffc107; }
+          @media print {
+            [contenteditable="true"] { background: transparent !important; }
+          }
+        </style>
+      `;
+
+      const html = buildPrintHTML('BAC Resolution - ' + (bacRes.resolution_number || ''), customStyles + fullContent);
+      openPrintPreview(html, { title: toFilename('BAC_Resolution_' + (bacRes.resolution_number || '')), pageSize: 'A4', landscape: false, editable: true });
+
+    } catch (err) {
+      console.error('Print BAC Resolution error:', err);
+      showNotification('Failed to print BAC Resolution: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT PURCHASE ORDER (PO) ====================
+  // Exact replica of the official DMW Purchase Order template
+  window.printPurchaseOrder = async function(poId) {
+    try {
+      showNotification('Loading Purchase Order data for print...', 'info');
+
+      // Resolve id
+      let id = poId;
+      if (typeof poId === 'string' && isNaN(poId)) {
+        const cached = cachedPO.find(p => p.po_number === poId);
+        if (cached) id = cached.id;
+      }
+
+      // Fetch full PO with items
+      const po = await apiRequest('/purchase-orders/' + id);
+      if (!po) { showNotification('Purchase Order not found', 'error'); return; }
+
+      // Fetch supplier details
+      let supplier = null;
+      if (po.supplier_id) {
+        try { supplier = await apiRequest('/suppliers/' + po.supplier_id); } catch(e) {}
+      }
+
+      // Fetch Regional Director from employees table (ORD dept_id=5, designation_id=16)
+      let rdName = 'RITCHEL M. BUTAO';
+      try {
+        const allEmployees = await apiRequest('/employees');
+        const rdEmployee = allEmployees.find(e => e.dept_id === 5 && e.designation_id === 16)
+          || allEmployees.find(e => (e.designation_name || '').toLowerCase().includes('director'))
+          || allEmployees.find(e => e.dept_id === 5);
+        if (rdEmployee && rdEmployee.full_name) rdName = rdEmployee.full_name.toUpperCase();
+
+        // Find Accountant III (FAD dept_id=1, designation containing "accountant")
+        var accountantName = 'BEALAH JOY T. CAMARIN';
+        var accountantDesignation = 'Accountant III';
+        const accEmployee = allEmployees.find(e => e.dept_id === 1 && (e.designation_name || '').toLowerCase().includes('accountant'));
+        if (accEmployee) {
+          accountantName = accEmployee.full_name ? accEmployee.full_name.toUpperCase() : accountantName;
+          accountantDesignation = accEmployee.designation_name || accountantDesignation;
+        }
+      } catch(e) {}
+
+      if (typeof accountantName === 'undefined') { var accountantName = 'BEALAH JOY T. CAMARIN'; var accountantDesignation = 'Accountant III'; }
+
+      const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const months = ['Jan.','Feb.','Mar.','Apr.','May','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Number to words helper
+      function numberToWords(num) {
+        if (num === 0) return 'Zero';
+        const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                      'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                      'Seventeen','Eighteen','Nineteen'];
+        const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+        const scales = ['','Thousand','Million','Billion'];
+
+        function convertGroup(n) {
+          let str = '';
+          if (n >= 100) { str += ones[Math.floor(n/100)] + ' Hundred '; n %= 100; }
+          if (n >= 20) { str += tens[Math.floor(n/10)] + ' '; n %= 10; }
+          if (n > 0) { str += ones[n] + ' '; }
+          return str.trim();
+        }
+
+        const wholePart = Math.floor(Math.abs(num));
+        const centsPart = Math.round((Math.abs(num) - wholePart) * 100);
+
+        if (wholePart === 0) return 'Zero and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
+
+        let words = '';
+        let tempNum = wholePart;
+        let scaleIdx = 0;
+        while (tempNum > 0) {
+          const group = tempNum % 1000;
+          if (group > 0) {
+            const groupWords = convertGroup(group);
+            words = groupWords + (scales[scaleIdx] ? ' ' + scales[scaleIdx] : '') + (words ? ' ' : '') + words;
+          }
+          tempNum = Math.floor(tempNum / 1000);
+          scaleIdx++;
+        }
+
+        return words.trim() + ' and ' + (centsPart < 10 ? '0' : '') + centsPart + '/100';
+      }
+
+      const supplierName = (po.supplier_name || supplier?.name || '').toUpperCase();
+      const supplierAddress = po.supplier_address || supplier?.address || '';
+      const supplierTIN = po.supplier_tin || supplier?.tin || '';
+      const contactPerson = supplier?.contact_person || '';
+      const modeOfProcurement = po.mode_of_procurement || 'SVP';
+      const placeOfDelivery = po.place_of_delivery || 'RO XIII–BUTUAN CITY';
+      const paymentTerms = po.payment_terms || 'CHECK / ADA';
+      const deliveryTerm = '15 DAYS';
+      const poDate = fmtDate(po.po_date || po.created_at);
+
+      // Build items table rows
+      const items = po.items || [];
+      let itemsHTML = '';
+      let grandTotal = 0;
+
+      // Inject item_specifications if items empty or into first item
+      if (po.item_specifications && items.length > 0 && !items[0].item_description) {
+        items[0].item_description = po.item_specifications;
+      } else if (po.item_specifications && items.length === 0) {
+        items.push({ quantity: 1, unit: 'Lot', item_name: po.item_specifications.split('\n')[0] || '', item_description: po.item_specifications, unit_price: po.total_amount || 0 });
+      }
+
+      if (items.length > 0) {
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity || 0);
+          const unitCost = parseFloat(item.unit_price || 0);
+          const totalCost = qty * unitCost;
+          grandTotal += totalCost;
+
+          // Main item row
+          itemsHTML += `
+            <tr>
+              <td class="po-cell-center">${idx + 1}</td>
+              <td class="po-cell-center">${item.unit || item.uom || ''}</td>
+              <td class="po-cell-desc"><strong>${item.item_name || ''}</strong></td>
+              <td class="po-cell-center">${qty}</td>
+              <td class="po-cell-right">${unitCost > 0 ? fmtCurrency(unitCost) : ''}</td>
+              <td class="po-cell-right">${fmtCurrency(totalCost)}</td>
+            </tr>`;
+
+          // Description/specs sub-row
+          if (item.item_description && item.item_description.trim().toLowerCase() !== (item.item_name || '').trim().toLowerCase()) {
+            const specLines = item.item_description.split('\n').filter(l => l.trim());
+            specLines.forEach(line => {
+              itemsHTML += `
+            <tr>
+              <td class="po-cell-center"></td>
+              <td class="po-cell-center"></td>
+              <td class="po-cell-desc po-item-specs">${line.trim()}</td>
+              <td class="po-cell-center"></td>
+              <td class="po-cell-right"></td>
+              <td class="po-cell-right"></td>
+            </tr>`;
+            });
+          }
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      const totalAmount = parseFloat(po.total_amount || 0) > 0 ? parseFloat(po.total_amount) : grandTotal;
+      const totalAmountWords = numberToWords(totalAmount);
+
+      // Add NOTHING FOLLOWS row
+      itemsHTML += `
+            <tr>
+              <td class="po-cell-center" colspan="6" style="text-align:center; padding:12px 0; font-weight:bold; font-style:italic; font-size:11pt; color:red;">***NOTHING FOLLOWS***</td>
+            </tr>`;
+
+      // Fill empty rows to make the form look right (at least ~10 visible rows)
+      const minRows = 10;
+      const currentRows = items.length + items.filter(i => i.item_description && i.item_description.trim().toLowerCase() !== (i.item_name || '').trim().toLowerCase()).length + 1;
+      for (let i = currentRows; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="po-cell-center">&nbsp;</td>
+              <td class="po-cell-center"></td>
+              <td class="po-cell-desc"></td>
+              <td class="po-cell-center"></td>
+              <td class="po-cell-right"></td>
+              <td class="po-cell-right"></td>
+            </tr>`;
+      }
+
+      const bodyContent = `
+        <style>
+          .po-form-title {
+            text-align: center;
+            font-size: 18pt;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif;
+            margin: 6px 0 8px 0;
+            letter-spacing: 2px;
+          }
+          .po-top-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .po-top-table td {
+            padding: 2px 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+            border: none;
+          }
+          .po-top-label {
+            font-weight: bold;
+            white-space: nowrap;
+          }
+          .po-top-value {
+            font-weight: bold;
+          }
+          .po-gentlemen {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            margin: 6px 0 0 0;
+            border-top: 1px solid #333;
+            padding-top: 4px;
+          }
+          .po-gentlemen-body {
+            font-family: Arial, sans-serif;
+            font-size: 9pt;
+            margin: 2px 0 6px 20px;
+          }
+          .po-delivery-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .po-delivery-table td {
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-size: 9pt;
+            vertical-align: middle;
+          }
+          .po-del-label { font-weight: bold; white-space: nowrap; }
+          .po-del-value { font-weight: bold; }
+          .po-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .po-items-table thead th {
+            border: 1px solid #333;
+            padding: 4px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            background: #fff;
+          }
+          .po-items-table tbody td {
+            border: 1px solid #333;
+            padding: 2px 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .po-cell-center { text-align: center; }
+          .po-cell-right { text-align: right; padding-right: 8px !important; }
+          .po-cell-desc { text-align: left; }
+          .po-item-specs {
+            font-weight: normal;
+            font-size: 9pt;
+            padding-left: 20px !important;
+            vertical-align: top;
+          }
+          .po-purpose-row td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            font-size: 9pt;
+          }
+          .po-total-row td {
+            border: 1px solid #333;
+            padding: 4px 6px;
+            font-size: 10pt;
+            font-weight: bold;
+          }
+          .po-penalty {
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+            font-style: italic;
+            padding: 4px 8px;
+            border: 1px solid #333;
+            border-top: none;
+          }
+          .po-sig-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .po-sig-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .po-sig-name {
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            text-decoration: underline;
+          }
+          .po-sig-designation {
+            text-align: center;
+            font-size: 8.5pt;
+          }
+          .po-fund-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .po-fund-table td {
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-size: 9pt;
+            vertical-align: middle;
+          }
+          .po-fund-label { font-weight: bold; white-space: nowrap; }
+        </style>
+
+        <div class="po-form-title">PURCHASE ORDER</div>
+
+        <!-- Supplier / PO Info top section -->
+        <table class="po-top-table">
+          <tr>
+            <td class="po-top-label" style="width:10%;">Supplier:</td>
+            <td class="po-top-value" style="width:48%;">${supplierName}</td>
+            <td class="po-top-label" style="width:14%;">P.O. No.:</td>
+            <td class="po-top-value" style="width:28%;">${po.po_number || ''}</td>
+          </tr>
+          <tr>
+            <td class="po-top-label">Address:</td>
+            <td class="po-top-value">${supplierAddress.toUpperCase()}</td>
+            <td class="po-top-label">Date:</td>
+            <td class="po-top-value">${poDate}</td>
+          </tr>
+          <tr>
+            <td class="po-top-label">TIN:</td>
+            <td class="po-top-value">${supplierTIN}</td>
+            <td class="po-top-label" style="white-space:nowrap;">Mode of Procurement:</td>
+            <td class="po-top-value">${modeOfProcurement}</td>
+          </tr>
+        </table>
+
+        <!-- Gentlemen -->
+        <div class="po-gentlemen">Gentlemen:</div>
+        <div class="po-gentlemen-body">Please furnish this Office the following articles subject to the terms and conditions contained herein:</div>
+
+        <!-- Delivery Info -->
+        <table class="po-delivery-table">
+          <tr>
+            <td class="po-del-label" style="width:18%;">Place of Delivery :</td>
+            <td class="po-del-value" style="width:32%;">${placeOfDelivery}</td>
+            <td class="po-del-label" style="width:16%;">Delivery Term:</td>
+            <td class="po-del-value" style="width:15%;">${deliveryTerm}</td>
+          </tr>
+          <tr>
+            <td class="po-del-label">Date of Delivery :</td>
+            <td class="po-del-value">${po.delivery_date ? fmtDate(po.delivery_date) + ' and onwards' : po.expected_delivery_date ? fmtDate(po.expected_delivery_date) + ' and onwards' : ''}</td>
+            <td class="po-del-label">Payment Term:</td>
+            <td class="po-del-value">${paymentTerms}</td>
+          </tr>
+        </table>
+
+        <!-- Items Table -->
+        <table class="po-items-table">
+          <thead>
+            <tr>
+              <th style="width:9%;">Item No.</th>
+              <th style="width:7%;">unit</th>
+              <th>Item Description</th>
+              <th style="width:10%;">Quantity</th>
+              <th style="width:12%;">Unit Cost</th>
+              <th style="width:14%;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+
+        <!-- Purpose -->
+        <table style="width:100%;border-collapse:collapse;margin:0;">
+          <tr class="po-purpose-row">
+            <td colspan="6" style="font-size:9pt;">
+              <span style="font-weight:bold;">PURPOSE:</span> ${po.purpose || ''}
+            </td>
+          </tr>
+        </table>
+
+        <!-- Total Amount in Words + Amount -->
+        <table style="width:100%;border-collapse:collapse;margin:0;font-family:Arial,sans-serif;">
+          <tr class="po-total-row">
+            <td style="width:65%; font-size:8pt; vertical-align:middle;">
+              <span style="font-weight:bold; font-style:italic;">[Total Amount in Words]</span>
+              <span style="font-weight:bold; font-style:italic; text-transform:uppercase;"> ${totalAmountWords}</span>
+            </td>
+            <td style="width:35%; text-align:right; font-size:11pt; padding-right:8px;">
+              ${fmtCurrency(totalAmount)}
+            </td>
+          </tr>
+        </table>
+
+        <!-- Penalty clause -->
+        <div class="po-penalty">
+          In case of failure to make the full delivery within the time specified above, a penalty of one-tenth (1/10) of one percent for every day of delay shall be imposed.
+        </div>
+
+        <!-- Conforme / Very truly yours signatures -->
+        <table class="po-sig-table">
+          <tr>
+            <td style="width:18%;"></td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Conforme:</td>
+            <td style="width:41%; text-align:center; padding-top:5px;">Very truly yours,</td>
+          </tr>
+          <tr>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:bottom;">Printed Name</td>
+            <td style="text-align:center; vertical-align:bottom; padding-top:50px;">
+              <div style="border-bottom:1px solid #333; width:80%; margin:0 auto;"></div>
+              <div style="font-size:8pt; margin-top:2px;">Signature over Printed Name of Supplier</div>
+            </td>
+            <td style="text-align:center; vertical-align:bottom; padding-top:50px;">
+              <div class="po-sig-name">${rdName}</div>
+              <div class="po-sig-designation">Regional Director</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size:8pt; font-weight:bold; vertical-align:top;">Date</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </table>
+
+        <!-- Fund Cluster / ORS BURS section -->
+        <table class="po-fund-table" style="margin-top:20px;">
+          <tr>
+            <td class="po-fund-label" style="width:15%;">Fund Cluster :</td>
+            <td style="width:35%;"></td>
+            <td class="po-fund-label" style="width:18%;">ORS/BURS No. :</td>
+            <td style="width:32%;"></td>
+          </tr>
+          <tr>
+            <td class="po-fund-label">Funds Available :</td>
+            <td></td>
+            <td class="po-fund-label">Date of the ORS/BURS :</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="2" rowspan="2" style="vertical-align:bottom; text-align:center; padding-top:30px; padding-bottom:4px;">
+              <div class="po-sig-name">${accountantName}</div>
+              <div class="po-sig-designation">${accountantDesignation}</div>
+            </td>
+            <td class="po-fund-label">Amount :</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="2"></td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('Purchase Order - ' + (po.po_number || ''), bodyContent);
+      openPrintPreview(html, { title: toFilename('PO_' + (po.po_number || '')), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print PO error:', err);
+      showNotification('Failed to print Purchase Order: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT RFQ (REQUEST FOR QUOTATION) ====================
+  // Fetches full RFQ + items from API and renders official DMW RFQ form
+  window.printRFQ = async function(rfqId) {
+    try {
+      showNotification('Loading RFQ data for print...', 'info');
+      let id = rfqId;
+      if (typeof rfqId === 'string' && isNaN(rfqId)) {
+        const cached = cachedRFQ.find(r => r.rfq_number === rfqId);
+        if (cached) id = cached.id;
+      }
+      const rfq = await apiRequest('/rfqs/' + id);
+      if (!rfq) { showNotification('RFQ not found', 'error'); return; }
+
+      // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
+      let bacSecName = 'GIOVANNI S. PAREDES', bacSecDesignation = '';
+      let bacChairName = '', bacChairDesignation = '';
+      let markName = 'MARK E. MARASIGAN', markDesignation = '';
+      let prPurpose = '';
+      try {
+        const [allUsers, allEmployees] = await Promise.all([
+          apiRequest('/users'),
+          apiRequest('/employees')
+        ]);
+        // BAC Secretariat
+        const bacSecUser = allUsers.find(u => u.role === 'bac_secretariat');
+        if (bacSecUser) {
+          bacSecName = bacSecUser.full_name || bacSecName;
+          const bacSecEmp = allEmployees.find(e => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
+          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || '';
+        }
+        // BAC Chairperson (primary or secondary role)
+        const bacChairUser = allUsers.find(u => u.role === 'bac_chair' || u.secondary_role === 'bac_chair');
+        if (bacChairUser) {
+          bacChairName = bacChairUser.full_name || '';
+          const bacChairEmp = allEmployees.find(e => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
+          if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || '';
+        }
+        // Mark E. Marasigan
+        const markEmp = allEmployees.find(e => e.full_name && e.full_name.trim().toLowerCase().includes('marasigan'));
+        if (markEmp) {
+          markName = markEmp.full_name || markName;
+          markDesignation = markEmp.designation_name || '';
+        }
+      } catch (e) { console.warn('Could not fetch BAC/employee data:', e); }
+
+      // Fetch Purpose from linked PR
+      if (rfq.pr_id) {
+        try {
+          const pr = await apiRequest('/purchase-requests/' + rfq.pr_id);
+          if (pr && pr.purpose) prPurpose = pr.purpose;
+        } catch (e) { console.warn('Could not fetch PR purpose:', e); }
+      }
+
+      const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const months = ['Jan.','Feb.','Mar.','Apr.','May','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Build item rows
+      const items = rfq.items || [];
+      let itemsHTML = '';
+      let abcTotal = 0;
+
+      // Inject item_specifications from rfqs table into the first item's description for print
+      if (rfq.item_specifications && items.length > 0) {
+        items[0].item_description = rfq.item_specifications;
+      } else if (rfq.item_specifications && items.length === 0) {
+        // If no rfq_items exist but specs are set, create a virtual item for print
+        items.push({ quantity: 1, unit: 'LOT', item_name: '', item_description: rfq.item_specifications, abc_unit_cost: rfq.abc_amount || 0 });
+      }
+
+      if (items.length > 0) {
+        items.forEach((item) => {
+          const qty = parseFloat(item.quantity || 0);
+          const abcUnitCost = parseFloat(item.abc_unit_cost || 0);
+          const abcItemTotal = qty * abcUnitCost;
+          abcTotal += abcItemTotal;
+
+          // Main item row
+          itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center">${qty}</td>
+              <td class="rfq-cell-center">${item.unit || ''}</td>
+              <td class="rfq-cell-desc"><strong>${item.item_name || ''}</strong></td>
+              <td class="rfq-cell-right">${fmtCurrency(abcItemTotal)}</td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+
+          // Description/specs rows
+          if (item.item_description) {
+            const specLines = item.item_description.split(/\\n|\n/).filter(l => l.trim());
+            specLines.forEach(line => {
+              itemsHTML += `
+            <tr class="rfq-spec-row">
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-specs">${line.trim()}</td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+            });
+          }
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Fill empty rows for form look
+      const minRows = 12;
+      const currentRows = items.length + items.filter(i => i.item_description).reduce((c, i) => c + (i.item_description.split(/\\n|\n/).filter(l => l.trim()).length), 0);
+      for (let i = currentRows; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center">&nbsp;</td>
+              <td class="rfq-cell-center"></td>
+              <td class="rfq-cell-desc"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+              <td class="rfq-cell-right"></td>
+            </tr>`;
+      }
+
+      const totalABC = parseFloat(rfq.abc_amount || 0) > 0 ? parseFloat(rfq.abc_amount) : abcTotal;
+
+      const bodyContent = `
+        <style>
+          .rfq-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 8px 0 12px 0;
+            letter-spacing: 1px;
+          }
+          .rfq-info-row {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            margin: 3px 0;
+            line-height: 1.5;
+          }
+          .rfq-info-row .rfq-label {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 140px;
+          }
+          .rfq-info-right {
+            float: right;
+            text-align: right;
+          }
+          .rfq-body-text {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            line-height: 1.5;
+            margin: 6px 0;
+            text-align: center;
+          }
+          .rfq-body-text.indent {
+            text-indent: 0;
+          }
+          .rfq-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 0 0;
+            font-family: Arial, sans-serif;
+          }
+          .rfq-items-table thead th {
+            border: 1px solid #333;
+            padding: 5px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+          }
+          .rfq-items-table tbody td {
+            border: 1px solid #333;
+            padding: 2px 5px;
+            font-size: 9.5pt;
+            vertical-align: top;
+          }
+          .rfq-cell-center { text-align: center; }
+          .rfq-cell-right { text-align: right; }
+          .rfq-cell-desc { text-align: left; }
+          .rfq-cell-specs {
+            text-align: left;
+            font-size: 9pt;
+            padding-left: 15px !important;
+            color: #333;
+          }
+          .rfq-spec-row td {
+            border-top: 1px dashed #999 !important;
+            border-bottom: 1px dashed #999 !important;
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
+          }
+          .rfq-total-row td {
+            border: 1px solid #333;
+            padding: 4px 5px;
+            font-size: 9.5pt;
+            font-weight: bold;
+          }
+          .rfq-sig-section {
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+            margin-top: 12px;
+          }
+          .rfq-sig-line {
+            border-bottom: 1px solid #333;
+            height: 30px;
+            margin: 10px 0 3px 0;
+            width: 250px;
+          }
+          .rfq-sig-label {
+            font-size: 9pt;
+            color: #444;
+            text-align: center;
+            width: 250px;
+          }
+          .rfq-terms {
+            font-family: Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.5;
+          }
+          .rfq-terms-row {
+            display: flex;
+            margin: 1px 0;
+          }
+          .rfq-terms-num {
+            min-width: 20px;
+            text-align: right;
+            padding-right: 6px;
+          }
+          .rfq-conforme {
+            margin-top: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+          }
+          .rfq-two-col {
+            display: flex;
+            justify-content: space-between;
+          }
+          .rfq-col-left { width: 48%; }
+          .rfq-col-right { width: 48%; text-align: center; }
+          .rfq-checkbox {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1.5px solid #333;
+            margin-right: 4px;
+            vertical-align: middle;
+            position: relative;
+            top: -1px;
+          }
+        </style>
+
+        <div class="rfq-title">REQUEST FOR QUOTATION</div>
+
+        <div class="rfq-two-col">
+          <div class="rfq-col-left"></div>
+          <div class="rfq-col-right" style="text-align:right;">
+            <div class="rfq-info-row"><span class="rfq-label">RFQ No.:</span> ${rfq.rfq_number || ''}</div>
+            <div class="rfq-info-row"><span class="rfq-label">Date:</span> ${fmtDate(rfq.date_prepared)}</div>
+          </div>
+        </div>
+
+        <div class="rfq-info-row"><span class="rfq-label">Company Name:</span> ${rfq.manual_supplier_name ? '<u>' + rfq.manual_supplier_name + '</u>' : '___________________________________'}</div>
+        <div class="rfq-info-row"><span class="rfq-label">Company Address:</span> ${rfq.manual_supplier_address ? '<u>' + rfq.manual_supplier_address + '</u>' : '___________________________________'}</div>
+        <div class="rfq-info-row"><span class="rfq-label">TIN:</span> ${rfq.manual_supplier_tin ? '<u>' + rfq.manual_supplier_tin + '</u>' : '___________________________________'}</div>
+
+        <div style="margin-top:10px;">
+          <div class="rfq-body-text" style="text-align:left;">Sir/Madam:</div>
+          <div class="rfq-body-text indent">May we invite your company to quote for the lowest price/s, VAT included, on the item/s listed and described hereunder.</div>
+          <div class="rfq-body-text">Please submit your QUOTATION to the Bids and Awards Committee (BAC), through BAC Secretary <strong><u>${bacSecName.toUpperCase()}</u></strong>, located at DMW-Caraga Esquina Dos Bldg, 3rd Floor, J.C. Aquino Ave., Corner Doongan, Butuan City, Telephone No.(085) 815-1708 in duplicate copies or via email dmw13.bac@gmail.com which shall be stamped thereon the date and time received by the BAC Secretariat.</div>
+          <div class="rfq-body-text indent">The quotation must be received by the BAC Secretariat not later than three (3) days from receipt hereof and not beyond 8:00 o'clock in the morning of the last day to submit the quoted price. All bids which are higher than the ABC shall be automatically disqualified.</div>
+          <div class="rfq-body-text indent">The BAC reserves the rights to reject any and all bid/s submitted which is/are not in accordance with the specification and those submitted after the deadline.</div>
+        </div>
+
+        <div class="rfq-sig-section" style="margin-top:20px;">
+          <div class="rfq-two-col" style="margin-top:5px;">
+            <div class="rfq-col-left">
+              <div>Served by:</div>
+              <div class="rfq-sig-label" style="margin-top:15px;"><strong style="text-decoration:underline;">${bacSecName.toUpperCase()}</strong></div>
+              <div class="rfq-sig-label">BAC Secretariat</div>
+              <div style="margin-top:10px;">Date:________________________</div>
+            </div>
+            <div class="rfq-col-right">
+              <div style="text-align:center;">Very truly yours,</div>
+              <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase; margin-top:15px; text-decoration:underline;">${bacChairName}</div>
+              <div style="font-size:9pt; color:#444;">${bacChairDesignation}</div>
+              <div style="font-size:9pt; color:#444;">BAC Chairperson</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:5px; border-top:1px dashed #999; padding-top:5px;"></div>
+
+        <table class="rfq-items-table">
+          <thead>
+            <tr>
+              <th style="width:8%;">Quantity</th>
+              <th style="width:10%;">Unit</th>
+              <th>Item (with specification)</th>
+              <th style="width:12%;">ABC</th>
+              <th style="width:13%;">Unit Cost</th>
+              <th style="width:13%;">Total Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+            ${prPurpose ? `<tr><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="padding:4px 5px; font-size:9.5pt; color:red; font-weight:bold; border:1px solid #333;"><span style="color:red; font-weight:bold;">PURPOSE: ${prPurpose}</span></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td><td style="border:1px solid #333;"></td></tr>` : ''}
+            <tr class="rfq-total-row">
+              <td colspan="3" style="text-align:center;">VAT INCLUSIVE</td>
+              <td style="text-align:right;">₱${fmtCurrency(totalABC)}</td>
+              <td style="text-align:right;"></td>
+              <td style="text-align:right;"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="rfq-two-col" style="margin-top:10px;">
+          <div class="rfq-col-left rfq-sig-section">
+            <div>Received by:</div>
+            <div class="rfq-sig-line"></div>
+            <div class="rfq-sig-label">(Name &amp; Signature of Proprietor/<br>Authorized Representative)</div>
+            <div style="margin-top:6px;">Telephone/Fax No. ___________________</div>
+            <div style="margin-top:3px;">Email ___________________________________</div>
+          </div>
+          <div class="rfq-col-right"></div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="rfq-info-row"><span class="rfq-label">PR No.:</span> <strong>${rfq.pr_number || ''}</strong></div>
+        </div>
+
+        <div class="rfq-terms" style="margin-top:8px;">
+          <div style="font-weight:bold; margin-bottom:4px;">Terms &amp; Conditions:</div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">1.</span><span>Award shall be made on &emsp; <span class="rfq-checkbox"></span> Per Item Basis &emsp; <span class="rfq-checkbox"></span> Lot/Package &emsp; <span class="rfq-checkbox"></span> Total Quoted</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">2.</span><span>Quotation validity shall not be less than <strong><u>30</u></strong> calendar days</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">3.</span><span>Must be registered with PhilGEPS.</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">4.</span><span>Goods shall be delivered within: <strong><u>one to three working days after the award has made</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">5.</span><span>Place of delivery: <strong><u>3rd Floor Esquina Dos Bldg., Cor. Doongan, Butuan City</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">6.</span><span>Term of Payment is <strong><u>Check</u></strong> / ADA</span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">7.</span><span>Liquidated Damages/Penalty: <strong><u>(1/10) of one percent for every days of delay shall be imposed</u></strong></span></div>
+          <div class="rfq-terms-row"><span class="rfq-terms-num">8.</span><span>In case of discrepancy between unit and total cost, until cost shall prevail</span></div>
+        </div>
+
+        <div class="rfq-two-col" style="margin-top:30px;">
+          <div class="rfq-col-left rfq-sig-section" style="text-align:center;">
+            <div class="rfq-sig-line" style="margin:25px auto 3px auto;"></div>
+            <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase;">${markName}</div>
+            <div style="font-size:9pt; color:#444;">AO I / SUPPLY OFFICER I</div>
+          </div>
+          <div class="rfq-col-right rfq-conforme" style="margin-top:0;">
+            <div>Conforme:</div>
+            <div class="rfq-sig-line" style="margin:25px auto 3px auto;"></div>
+            <div class="rfq-sig-label" style="margin:0 auto;">Name &amp; Signature of Proprietor/<br>Authorized Representative</div>
+          </div>
+        </div>
+      `;
+
+      const html = buildPrintHTML('RFQ - ' + rfq.rfq_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('RFQ_' + rfq.rfq_number), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print RFQ error:', err);
+      showNotification('Failed to print RFQ: ' + err.message, 'error');
+    }
+  };
+
+  // Print Abstract of Quotation — matching government AOQ form (ABS JAN 2026.xlsx template)
+  window.printAbstract = async function(abstractId) {
+    try {
+      showNotification('Loading Abstract data for print...', 'info');
+      const abs = await apiRequest('/abstracts/' + abstractId);
+      if (!abs) { showNotification('Abstract not found', 'error'); return; }
+
+      // Fetch RFQ details for ABC amount and items
+      let rfqData = null;
+      let prPurpose = abs.purpose || '';
+      if (abs.rfq_id) {
+        try {
+          rfqData = await apiRequest('/rfqs/' + abs.rfq_id);
+          if (rfqData && rfqData.pr_id) {
+            try {
+              const pr = await apiRequest('/purchase-requests/' + rfqData.pr_id);
+              if (pr && pr.purpose) prPurpose = pr.purpose;
+            } catch(e) {}
+          }
+        } catch(e) { console.warn('Could not fetch RFQ data:', e); }
+      }
+
+      // BAC members — use signatories saved on the abstract record
+      let bacChairName = '_______________', bacChairDesignation = 'BAC Chairperson';
+      let bacViceChairName = '_______________', bacViceChairDesignation = 'BAC Vice-Chairperson';
+      let bacMembers = [
+        { name: '_______________', title: 'BAC Member' },
+        { name: '_______________', title: 'BAC Member' },
+        { name: '_______________', title: 'BAC Member' }
+      ];
+      let bacSecName = '_______________', bacSecTitle = 'Chairperson, BAC Secretariat';
+      let bacSec2Name = '';
+      let rdName = '_______________', rdTitle = 'Regional Director';
+      try {
+        const allEmployees = await apiRequest('/employees');
+        const getEmpNameUpper = (empId) => {
+          if (!empId) return '_______________';
+          const emp = allEmployees.find(e => e.id === parseInt(empId));
+          return emp ? (emp.full_name || '').toUpperCase() : '_______________';
+        };
+        const getEmpDesig = (empId, fallback) => {
+          if (!empId) return fallback;
+          const emp = allEmployees.find(e => e.id === parseInt(empId));
+          return emp && emp.designation_name ? emp.designation_name : fallback;
+        };
+        // Use saved signatory IDs from the abstract record
+        if (abs.bac_chairperson_id) bacChairName = getEmpNameUpper(abs.bac_chairperson_id);
+        if (abs.vice_chairperson_id) bacViceChairName = getEmpNameUpper(abs.vice_chairperson_id);
+        if (abs.bac_member1_id) bacMembers[0].name = getEmpNameUpper(abs.bac_member1_id);
+        if (abs.bac_member2_id) bacMembers[1].name = getEmpNameUpper(abs.bac_member2_id);
+        if (abs.bac_member3_id) bacMembers[2].name = getEmpNameUpper(abs.bac_member3_id);
+        if (abs.bac_secretariat_id) bacSecName = getEmpNameUpper(abs.bac_secretariat_id);
+        if (abs.bac_secretariat2_id) bacSec2Name = getEmpNameUpper(abs.bac_secretariat2_id);
+        if (abs.regional_director_id) rdName = getEmpNameUpper(abs.regional_director_id);
+      } catch(e) {}
+
+      const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const months = ['Jan.','Feb.','Mar.','Apr.','May','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+        return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+      };
+      const fmtCurrency = (v) => {
+        const num = parseFloat(v || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+
+      // Quotations — pad to 3 suppliers
+      const quotations = abs.quotations || [];
+      while (quotations.length < 3) quotations.push({ supplier_name: '', items: [], bid_amount: 0 });
+
+      // Items from RFQ or first quotation
+      let abstractItems = [];
+      if (rfqData && rfqData.items && rfqData.items.length > 0) {
+        abstractItems = rfqData.items.map(it => ({
+          qty: parseFloat(it.quantity || 0),
+          unit: it.unit || '',
+          description: it.item_name || it.item_description || '',
+          abc: parseFloat(it.abc_total_cost || it.abc_unit_cost || 0)
+        }));
+      } else if (quotations[0] && quotations[0].items && quotations[0].items.length > 0) {
+        abstractItems = quotations[0].items.map(it => ({
+          qty: parseFloat(it.quantity || 0),
+          unit: it.unit || '',
+          description: it.item_description || '',
+          abc: 0
+        }));
+      }
+
+      // Supplier header row — no colors
+      let supplierHeaders = '';
+      let supplierSubHeaders = '';
+      for (let si = 0; si < 3; si++) {
+        const sName = (quotations[si] && quotations[si].supplier_name) ? quotations[si].supplier_name.toUpperCase() : '';
+        supplierHeaders += `<th colspan="2" class="abs-th">${sName}</th>`;
+        supplierSubHeaders += `<th class="abs-th" style="width:9%;">Unit Price</th><th class="abs-th" style="width:9%;">Total Price</th>`;
+      }
+
+      // Item rows
+      let itemsHTML = '';
+      abstractItems.forEach((item) => {
+        let supplierCells = '';
+        for (let si = 0; si < 3; si++) {
+          const q = quotations[si];
+          let unitPrice = '', totalPrice = '';
+          if (q && q.items && q.items.length > 0) {
+            const matchItem = q.items.find(qi => qi.item_description && item.description && qi.item_description.toLowerCase().includes(item.description.toLowerCase().substring(0, 15))) || q.items[0];
+            if (matchItem) {
+              unitPrice = fmtCurrency(matchItem.unit_price || 0);
+              totalPrice = fmtCurrency(matchItem.total_price || 0);
+            }
+          }
+          supplierCells += `<td class="abs-td abs-r">${unitPrice}</td><td class="abs-td abs-r">${totalPrice}</td>`;
+        }
+        itemsHTML += `<tr>
+          <td class="abs-td abs-c">${item.qty}</td>
+          <td class="abs-td abs-c">${item.unit}</td>
+          <td class="abs-td">${item.description}</td>
+          <td class="abs-td abs-r">${fmtCurrency(item.abc)}</td>
+          ${supplierCells}
+        </tr>`;
+      });
+
+      // Notes / specs rows
+      if (abs.item_specifications) {
+        const specs = abs.item_specifications.split(/\n|\r\n/).filter(l => l.trim());
+        itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8" style="font-weight:bold;">Note:</td></tr>`;
+        specs.forEach((spec, i) => {
+          itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8">${(i + 1)}. ${spec.trim()}</td></tr>`;
+        });
+      }
+
+      // Empty filler rows
+      const totalContentRows = abstractItems.length + (abs.item_specifications ? abs.item_specifications.split(/\n/).filter(l => l.trim()).length + 1 : 0);
+      for (let i = totalContentRows; i < 6; i++) {
+        itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
+      }
+
+      // PURPOSE row with supplier totals
+      let purposeTotalCells = '';
+      for (let si = 0; si < 3; si++) {
+        const q = quotations[si];
+        const total = q ? parseFloat(q.bid_amount || 0) : 0;
+        purposeTotalCells += `<td class="abs-td"></td><td class="abs-td abs-r" style="font-weight:bold;">${total > 0 ? fmtCurrency(total) : ''}</td>`;
+      }
+
+      const recommendedName = abs.recommended_supplier_name || (quotations[0] ? quotations[0].supplier_name : '');
+      const recommendedAmount = fmtCurrency(abs.recommended_amount || 0);
+
+      const bodyContent = `
+        <style>
+          @page { size: A4 landscape; margin: 8mm 10mm; }
+          .abs-wrap { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; line-height: 1.3; }
+          .abs-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 2px 0 6px 0; letter-spacing: 0.5px; }
+          .abs-info { font-size: 9pt; margin: 2px 0; }
+          .abs-info b { min-width: 70px; display: inline-block; }
+          .abs-tbl { width: 100%; border-collapse: collapse; margin: 4px 0 0 0; }
+          .abs-th { border: 1px solid #000; padding: 2px 3px; font-size: 7.5pt; font-weight: bold; text-align: center; vertical-align: middle; }
+          .abs-td { border: 1px solid #000; padding: 1px 3px; font-size: 8pt; vertical-align: top; }
+          .abs-c { text-align: center; }
+          .abs-r { text-align: right; }
+          .abs-cert { font-size: 8pt; line-height: 1.4; margin-top: 4px; }
+          .abs-cert p { margin: 2px 0; }
+          .abs-sigs { margin-top: 6px; font-size: 8pt; }
+          .abs-sig-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
+          .abs-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 2px; }
+          .abs-sl { border-bottom: 1px solid #000; height: 18px; margin: 8px auto 1px auto; width: 80%; }
+          .abs-sn { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
+          .abs-st { font-size: 7pt; color: #333; }
+          .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
+        </style>
+
+        <div class="abs-wrap">
+          <div class="abs-title">ABSTRACT OF QUOTATION</div>
+
+          <div style="display:flex; justify-content:space-between;">
+            <div>
+              <div class="abs-info"><b>AOQ No.:</b> ${abs.abstract_number || ''}</div>
+            </div>
+            <div>
+              <div class="abs-info"><b>DATE:</b> ${fmtDate(abs.date_prepared)}</div>
+            </div>
+          </div>
+
+          <table class="abs-tbl">
+            <thead>
+              <tr>
+                <th colspan="3" class="abs-th">PARTICULARS</th>
+                <th rowspan="2" class="abs-th" style="width:10%;">ABC</th>
+                ${supplierHeaders}
+              </tr>
+              <tr>
+                <th class="abs-th" style="width:5%;">Qty.</th>
+                <th class="abs-th" style="width:4%;">Unit</th>
+                <th class="abs-th" style="width:18%;">Items</th>
+                ${supplierSubHeaders}
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+              <tr>
+                <td class="abs-td"></td>
+                <td class="abs-td"></td>
+                <td class="abs-td" style="font-weight:bold;">PURPOSE: ${prPurpose}</td>
+                <td class="abs-td"></td>
+                ${purposeTotalCells}
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="abs-cert">
+            <p>We <b>CERTIFY</b> that we opened and recorded herein quotations received in respond to the RFQ.</p>
+            <p>We therefore <b>RECOMMEND</b> to award to <b><u>${recommendedName}</u></b> with a total bid price of <b><u>₱${recommendedAmount}</u></b> having submitted the most responsive quotation.</p>
+            <p>We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
+          </div>
+
+          <div class="abs-sigs">
+            <div class="abs-lbl">Recommended By:</div>
+            <div style="text-align:center;margin-bottom:6px;">
+              <div class="abs-sn" style="text-decoration:underline;">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div>
+            </div>
+            <div class="abs-sig-row">
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
+            </div>
+            <div class="abs-sig-row">
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
+              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
+            </div>
+
+            <div style="margin-top:8px;">
+              <div class="abs-lbl">Approved By:</div>
+              <div style="text-align:center;">
+                <div class="abs-sn" style="text-decoration:underline;">${rdName}</div><div class="abs-st">${rdTitle}</div>
+                <div class="abs-st" style="font-style:italic;">Head of the Procuring Entity</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const html = buildPrintHTML('Abstract of Quotation - ' + abs.abstract_number, bodyContent);
+      openPrintPreview(html, { title: toFilename('AOQ_' + abs.abstract_number), pageSize: 'A4', landscape: true, editable: true });
+    } catch (err) {
+      console.error('Print Abstract error:', err);
+      showNotification('Failed to print Abstract: ' + err.message, 'error');
+    }
+  };
+
+  // ==================== PRINT RIS (REQUISITION AND ISSUE SLIP - APPENDIX 50) ====================
+  window.printRIS = async function(risId) {
+    try {
+      showNotification('Loading RIS data for print...', 'info');
+
+      // Resolve id from cache if string
+      let id = risId;
+      if (typeof risId === 'string' && isNaN(risId)) {
+        const cached = cachedRIS?.find(r => r.ris_no === risId);
+        if (cached) id = cached.id;
+      }
+
+      const ris = await apiRequest('/ris/' + id);
+      if (!ris) { showNotification('RIS not found', 'error'); return; }
+
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+      // Build item rows
+      const items = ris.items || [];
+      let itemsHTML = '';
+
+      if (items.length > 0) {
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity || 0);
+          itemsHTML += `
+            <tr>
+              <td class="ris-cell-center">${item.stock_no || ''}</td>
+              <td class="ris-cell-center">${item.uom || item.item_unit || ''}</td>
+              <td class="ris-cell-desc">${item.description || item.item_name || ''}</td>
+              <td class="ris-cell-center">${qty}</td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center">${qty}</td>
+              <td class="ris-cell-desc"></td>
+            </tr>`;
+        });
+      } else {
+        itemsHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No items</td></tr>';
+      }
+
+      // Add empty rows to fill space (minimum ~12 visible rows for form look)
+      const minRows = 12;
+      for (let i = items.length; i < minRows; i++) {
+        itemsHTML += `
+            <tr>
+              <td class="ris-cell-center">&nbsp;</td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-desc"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-center"></td>
+              <td class="ris-cell-desc"></td>
+            </tr>`;
+      }
+
+      const bodyContent = `
+        <style>
+          /* RIS-specific print styles matching Appendix 50 */
+          .ris-form-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            margin: 4px 0 2px 0;
+            letter-spacing: 1px;
+          }
+          .ris-appendix {
+            text-align: center;
+            font-size: 8pt;
+            font-style: italic;
+            font-family: Arial, sans-serif;
+            margin-bottom: 8px;
+            color: #444;
+          }
+          .ris-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-header-table td {
+            padding: 2px 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-header-label {
+            font-weight: normal;
+            color: #333;
+          }
+          .ris-header-value {
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+          }
+          .ris-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-info-table td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-info-label {
+            font-weight: normal;
+            color: #333;
+            white-space: nowrap;
+          }
+          .ris-info-value {
+            font-weight: bold;
+          }
+          .ris-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-items-table thead th {
+            border: 1px solid #333;
+            padding: 4px 4px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            background: #f5f5f5;
+          }
+          .ris-items-table tbody td {
+            border: 1px solid #333;
+            padding: 3px 5px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          .ris-cell-center { text-align: center; }
+          .ris-cell-right { text-align: right; }
+          .ris-cell-desc { text-align: left; }
+          .ris-purpose-row td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            font-size: 10pt;
+          }
+          .ris-sig-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-family: Arial, sans-serif;
+          }
+          .ris-sig-table td {
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-size: 9pt;
+            vertical-align: top;
+          }
+          .ris-sig-label {
+            font-weight: normal;
+            font-size: 8pt;
+          }
+          .ris-sig-name {
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+            text-transform: uppercase;
+            padding-top: 40px !important;
+          }
+          .ris-sig-designation {
+            text-align: center;
+            font-size: 8pt;
+            color: #444;
+            padding-bottom: 5px !important;
+          }
+          .ris-qty-header {
+            text-align: center;
+            font-size: 8pt;
+            font-weight: bold;
+            border: 1px solid #333;
+            padding: 2px;
+          }
+        </style>
+
+        <table class="ris-header-table" style="margin-bottom:5px;">
+          <tr>
+            <td style="width:70%;">
+              <span class="ris-header-label">Entity Name:</span>
+              <span class="ris-header-value" style="display:inline-block;min-width:200px;" contenteditable="true">DEPARTMENT OF MIGRANT WORKERS - CARAGA</span>
+            </td>
+            <td style="width:30%;">
+              <span class="ris-header-label">Fund Cluster:</span>
+              <span class="ris-header-value" style="display:inline-block;min-width:80px;" contenteditable="true">01101101</span>
+            </td>
+          </tr>
+        </table>
+
+        <div class="ris-form-title">REQUISITION AND ISSUE SLIP</div>
+        <div class="ris-appendix">(Appendix 50)</div>
+
+        <table class="ris-info-table">
+          <tr>
+            <td class="ris-info-label" style="width:18%;">Division:</td>
+            <td class="ris-info-value" style="width:32%;" contenteditable="true">${ris.division || ''}</td>
+            <td class="ris-info-label" style="width:18%;">Responsibility Center Code:</td>
+            <td class="ris-info-value" style="width:32%;" contenteditable="true">${ris.division || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-info-label">RIS No.:</td>
+            <td class="ris-info-value" contenteditable="true">${ris.ris_no || ''}</td>
+            <td class="ris-info-label">Date:</td>
+            <td class="ris-info-value" contenteditable="true">${fmtDate(ris.ris_date)}</td>
+          </tr>
+        </table>
+
+        <table class="ris-items-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:10%;">Stock No.</th>
+              <th rowspan="2" style="width:8%;">Unit</th>
+              <th rowspan="2">Description</th>
+              <th colspan="3" style="width:24%;">Quantity</th>
+              <th rowspan="2" style="width:15%;">Remarks</th>
+            </tr>
+            <tr>
+              <th class="ris-qty-header" style="width:8%;">RIS</th>
+              <th class="ris-qty-header" style="width:8%;">Available</th>
+              <th class="ris-qty-header" style="width:8%;">Issue</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+
+        <table class="ris-info-table" style="margin-top:0;">
+          <tr>
+            <td class="ris-info-label" style="width:12%;">Purpose:</td>
+            <td class="ris-info-value" colspan="3" contenteditable="true">${ris.purpose || ''}</td>
+          </tr>
+        </table>
+
+        <table class="ris-sig-table">
+          <tr>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Requested by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Approved by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Issued by:</td>
+            <td style="width:25%; text-align:center;" class="ris-sig-label">Received by:</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;">Signature:</td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+            <td class="ris-sig-label" style="font-size:8pt; padding-top:5px;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-name" contenteditable="true">${ris.requested_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.approved_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.issued_by_name || ''}</td>
+            <td class="ris-sig-name" contenteditable="true">${ris.received_by_name || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Printed Name:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-designation" contenteditable="true">${ris.requested_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.approved_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.issued_by_designation || ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.received_by_designation || ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Designation:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+          <tr>
+            <td class="ris-sig-designation" contenteditable="true">${fmtDate(ris.ris_date)}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.approved_by_name ? fmtDate(ris.ris_date) : ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.issued_by_name ? fmtDate(ris.ris_date) : ''}</td>
+            <td class="ris-sig-designation" contenteditable="true">${ris.received_by_name ? fmtDate(ris.ris_date) : ''}</td>
+          </tr>
+          <tr>
+            <td class="ris-sig-label" style="font-size:8pt;">Date:</td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+            <td class="ris-sig-label" style="font-size:8pt;"></td>
+          </tr>
+        </table>
+      `;
+
+      const html = buildPrintHTML('RIS - ' + ris.ris_no, bodyContent);
+      openPrintPreview(html, { title: toFilename('RIS_' + ris.ris_no), pageSize: 'A4', landscape: false, editable: true });
+    } catch (err) {
+      console.error('Print RIS error:', err);
+      showNotification('Failed to print RIS: ' + err.message, 'error');
+    }
+  };
+
+  // Print current page/table
+  window.printCurrentPage = function() {
+    const currentPage = document.querySelector('.page.active');
+    if (!currentPage) {
+      alert('No active page to print');
+      return;
+    }
+    
+    const pageTitle = currentPage.querySelector('.form-title')?.textContent 
+      || currentPage.querySelector('h2, .page-title')?.textContent 
+      || 'Report';
+
+    // --- APP / PPMP page detection ---
+    const isAPPPage = currentPage.id === 'app' || pageTitle.toLowerCase().includes('annual procurement');
+    const isPPMPPage = currentPage.id === 'ppmp' || pageTitle.toLowerCase().includes('project procurement management');
+
+    // For APP and PPMP pages, target the data-table specifically (skip division budget summary table)
+    const table = (isAPPPage || isPPMPPage)
+      ? (currentPage.querySelector('.data-card table.data-table') || currentPage.querySelector('table.data-table') || currentPage.querySelector('table'))
+      : currentPage.querySelector('table');
+    if (!table) {
+      alert('No table data to print');
+      return;
+    }
+    const tableClone = table.cloneNode(true);
+    const chiefDivMap = { 'chief_fad': 'FAD', 'chief_wrsd': 'WRSD', 'chief_mwpsd': 'MWPSD', 'chief_mwptd': 'MWPTD' };
+    const userRole = (currentUser && currentUser.role) ? currentUser.role : '';
+    const printChiefRole = getUserChiefRole();
+    const isChief = !!printChiefRole;
+    if (isAPPPage && isChief) {
+      const chiefDiv = chiefDivMap[printChiefRole];
+      // The 3rd column (index 2) is the "End-User / Implementing Unit" dept code
+      // Skip total/summary rows (they use colspan)
+      tableClone.querySelectorAll('tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        // Preserve total row — has colspan attribute on first cell
+        if (cells.length > 0 && cells[0].hasAttribute('colspan')) return;
+        if (cells.length > 2) {
+          const deptText = (cells[2].textContent || '').trim().toUpperCase();
+          if (deptText !== chiefDiv) {
+            row.remove();
+          }
+        }
+      });
+    }
+    
+    // Remove action column (last column)
+    tableClone.querySelectorAll('th:last-child').forEach(el => el.remove());
+    tableClone.querySelectorAll('td:last-child').forEach(el => el.remove());
+
+    // For PPMP page: also remove Status column (interactive badges don't print well)
+    if (isPPMPPage) {
+      const ppmpHeaders = tableClone.querySelectorAll('thead th');
+      let statusColIdx = -1;
+      ppmpHeaders.forEach((th, idx) => {
+        if (th.textContent.trim().toLowerCase() === 'status') { statusColIdx = idx; th.remove(); }
+      });
+      if (statusColIdx >= 0) {
+        tableClone.querySelectorAll('tbody tr').forEach(row => {
+          const cells = row.querySelectorAll('td');
+          // Skip rows with colspan (section headers, totals)
+          if (cells.length > 0 && cells[0].hasAttribute('colspan')) return;
+          if (cells[statusColIdx]) cells[statusColIdx].remove();
+        });
+      }
+    }
+
+    // Remove Docs / Attached Supporting Documents column
+    const allHeaders = tableClone.querySelectorAll('thead th');
+    let docsColIndex = -1;
+    allHeaders.forEach((th, idx) => {
+      const text = th.textContent.trim().toLowerCase();
+      if (text === 'docs' || text === 'attached supporting documents') {
+        docsColIndex = idx;
+        th.remove();
+      }
+    });
+    if (docsColIndex >= 0) {
+      tableClone.querySelectorAll('tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells[docsColIndex]) cells[docsColIndex].remove();
+      });
+    }
+
+    // Remove any remaining attachment buttons/popovers in cells
+    tableClone.querySelectorAll('button, .btn-attachment-cell, .att-popover').forEach(el => el.remove());
+    
+    const html = buildPrintHTML(pageTitle, `<h3>${pageTitle}</h3>${tableClone.outerHTML}`);
+    const colCount = tableClone.querySelectorAll('thead th').length;
+    const descriptiveFile = getDescriptiveFilename();
+    openPrintPreview(html, { landscape: colCount > 7, title: descriptiveFile });
+  };
+
+  // Delete Record Function with API
+  window.deleteRecord = async function(recordType, recordId) {
+    const endpointMap = {
+      'Item': '/items',
+      'Supplier': '/suppliers',
+      'User': '/users',
+      'Employee': '/employees',
+      'PPMP': '/plans',
+      'PR': '/purchase-requests',
+      'RFQ': '/rfqs',
+      'Abstract': '/abstracts',
+      'PostQual': '/post-qualifications',
+      'BACResolution': '/bac-resolutions',
+      'NOA': '/notices-of-award',
+      'PO': '/purchase-orders',
+      'IAR': '/iars',
+      'POPacket': '/po-packets',
+      'COA': '/coa-submissions',
+      'PAR': '/pars',
+      'PTR': '/ptrs',
+      'RIS': '/ris',
+      'TripTicket': '/trip-tickets',
+      'StockCard': '/stock-cards',
+      'PropertyCard': '/property-cards',
+      'ICS': '/ics',
+      'Office': '/offices',
+      'Designation': '/designations',
+      'Division': '/divisions',
+      'FundCluster': '/fund-clusters',
+      'ProcurementMode': '/procurement-modes',
+      'UACSCode': '/uacs-codes',
+      'UOM': '/uoms'
+    };
+    
+    const endpoint = endpointMap[recordType];
+    if (!endpoint) {
+      alert(`Unknown record type: ${recordType}`);
+      return;
+    }
+    
+    try {
+      await apiRequest(`${endpoint}/${recordId}`, 'DELETE');
+      alert(`${recordType} deleted successfully.`);
+      
+      // Reload the current page data
+      const refreshMap = {
+        'Item': loadItems,
+        'Supplier': loadSuppliers,
+        'User': loadUsers,
+        'Employee': loadEmployees,
+        'PPMP': loadPPMP,
+        'PR': loadPR,
+        'RFQ': loadRFQ,
+        'Abstract': loadAbstract,
+        'PostQual': loadPostQual,
+        'BACResolution': loadBACResolution,
+        'NOA': loadNOA,
+        'PO': loadPO,
+        'IAR': loadIAR,
+        'POPacket': loadPOPacket,
+        'COA': loadCOA,
+        'PAR': loadPAR,
+        'PTR': loadPTR,
+        'RIS': loadRIS,
+        'TripTicket': loadTripTickets,
+        'StockCard': loadStockCards,
+        'PropertyCard': loadPropertyCards,
+        'ICS': loadICS,
+        'Office': loadOffices,
+        'Designation': loadDesignations,
+        'Division': loadDivisions,
+        'FundCluster': loadFundClusters,
+        'ProcurementMode': loadProcurementModes,
+        'UACSCode': loadUACSCodes,
+        'UOM': loadUOMs
+      };
+      if (refreshMap[recordType]) refreshMap[recordType]();
+      // Also refresh APP budget summary and dashboard stats when PPMP is deleted
+      if (recordType === 'PPMP') {
+        if (typeof loadAPP === 'function') loadAPP();
+        if (typeof loadDashboardStats === 'function') loadDashboardStats();
+      }
+    } catch (err) {
+      console.error(`Delete ${recordType} error:`, err);
+      alert(`Failed to delete ${recordType}: ${err.message}`);
+    }
+  };
+
+  // =====================================================
+  // EXPORT TO EXCEL/CSV FUNCTIONS
+  // =====================================================
+
+  // Convert data to CSV format
+  function convertToCSV(data, headers) {
+    const headerRow = headers.join(',');
+    const rows = data.map(row => 
+      headers.map(header => {
+        let value = row[header] || '';
+        // Escape quotes and wrap in quotes if contains comma
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          value = '"' + value.replace(/"/g, '""') + '"';
+        }
+        return value;
+      }).join(',')
+    );
+    return [headerRow, ...rows].join('\n');
+  }
+
+  // Download CSV file
+  function downloadCSV(csvContent, filename) {
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Document title mapping for Excel header
+  function getExcelDocTitle(docType) {
+    const titles = {
+      'PPMP': 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)',
+      'APP': 'ANNUAL PROCUREMENT PLAN (APP)',
+      'PR': 'PURCHASE REQUESTS',
+      'RFQ': 'REQUEST FOR QUOTATION',
+      'Abstract': 'ABSTRACT OF QUOTATIONS',
+      'PostQual': 'POST-QUALIFICATION',
+      'BACRes': 'BAC RESOLUTION',
+      'NOA': 'NOTICE OF AWARD',
+      'PO': 'PURCHASE ORDERS',
+      'IAR': 'INSPECTION AND ACCEPTANCE REPORT',
+      'POPacket': 'PO PACKET',
+      'COA': 'CERTIFICATE OF ACCEPTANCE',
+      'Items': 'ITEMS MASTER LIST',
+      'Suppliers': 'SUPPLIERS MASTER LIST',
+      'Users': 'USER ACCOUNTS',
+      'ICS': 'INVENTORY CUSTODIAN SLIP',
+      'StockCards': 'STOCK CARDS',
+      'PropertyCards': 'PROPERTY CARDS',
+      'Employees': 'EMPLOYEES LIST',
+      'PAR': 'PROPERTY ACKNOWLEDGEMENT RECEIPT',
+      'PTR': 'PROPERTY TRANSFER REPORT',
+      'RIS': 'REQUISITION AND ISSUE SLIP',
+      'SuppliesLedger': 'SUPPLIES LEDGER',
+      'SemiExpendable': 'SEMI-EXPENDABLE PROPERTY',
+      'CapitalOutlay': 'CAPITAL OUTLAY',
+      'TripTickets': 'TRIP TICKETS',
+      'Divisions': 'DIVISIONS',
+      'Offices': 'OFFICES',
+      'Designations': 'DESIGNATIONS',
+      'FundClusters': 'FUND CLUSTERS',
+      'ProcurementModes': 'PROCUREMENT MODES',
+      'UACSCodes': 'UACS CODES',
+      'UOMs': 'UNITS OF MEASURE'
+    };
+    return titles[docType] || docType.toUpperCase();
+  }
+
+  // Build Excel-compatible HTML with government header & logos (matches print layout)
+  function buildExcelHTML(docTitle, headers, data) {
+    const colCount = headers.length;
+
+    let tableRows = '';
+    data.forEach(row => {
+      tableRows += '<tr>';
+      headers.forEach(h => {
+        let val = row[h] || '';
+        // Escape HTML entities
+        val = String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        tableRows += `<td style="border:1px solid #333; padding:4px 6px; font-size:10pt; vertical-align:top; white-space:normal;">${val}</td>`;
+      });
+      tableRows += '</tr>';
+    });
+
+    let headerCols = '';
+    headers.forEach(h => {
+      headerCols += `<th style="border:1px solid #333; padding:5px 6px; font-size:9pt; font-weight:bold; text-align:center; background:#e8e8e8; text-transform:uppercase; white-space:normal;">${h}</th>`;
+    });
+
+    // Middle columns span
+    const midSpan = Math.max(1, colCount - 2);
+
+    // Use file:// URIs for local images (Excel supports these, not data: URIs)
+    const _dmwPath = dmwLogoFilePath || (typeof window !== 'undefined' && window.__dmwLogoPath) || '';
+    const _bpPath = bpLogoFilePath || (typeof window !== 'undefined' && window.__bpLogoPath) || '';
+    const _dmwLogo = dmwLogoBase64 || (typeof window !== 'undefined' && window.__dmwLogo) || '';
+    const _bpLogo = bagongPilipinasBase64 || (typeof window !== 'undefined' && window.__bpLogo) || '';
+    let dmwImgTag = _dmwPath ? `<img src="file:///${_dmwPath.replace(/\\/g, '/')}" width="90" height="90">` : '';
+    let bpImgTag = _bpPath ? `<img src="file:///${_bpPath.replace(/\\/g, '/')}" width="70" height="70">` : '';
+    // Fallback to base64/URL if file path not available
+    if (!dmwImgTag && _dmwLogo) dmwImgTag = `<img src="${_dmwLogo}" width="90" height="90">`;
+    if (!bpImgTag && _bpLogo) bpImgTag = `<img src="${_bpLogo}" width="70" height="70">`;
+
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+=======
  </div>
  </div>
 
@@ -25894,6 +42269,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  if (!bpImgTag && _bpLogo) bpImgTag = `<img src="${_bpLogo}" width="70" height="70">`;
 
  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+>>>>>>> 0e7879980748545fb091d4d9b6e25aae15b0f189
 <head>
  <meta charset="UTF-8">
  <!--[if gte mso 9]>
