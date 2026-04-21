@@ -4137,22 +4137,84 @@ body:has(.login-overlay.visible) {
 /* ==================== PRINT STYLES ==================== */
 
 @media print {
+ /* Hide UI elements */
  .sidebar, .top-header, .page-actions, .action-buttons,
- .btn, .search-box, .filter-group, .info-banner { display: none !important; }
+ .btn, .search-box, .filter-group, .info-banner,
+ .notification-bell, i.fa-bars { display: none !important; }
  
- .main-content { margin-left: 0; }
- .page-content { padding: 0; }
+ /* Layout adjustments */
+ .main-content { margin-left: 0 !important; }
+ .page-content { padding: 0 !important; }
  .data-card-top-scroll { display: none !important; }
  
- .data-table th, .data-table td { padding: 3px 6px; font-size: 10px; }
- .data-table th { background: #eee !important; -webkit-print-color-adjust: exact; }
+ /* FIXED TABLE LAYOUT - Critical for column sizing */
+ .data-table {
+   table-layout: fixed !important;
+   width: 100% !important;
+   font-size: 9px !important;
+   border-collapse: collapse !important;
+ }
  
- .gov-form-header { border: none; }
- .gov-form-header .dmw-letterhead { padding: 10px 15px 8px; }
- .gov-form-header .dmw-letterhead .letterhead-logo { width: 72px; height: 72px; }
- .gov-form-header .dmw-letterhead .letterhead-logo-right { width: 58px; height: 58px; }
- .gov-form-header .dmw-letterhead .letterhead-dept { font-size: 18px; }
- .gov-form-header .letterhead-divider { margin: 0 20px; }
+ /* Abstract Page Column Widths (10 columns) */
+ #abstract .data-table th:nth-child(1),
+ #abstract .data-table td:nth-child(1) { width: 8%; min-width: 60px; }  /* AOQ No. */
+ #abstract .data-table th:nth-child(2),
+ #abstract .data-table td:nth-child(2) { width: 8%; min-width: 65px; }  /* Date */
+ #abstract .data-table th:nth-child(3),
+ #abstract .data-table td:nth-child(3) { width: 10%; min-width: 75px; } /* RFQ Ref */
+ #abstract .data-table th:nth-child(4),
+ #abstract .data-table td:nth-child(4) { width: 15%; }                 /* Purpose */
+ #abstract .data-table th:nth-child(5),
+ #abstract .data-table td:nth-child(5) { width: 8%; min-width: 70px; }  /* ABC */
+ #abstract .data-table th:nth-child(6),
+ #abstract .data-table td:nth-child(6) { width: 8%; min-width: 55px; }  /* Bidders */
+ #abstract .data-table th:nth-child(7),
+ #abstract .data-table td:nth-child(7) { width: 18%; }                 /* Supplier */
+ #abstract .data-table th:nth-child(8),
+ #abstract .data-table td:nth-child(8) { width: 10%; min-width: 75px; } /* Amount */
+ #abstract .data-table th:nth-child(9),
+ #abstract .data-table td:nth-child(9) { width: 8%; min-width: 60px; }  /* Status */
+ #abstract .data-table th:nth-child(10),
+ #abstract .data-table td:nth-child(10) { display: none !important; }   /* Actions */
+ 
+ /* Generic table improvements */
+ .data-table th { 
+   padding: 2px 4px !important; 
+   font-size: 8px !important; 
+   font-weight: 700 !important;
+   line-height: 1.1 !important;
+   background: #eee !important;
+   -webkit-print-color-adjust: exact !important;
+ }
+ .data-table td { 
+   padding: 3px 5px !important; 
+   font-size: 9px !important;
+   line-height: 1.2 !important;
+   vertical-align: middle !important;
+   border: 1px solid #ccc !important;
+ }
+ 
+ /* Text overflow handling */
+ .data-table td, .data-table th {
+   word-break: break-word !important;
+   overflow-wrap: break-word !important;
+   hyphens: auto !important;
+ }
+ 
+ /* Smaller badges/status */
+ .status-badge { 
+   font-size: 7px !important; 
+   padding: 1px 4px !important; 
+   line-height: 1 !important;
+ }
+ 
+ /* Letterhead optimization */
+ .gov-form-header { border: none !important; }
+ .gov-form-header .dmw-letterhead { padding: 10px 15px 8px !important; }
+ .gov-form-header .dmw-letterhead .letterhead-logo { width: 60px !important; height: 60px !important; }
+ .gov-form-header .dmw-letterhead .letterhead-logo-right { width: 50px !important; height: 50px !important; }
+ .gov-form-header .dmw-letterhead .letterhead-dept { font-size: 16px !important; }
+ .gov-form-header .letterhead-divider { margin: 0 20px !important; }
 }
 
 /* ==================== USER MANAGEMENT STYLES ==================== */
