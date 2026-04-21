@@ -168,6 +168,35 @@ function connectSocket() {
  handleRealtimeDataChange(event);
  });
 
+ // Real-time APP status change listener (updates indicator immediately)
+ socket.on('status_changed', async (event) => {
+ console.log('[SOCKET-STATUS] APP status changed:', event.app_version, '| FY:', event.fiscal_year);
+
+ const activePage = document.querySelector('.page.active');
+ const activePageId = activePage ? activePage.id : null;
+
+ // Only update if user is viewing the APP page
+ if (activePageId === 'app') {
+ try {
+ // Fetch fresh status
+ const freshStatus = await apiRequest(`/app-settings/${event.fiscal_year}`, 'GET');
+ console.log('[SOCKET-STATUS] Fetched fresh status:', freshStatus?.app_type);
+
+ // Update global cache
+ window._appStatus = freshStatus;
+
+ // Update the version banner indicator immediately (no page refresh needed)
+ updateAPPVersionBanner(freshStatus);
+ console.log('[SOCKET-STATUS] Version banner updated to:', freshStatus?.app_type);
+
+ // Show toast notification
+ showToast('APP status updated to ' + (freshStatus?.app_type || 'unknown').charAt(0).toUpperCase() + (freshStatus?.app_type || 'unknown').slice(1), 'info');
+ } catch (err) {
+ console.error('[SOCKET-STATUS] Error updating status indicator:', err);
+ }
+ }
+ });
+
  socket.on('clients_count', (data) => {
  console.log('[SOCKET] Connected clients:', data.count);
  // Display connected client count in the UI
@@ -18326,11 +18355,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  
  showNotification('APP status updated to ' + appType.charAt(0).toUpperCase() + appType.slice(1) + (appType === 'updated' ? ' (v' + result.update_count + ')' : ''), 'success');
  closeModal();
- 
+
+ // Immediately update the version banner indicator
+ window._appStatus = result;
+ updateAPPVersionBanner(result);
+
  // Reload APP table with fresh data
  window._appData = null;
  window._appItems = null;
- window._appStatus = null;
  await new Promise(resolve => setTimeout(resolve, 300));
  await realTimeUpdateAPPTable(fy);
  
@@ -18361,6 +18393,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
  // Update stats and badges
  updateAPPStatsAndBudget(appData || [], appStatus);
+
+ // Update the APP version banner indicator in real-time
+ updateAPPVersionBanner(appStatus);
 
  // Emit event for any listeners
  if (window.socket) {

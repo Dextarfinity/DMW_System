@@ -3134,6 +3134,17 @@ app.put('/api/app-settings/:year', authenticateToken, async (req, res) => {
 
     // Broadcast the change to all connected clients
     if (io) {
+      // Emit specific status_changed event for immediate UI update
+      io.emit('status_changed', {
+        resource: 'app-settings',
+        fiscal_year: year,
+        app_version: app_type,
+        update_count: result.rows[0].update_count,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+
+      // Also emit data_changed for full page reload
       io.emit('data_changed', {
         resource: 'app-settings',
         action: 'update',
