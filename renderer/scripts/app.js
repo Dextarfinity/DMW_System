@@ -28263,9 +28263,6 @@ Failure to submit the above requirements within the prescribed period shall cons
  // SAVE FUNCTIONS FOR ALL TRANSACTION CREATE FORMS
  // ============================================================
 
- // Division code to dept_id mapping
- const deptIdMap = { 'FAD': 1, 'MWPTD': 2, 'MWPSD': 3, 'WRSD': 4, 'ORD': 5 };
-
  // Convert full division name to short code for PPMP number generation
  function getDivisionCode(divisionName) {
  if (!divisionName) return '';
