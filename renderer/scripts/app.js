@@ -22860,19 +22860,19 @@ Failure to submit the above requirements within the prescribed period shall cons
           const st = isBold ? 'font-weight:bold;' : '';
           const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:8px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:8px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
-            '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
             '</tr>';
         });
       } else {
         for (let i = 1; i <= 3; i++) {
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:8px;border:1px solid #000;">' + i + '</td>' +
-            '<td style="padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
-            '<td style="text-align:right;padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
-            '<td style="padding:8px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;">' + i + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
             '</tr>';
         }
       }
@@ -22888,24 +22888,24 @@ Failure to submit the above requirements within the prescribed period shall cons
           const contractUnitCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
           const contractTotalCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) : bidAmount;
           detailTableRows += '<tr>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcUnitCost) + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcTotalCost) + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' + qty + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' + (item.unit || '') + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;font-size:10pt;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(contractUnitCost) + '</td>' +
-            '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(contractTotalCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcTotalCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' + qty + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' + (item.unit || '') + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(contractUnitCost) + '</td>' +
+            '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(contractTotalCost) + '</td>' +
             '</tr>';
         });
       } else {
         detailTableRows = '<tr>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">Lot</td>' +
-          '<td style="border:1px solid #000;padding:4px;font-size:10pt;" contenteditable="true">' + procurementDescription + '</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(abcAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">Lot</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' + procurementDescription + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' + fmtCurrency(bidAmount) + '</td>' +
           '</tr>';
       }
 
@@ -23019,10 +23019,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             </colgroup>
             <thead>
               <tr>
-                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">No.</th>
-                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Name of the Bidder</th>
-                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Total Bid Amount</th>
-                <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;">Remarks</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">No.</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Name of the Bidder</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Total Bid Amount</th>
+                <th style="border:1px solid #000;padding:12px 8px;font-weight:bold;text-align:center;min-height:40px;vertical-align:middle;">Remarks</th>
               </tr>
             </thead>
             <tbody>${biddersTableRows}</tbody>
@@ -23038,25 +23038,25 @@ Failure to submit the above requirements within the prescribed period shall cons
           <table style="width:100%;border-collapse:collapse;margin:10px 0;">
             <thead>
               <tr>
-                <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">ABC</th>
-                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Qty.</th>
-                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit</th>
-                <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Description</th>
-                <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Contract Price</th>
+                <th colspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">ABC</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Qty.</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Unit</th>
+                <th rowspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Description</th>
+                <th colspan="2" style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:40px;vertical-align:middle;">Contract Price</th>
               </tr>
               <tr>
-                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit Cost</th>
-                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Total Cost</th>
-                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Unit Cost</th>
-                <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;">Total Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Total Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Unit Cost</th>
+                <th style="border:1px solid #000;padding:12px 4px;text-align:center;font-size:10pt;font-weight:bold;min-height:35px;vertical-align:middle;">Total Cost</th>
               </tr>
             </thead>
             <tbody>
               ${detailTableRows}
               <tr>
-                <td colspan="5" style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">Total Contract Price</td>
-                <td style="border:1px solid #000;padding:4px;"></td>
-                <td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
+                <td colspan="5" style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;font-weight:bold;">Total Contract Price</td>
+                <td style="border:1px solid #000;padding:3px 2px;"></td>
+                <td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
               </tr>
             </tbody>
           </table>
