@@ -113,6 +113,14 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // Serve renderer (frontend) files so Electron clients load UI from the server.
 // This makes ALL frontend changes on the server propagate to every client automatically.
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+
+// REAL-TIME VERSION SYNC: Send version header so all clients auto-refresh on changes
+const APP_VERSION = String(Date.now()); // Use timestamp to force refresh whenever server restarts
+app.use((req, res, next) => {
+  res.setHeader('X-App-Version', APP_VERSION);
+  next();
+});
+
 app.use(express.static(RENDERER_DIR, {
   etag: false,
   lastModified: true,
@@ -122,6 +130,7 @@ app.use(express.static(RENDERER_DIR, {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('X-App-Version', APP_VERSION);
     }
   }
 }));
@@ -765,8 +774,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     ] = await Promise.all([
       // Basic counts — uses safeQuery so missing tables don't crash the dashboard
       safeQuery('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
-      safeQuery('SELECT COUNT(*) FROM procurementplans WHERE (is_deleted = false OR is_deleted IS NULL)'),
-      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery('SELECT COUNT(*) FROM procurementplans'),
+      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
       safeQuery('SELECT COUNT(*) FROM purchaserequests'),
       safeQuery('SELECT COUNT(*) FROM purchaseorders'),
       safeQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
@@ -796,11 +805,11 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       safeQuery("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
       safeQuery("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
       // PPMP by division (with status breakdown) — current fiscal year only
-      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
+      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
       // Total PPMP budget — current fiscal year only
-      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
       // PPMP status breakdown — current fiscal year only
-      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND (is_deleted = false OR is_deleted IS NULL) AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
+      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
       // Recent PRs with department + item descriptions
       safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
         COALESCE(
@@ -1675,20 +1684,24 @@ app.get('/api/plans', authenticateToken, async (req, res) => {
       conditions.push(`pp.procurement_mode = $${params.length}`);
     }
 
-    // Procurement source filter (PS-DBM, NON PS-DBM, PAPs)
+    // Procurement source filter (PS-DBM, NON PS-DBM, PAPs, MANUAL-NON-PSDBM)
     if (req.query.procurement_source) {
-      params.push(req.query.procurement_source);
-      conditions.push(`pp.procurement_source = $${params.length}`);
+      const srcVal = req.query.procurement_source;
+      if (srcVal === 'NON PS-DBM') {
+        // Catalog-only: NON PS-DBM entries that have a linked item_id
+        conditions.push(`pp.procurement_source = 'NON PS-DBM' AND pp.item_id IS NOT NULL`);
+      } else if (srcVal === 'MANUAL-NON-PSDBM') {
+        // Manual entries: explicitly tagged MANUAL-NON-PSDBM, OR old NON PS-DBM entries with no item_id
+        conditions.push(`(pp.procurement_source = 'MANUAL-NON-PSDBM' OR (pp.procurement_source = 'NON PS-DBM' AND pp.item_id IS NULL))`);
+      } else {
+        params.push(srcVal);
+        conditions.push(`pp.procurement_source = $${params.length}`);
+      }
     }
 
     // Only return PPMP line items (with ppmp_no) unless explicitly requesting all
     if (req.query.ppmp_only !== 'false') {
       conditions.push(`pp.ppmp_no IS NOT NULL`);
-    }
-
-    // Exclude soft-deleted unless explicitly requesting them
-    if (req.query.include_deleted !== 'true') {
-      conditions.push(`(pp.is_deleted = false OR pp.is_deleted IS NULL)`);
     }
 
     if (conditions.length > 0) {
@@ -1707,6 +1720,7 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
       `SELECT pp.*, d.name as department_name, d.code as department_code,
               it.name as item_name, it.unit as item_unit, it.unit_price as item_unit_price,
               it.category as item_category, it.description as item_description_detail,
+              it.procurement_source as item_procurement_source,
               pap.pap_name as pap_pap_name,
               cu.username as chief_approver_name,
               hu.username as hope_approver_name,
@@ -1725,7 +1739,36 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
     );
     if (plan.rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
     const items = await pool.query('SELECT * FROM plan_items WHERE plan_id = $1 ORDER BY id', [req.params.id]);
-    res.json({ ...plan.rows[0], items: items.rows });
+    const planData = { ...plan.rows[0], items: items.rows };
+    // Ensure unit and unit_price are always available from plan_items if not on procurementplans
+    if (items.rows.length > 0) {
+      if (!planData.unit) planData.unit = items.rows[0].unit || null;
+      if (!planData.unit_price || parseFloat(planData.unit_price) === 0) {
+        planData.unit_price = items.rows[0].unit_price || 0;
+      }
+    }
+    // DEBUG: Log what unit data is being sent to the frontend
+    console.log(`[DEBUG] GET /api/plans/${req.params.id} => unit="${planData.unit}", unit_price="${planData.unit_price}", item_unit="${planData.item_unit}", plan_items[0].unit="${items.rows.length > 0 ? items.rows[0].unit : 'NO_ITEMS'}"`);
+    res.json(planData);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DEBUG ENDPOINT: Check unit/unit_price data in procurementplans table
+app.get('/api/debug/plans-unit-data', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT pp.id, pp.description, pp.procurement_source, pp.unit, pp.unit_price, pp.item_id,
+             pi.unit as plan_item_unit, pi.unit_price as plan_item_unit_price,
+             it.unit as items_table_unit, it.unit_price as items_table_unit_price
+      FROM procurementplans pp
+      LEFT JOIN plan_items pi ON pi.plan_id = pp.id
+      LEFT JOIN items it ON pp.item_id = it.id
+      WHERE pp.ppmp_no IS NOT NULL
+      ORDER BY pp.id DESC
+      LIMIT 20
+    `);
+    console.log('[DEBUG] Plans unit data:', JSON.stringify(result.rows, null, 2));
+    res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1736,7 +1779,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
@@ -1770,12 +1813,13 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const planResult = await client.query(
       `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
         ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-        category, item_id, section, item_description, procurement_source) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
+        category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
       [deptId, fy, status || 'draft', remarks, total_amount || 0, req.user.id,
        finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
        pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+       unit || null, unit_price || 0, plan_type || 'INDICATIVE']
     );
     const plan = planResult.rows[0];
     if (items && items.length > 0) {
@@ -1808,7 +1852,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const { dept_id, fiscal_year, status, remarks, total_amount,
               ppmp_no, description, project_type, quantity_size, procurement_mode,
               pre_procurement, start_date, end_date, delivery_period, fund_source,
-              category, item_id, section, item_description, procurement_source } = entry;
+              category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = entry;
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
@@ -1842,12 +1886,13 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
       const planResult = await client.query(
         `INSERT INTO procurementplans (dept_id, fiscal_year, status, remarks, total_amount, created_by,
           ppmp_no, description, project_type, quantity_size, procurement_mode, pre_procurement, start_date, end_date, delivery_period, fund_source,
-          category, item_id, section, item_description, procurement_source) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
+          category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING id`,
         [deptId, fy, status || 'pending', remarks, total_amount || 0, req.user.id,
          finalPpmpNo, description, project_type || 'Goods', quantity_size, procurement_mode || 'Small Value Procurement',
          pre_procurement || 'NO', start_date, end_date, delivery_period, fund_source || 'GAA',
-         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+         category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+         unit || null, unit_price || 0, plan_type || 'INDICATIVE']
       );
       const planId = planResult.rows[0].id;
       createdIds.push(planId);
@@ -1877,18 +1922,20 @@ app.put('/api/plans/:id', authenticateToken, async (req, res) => {
     const { dept_id, fiscal_year, status, remarks, total_amount, items,
             ppmp_no, description, project_type, quantity_size, procurement_mode,
             pre_procurement, start_date, end_date, delivery_period, fund_source,
-            category, item_id, section, item_description, procurement_source } = req.body;
+            category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = req.body;
     const result = await client.query(
       `UPDATE procurementplans SET dept_id=$1, fiscal_year=$2, status=$3, remarks=$4, total_amount=$5,
         ppmp_no=$7, description=$8, project_type=$9, quantity_size=$10, procurement_mode=$11,
         pre_procurement=$12, start_date=$13, end_date=$14, delivery_period=$15, fund_source=$16,
         category=$17, item_id=$18, section=$19, item_description=$20, procurement_source=$21,
+        unit=$22, unit_price=$23, plan_type=$24,
         updated_at=CURRENT_TIMESTAMP
        WHERE id=$6 RETURNING *`,
       [dept_id, fiscal_year, status, remarks, total_amount, req.params.id,
        ppmp_no, description, project_type, quantity_size, procurement_mode,
        pre_procurement, start_date, end_date, delivery_period, fund_source,
-       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM']
+       category || null, item_id || null, section || 'GENERAL PROCUREMENT', item_description || null, procurement_source || 'NON PS-DBM',
+       unit || null, unit_price || 0, plan_type || 'INDICATIVE']
     );
     if (items) {
       await client.query('DELETE FROM plan_items WHERE plan_id = $1', [req.params.id]);
@@ -2001,6 +2048,8 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
       if (!up.item_id) {
         try {
           const procSource = up.procurement_source || 'NON PS-DBM';
+          // For catalog items, normalize MANUAL-NON-PSDBM to NON PS-DBM
+          const catalogSource = procSource === 'MANUAL-NON-PSDBM' ? 'NON PS-DBM' : procSource;
           const codePrefix = procSource === 'PAPs' ? 'PAP-A-' : 'NPD-A-';
           const itemCode = codePrefix + Date.now();
           const itemName = (up.description || '').split('\n')[0].trim() || 'Approved Item';
@@ -2039,7 +2088,7 @@ app.put('/api/plans/:id/approve', authenticateToken, async (req, res) => {
           const newItem = await pool.query(
             `INSERT INTO items (code, name, description, unit, unit_price, category, procurement_source, quantity, reorder_point, is_active)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, true) RETURNING id, code`,
-            [itemCode, itemName, up.item_description || up.description || '', catalogUnit, catalogUnitPrice, up.category || '', procSource, catalogQuantity]
+            [itemCode, itemName, up.item_description || up.description || '', catalogUnit, catalogUnitPrice, up.category || '', catalogSource, catalogQuantity]
           );
           // Link the PPMP entry to the new catalog item
           await pool.query('UPDATE procurementplans SET item_id = $1 WHERE id = $2', [newItem.rows[0].id, req.params.id]);
@@ -2193,44 +2242,58 @@ app.put('/api/plans/:id/resubmit', authenticateToken, async (req, res) => {
 });
 
 // GET all plan items across all plans (for the APP page)
-// Returns PPMP entries from procurementplans directly, with codes transformed to APP codes
+// Returns PPMP entries joined with app_entries
 app.get('/api/plan-items', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.query.fiscal_year;
-    let whereClause = `WHERE pp.ppmp_no IS NOT NULL AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`;
+    let whereClause = `WHERE ae.id IS NOT NULL
+      AND pp.ppmp_no IS NOT NULL AND pp.status = 'approved'`;
     const params = [];
     if (fiscalYear) {
       params.push(parseInt(fiscalYear));
-      whereClause += ` AND pp.fiscal_year = $${params.length}`;
+      whereClause += ` AND ae.fiscal_year = $${params.length}`;
     }
+    
+    console.log('[API /plan-items] Query fiscal_year:', fiscalYear);
+    
     const result = await pool.query(
       `SELECT pp.id, pp.ppmp_no,
-              REPLACE(pp.ppmp_no, 'PPMP-', 'APP-') as item_code,
-              pp.description as item_name,
-              pp.description as item_description,
-              'lot' as unit,
-              pp.total_amount as unit_price,
-              pp.total_amount as total_price,
-              1 as total_qty,
+              ae.id as app_entry_id,
+              ae.app_code as item_code,
+              ae.project_title as item_name,
+              ae.general_description as item_description,
+              ae.procurement_mode,
+              ae.early_procurement,
+              ae.bid_criteria,
+              ae.start_date, ae.end_date,
+              ae.fund_source,
+              ae.estimated_budget as total_price,
+              ae.estimated_budget as unit_price,
+              ae.procurement_strategy,
+              ae.app_version,
+              ae.remarks,
+              ae.fiscal_year,
               pp.project_type as category,
-              pp.procurement_mode,
               pp.procurement_source,
-              pp.fund_source,
-              pp.fiscal_year,
               pp.status as plan_status,
               pp.dept_id,
-              pp.remarks,
-              pp.start_date, pp.end_date,
               d.name as department_name,
               d.code as department_code
        FROM procurementplans pp
+       INNER JOIN app_entries ae ON ae.plan_id = pp.id
        LEFT JOIN departments d ON pp.dept_id = d.id
        ${whereClause}
-       ORDER BY pp.id`,
+       ORDER BY ae.id`,
       params
     );
+    
+    console.log('[API /plan-items] ✅ Query returned ' + result.rows.length + ' rows');
+    
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('[API /plan-items] ERROR:', err.message);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // PUT adjust APP item budget (total_amount on procurementplans)
@@ -2264,56 +2327,243 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT update APP entry (app_entries table) — handles all APP-specific edits
+app.put('/api/app-entries/:planId', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const allowedRoles = ['admin', 'hope', 'bac_secretariat', 'encoder', 'budget_consultant'];
+    const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+    if (!userRoles.some(r => allowedRoles.includes(r) || chiefRoles.includes(r))) {
+      return res.status(403).json({ error: 'Not authorized to edit APP entries' });
+    }
+
+    const {
+      project_title, general_description, procurement_mode, early_procurement,
+      bid_criteria, start_date, end_date, fund_source, estimated_budget,
+      procurement_strategy, app_version, remarks
+    } = req.body;
+
+    // Ensure app_entries row exists
+    const existing = await pool.query('SELECT id, project_title FROM app_entries WHERE plan_id = $1', [req.params.planId]);
+    let appEntryId;
+    
+    // Auto-summarize general_description if not provided or empty
+    let finalGenDesc = general_description;
+    const titleToSummarize = project_title || (existing.rows.length ? existing.rows[0].project_title : '');
+    if (!finalGenDesc || finalGenDesc.trim() === '') {
+      finalGenDesc = summarizeProjectTitle(titleToSummarize);
+    }
+    
+    if (!existing.rows.length) {
+      const ppmp = await pool.query('SELECT fiscal_year FROM procurementplans WHERE id = $1', [req.params.planId]);
+      if (!ppmp.rows.length) return res.status(404).json({ error: 'PPMP not found' });
+      const insert = await pool.query(
+        `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
+          procurement_mode, early_procurement, bid_criteria, start_date, end_date,
+          fund_source, estimated_budget, procurement_strategy, app_version, remarks)
+        VALUES ($1, $2, REPLACE((SELECT ppmp_no FROM procurementplans WHERE id=$1), 'PPMP-', 'APP-'),
+          $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id`,
+        [req.params.planId, ppmp.rows[0].fiscal_year, project_title, finalGenDesc,
+         procurement_mode, early_procurement || 'No', bid_criteria || 'LCRB',
+         start_date, end_date, fund_source, estimated_budget || 0,
+         procurement_strategy || '-', app_version || 'indicative', remarks]
+      );
+      appEntryId = insert.rows[0].id;
+    } else {
+      appEntryId = existing.rows[0].id;
+    }
+
+    // Update app_entries row
+    const result = await pool.query(
+      `UPDATE app_entries SET
+         project_title = COALESCE($1, project_title),
+         general_description = COALESCE($2, general_description),
+         procurement_mode = COALESCE($3, procurement_mode),
+         early_procurement = COALESCE($4, early_procurement),
+         bid_criteria = COALESCE($5, bid_criteria),
+         start_date = COALESCE($6, start_date),
+         end_date = COALESCE($7, end_date),
+         fund_source = COALESCE($8, fund_source),
+         estimated_budget = COALESCE($9::NUMERIC, estimated_budget),
+         procurement_strategy = COALESCE($10, procurement_strategy),
+         app_version = COALESCE($11, app_version),
+         remarks = COALESCE($12, remarks),
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $13
+       RETURNING *`,
+      [project_title, finalGenDesc, procurement_mode, early_procurement,
+       bid_criteria, start_date, end_date, fund_source, estimated_budget,
+       procurement_strategy, app_version, remarks, appEntryId]
+    );
+
+    console.log('[APP-ENTRIES] ✅ Updated app_entry ' + appEntryId + ' - General description auto-summarized: ' + (finalGenDesc !== general_description));
+    io.emit('data_changed', { type: 'plan-items', action: 'app_entry_updated', app_entry_id: appEntryId });
+    res.json({ message: 'APP entry updated successfully', app_entry: result.rows[0] });
+  } catch (err) {
+    console.error('APP entry update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE APP entry (hard delete - completely remove from database)
+app.put('/api/app-entries/:planId/delete', authenticateToken, async (req, res) => {
+  try {
+    const { planId } = req.params;
+    console.log('[DELETE-APP] 🗑️ Hard deleting APP entry for plan_id:', planId);
+    
+    // First, verify the entry exists
+    const checkResult = await pool.query(
+      `SELECT id, plan_id, app_code, project_title FROM app_entries WHERE plan_id = $1`,
+      [planId]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      console.error('[DELETE-APP] ❌ Entry not found for plan_id:', planId);
+      return res.status(404).json({ error: 'APP entry not found' });
+    }
+    
+    const existingEntry = checkResult.rows[0];
+    console.log('[DELETE-APP] Found entry:', existingEntry.app_code, '- ID:', existingEntry.id);
+    
+    // Hard delete: completely remove from database
+    const result = await pool.query(
+      `DELETE FROM app_entries WHERE plan_id = $1 RETURNING id, plan_id, app_code, project_title`,
+      [planId]
+    );
+    
+    const deletedEntry = result.rows[0];
+    console.log('[DELETE-APP] ✅ Completely removed from database - plan_id:', planId, '- app_entry_id:', deletedEntry.id);
+    
+    // Verify deletion actually persisted - should return 0 rows
+    const verifyResult = await pool.query(
+      `SELECT id FROM app_entries WHERE plan_id = $1`,
+      [planId]
+    );
+    
+    if (verifyResult.rows.length === 0) {
+      console.log('[DELETE-APP] ✅✅ VERIFIED: Entry completely removed from app_entries table');
+    } else {
+      console.error('[DELETE-APP] ⚠️ WARNING: Deletion verification failed! Entry may still exist in database.');
+    }
+    
+    // Broadcast deletion to all connected clients so they refresh immediately
+    io.emit('data_changed', { 
+      resource: 'plan-items', 
+      action: 'app_entry_deleted', 
+      plan_id: planId,
+      user: req.user,
+      timestamp: new Date().toISOString()
+    });
+    console.log('[DELETE-APP] 📡 Broadcast to all clients: app_entry_deleted event');
+    
+    res.json({ 
+      message: 'APP entry successfully deleted from database',
+      plan_id: planId,
+      deleted: true,
+      deleted_entry: deletedEntry
+    });
+    
+  } catch (err) {
+    console.error('[DELETE-APP] 🚨 ERROR:', err.message);
+    res.status(500).json({ error: 'Failed to delete APP entry: ' + err.message });
+  }
+});
+
 // GET APP budget summary (total allocated, active, available)
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
   try {
     const fy = req.query.fiscal_year || new Date().getFullYear();
-    // Only count non-deleted approved PPMPs for budget figures
-    const result = await pool.query(
-      `SELECT 
-        COALESCE(SUM(total_amount), 0) as total_budget,
-        COALESCE(SUM(total_amount), 0) as active_budget,
-        COUNT(*)::int as active_count
-       FROM procurementplans
-       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND (is_deleted = false OR is_deleted IS NULL)`,
+    
+    // Check if consolidation has been done (check app_entries table for this FY)
+    const appCheckResult = await pool.query(
+      `SELECT COUNT(*)::int as count FROM app_entries WHERE fiscal_year = $1`,
       [fy]
     );
-    // Count removed (soft-deleted) approved PPMPs for this fiscal year
-    const removedResult = await pool.query(
-      `SELECT COUNT(*)::int as removed_count,
-              COALESCE(SUM(total_amount), 0) as removed_budget
-       FROM procurementplans
-       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND is_deleted = true`,
-      [fy]
-    );
+    const hasConsolidated = appCheckResult.rows[0].count > 0;
+    
+    console.log('[APP-BUDGET] FY ' + fy + ' - Consolidated: ' + hasConsolidated + ', APP entries: ' + appCheckResult.rows[0].count);
+    
+    let result, removedResult, deptResult, deptRemovedResult;
+    
+    if (hasConsolidated) {
+      // Return APP entries budget (after consolidation - hard delete only)
+      console.log('[APP-BUDGET] Returning APP entries budget');
+      result = await pool.query(
+        `SELECT 
+          COALESCE(SUM(estimated_budget), 0) as total_budget,
+          COALESCE(SUM(estimated_budget), 0) as active_budget,
+          COUNT(*)::int as active_count
+         FROM app_entries
+         WHERE fiscal_year = $1`,
+        [fy]
+      );
+      
+      removedResult = await pool.query(
+        `SELECT 0::int as removed_count,
+                0::numeric as removed_budget`
+      );
+      
+      deptResult = await pool.query(
+        `SELECT d.code as department_code, d.name as department_name,
+                COALESCE(SUM(ae.estimated_budget), 0) as active,
+                COUNT(*)::int as active_count
+         FROM app_entries ae
+         LEFT JOIN procurementplans pp ON ae.plan_id = pp.id
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE ae.fiscal_year = $1
+         GROUP BY d.code, d.name ORDER BY d.code`,
+        [fy]
+      );
+      
+      deptRemovedResult = await pool.query(
+        `SELECT d.code as department_code,
+                0::numeric as removed_budget,
+                0::int as removed_count
+         FROM departments d
+         WHERE 1=0`
+      );
+    } else {
+      // Return PPMP budget (before consolidation - hard delete only)
+      console.log('[APP-BUDGET] Returning PPMP budget (no consolidation yet)');
+      result = await pool.query(
+        `SELECT 
+          COALESCE(SUM(total_amount), 0) as total_budget,
+          COALESCE(SUM(total_amount), 0) as active_budget,
+          COUNT(*)::int as active_count
+         FROM procurementplans
+         WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+        [fy]
+      );
+      
+      removedResult = await pool.query(
+        `SELECT 0::int as removed_count,
+                0::numeric as removed_budget`
+      );
+      
+      deptResult = await pool.query(
+        `SELECT d.code as department_code, d.name as department_name,
+                COALESCE(SUM(pp.total_amount), 0) as active,
+                COUNT(*)::int as active_count
+         FROM procurementplans pp
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+         GROUP BY d.code, d.name ORDER BY d.code`,
+        [fy]
+      );
+      
+      deptRemovedResult = await pool.query(
+        `SELECT d.code as department_code,
+                0::numeric as removed_budget,
+                0::int as removed_count
+         FROM departments d
+         WHERE 1=0`
+      );
+    }
+    
     const row = result.rows[0];
     const removed = removedResult.rows[0];
-    // Department breakdown (non-deleted approved only)
-    const deptResult = await pool.query(
-      `SELECT d.code as department_code, d.name as department_name,
-              COALESCE(SUM(pp.total_amount), 0) as active,
-              COUNT(*)::int as active_count
-       FROM procurementplans pp
-       LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
-         AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
-       GROUP BY d.code, d.name ORDER BY d.code`,
-      [fy]
-    );
-    // Department removed breakdown
-    const deptRemovedResult = await pool.query(
-      `SELECT d.code as department_code,
-              COALESCE(SUM(pp.total_amount), 0) as removed_budget,
-              COUNT(*)::int as removed_count
-       FROM procurementplans pp
-       LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
-         AND pp.is_deleted = true
-       GROUP BY d.code`,
-      [fy]
-    );
+    
     // Merge removed data into department breakdown
     const removedMap = {};
     deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
@@ -2322,6 +2572,9 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
       removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
       removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
     }));
+    
+    console.log('[APP-BUDGET] Returning: active=' + row.active_budget + ', departments=' + departments.length);
+    
     res.json({
       total_budget: row.total_budget,
       active_budget: row.active_budget,
@@ -2331,7 +2584,10 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
       removed_budget: removed.removed_budget,
       by_department: departments
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('[APP-BUDGET] ERROR:', err.message);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 // POST consolidate PPMP into APP
@@ -2339,37 +2595,40 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
 app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   try {
     const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    console.log('[CONSOLIDATE] 🔄 Starting consolidation for FY', fiscalYear);
 
-    // Get all active (non-deleted) PPMP entries for this fiscal year
+    // Get all active PPMP entries for this fiscal year (hard delete means no is_deleted check)
     const result = await pool.query(
       `SELECT COUNT(*) as item_count,
               COALESCE(SUM(pp.total_amount), 0) as total_abc
        FROM procurementplans pp
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL) AND pp.status = 'approved'`,
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'`,
       [fiscalYear]
     );
+    
+    console.log('[CONSOLIDATE] ✅ Found ' + result.rows[0].item_count + ' approved PPMP entries');
 
-    // Get total approved (non-deleted only)
+    // Get total approved (hard delete means no is_deleted check)
     const totalResult = await pool.query(
       `SELECT COALESCE(SUM(total_amount), 0) as total_approved
-       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'
-         AND (is_deleted = false OR is_deleted IS NULL)`,
+       FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
       [fiscalYear]
     );
 
-    // Get breakdown by department
+    // Get breakdown by department (hard delete only)
     const deptBreakdown = await pool.query(
       `SELECT d.name as department_name, COUNT(*) as count,
               COALESCE(SUM(pp.total_amount), 0) as total
        FROM procurementplans pp
        LEFT JOIN departments d ON pp.dept_id = d.id
-       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND (pp.is_deleted = false OR pp.is_deleted IS NULL)
+       WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
          AND pp.status = 'approved'
        GROUP BY d.name ORDER BY d.name`,
       [fiscalYear]
     );
 
     // Record consolidation timestamp in app_settings
+    console.log('[CONSOLIDATE] 🔄 Updating app_settings...');
     await pool.query(
       `INSERT INTO app_settings (fiscal_year, app_type, consolidated_at, consolidated_count, set_by, set_at)
        VALUES ($1, 'indicative', CURRENT_TIMESTAMP, 1, $2, CURRENT_TIMESTAMP)
@@ -2379,18 +2638,147 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
          set_at = CURRENT_TIMESTAMP`,
       [fiscalYear, req.user.id]
     );
+    console.log('[CONSOLIDATE] ✅ app_settings updated');
+
+    // Auto-populate item_description from description for items that don't have one
+    console.log('[CONSOLIDATE] 🔄 Updating item descriptions...');
+    await pool.query(
+      `UPDATE procurementplans
+       SET item_description = description
+       WHERE ppmp_no IS NOT NULL AND fiscal_year = $1
+         AND status = 'approved'
+         AND (item_description IS NULL OR item_description = '')`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] ✅ Item descriptions updated');
+
+    // Create app_entries for each approved PPMP (idempotent — UPSERT to handle re-consolidation)
+    console.log('[CONSOLIDATE] 🔄 Inserting into app_entries...');
+    const appInsert = await pool.query(
+      `INSERT INTO app_entries (plan_id, fiscal_year, app_code, project_title, general_description,
+        procurement_mode, early_procurement, bid_criteria, start_date, end_date,
+        fund_source, estimated_budget, procurement_strategy, app_version, remarks)
+      SELECT pp.id, pp.fiscal_year, REPLACE(pp.ppmp_no, 'PPMP-', 'APP-'),
+             pp.description, pp.description,
+             pp.procurement_mode, 'No', 'LCRB', pp.start_date, pp.end_date,
+             pp.fund_source, pp.total_amount, COALESCE(pp.procurement_source, '-'),
+             'indicative', pp.remarks
+      FROM procurementplans pp
+      WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1
+        AND pp.status = 'approved'
+      ON CONFLICT (plan_id) DO UPDATE SET
+        app_code = EXCLUDED.app_code,
+        project_title = EXCLUDED.project_title,
+        general_description = EXCLUDED.general_description,
+        procurement_mode = EXCLUDED.procurement_mode,
+        bid_criteria = EXCLUDED.bid_criteria,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        fund_source = EXCLUDED.fund_source,
+        estimated_budget = EXCLUDED.estimated_budget,
+        procurement_strategy = EXCLUDED.procurement_strategy,
+        remarks = EXCLUDED.remarks,
+        is_deleted = false,
+        updated_at = CURRENT_TIMESTAMP`,
+      [fiscalYear]
+    );
+
+    console.log('[CONSOLIDATE] ✅ INSERT rowCount: ' + appInsert.rowCount + ' entries inserted/updated in app_entries');
+    
+    // VERIFY: Check what was actually created
+    const verifyCheck = await pool.query(
+      `SELECT COUNT(*) as count FROM app_entries WHERE fiscal_year = $1`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 VERIFICATION: app_entries has ' + verifyCheck.rows[0].count + ' total entries for FY ' + fiscalYear);
+    
+    // Debug: Show the actual IDs and details of entries just created/updated
+    const debugEntries = await pool.query(
+      `SELECT id, plan_id, app_code, project_title, fiscal_year, is_deleted, created_at, updated_at 
+       FROM app_entries 
+       WHERE fiscal_year = $1 
+       ORDER BY updated_at DESC 
+       LIMIT 5`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 Sample entries (last 5):', debugEntries.rows);
+    
+    // Check procurementplans for approved entries
+    const ppmpAllCheck = await pool.query(
+      `SELECT COUNT(*) as count, status FROM procurementplans 
+       WHERE fiscal_year = $1 AND ppmp_no IS NOT NULL
+       GROUP BY status`,
+      [fiscalYear]
+    );
+    console.log('[CONSOLIDATE] 🔍 Procurementplans status breakdown:', ppmpAllCheck.rows);
+    
+    // Also verify those plan_ids exist in procurementplans as APPROVED
+    if (debugEntries.rows.length > 0) {
+      const planIds = debugEntries.rows.map(r => r.plan_id);
+      console.log('[CONSOLIDATE] 🔍 Checking plan_ids:', planIds);
+      const ppmpCheck = await pool.query(
+        `SELECT id, ppmp_no, status, fiscal_year FROM procurementplans WHERE id = ANY($1)`,
+        [planIds]
+      );
+      console.log('[CONSOLIDATE] 🔍 Procurementplans for those IDs:', ppmpCheck.rows);
+    }
 
     res.json({
-      message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}.`,
-      created: 0,
+      message: `APP consolidated from ${result.rows[0].item_count} active PPMP entries for FY ${fiscalYear}. ${appInsert.rowCount} new APP entries created.`,
+      created: appInsert.rowCount,
       total_items: parseInt(result.rows[0].item_count),
       total_abc: parseFloat(result.rows[0].total_abc),
       total_approved: parseFloat(totalResult.rows[0].total_approved),
       available_budget: 0,
+      count: parseInt(result.rows[0].item_count),
       by_department: deptBreakdown.rows
     });
   } catch (err) {
-    console.error('Consolidation error:', err);
+    console.error('[CONSOLIDATE] 🚨 CONSOLIDATION ERROR:', err.message);
+    console.error('[CONSOLIDATE] Stack:', err.stack);
+    res.status(500).json({ error: err.message, details: 'Consolidation failed. Check server logs.' });
+  }
+});
+
+// Sync APP status to all consolidated entries (update app_version field)
+app.post('/api/plan-items/sync-status', authenticateToken, async (req, res) => {
+  try {
+    const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    const appVersion = req.body.app_version || 'indicative';
+    const remarks = req.body.remarks || '';
+
+    console.log('[SYNC-STATUS] 🔄 Syncing status to all app_entries for FY', fiscalYear, 'version:', appVersion);
+
+    // Update all app_entries with new app_version
+    const updateResult = await pool.query(
+      `UPDATE app_entries
+       SET app_version = $1, remarks = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE fiscal_year = $3 AND is_deleted = false`,
+      [appVersion, remarks, fiscalYear]
+    );
+
+    console.log('[SYNC-STATUS] ✅ Updated ' + updateResult.rowCount + ' app_entries with app_version:', appVersion);
+
+    // Broadcast the change to all connected clients
+    if (io) {
+      io.emit('data_changed', {
+        resource: 'plan-items',
+        action: 'sync-status',
+        fiscal_year: fiscalYear,
+        app_version: appVersion,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+      console.log('[SYNC-STATUS] ✅ Broadcasted status change to all clients');
+    }
+
+    res.json({
+      message: `Synced ${updateResult.rowCount} app_entries to version ${appVersion}`,
+      updated: updateResult.rowCount,
+      app_version: appVersion
+    });
+  } catch (err) {
+    console.error('[SYNC-STATUS] 🚨 ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2424,8 +2812,7 @@ app.get('/api/paps', authenticateToken, async (req, res) => {
       params.push(req.query.status);
       conditions.push(`p.status = $${params.length}`);
     }
-    // Exclude soft-deleted
-    conditions.push(`(p.is_deleted = false OR p.is_deleted IS NULL)`);
+    // Hard delete means no need to check is_deleted
 
     if (conditions.length > 0) {
       query += ` WHERE ` + conditions.join(' AND ');
@@ -2611,15 +2998,44 @@ app.put('/api/paps/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
-// DELETE PAP (soft-delete)
+// DELETE PAP (hard delete)
 app.delete('/api/paps/:id', authenticateToken, async (req, res) => {
   try {
+    console.log('[DELETE-PAP] 🗑️ Hard deleting PAP for id:', req.params.id);
+    
+    // Verify PAP exists
+    const checkResult = await pool.query('SELECT id, pap_name FROM paps WHERE id = $1', [req.params.id]);
+    if (checkResult.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
+    
+    // Delete PAP items first
+    await pool.query('DELETE FROM pap_items WHERE pap_id = $1', [req.params.id]);
+    
+    // Hard delete the PAP
     const result = await pool.query(
-      `UPDATE paps SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+      `DELETE FROM paps WHERE id = $1 RETURNING id, pap_name`,
       [req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PAP not found' });
-    res.json({ message: 'PAP removed successfully', pap: result.rows[0] });
+    
+    // Verify deletion
+    const verifyResult = await pool.query('SELECT id FROM paps WHERE id = $1', [req.params.id]);
+    if (verifyResult.rows.length === 0) {
+      console.log('[DELETE-PAP] ✅✅ VERIFIED: PAP completely removed');
+    }
+    
+    io.emit('data_changed', { 
+      resource: 'paps', 
+      action: 'pap_deleted', 
+      pap_id: req.params.id,
+      user: req.user,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ 
+      message: 'PAP successfully deleted',
+      pap_id: req.params.id,
+      deleted: true,
+      deleted_pap: result.rows[0]
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2715,6 +3131,30 @@ app.put('/api/app-settings/:year', authenticateToken, async (req, res) => {
        RETURNING *`,
       [year, app_type, updateCount, req.user.id, remarks || '']
     );
+
+    // Broadcast the change to all connected clients
+    if (io) {
+      // Emit specific status_changed event for immediate UI update
+      io.emit('status_changed', {
+        resource: 'app-settings',
+        fiscal_year: year,
+        app_version: app_type,
+        update_count: result.rows[0].update_count,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+
+      // Also emit data_changed for full page reload
+      io.emit('data_changed', {
+        resource: 'app-settings',
+        action: 'update',
+        fiscal_year: year,
+        app_type: app_type,
+        timestamp: new Date().toISOString(),
+        user: req.user
+      });
+    }
+
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5387,6 +5827,65 @@ app.get('/api/activity-logs/summary', authenticateToken, authorizeRoles('admin',
 });
 
 // ==============================================================================
+// HELPER FUNCTION: Summarize Project Title to General Description
+// ==============================================================================
+function summarizeProjectTitle(title) {
+  if (!title) return '-';
+  let desc = title.trim();
+
+  // Strip common procurement prefixes
+  const prefixes = [
+    /^Provision\s+of\s+(Repairs\s+and\s+Maintenance\s+(for|of)\s+)?/i,
+    /^Procurement\s+of\s+/i,
+    /^Supply\s+and\s+Delivery\s+of\s+/i,
+    /^Purchase\s+of\s+/i,
+    /^Acquisition\s+of\s+/i,
+    /^Hiring\s+of\s+/i,
+    /^Engagement\s+of\s+/i,
+    /^Availment\s+of\s+/i,
+    /^Hosting\s+(of\s+)?/i,
+    /^Conduct(ing)?\s+of\s+(the\s+)?/i,
+    /^Payment\s+for\s+(the\s+)?/i,
+    /^Subscription\s+(to|of|for)\s+/i,
+    /^Renewal\s+of\s+/i,
+    /^Lease\s+of\s+/i,
+    /^Contracting\s+of\s+/i,
+    /^Orientation\s+on\s+(the\s+)?/i,
+    /^Lecture\s+on\s+(the\s+)?/i,
+    /^Training\s+on\s+(the\s+)?/i,
+    /^Seminar\s+on\s+(the\s+)?/i,
+    /^Workshop\s+on\s+(the\s+)?/i,
+    /^Conference\s+on\s+(the\s+)?/i,
+    /^Facilitation\s+of\s+(the\s+)?/i,
+    /^Implementation\s+of\s+(the\s+)?/i,
+    /^Installation\s+of\s+/i,
+    /^Repair\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^Repairs\s+and\s+Maintenance\s+(of|for)\s+/i,
+    /^RM\s*[-–]\s*/i,
+    /^Maintenance\s+(of|for)\s+/i,
+    /^Development\s+of\s+/i,
+    /^Preparation\s+of\s+/i,
+    /^Reproduction\s+of\s+/i,
+    /^Printing\s+of\s+/i,
+    /^Publication\s+of\s+/i,
+    /^Production\s+of\s+/i,
+  ];
+  for (const prefix of prefixes) {
+    desc = desc.replace(prefix, '');
+  }
+
+  // Strip trailing fiscal year references
+  desc = desc.replace(/\s*(for\s+)?(FY|CY)\s*\d{4}\s*$/i, '').trim();
+
+  // Strip trailing location references (in parentheses or after "at")
+  desc = desc.replace(/\s*\(.*\)\s*$/i, '').trim();
+  desc = desc.replace(/\s+at\s+.+$/i, '').trim();
+
+  // Return original or summarized (prefer summarized if different and not empty)
+  return desc && desc.length > 0 ? desc : title.substring(0, 100);
+}
+
+// ==============================================================================
 // HEALTH CHECK
 // ==============================================================================
 
@@ -5848,11 +6347,116 @@ async function runMigrations() {
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS requisitioning_office TEXT`,
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS property_custodian TEXT`,
     `ALTER TABLE iars ADD COLUMN IF NOT EXISTS inspector_name TEXT`,
+    // Ensure unit and unit_price columns exist on procurementplans
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`,
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`,
+    // Ensure plan_type column exists on procurementplans (INDICATIVE / FINAL)
+    `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS plan_type VARCHAR(20) DEFAULT 'INDICATIVE'`,
   ];
   for (const sql of migrations) {
-    try { await pool.query(sql); } catch (e) { /* column may already exist */ }
+    try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }
   }
   console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+
+  // CRITICAL: Ensure unit and unit_price columns exist - explicit check and create
+  try {
+    const colCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'procurementplans' AND column_name IN ('unit', 'unit_price')
+    `);
+    const existingCols = colCheck.rows.map(r => r.column_name);
+    console.log('[MIGRATION] procurementplans existing unit columns:', existingCols);
+    if (!existingCols.includes('unit')) {
+      await pool.query('ALTER TABLE procurementplans ADD COLUMN unit VARCHAR(50)');
+      console.log('[MIGRATION] Created unit column on procurementplans');
+    }
+    if (!existingCols.includes('unit_price')) {
+      await pool.query('ALTER TABLE procurementplans ADD COLUMN unit_price DECIMAL(12,2) DEFAULT 0');
+      console.log('[MIGRATION] Created unit_price column on procurementplans');
+    }
+  } catch (e) { console.error('[MIGRATION] CRITICAL unit column creation error:', e.message); }
+
+  // Migrate all NON PS-DBM procurement plans to MANUAL-NON-PSDBM
+  // All NON-PSDBM entries in PPMP are created manually, not from catalog
+  try {
+    const result = await pool.query(
+      `UPDATE procurementplans SET procurement_source = 'MANUAL-NON-PSDBM' WHERE procurement_source = 'NON PS-DBM'`
+    );
+    if (result.rowCount > 0) {
+      console.log(`[MIGRATION] Updated ${result.rowCount} NON PS-DBM entries to MANUAL-NON-PSDBM`);
+    }
+  } catch (e) { console.error('[MIGRATION] NON PS-DBM migration error:', e.message); }
+
+  // Backfill unit and unit_price in procurementplans from plan_items for existing records
+  try {
+    const result = await pool.query(
+      `UPDATE procurementplans pp
+       SET unit = pi.unit, unit_price = pi.unit_price
+       FROM plan_items pi
+       WHERE pi.plan_id = pp.id
+         AND (pp.unit IS NULL OR pp.unit = '')
+         AND pi.unit IS NOT NULL AND pi.unit != ''`
+    );
+    if (result.rowCount > 0) {
+      console.log(`[MIGRATION] Backfilled unit/unit_price for ${result.rowCount} entries from plan_items`);
+    }
+  } catch (e) { console.error('[MIGRATION] unit/price backfill error:', e.message); }
+
+  // Backfill unit from item_description for entries that still have no unit
+  // item_description often contains "Unit: Bottle" or "Unit: book" etc.
+  try {
+    const noUnitRows = await pool.query(
+      `SELECT id, item_description FROM procurementplans
+       WHERE (unit IS NULL OR unit = '')
+         AND item_description IS NOT NULL AND item_description != ''`
+    );
+    let backfilledCount = 0;
+    for (const row of noUnitRows.rows) {
+      const match = row.item_description.match(/Unit:\s*([^;,\n]+)/i);
+      if (match) {
+        const parsedUnit = match[1].trim().split(/\s+/)[0]; // First word after "Unit:" e.g. "Bottle" from "Bottle, 65ml"
+        if (parsedUnit) {
+          await pool.query('UPDATE procurementplans SET unit = $1 WHERE id = $2', [parsedUnit, row.id]);
+          backfilledCount++;
+          console.log(`[MIGRATION] Backfilled unit="${parsedUnit}" for plan id=${row.id} from item_description`);
+        }
+      }
+    }
+    if (backfilledCount > 0) {
+      console.log(`[MIGRATION] Backfilled unit for ${backfilledCount} entries from item_description`);
+    }
+  } catch (e) { console.error('[MIGRATION] item_description unit backfill error:', e.message); }
+
+  // ── Create app_entries table ──
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_entries (
+        id                    SERIAL PRIMARY KEY,
+        plan_id               INTEGER NOT NULL REFERENCES procurementplans(id) ON DELETE CASCADE,
+        fiscal_year           INTEGER NOT NULL,
+        app_code              VARCHAR(50),
+        project_title         TEXT,
+        general_description   TEXT,
+        procurement_mode      VARCHAR(255),
+        early_procurement     VARCHAR(5) DEFAULT 'No',
+        bid_criteria          VARCHAR(100) DEFAULT 'LCRB',
+        start_date            VARCHAR(20),
+        end_date              VARCHAR(20),
+        fund_source           VARCHAR(100),
+        estimated_budget      NUMERIC(15,2) DEFAULT 0,
+        procurement_strategy  VARCHAR(255) DEFAULT '-',
+        app_version           VARCHAR(20) DEFAULT 'indicative',
+        remarks               TEXT,
+        is_deleted            BOOLEAN DEFAULT false,
+        created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(plan_id)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_app_entries_plan_id ON app_entries(plan_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_app_entries_fiscal_year ON app_entries(fiscal_year)`);
+    console.log('[MIGRATION] app_entries table ensured');
+  } catch (e) { console.error('[MIGRATION] app_entries table error:', e.message); }
 }
 
 runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));

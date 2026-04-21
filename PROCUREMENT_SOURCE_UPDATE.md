@@ -230,4 +230,105 @@ Estimated Budget = Unit Price × Quantity
 3. Handling Logic
 Items manually added and items selected from the Item Catalog should be treated as part of the same unified item list within the system.
 
-sasa
+
+ALSO IN THE PPMP PAGE WHEN EDITING A SPECIFIC PPMP WITH THE UNIT DROPdown IN THE EDIT PPMP ENTRY MODAL THEN SAVE CHANGES THEN THE QUANTITY AND SIZE COLUMN FOR SPECIFIC PPMP IS DISPLAYED LIKE THIS FOR EXAMPLE:
+
+20 bottle @ ₱687.50/ bottle APPLY IT TO ALL PPMP IN ALL DIVISIONS AND SAVE IT TO THE DATABASE MAKE IT ALL DYNAMIC WHAT DISPLAYS IN THE PPMP PAGE
+
+PPMP NO. GENERAL DESCRIPTION AND OBJECTIVE OF THE PROJECT TO BE PROCURED TYPE OF PROJECT
+(GOODS, INFRASTRUCTURE, CONSULTING SERVICES) QUANTITY AND SIZE RECOMMENDED MODE OF PROCUREMENT PRE-PROCUREMENT CONFERENCE
+(YES/NO) START OF PROCUREMENT ACTIVITY
+(MM/YYYY) END OF PROCUREMENT ACTIVITY
+(MM/YYYY) EXPECTED DELIVERY / IMPLEMENTATION PERIOD SOURCE OF FUNDS ESTIMATED BUDGET / ABC (₱) REMARKS STATUS
+
+WILL BE SAVED IN THE PROCUREMENTPLANS TABLE IN THE DATABASE
+
+
+
+
+IN APP PAGE ONCE THERE IS DELETION IN APP MAKE ALSO THE TOTAL APPROVED BUDGET AND AVAILABLE BUDGET DYNAMIC BASED ON THE APP DISPLAYED ON THE TABLE MAKE IT SYNCHRONIZED
+
+AND ALSO WHEN THE USER REFRESHES APPLICATION AFTR REFRESHED IT WILL NOT GO BACK TO DASHBOARD PAGE ONLY IN THE CURRENT PAGE PLEASE FIX ALL THE ROUTING IN THIS APPLICATION AND MAKE IT PERFECT.
+
+
+# DMW Procurement System - ROUTING FIX IMPLEMENTATION
+
+## ✅ PLAN APPROVED: Fix refresh → stay on current page (ALL pages)
+
+### CURRENT STATUS: [0/8] ⏳ Planning
+
+## 📋 IMPLEMENTATION STEPS
+
+### [ ] 1. CREATE TODO.md ✅ **DONE**
+
+### [ ] 2. Update navigateTo(pageId) → set window.location.hash
+- Add `window.location.hash = pageId`
+- Store in localStorage
+- Update nav menu active states
+
+### [ ] 3. Add browser navigation handlers
+```
+window.onhashchange = () => navigateToFromHash()
+window.onpopstate = () => navigateToFromHash()
+```
+
+### [ ] 4. Fix DOMContentLoaded initialization
+- Parse `window.location.hash` on load
+- Default to 'dashboard' only if empty
+- Restore from localStorage backup
+
+### [ ] 5. Update ALL nav menu links
+- Add `onclick="navigateTo('pageId')"` to ALL nav items
+- Add `data-page="pageId"` attributes
+
+### [ ] 6. Add navigateToFromHash() helper
+- Extract pageId from `window.location.hash.slice(1)`
+- Validate against rolePermissions
+- Call navigateTo(pageId)
+
+### [ ] 7. Add localStorage persistence
+```
+localStorage.setItem('dmw_active_page', pageId)
+localStorage.getItem('dmw_active_page')
+```
+
+### [ ] 8. **TEST ALL PAGES** 
+```
+✅ Dashboard     ✅ PPMP      ✅ APP  
+✅ PR           ✅ RFQ       ✅ Abstract
+✅ Post-Qual    ✅ BAC Reso  ✅ NOA
+✅ PO           ✅ IAR       ✅ Items
+✅ Suppliers    ✅ Stock     ✅ Property
+✅ RIS          ✅ Reports
+```
+
+### [ ] 9. **PRODUCTION VERIFY**
+```
+DMW_System/RESTART_SERVER.bat
+Test refresh on ALL pages
+Test back/forward buttons
+```
+
+## 🔍 DEBUG COMMANDS (Keep for reference)
+```
+findstr /n /i "navigateTo\|activePageId\|dashboard" renderer/scripts/app.js
+```
+
+## 📝 NOTES
+- File: `renderer/scripts/app.js` (VSCode open)
+- Affects: ALL 25+ pages
+- Backup: `git commit -m "pre-routing-fix"`
+
+
+IN APP PAGE ONCE THERE IS DELETION IN APP MAKE ALSO THE TOTAL APPROVED BUDGET AND AVAILABLE BUDGET DYNAMIC BASED ON THE APP DISPLAYED ON THE TABLE MAKE IT SYNCHRONIZED
+
+AND ALSO WHEN THE USER REFRESHES APPLICATION AFTR REFRESHED IT WILL NOT GO BACK TO DASHBOARD PAGE ONLY IN THE CURRENT PAGE PLEASE FIX ALL THE ROUTING IN THIS APPLICATION AND MAKE IT PERFECT
+
+ALSO WHEN ALL THE CONSOLIDATED APP ARE DELETED THEN THE AVAILABLE BUDGET IS ALSO 0 
+
+IN APP PAGE ONCE THERE IS DELETION IN APP MAKE ALSO THE TOTAL APPROVED BUDGET AND AVAILABLE BUDGET DYNAMIC BASED ON THE APP DISPLAYED ON THE TABLE MAKE IT SYNCHRONIZED
+
+
+WHEN THERE IS NO CONSOLIDATED APP AND ALL THE APP ARE DELETED THEN THE AVAILABLE BUDGET WILL ALSO BE DELETED OR 0 BALANCE 
+
+AND ALSO WHEN CONSOLIDATING FROM PPMP TO APP PAGE, ALL THE CONSOLIDATED APP MUST DISPLAY RIGHT AWAY NO REFRESH APPLICATION NEEDED IT WILL DISPLAY IN THE APP PAGE IN REAL TIME
