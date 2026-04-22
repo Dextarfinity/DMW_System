@@ -349,3 +349,20 @@ OTHER APP PAGE BUGS:
 5. IN EDIT BUTTON IN APP, FETCH THE START DATE AND END DATE FROM THE DATABASE LIKE FETCHED IT IN DATE FORMAT ALSO IN THE EDIT APP ENTRY MODAL. 
 
 6. THE CONSOLIDATION STATUS MUST BE IN REAL-TIME, "Consolidated" and "Not yet Consolidated" must always display in the "Consolidated from PPMP" BUTTON.
+
+
+
+
+
+
+
+PLEASE FIX THIS OCCURING PROBLEM
+
+The API says the budget was ALREADY 1000! But then the frontend gets 2000 back.
+
+This means:
+
+✅ procurementplans.total_amount = 1000 (database updated correctly)
+❌ app_entries.estimated_budget = 2000 (NOT UPDATED!)
+❌ GET /plan-items reads from app_entries and returns 2000
+The two tables are OUT OF SYNC!
