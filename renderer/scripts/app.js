@@ -80,9 +80,13 @@ function discoverServer() {
   let discoveredIPs = [];
   for (const ip of [...SERVER_IPS, 'localhost']) {
    try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+
     const response = await fetch(`http://${ip}:${SERVER_PORT}/api/server-ips`, {
-     signal: AbortSignal.timeout(2000)
+     signal: controller.signal
     });
+    clearTimeout(timer);
     if (response.ok) {
      const data = await response.json();
      if (data.all_ips && Array.isArray(data.all_ips)) {
@@ -166,9 +170,13 @@ function startPeriodicIPRefresh() {
   try {
    // Try to fetch the latest server IPs from the current connection
    if (RESOLVED_SERVER_IP) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+
     const response = await fetch(`http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api/server-ips`, {
-     signal: AbortSignal.timeout(2000)
+     signal: controller.signal
     });
+    clearTimeout(timer);
     if (response.ok) {
      const data = await response.json();
      if (data.all_ips && Array.isArray(data.all_ips)) {
@@ -204,6 +212,8 @@ function stopPeriodicIPRefresh() {
   _ipRefreshTimer = null;
  }
 }
+
+/**
  * Connect to the Socket.IO server. Called after login or session restore.
  * Authenticates with JWT and listens for real-time data_changed events
  * so when ANY other Electron client creates/updates/deletes data,
