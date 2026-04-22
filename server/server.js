@@ -2299,40 +2299,87 @@ app.get('/api/plan-items', authenticateToken, async (req, res) => {
 // PUT adjust APP item budget (total_amount on procurementplans)
 app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res) => {
   try {
+    console.log('\n========== BUDGET ADJUSTMENT REQUEST ==========');
+    console.log('[BUDGET-API] Item ID:', req.params.id);
+    console.log('[BUDGET-API] User:', req.user.username);
+
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
     const allowedRoles = ['admin', 'hope', 'budget_consultant', 'bac_secretariat', 'encoder'];
     const chiefRoles = ['chief_fad', 'chief_wrsd', 'chief_mwpsd', 'chief_mwptd'];
+
     if (!userRoles.some(r => allowedRoles.includes(r) || chiefRoles.includes(r))) {
+      console.error('[BUDGET-API] ❌ User not authorized. Roles:', userRoles);
       return res.status(403).json({ error: 'Not authorized to adjust APP budget' });
     }
+    console.log('[BUDGET-API] ✅ User authorized');
+
     const { total_amount, reason } = req.body;
+    console.log('[BUDGET-API] New amount:', total_amount);
+    console.log('[BUDGET-API] Reason:', reason);
+
     if (total_amount === undefined || total_amount === null || isNaN(parseFloat(total_amount)) || parseFloat(total_amount) < 0) {
+      console.error('[BUDGET-API] ❌ Invalid amount provided');
       return res.status(400).json({ error: 'Valid total_amount is required' });
     }
+
     // Get current plan info
     const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
-    if (!plan.rows.length) return res.status(404).json({ error: 'APP item not found' });
+    if (!plan.rows.length) {
+      console.error('[BUDGET-API] ❌ Plan not found with id:', req.params.id);
+      return res.status(404).json({ error: 'APP item not found' });
+    }
+
     const oldAmount = parseFloat(plan.rows[0].total_amount || 0);
     const newAmount = parseFloat(total_amount);
 
-    // Update BOTH procurementplans and app_entries with the new budget
+    console.log('[BUDGET-API] Old amount:', oldAmount);
+    console.log('[BUDGET-API] New amount:', newAmount);
+    console.log('[BUDGET-API] ⏳ Updating procurementplans table...');
+
+    // Update procurementplans
     const result = await pool.query(
       `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
       [newAmount, req.params.id]
     );
+    console.log('[BUDGET-API] ✅ procurementplans updated');
 
-    // Also update the associated app_entries.estimated_budget so frontend sees the change
-    await pool.query(
-      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2`,
+    // Also update the associated app_entries.estimated_budget
+    console.log('[BUDGET-API] ⏳ Updating app_entries table...');
+    const appUpdate = await pool.query(
+      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING *`,
       [newAmount, req.params.id]
     );
+    console.log('[BUDGET-API] ✅ app_entries updated. Rows affected:', appUpdate.rowCount);
+
+    // Verify both updates
+    console.log('[BUDGET-API] ⏳ VERIFYING both tables updated correctly...');
+    const planCheck = await pool.query('SELECT total_amount FROM procurementplans WHERE id = $1', [req.params.id]);
+    const appCheck = await pool.query('SELECT estimated_budget FROM app_entries WHERE plan_id = $1', [req.params.id]);
+
+    console.log('[BUDGET-API] ✅ procurementplans.total_amount:', planCheck.rows[0]?.total_amount);
+    console.log('[BUDGET-API] ✅ app_entries.estimated_budget:', appCheck.rows[0]?.estimated_budget);
 
     // Log the adjustment
-    console.log(`APP budget adjusted: Plan #${req.params.id} from ₱${oldAmount} to ₱${newAmount} by user ${req.user.username} (${reason || 'no reason'})`);
+    console.log(`[BUDGET-API] ✅ SUCCESS: Plan #${req.params.id} updated ₱${oldAmount} → ₱${newAmount} by ${req.user.username}`);
+
     // Emit real-time update to all clients
-    io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id) });
-    res.json({ message: 'Budget adjusted successfully', old_amount: oldAmount, new_amount: newAmount, plan: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    console.log('[BUDGET-API] 📡 Broadcasting real-time update to all clients...');
+    io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id), newAmount });
+
+    console.log('========== BUDGET ADJUSTMENT SUCCESS ==========\n');
+
+    res.json({
+      message: 'Budget adjusted successfully',
+      old_amount: oldAmount,
+      new_amount: newAmount,
+      plan: result.rows[0]
+    });
+  } catch (err) {
+    console.error('[BUDGET-API] ❌ ERROR:', err.message);
+    console.error(err);
+    console.log('========== BUDGET ADJUSTMENT FAILED ==========\n');
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // PUT update APP entry (app_entries table) — handles all APP-specific edits

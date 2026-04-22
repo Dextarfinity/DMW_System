@@ -18961,37 +18961,82 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Adjust APP Budget API call
   window.adjustAPPBudget = async function(itemId) {
+    console.log('========== BUDGET ADJUSTMENT START ==========');
     const amountInput = document.getElementById('adjustBudgetAmount');
     const reasonInput = document.getElementById('adjustBudgetReason');
-    if (!amountInput) return;
+
+    if (!amountInput) {
+      console.error('[ADJUST-BUDGET] Input field not found!');
+      alert('Error: Budget amount input not found');
+      return;
+    }
+
     const newAmount = parseFloat(amountInput.value);
+    console.log('[ADJUST-BUDGET] itemId:', itemId);
+    console.log('[ADJUST-BUDGET] newAmount:', newAmount);
+
     if (isNaN(newAmount) || newAmount < 0) {
+      console.error('[ADJUST-BUDGET] Invalid amount:', newAmount);
       alert('Please enter a valid budget amount.');
       return;
     }
-    const reason = reasonInput ? reasonInput.value.trim() : '';
-    try {
-      console.log('[ADJUST-BUDGET] Sending budget adjustment for item:', itemId);
-      console.log('[ADJUST-BUDGET] New amount:', newAmount);
-      console.log('[ADJUST-BUDGET] Token present:', authToken ? 'YES' : 'NO');
 
-      const data = await apiRequest('/plan-items/' + itemId + '/adjust-budget', 'PUT', {
+    const reason = reasonInput ? reasonInput.value.trim() : 'Budget adjustment';
+    console.log('[ADJUST-BUDGET] reason:', reason);
+    console.log('[ADJUST-BUDGET] token present:', !!authToken);
+
+    try {
+      // Step 1: Send to API
+      console.log('[ADJUST-BUDGET] ⏳ STEP 1: Sending API request...');
+      const response = await apiRequest('/plan-items/' + itemId + '/adjust-budget', 'PUT', {
         total_amount: newAmount,
         reason: reason
       });
+      console.log('[ADJUST-BUDGET] ✅ STEP 1 COMPLETE - API Response:', response);
+
+      // Step 2: Close modal immediately
       closeModal();
-      showNotification('Budget adjusted successfully — ₱' + (data.old_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + (data.new_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
-      // Refresh APP table - AWAIT to ensure data loads before UI updates
-      console.log('[ADJUST-BUDGET] Refreshing APP data from database...');
+      console.log('[ADJUST-BUDGET] ✅ Modal closed');
+
+      // Step 3: Show success notification
+      showNotification('Budget adjusted successfully — ₱' + (response.old_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + (response.new_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
+      console.log('[ADJUST-BUDGET] ✅ Notification shown');
+
+      // Step 4: Force refresh from database with delay to ensure server updated
+      console.log('[ADJUST-BUDGET] ⏳ STEP 2: Waiting 500ms for database to commit...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      console.log('[ADJUST-BUDGET] ⏳ STEP 3: Reloading APP data from server...');
+      // Clear any cached data
+      window._appItems = [];
+      window._appStatus = null;
+
+      // Force reload with cache bust
       if (typeof loadAPP === 'function') {
-        await loadAPP();
-        console.log('[ADJUST-BUDGET] APP data refreshed successfully');
-      } else if (typeof navigateTo === 'function') {
-        navigateTo('app');
+        const freshItems = await loadAPP();
+        console.log('[ADJUST-BUDGET] ✅ STEP 3 COMPLETE - Refreshed', freshItems.length, 'items');
+
+        // Verify the change was applied
+        const updatedItem = freshItems.find(i => i.id === itemId);
+        if (updatedItem) {
+          const itemBudget = parseFloat(updatedItem.total_price || updatedItem.unit_price || 0);
+          console.log('[ADJUST-BUDGET] ✅ VERIFICATION: Item', itemId, 'now has budget:', itemBudget);
+          if (Math.abs(itemBudget - newAmount) < 0.01) {
+            console.log('[ADJUST-BUDGET] ✅ CONFIRMED: Budget change was saved correctly!');
+          } else {
+            console.warn('[ADJUST-BUDGET] ⚠️ WARNING: Budget mismatch. Expected:', newAmount, 'Got:', itemBudget);
+          }
+        }
+      } else {
+        console.error('[ADJUST-BUDGET] loadAPP function not found!');
       }
+
+      console.log('========== BUDGET ADJUSTMENT SUCCESS ==========');
     } catch (err) {
-      console.error('[ADJUST-BUDGET] ERROR:', err.message);
+      console.error('[ADJUST-BUDGET] ❌ ERROR:', err.message);
+      console.error('[ADJUST-BUDGET] Stack:', err.stack);
       showNotification('Error adjusting budget: ' + err.message, 'error');
+      console.log('========== BUDGET ADJUSTMENT FAILED ==========');
     }
   };
 
