@@ -18867,7 +18867,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
     const reason = reasonInput ? reasonInput.value.trim() : '';
     try {
-      const data = await apiRequest('/plan-items/' + itemId + '/adjust-budget', 'PUT', {
+      console.log('[ADJUST-BUDGET] Sending budget adjustment for item:', itemId);
+      console.log('[ADJUST-BUDGET] New amount:', newAmount);
+      console.log('[ADJUST-BUDGET] Token present:', authToken ? 'YES' : 'NO');
+
+      const data = await apiRequest('plan-items/' + itemId + '/adjust-budget', 'PUT', {
         total_amount: newAmount,
         reason: reason
       });
@@ -18877,6 +18881,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (typeof loadAPP === 'function') loadAPP();
       else if (typeof navigateTo === 'function') navigateTo('app');
     } catch (err) {
+      console.error('[ADJUST-BUDGET] ERROR:', err.message);
       showNotification('Error adjusting budget: ' + err.message, 'error');
     }
   };
@@ -35373,9 +35378,17 @@ Failure to submit the above requirements within the prescribed period shall cons
  };
 
  // View APP Project Details
- window.showViewAPPModal = function(itemId) {
- const items = window._appItems || [];
- const item = items.find(i => i.id === itemId);
+ // View APP Project Details
+ window.showViewAPPModal = async function(itemId) {
+ let item = (window._appItems || []).find(i => i.id === itemId);
+
+ // If item not found, refresh data and retry (race condition fix)
+ if (!item) {
+ showNotification('Loading APP data...', 'info');
+ await loadAPP();
+ item = (window._appItems || []).find(i => i.id === itemId);
+ }
+
  if (!item) { alert('APP item not found'); return; }
 
  function getDeptCode(name) {
@@ -35417,7 +35430,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  const estBudget = parseFloat(item.total_price || item.unit_price || 0);
  const startDate = formatProcDate(item.start_date);
  const endDate = formatProcDate(item.end_date);
- 
+
  // Build version tag per item
  let versionTag = '';
  const appVer = (item.app_version || 'indicative').toLowerCase();
@@ -35454,10 +35467,23 @@ Failure to submit the above requirements within the prescribed period shall cons
  openModal('View APP Project', html, { preventOutsideClose: true });
  };
 
+ // ========================================================================
+ // ========================================================================
+ // NOTE: All old duplicate function definitions have been removed
+ // ========================================================================
+ // ========================================================================
+
  // Adjust APP Budget Modal
- window.showAdjustAPPBudgetModal = function(itemId) {
- const items = window._appItems || [];
- const item = items.find(i => i.id === itemId);
+ window.showAdjustAPPBudgetModal = async function(itemId) {
+ let item = (window._appItems || []).find(i => i.id === itemId);
+
+ // If item not found, refresh data and retry (race condition fix)
+ if (!item) {
+ showNotification('Loading APP data...', 'info');
+ await loadAPP();
+ item = (window._appItems || []).find(i => i.id === itemId);
+ }
+
  if (!item) { alert('APP item not found'); return; }
 
  const currentBudget = parseFloat(item.total_price || item.unit_price || 0);
@@ -35493,35 +35519,6 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  `;
  openModal('Adjust APP Budget', html, { preventOutsideClose: true });
- };
-
- // Adjust APP Budget API call
- window.adjustAPPBudget = async function(itemId) {
- const amountInput = document.getElementById('adjustBudgetAmount');
- const reasonInput = document.getElementById('adjustBudgetReason');
- if (!amountInput) return;
- const newAmount = parseFloat(amountInput.value);
- if (isNaN(newAmount) || newAmount < 0) {
- alert('Please enter a valid budget amount.');
- return;
- }
- const reason = reasonInput ? reasonInput.value.trim() : '';
- try {
- const res = await fetch(getApiUrl() + '/api/plan-items/' + itemId + '/adjust-budget', {
- method: 'PUT',
- headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (authToken || '') },
- body: JSON.stringify({ total_amount: newAmount, reason: reason })
- });
- const data = await res.json();
- if (!res.ok) throw new Error(data.error || 'Failed to adjust budget');
- closeModal();
- showNotification('Budget adjusted successfully — ₱' + data.old_amount.toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + data.new_amount.toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
- // Refresh APP table
- if (typeof loadAPP === 'function') loadAPP();
- else if (typeof navigateTo === 'function') navigateTo('app');
- } catch (err) {
- alert('Error: ' + err.message);
- }
  };
 
  // =====================================================
@@ -38325,29 +38322,6 @@ Failure to submit the above requirements within the prescribed period shall cons
  };
 
  // Create PR from APP Modal — Redirects to PR page with pre-populated data
- window.showCreatePRFromAPPModal = function(itemId) {
- const items = window._appItems || [];
- const item = items.find(i => i.id === itemId);
- if (!item) { alert('APP item not found'); return; }
-
- // Store the APP item data for pre-population in the PR form
- window._prFromAPPItem = item;
-
- // Navigate to PR page
- if (typeof navigateTo === 'function') {
- navigateTo('purchase-requests');
- } else {
- // Fallback: click the PR nav link
- const prNav = document.querySelector('[data-page="purchase-requests"]');
- if (prNav) prNav.click();
- }
-
- // Open New PR modal after navigation with a small delay
- setTimeout(() => {
- showNewPRModal();
- }, 300);
- };
-
  // Approve PR Modal
  window.showApprovePRModal = async function(prIdOrNo) {
  // Fetch actual PR data dynamically
