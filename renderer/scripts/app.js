@@ -189,6 +189,12 @@ function connectSocket() {
  updateAPPVersionBanner(freshStatus);
  console.log('[SOCKET-STATUS] Version banner updated to:', freshStatus?.app_type);
 
+ // Update consolidate button badge in real-time (fix for real-time status)
+ if (window._appItems && window._appItems.length > 0) {
+ updateConsolidateButtonBadge(freshStatus, window._appItems);
+ console.log('[SOCKET-STATUS] Consolidate button badge updated');
+ }
+
  // Show toast notification
  showToast('APP status updated to ' + (freshStatus?.app_type || 'unknown').charAt(0).toUpperCase() + (freshStatus?.app_type || 'unknown').slice(1), 'info');
  } catch (err) {
@@ -1634,8 +1640,49 @@ async function initPPMPFilters() {
  }
 }
 
+/**
+ * Update the consolidate button badge in real-time
+ * Shows consolidation status dynamically without requiring page refresh
+ */
+function updateConsolidateButtonBadge(appStatus, items) {
+ const consolidateBtn = document.querySelector('[data-action="consolidate-app"]');
+ if (!consolidateBtn) return;
+
+ // Check consolidation status
+ const isConsolidated = appStatus && appStatus.consolidated_at;
+ let newUnconsolidatedCount = 0;
+
+ if (isConsolidated) {
+ // Count new entries since consolidation
+ const consolidatedAt = new Date(appStatus.consolidated_at);
+ newUnconsolidatedCount = (items || []).filter(item => {
+ const approvedAt = item.updated_at ? new Date(item.updated_at) : null;
+ return approvedAt && approvedAt > consolidatedAt;
+ }).length;
+ }
+
+ // Remove old badge if any
+ const oldBadge = consolidateBtn.querySelector('.consolidate-badge');
+ if (oldBadge) oldBadge.remove();
+
+ // Update badge based on consolidation status
+ if (!isConsolidated) {
+ consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff5722;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">Not yet consolidated</span>';
+ } else if (newUnconsolidatedCount > 0) {
+ consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff9800;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">' + newUnconsolidatedCount + ' new</span>';
+ } else {
+ // Fully consolidated - show checkmark badge
+ consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#4caf50;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">✓ Consolidated</span>';
+ }
+
+ console.log('[CONSOLIDATE-BADGE] Updated badge - isConsolidated:', isConsolidated, 'newUnconsolidatedCount:', newUnconsolidatedCount);
+}
+
 async function loadAPP() {
  try {
+ // Clear stale app status cache to ensure fresh fetch (fix for consolidated checkmark persistence)
+ window._appStatus = null;
+
  const fy = window._appFilterYear || getCurrentFiscalYear();
  const [items, appStatus, budgetSummary] = await Promise.all([
  apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now()),
@@ -1666,17 +1713,7 @@ async function loadAPP() {
  // Update consolidate button with badge for new entries
  const consolidateBtn = document.querySelector('[data-action="consolidate-app"]');
  if (consolidateBtn) {
- // Remove old badge if any
- const oldBadge = consolidateBtn.querySelector('.consolidate-badge');
- if (oldBadge) oldBadge.remove();
-
- if (!isConsolidated) {
- consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff5722;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">Not yet consolidated</span>';
- } else if (newUnconsolidatedCount > 0) {
- consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP <span class="consolidate-badge" style="background:#ff9800;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px;">' + newUnconsolidatedCount + ' new</span>';
- } else {
- consolidateBtn.innerHTML = '<i class="fas fa-layer-group"></i> Consolidate from PPMP';
- }
+ updateConsolidateButtonBadge(appStatus, items);
  }
 
  // Only show items if consolidated, otherwise show message
@@ -3651,8 +3688,16 @@ window.onAPPFYChange = function() {
 /** Edit APP Modal */
 window.showEditAPPModal = async function(planId) {
  try {
- // Get the app entry from cached items
- const item = window._appItems && window._appItems.find(i => i.id === planId);
+ // Get the app entry from cached items - retry if not found
+ let item = window._appItems && window._appItems.find(i => i.id === planId);
+
+ // If item not found, refresh data and retry (race condition fix)
+ if (!item) {
+ showNotification('Loading APP data...', 'info');
+ await loadAPP();
+ item = window._appItems && window._appItems.find(i => i.id === planId);
+ }
+
  if (!item) { showNotification('APP entry not found', 'error'); return; }
 
  const procModes = await apiRequest('/procurement-modes').catch(() => []);
@@ -3661,13 +3706,21 @@ window.showEditAPPModal = async function(planId) {
  // Format dates: DB may store as ISO or YYYY-MM
  const toMonthValue = (d) => {
  if (!d) return '';
- const s = String(d);
+ const s = String(d).trim();
+ // Already in YYYY-MM format
  if (/^\d{4}-\d{2}$/.test(s)) return s;
+ // ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
  const m = s.match(/^(\d{4})-(\d{2})/);
- return m ? m[1] + '-' + m[2] : '';
+ if (m) return m[1] + '-' + m[2];
+ // Fallback: return empty
+ return '';
  };
  const startDateVal = toMonthValue(item.start_date);
  const endDateVal = toMonthValue(item.end_date);
+
+ // Debug logging for dates
+ console.log('[EDIT APP] Item start_date:', item.start_date, '-> Converted to:', startDateVal);
+ console.log('[EDIT APP] Item end_date:', item.end_date, '-> Converted to:', endDateVal);
 
  function getDeptCode(name) {
  if (!name) return 'DMW';
@@ -3802,8 +3855,16 @@ window.submitEditAPP = async function(e, planId) {
 
 /** Delete APP Entry (hard delete - completely remove from database) */
 window.deleteAPPEntry = async function(planId) {
- // Get the APP entry details for confirmation
- const appItem = window._appItems ? window._appItems.find(item => item.app_entry_id == planId || item.id == planId) : null;
+ // Get the APP entry details for confirmation - retry if not found
+ let appItem = window._appItems ? window._appItems.find(item => item.app_entry_id == planId || item.id == planId) : null;
+
+ // If item not found, refresh data and retry (race condition fix)
+ if (!appItem) {
+ showNotification('Loading APP data...', 'info');
+ await loadAPP();
+ appItem = window._appItems ? window._appItems.find(item => item.app_entry_id == planId || item.id == planId) : null;
+ }
+
  const appCode = appItem ? appItem.item_code : 'APP-???';
  const projectTitle = appItem ? appItem.item_name : 'Untitled Project';
  const budget = appItem ? parseFloat(appItem.total_price || 0) : 0;
@@ -18681,9 +18742,16 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // View APP Project Details
-  window.showViewAPPModal = function(itemId) {
-    const items = window._appItems || [];
-    const item = items.find(i => i.id === itemId);
+  window.showViewAPPModal = async function(itemId) {
+    let item = (window._appItems || []).find(i => i.id === itemId);
+
+    // If item not found, refresh data and retry (race condition fix)
+    if (!item) {
+      showNotification('Loading APP data...', 'info');
+      await loadAPP();
+      item = (window._appItems || []).find(i => i.id === itemId);
+    }
+
     if (!item) { alert('APP item not found'); return; }
 
     function getDeptCode(name) {
@@ -18740,9 +18808,16 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Adjust APP Budget Modal
-  window.showAdjustAPPBudgetModal = function(itemId) {
-    const items = window._appItems || [];
-    const item = items.find(i => i.id === itemId);
+  window.showAdjustAPPBudgetModal = async function(itemId) {
+    let item = (window._appItems || []).find(i => i.id === itemId);
+
+    // If item not found, refresh data and retry (race condition fix)
+    if (!item) {
+      showNotification('Loading APP data...', 'info');
+      await loadAPP();
+      item = (window._appItems || []).find(i => i.id === itemId);
+    }
+
     if (!item) { alert('APP item not found'); return; }
 
     const currentBudget = parseFloat(item.total_price || item.unit_price || 0);
@@ -18792,20 +18867,17 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
     const reason = reasonInput ? reasonInput.value.trim() : '';
     try {
-      const res = await fetch(getApiUrl() + '/api/plan-items/' + itemId + '/adjust-budget', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-        body: JSON.stringify({ total_amount: newAmount, reason: reason })
+      const data = await apiRequest('/plan-items/' + itemId + '/adjust-budget', 'PUT', {
+        total_amount: newAmount,
+        reason: reason
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to adjust budget');
       closeModal();
-      showNotification('Budget adjusted successfully — ₱' + data.old_amount.toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + data.new_amount.toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
+      showNotification('Budget adjusted successfully — ₱' + (data.old_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + (data.new_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
       // Refresh APP table
       if (typeof loadAPP === 'function') loadAPP();
       else if (typeof navigateTo === 'function') navigateTo('app');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showNotification('Error adjusting budget: ' + err.message, 'error');
     }
   };
 
@@ -21553,9 +21625,16 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Create PR from APP Modal — Redirects to PR page with pre-populated data
-  window.showCreatePRFromAPPModal = function(itemId) {
-    const items = window._appItems || [];
-    const item = items.find(i => i.id === itemId);
+  window.showCreatePRFromAPPModal = async function(itemId) {
+    let item = (window._appItems || []).find(i => i.id === itemId);
+
+    // If item not found, refresh data and retry (race condition fix)
+    if (!item) {
+      showNotification('Loading APP data...', 'info');
+      await loadAPP();
+      item = (window._appItems || []).find(i => i.id === itemId);
+    }
+
     if (!item) { alert('APP item not found'); return; }
 
     // Store the APP item data for pre-population in the PR form
@@ -34602,6 +34681,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  const appEntriesResponse = await apiRequest('/plan-items?fiscal_year=' + fy + '&_cache_bust=' + Date.now(), 'GET');
  consolidatedEntries = appEntriesResponse || [];
  console.log('[CONSOLIDATE] Fetched', consolidatedEntries.length, 'consolidated APP entries');
+
+ // Update global items array and re-render table immediately (real-time fix)
+ window._appItems = consolidatedEntries;
+ const appStatus = await apiRequest('/app-settings/' + fy + '?_cache_bust=' + Date.now());
+ renderAPPTable(consolidatedEntries, appStatus);
+ updateAPPSummary(consolidatedEntries, {});
+ console.log('[CONSOLIDATE] Table updated with new consolidated APP entries');
  } catch (fetchErr) {
  console.warn('[CONSOLIDATE] Could not fetch APP entries:', fetchErr);
  consolidatedEntries = [];
