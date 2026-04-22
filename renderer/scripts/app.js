@@ -18975,7 +18975,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       console.log('[ADJUST-BUDGET] New amount:', newAmount);
       console.log('[ADJUST-BUDGET] Token present:', authToken ? 'YES' : 'NO');
 
-      const data = await apiRequest('plan-items/' + itemId + '/adjust-budget', 'PUT', {
+      const data = await apiRequest('/plan-items/' + itemId + '/adjust-budget', 'PUT', {
         total_amount: newAmount,
         reason: reason
       });
