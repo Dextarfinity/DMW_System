@@ -2322,42 +2322,61 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
       return res.status(400).json({ error: 'Valid total_amount is required' });
     }
 
-    // Get current plan info
+    // Get current plan info from procurementplans
+    console.log('[BUDGET-API] ⏳ Fetching procurementplans with id:', req.params.id);
     const plan = await pool.query('SELECT * FROM procurementplans WHERE id = $1', [req.params.id]);
     if (!plan.rows.length) {
-      console.error('[BUDGET-API] ❌ Plan not found with id:', req.params.id);
+      console.error('[BUDGET-API] ❌ procurementplans not found with id:', req.params.id);
       return res.status(404).json({ error: 'APP item not found' });
     }
+    console.log('[BUDGET-API] ✅ Found procurementplans:', plan.rows[0].id);
 
     const oldAmount = parseFloat(plan.rows[0].total_amount || 0);
     const newAmount = parseFloat(total_amount);
 
     console.log('[BUDGET-API] Old amount:', oldAmount);
     console.log('[BUDGET-API] New amount:', newAmount);
-    console.log('[BUDGET-API] ⏳ Updating procurementplans table...');
 
     // Update procurementplans
-    const result = await pool.query(
-      `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+    console.log('[BUDGET-API] ⏳ Updating procurementplans table (id=' + req.params.id + ')...');
+    const ppUpdate = await pool.query(
+      `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, total_amount`,
       [newAmount, req.params.id]
     );
-    console.log('[BUDGET-API] ✅ procurementplans updated');
+    console.log('[BUDGET-API] ✅ procurementplans updated. Rows affected:', ppUpdate.rowCount);
+    if (ppUpdate.rowCount > 0) {
+      console.log('[BUDGET-API] ✅ procurementplans new value:', ppUpdate.rows[0].total_amount);
+    }
 
-    // Also update the associated app_entries.estimated_budget
-    console.log('[BUDGET-API] ⏳ Updating app_entries table...');
+    // Update app_entries using plan_id
+    console.log('[BUDGET-API] ⏳ Updating app_entries table (plan_id=' + req.params.id + ')...');
     const appUpdate = await pool.query(
-      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING *`,
+      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING plan_id, estimated_budget`,
       [newAmount, req.params.id]
     );
     console.log('[BUDGET-API] ✅ app_entries updated. Rows affected:', appUpdate.rowCount);
+    if (appUpdate.rowCount > 0) {
+      console.log('[BUDGET-API] ✅ app_entries new value:', appUpdate.rows[0].estimated_budget);
+    } else {
+      console.warn('[BUDGET-API] ⚠️ WARNING: No app_entries row found with plan_id=' + req.params.id);
+    }
 
     // Verify both updates
     console.log('[BUDGET-API] ⏳ VERIFYING both tables updated correctly...');
-    const planCheck = await pool.query('SELECT total_amount FROM procurementplans WHERE id = $1', [req.params.id]);
-    const appCheck = await pool.query('SELECT estimated_budget FROM app_entries WHERE plan_id = $1', [req.params.id]);
+    const planCheck = await pool.query('SELECT id, total_amount FROM procurementplans WHERE id = $1', [req.params.id]);
+    const appCheck = await pool.query('SELECT plan_id, estimated_budget FROM app_entries WHERE plan_id = $1', [req.params.id]);
 
-    console.log('[BUDGET-API] ✅ procurementplans.total_amount:', planCheck.rows[0]?.total_amount);
-    console.log('[BUDGET-API] ✅ app_entries.estimated_budget:', appCheck.rows[0]?.estimated_budget);
+    console.log('[BUDGET-API] ✅ procurementplans verification - id:', planCheck.rows[0]?.id, 'total_amount:', planCheck.rows[0]?.total_amount);
+    console.log('[BUDGET-API] ✅ app_entries verification - plan_id:', appCheck.rows[0]?.plan_id, 'estimated_budget:', appCheck.rows[0]?.estimated_budget);
+
+    // Test what GET will return
+    console.log('[BUDGET-API] ⏳ Testing GET /plan-items query...');
+    const getTest = await pool.query(
+      `SELECT pp.id, ae.estimated_budget as total_price FROM procurementplans pp
+       LEFT JOIN app_entries ae ON ae.plan_id = pp.id WHERE pp.id = $1`,
+      [req.params.id]
+    );
+    console.log('[BUDGET-API] ✅ GET query will return - id:', getTest.rows[0]?.id, 'total_price:', getTest.rows[0]?.total_price);
 
     // Log the adjustment
     console.log(`[BUDGET-API] ✅ SUCCESS: Plan #${req.params.id} updated ₱${oldAmount} → ₱${newAmount} by ${req.user.username}`);
@@ -2372,7 +2391,7 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
       message: 'Budget adjusted successfully',
       old_amount: oldAmount,
       new_amount: newAmount,
-      plan: result.rows[0]
+      plan: ppUpdate.rows[0]
     });
   } catch (err) {
     console.error('[BUDGET-API] ❌ ERROR:', err.message);
