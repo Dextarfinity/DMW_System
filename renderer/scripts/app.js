@@ -18981,9 +18981,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       });
       closeModal();
       showNotification('Budget adjusted successfully — ₱' + (data.old_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' → ₱' + (data.new_amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2}), 'success');
-      // Refresh APP table
-      if (typeof loadAPP === 'function') loadAPP();
-      else if (typeof navigateTo === 'function') navigateTo('app');
+      // Refresh APP table - AWAIT to ensure data loads before UI updates
+      console.log('[ADJUST-BUDGET] Refreshing APP data from database...');
+      if (typeof loadAPP === 'function') {
+        await loadAPP();
+        console.log('[ADJUST-BUDGET] APP data refreshed successfully');
+      } else if (typeof navigateTo === 'function') {
+        navigateTo('app');
+      }
     } catch (err) {
       console.error('[ADJUST-BUDGET] ERROR:', err.message);
       showNotification('Error adjusting budget: ' + err.message, 'error');
