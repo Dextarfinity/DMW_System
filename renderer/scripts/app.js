@@ -18913,6 +18913,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Adjust APP Budget Modal
   window.showAdjustAPPBudgetModal = async function(itemId) {
+    console.log('[MODAL] Opening adjust budget modal for itemId:', itemId);
+
     let item = (window._appItems || []).find(i => i.id === itemId);
 
     // If item not found, refresh data and retry (race condition fix)
@@ -18922,9 +18924,23 @@ Failure to submit the above requirements within the prescribed period shall cons
       item = (window._appItems || []).find(i => i.id === itemId);
     }
 
-    if (!item) { alert('APP item not found'); return; }
+    if (!item) {
+      console.error('[MODAL] Item not found with id:', itemId);
+      alert('APP item not found');
+      return;
+    }
 
     const currentBudget = parseFloat(item.total_price || item.unit_price || 0);
+
+    // DEBUG: Log all item properties
+    console.log('[MODAL] Item data from frontend:');
+    console.log('  - item.id:', item.id);
+    console.log('  - item.app_entry_id:', item.app_entry_id);
+    console.log('  - item.total_price:', item.total_price);
+    console.log('  - item.unit_price:', item.unit_price);
+    console.log('  - item.item_code:', item.item_code);
+    console.log('  - item.item_name:', item.item_name);
+
     const html = `
       <div style="margin-bottom:18px;">
         <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
@@ -18932,8 +18948,32 @@ Failure to submit the above requirements within the prescribed period shall cons
             <i class="fas fa-coins" style="color:#d69e2e;font-size:18px;"></i>
             <strong style="color:#744210;">Adjust APP Budget</strong>
           </div>
-          <div style="font-size:13px;color:#744210;">Modify the estimated budget for this APP entry. This will update the total amount in the procurement plan.</div>
+          <div style="font-size:13px;color:#744210;">Modify the estimated budget for this APP entry. This will update the database.</div>
         </div>
+
+        <!-- DEBUG TABLE: Show actual data being used -->
+        <div style="background:#f0f0f0;border:1px solid #ddd;border-radius:4px;padding:12px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:bold;color:#666;margin-bottom:8px;">🔍 DEBUG INFO:</div>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <tr style="border-bottom:1px solid #ddd;">
+              <td style="padding:4px;font-weight:bold;">procurementplans.id (item.id):</td>
+              <td style="padding:4px;color:#2b6cb0;font-weight:bold;">${item.id}</td>
+            </tr>
+            <tr style="border-bottom:1px solid #ddd;">
+              <td style="padding:4px;font-weight:bold;">app_entries.id (item.app_entry_id):</td>
+              <td style="padding:4px;color:#2b6cb0;font-weight:bold;">${item.app_entry_id || 'N/A'}</td>
+            </tr>
+            <tr style="border-bottom:1px solid #ddd;">
+              <td style="padding:4px;font-weight:bold;">Current total_price:</td>
+              <td style="padding:4px;color:#2b6cb0;">₱${currentBudget.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px;font-weight:bold;">Will be sent to API as:</td>
+              <td style="padding:4px;color:#d69e2e;font-weight:bold;">/plan-items/${item.id}/adjust-budget</td>
+            </tr>
+          </table>
+        </div>
+
         <div class="view-details" style="margin-bottom:16px;">
           <div class="detail-row"><label>Item Code:</label><span>${item.item_code || '-'}</span></div>
           <div class="detail-row"><label>Item Name:</label><span>${item.item_name || '-'}</span></div>
