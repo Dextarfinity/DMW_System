@@ -63,7 +63,10 @@ let SOCKET_SERVER_URL = null;
 let _serverDiscoveryPromise = null;
 
 /**
- * Race all candidate IPs — the first one to respond on /api/health wins.
+ * Enhanced server discovery with auto IP detection.
+ * 1. First, tries to fetch server's IP list from /api/server-ips (best method — gets dynamic IPs)
+ * 2. Then races all candidate IPs on /api/health
+ * 3. Falls back to configured IPs if auto-discovery fails
  * Returns the IP string. Falls back to the first IP if none respond.
  */
 function discoverServer() {
@@ -72,38 +75,75 @@ function discoverServer() {
  _serverDiscoveryPromise = new Promise((resolve) => {
  let settled = false;
 
- // Also try localhost for the server PC itself
+ // Try to fetch server IPs from the server itself (works if any server is reachable)
+ const tryAutoDiscovery = async () => {
+  let discoveredIPs = [];
+  for (const ip of [...SERVER_IPS, 'localhost']) {
+   try {
+    const response = await fetch(`http://${ip}:${SERVER_PORT}/api/server-ips`, {
+     signal: AbortSignal.timeout(2000)
+    });
+    if (response.ok) {
+     const data = await response.json();
+     if (data.all_ips && Array.isArray(data.all_ips)) {
+      discoveredIPs = data.all_ips.filter(ip => ip !== 'localhost');
+      console.log('[DISCOVERY] Auto-discovered server IPs:', discoveredIPs);
+      // Update SERVER_IPS with discovered IPs for future use
+      if (discoveredIPs.length > 0) {
+       SERVER_IPS = discoveredIPs;
+      }
+      return discoveredIPs;
+     }
+    }
+   } catch (err) {
+    console.log(`[DISCOVERY] Could not reach auto-discovery at ${ip}:${SERVER_PORT}`);
+   }
+  }
+  return [];
+ };
+
+ // Also try localhost and configured servers
  const candidates = [...SERVER_IPS, 'localhost'];
 
- candidates.forEach(ip => {
- const url = `http://${ip}:${SERVER_PORT}/api/health`;
- const controller = new AbortController();
- const timer = setTimeout(() => controller.abort(), 3000);
+ // First attempt auto-discovery
+ tryAutoDiscovery().then(discoveredIPs => {
+  const allCandidates = discoveredIPs.length > 0
+   ? [...new Set([...discoveredIPs, ...SERVER_IPS, 'localhost'])]
+   : candidates;
 
- fetch(url, { signal: controller.signal })
- .then(r => {
- clearTimeout(timer);
- if (r.ok && !settled) {
- settled = true;
- RESOLVED_SERVER_IP = ip;
- SOCKET_SERVER_URL = `http://${ip}:${SERVER_PORT}`;
- console.log(`[DISCOVERY] Server found at ${ip}:${SERVER_PORT}`);
- resolve(ip);
- }
- })
- .catch(() => { clearTimeout(timer); });
+  console.log('[DISCOVERY] Trying candidates:', allCandidates);
+
+  // Race health checks against all candidates
+  allCandidates.forEach(ip => {
+   const url = `http://${ip}:${SERVER_PORT}/api/health`;
+   const controller = new AbortController();
+   const timer = setTimeout(() => controller.abort(), 3000);
+
+   fetch(url, { signal: controller.signal })
+   .then(r => {
+    clearTimeout(timer);
+    if (r.ok && !settled) {
+     settled = true;
+     RESOLVED_SERVER_IP = ip;
+     SOCKET_SERVER_URL = `http://${ip}:${SERVER_PORT}`;
+     console.log(`[DISCOVERY] ✓ Server found at ${ip}:${SERVER_PORT}`);
+     resolve(ip);
+    }
+   })
+   .catch(() => { clearTimeout(timer); });
+  });
+
+  // Fallback after 5 seconds — use first IP
+  setTimeout(() => {
+   if (!settled) {
+    settled = true;
+    RESOLVED_SERVER_IP = allCandidates[0] || SERVER_IPS[0];
+    SOCKET_SERVER_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}`;
+    console.warn('[DISCOVERY] ⚠ No server responded; falling back to', RESOLVED_SERVER_IP);
+    resolve(RESOLVED_SERVER_IP);
+   }
+  }, 5000);
  });
-
- // Fallback after 4 seconds — use first IP
- setTimeout(() => {
- if (!settled) {
- settled = true;
- RESOLVED_SERVER_IP = SERVER_IPS[0];
- SOCKET_SERVER_URL = `http://${SERVER_IPS[0]}:${SERVER_PORT}`;
- console.warn('[DISCOVERY] No server responded; falling back to', SERVER_IPS[0]);
- resolve(SERVER_IPS[0]);
- }
- }, 4000);
  });
 
  return _serverDiscoveryPromise;
@@ -112,9 +152,58 @@ function discoverServer() {
 // Socket instance (created once, reconnects automatically)
 let socket = null;
 let _socketReconnectTimer = null;
-
+let _ipRefreshTimer = null;
 
 /**
+ * Periodic IP refresh — detects WiFi network changes and updates server IPs automatically.
+ * Runs every 30 seconds to check if server IPs have changed (e.g., WiFi reconnection).
+ * If socket is disconnected and IP changed, triggers reconnection.
+ */
+function startPeriodicIPRefresh() {
+ if (_ipRefreshTimer) clearInterval(_ipRefreshTimer);
+
+ _ipRefreshTimer = setInterval(async () => {
+  try {
+   // Try to fetch the latest server IPs from the current connection
+   if (RESOLVED_SERVER_IP) {
+    const response = await fetch(`http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api/server-ips`, {
+     signal: AbortSignal.timeout(2000)
+    });
+    if (response.ok) {
+     const data = await response.json();
+     if (data.all_ips && Array.isArray(data.all_ips)) {
+      const newIPs = data.all_ips.filter(ip => ip !== 'localhost');
+      // Check if IPs have changed
+      const ipsChanged = newIPs.length !== SERVER_IPS.length ||
+       !newIPs.every(ip => SERVER_IPS.includes(ip));
+      if (ipsChanged) {
+       console.log('[IP-REFRESH] ⚡ Server IPs updated:', newIPs);
+       SERVER_IPS = newIPs;
+       // If socket is disconnected, reset discovery to try new IPs
+       if (socket && !socket.connected) {
+        console.log('[IP-REFRESH] Socket disconnected with new IPs available, attempting reconnect...');
+        _serverDiscoveryPromise = null; // Reset discovery cache
+        connectSocket();
+       }
+      }
+     }
+    }
+   }
+  } catch (err) {
+   // Silently fail — just means server not currently reachable for refresh
+  }
+ }, 30000); // Every 30 seconds
+}
+
+/**
+ * Stop the periodic IP refresh
+ */
+function stopPeriodicIPRefresh() {
+ if (_ipRefreshTimer) {
+  clearInterval(_ipRefreshTimer);
+  _ipRefreshTimer = null;
+ }
+}
  * Connect to the Socket.IO server. Called after login or session restore.
  * Authenticates with JWT and listens for real-time data_changed events
  * so when ANY other Electron client creates/updates/deletes data,
@@ -235,6 +324,8 @@ function disconnectSocket() {
  socket.disconnect();
  socket = null;
  }
+ // Stop periodic IP refresh when disconnecting
+ stopPeriodicIPRefresh();
 }
 
 /**
@@ -6042,6 +6133,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Connect to Socket.IO for real-time sync across all Electron clients
  connectSocket();
+
+ // Start periodic IP refresh to detect WiFi network changes
+ startPeriodicIPRefresh();
 
  // Navigate to previous page from hash/localStorage, or dashboard if none exists
  navigateToFromHash();

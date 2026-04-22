@@ -5923,6 +5923,28 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Auto IP Detection — returns all available server IPs for dynamic network discovery
+app.get('/api/server-ips', (req, res) => {
+  try {
+    const allIPs = getAllLocalIPs();
+    const ips = allIPs.map(ip => ip.address);
+
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      current_ip: getLocalIP(),
+      all_ips: ips.length > 0 ? ips : ['localhost'],
+      port: PORT,
+      network_interfaces: allIPs
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: err.message
+    });
+  }
+});
+
 // ==============================================================================
 // ==============================================================================
 // FILE ATTACHMENT ENDPOINTS
