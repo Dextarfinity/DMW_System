@@ -2314,14 +2314,22 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
     if (!plan.rows.length) return res.status(404).json({ error: 'APP item not found' });
     const oldAmount = parseFloat(plan.rows[0].total_amount || 0);
     const newAmount = parseFloat(total_amount);
-    // Update the budget
+
+    // Update BOTH procurementplans and app_entries with the new budget
     const result = await pool.query(
       `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
       [newAmount, req.params.id]
     );
+
+    // Also update the associated app_entries.estimated_budget so frontend sees the change
+    await pool.query(
+      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2`,
+      [newAmount, req.params.id]
+    );
+
     // Log the adjustment
     console.log(`APP budget adjusted: Plan #${req.params.id} from ₱${oldAmount} to ₱${newAmount} by user ${req.user.username} (${reason || 'no reason'})`);
-    // Emit real-time update
+    // Emit real-time update to all clients
     io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id) });
     res.json({ message: 'Budget adjusted successfully', old_amount: oldAmount, new_amount: newAmount, plan: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
