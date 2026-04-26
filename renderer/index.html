@@ -2529,14 +2529,28 @@
  // Only refresh when there are actual CODE changes, NOT on every tab switch
  let CURRENT_VERSION = '20260417002'; // Updated for real-time refresh
  let lastVersionCheck = Date.now();
+ let _versionCheckInProgress = false;
  
  async function checkForUpdates() {
+ if (_versionCheckInProgress) return; // Prevent simultaneous checks
+ _versionCheckInProgress = true;
+
  try {
+ const controller = new AbortController();
+ const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
  const response = await fetch('/', { 
  method: 'HEAD',
  cache: 'no-cache',
- pragma: 'no-cache'
+ signal: controller.signal,
+ headers: {
+  'Pragma': 'no-cache',
+  'Cache-Control': 'no-cache'
+ }
  });
+
+ clearTimeout(timeoutId);
+
  const versionHeader = response.headers.get('X-App-Version') || CURRENT_VERSION;
  if (versionHeader !== CURRENT_VERSION) {
  console.log('[AUTO-SYNC] New version detected:', versionHeader, '- Refreshing...');
@@ -2544,7 +2558,12 @@
  window.location.reload(true); // Hard refresh
  }
  } catch (e) {
- console.warn('[AUTO-SYNC] Could not check for updates:', e.message);
+ // Only log if it's not a network timeout or abort (these are expected)
+ if (e.name !== 'AbortError') {
+  console.debug('[AUTO-SYNC] Version check skipped:', e.message);
+ }
+ } finally {
+ _versionCheckInProgress = false;
  }
  }
  
@@ -2556,6 +2575,7 @@
  
  // DO NOT refresh on tab visibility change - preserve modal state
  // Users can manually refresh if they want the latest version
+
 
  // Inject DMW letterhead into every gov-form-header (matching official DMW Regional Office letterhead)
  document.querySelectorAll('.gov-form-header').forEach(function(header) {

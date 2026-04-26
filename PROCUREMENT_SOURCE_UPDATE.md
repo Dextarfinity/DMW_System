@@ -356,7 +356,7 @@ OTHER APP PAGE BUGS:
 
 
 
-PLEASE FIX THIS OCCURING PROBLEM
+PLEASE FIX THIS OCCURING PROBLEM AND COMMUNICATE WITH THE SERVER TO ACCESS THE APP_ENTRIES TABLE IN THE DATABASE
 
 The API says the budget was ALREADY 1000! But then the frontend gets 2000 back.
 
@@ -366,3 +366,22 @@ This means:
 ❌ app_entries.estimated_budget = 2000 (NOT UPDATED!)
 ❌ GET /plan-items reads from app_entries and returns 2000
 The two tables are OUT OF SYNC!
+
+FOR THE AUTO DISCOVERY IP ADDRESSES, REMOVE THE DEFUALT IP ADRESSES SINCE THIS APPLICATION AUTO DETECTS THE CURRENT IP ADDRESS OF THE CONNECTED NETWORK OF THE SERVER THEN THE CLIENT SIDE WILL ALSO REFER TO THE SERVER'S IP ADDRESS IN ORDER TO ACCESS THE APPLICATION.
+
+NOW, DELETE THESE FUNCTION WHEN INSTALLING THE APPLICATIONS AND REPLACE THE AUTO DETECTION OF THE SERVER 
+
+// =====================================================
+// EXTERNAL CONFIG - Server IPs loaded from userData
+// This allows updating server IPs without rebuilding the app.
+// Config file: %APPDATA%/procurement-plan-system/server-config.json
+// =====================================================
+const DEFAULT_SERVER_IPS = [
+  '192.168.1.117',     // WiFi Network 
+  '192.168.100.235'    // WiFi Network 
+
+THESE FUNCTIONS CAN BE FOUND IN THE FOLLOWING FILES:
+main.js
+app.js
+
+

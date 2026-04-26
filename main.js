@@ -2,75 +2,22 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 
 let mainWindow;
 
 // =====================================================
-// EXTERNAL CONFIG - Server IPs loaded from userData
-// This allows updating server IPs without rebuilding the app.
-// Config file: %APPDATA%/procurement-plan-system/server-config.json
+// DYNAMIC SERVER DISCOVERY (No Hardcoded IPs)
+// Server advertises its actual network IPs via /api/server-ips
+// This allows pure dynamic discovery without any defaults or config files.
 // =====================================================
-const DEFAULT_SERVER_IPS = [
-  '192.168.1.117',     // WiFi Network 
-  '192.168.100.235'    // WiFi Network 
-];
 const SERVER_PORT = 3000;
 
-// Will be populated from external config or defaults
-let SERVER_IPS = [...DEFAULT_SERVER_IPS];
+// Will be populated from auto-discovery only
+let SERVER_IPS = [];
 
 // Resolved at startup — set by discoverServer()
 let RESOLVED_SERVER_URL = null;
-
-/**
- * Get the path to the external config file in userData.
- */
-function getConfigPath() {
-  const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'server-config.json');
-}
-
-/**
- * Load server IPs from external config file.
- * Creates the file with defaults if it doesn't exist.
- */
-function loadServerConfig() {
-  const configPath = getConfigPath();
-
-  try {
-    if (fs.existsSync(configPath)) {
-      const data = fs.readFileSync(configPath, 'utf8');
-      const config = JSON.parse(data);
-      if (Array.isArray(config.serverIPs) && config.serverIPs.length > 0) {
-        SERVER_IPS = config.serverIPs;
-        console.log('[CONFIG] Loaded server IPs from external config:', SERVER_IPS);
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn('[CONFIG] Error reading config file:', err.message);
-  }
-
-  // Create default config file
-  try {
-    const defaultConfig = {
-      serverIPs: DEFAULT_SERVER_IPS,
-      port: SERVER_PORT,
-      _comment: 'Edit serverIPs array to add/change server addresses. Changes take effect on app restart.'
-    };
-    // Ensure the directory exists
-    const configDir = path.dirname(configPath);
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
-    console.log('[CONFIG] Created default config at:', configPath);
-  } catch (err) {
-    console.warn('[CONFIG] Could not create config file:', err.message);
-  }
-
-  SERVER_IPS = [...DEFAULT_SERVER_IPS];
-}
 
 function getAppIconPath() {
   if (process.platform === 'win32') {
@@ -100,37 +47,89 @@ function checkServerIP(ip) {
 }
 
 /**
+ * Discover server IPs dynamically from /api/server-ips endpoint.
+ * Falls back to localhost if no IPs are discovered.
+ */
+async function fetchServerIPsFromServer() {
+  const candidates = ['localhost', '127.0.0.1'];
+  for (const ip of candidates) {
+    try {
+      const url = `http://${ip}:${SERVER_PORT}/api/server-ips`;
+      return await new Promise((resolve) => {
+        const req = http.get(url, { timeout: 2500 }, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.all_ips && Array.isArray(parsed.all_ips)) {
+                const ips = parsed.all_ips.filter(ip => ip !== 'localhost');
+                console.log('[DISCOVERY] Auto-discovered server IPs from', ip + ':', ips);
+                resolve(ips.length > 0 ? ips : [ip]);
+              } else {
+                resolve([]);
+              }
+            } catch (err) {
+              resolve([]);
+            }
+          });
+          res.resume();
+        });
+        req.on('error', () => resolve([]));
+        req.on('timeout', () => { req.destroy(); resolve([]); });
+      });
+    } catch (err) {
+      // Continue to next candidate
+    }
+  }
+  return [];
+}
+
+/**
  * Discover which server IP is reachable.
- * Tries localhost first; if unavailable, tries remote IPs in parallel.
- * Falls back to the first IP if none respond.
+ * 1. Tries localhost first (local development)
+ * 2. Fetches dynamically advertised IPs from server
+ * 3. Races all candidates on /api/health
+ * 4. Falls back to localhost if nothing responds
  */
 async function discoverServer() {
   if (RESOLVED_SERVER_URL) return RESOLVED_SERVER_URL;
 
-  console.log('[DISCOVERY] Checking server IPs:', SERVER_IPS.join(', '));
-
-  // Try localhost FIRST — if a local server is running, always use it
-  const localResult = await checkServerIP('localhost');
+  // Try localhost first (best for development and LAN)
+  console.log('[DISCOVERY] Starting dynamic IP discovery...');
+  let localResult = await checkServerIP('localhost');
   if (localResult) {
     RESOLVED_SERVER_URL = localResult;
-    console.log(`[DISCOVERY] Local server found at localhost:${SERVER_PORT} — using local`);
+    console.log('[DISCOVERY] ✓ Using localhost (local development)');
     return RESOLVED_SERVER_URL;
   }
 
-  // Localhost not available — try remote server IPs
-  const results = await Promise.all(SERVER_IPS.map(ip => checkServerIP(ip)));
+  // Fetch server IPs from the server itself
+  console.log('[DISCOVERY] Fetching server-advertised IPs from network...');
+  let discoveredIPs = await fetchServerIPsFromServer();
+  
+  if (discoveredIPs.length === 0) {
+    // No IPs discovered; fallback to localhost
+    discoveredIPs = ['localhost'];
+    console.log('[DISCOVERY] No IPs discovered; using localhost');
+  }
+
+  console.log('[DISCOVERY] Trying candidates:', discoveredIPs);
+
+  // Race health checks against all discovered IPs
+  const results = await Promise.all(discoveredIPs.map(ip => checkServerIP(ip)));
 
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] Server found at ${SERVER_IPS[i]}:${SERVER_PORT}`);
+      console.log(`[DISCOVERY] ✓ Server found at ${discoveredIPs[i]}:${SERVER_PORT}`);
       return RESOLVED_SERVER_URL;
     }
   }
 
-  // Fallback to first IP
-  RESOLVED_SERVER_URL = `http://${SERVER_IPS[0]}:${SERVER_PORT}`;
-  console.warn('[DISCOVERY] No server responded; falling back to', SERVER_IPS[0]);
+  // Fallback to localhost
+  RESOLVED_SERVER_URL = `http://localhost:${SERVER_PORT}`;
+  console.warn('[DISCOVERY] ⚠ No server responded; falling back to localhost');
   return RESOLVED_SERVER_URL;
 }
 
@@ -267,7 +266,6 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
-  loadServerConfig();  // Load external config before creating window
   createWindow();
 });
 

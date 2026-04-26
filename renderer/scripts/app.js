@@ -7,55 +7,14 @@
 const { io: ioConnect } = require('socket.io-client');
 
 // =====================================================
-// EXTERNAL CONFIG - Server IPs loaded from userData
-// This allows updating server IPs without rebuilding the app.
-// Config file: %APPDATA%/dmw-procurement/server-config.json
+// DYNAMIC SERVER IP DETECTION (No Hardcoded IPs)
+// Server advertises its actual network IPs via /api/server-ips
+// This allows pure dynamic discovery without any defaults.
 // =====================================================
-const fs = require('fs');
-const path = require('path');
-
-
-const DEFAULT_SERVER_IPS = [
- '192.168.1.117', // WiFi Network 2 (primary)
- '192.168.100.235' // WiFi Network 1
-];
 const SERVER_PORT = 3000;
 
-// Will be populated from external config or defaults
-let SERVER_IPS = [...DEFAULT_SERVER_IPS];
-
-/**
- * Load server IPs from external config file (same as main process uses).
- */
-function loadServerConfig() {
- try {
- // Use APPDATA to find the config (same location as Electron's userData)
- const appData = process.env.APPDATA || (process.platform === 'darwin'
- ? path.join(process.env.HOME, 'Library', 'Application Support')
- : path.join(process.env.HOME, '.config'));
-
- // Electron stores userData in %APPDATA%/<app-name> based on package.json name
- const configPath = path.join(appData, 'procurement-plan-system', 'server-config.json');
-
- if (fs.existsSync(configPath)) {
- const data = fs.readFileSync(configPath, 'utf8');
- const config = JSON.parse(data);
- if (Array.isArray(config.serverIPs) && config.serverIPs.length > 0) {
- SERVER_IPS = config.serverIPs;
- console.log('[CONFIG] Renderer loaded server IPs from external config:', SERVER_IPS);
- return;
- }
- }
- } catch (err) {
- console.warn('[CONFIG] Renderer could not load external config:', err.message);
- }
-
- SERVER_IPS = [...DEFAULT_SERVER_IPS];
- console.log('[CONFIG] Renderer using default server IPs:', SERVER_IPS);
-}
-
-// Load config immediately
-loadServerConfig();
+// Will be populated from auto-discovery only
+let SERVER_IPS = [];
  
 // Resolved at startup — set by discoverServer()
 let RESOLVED_SERVER_IP = null;
@@ -63,26 +22,43 @@ let SOCKET_SERVER_URL = null;
 let _serverDiscoveryPromise = null;
 
 /**
- * Enhanced server discovery with auto IP detection.
- * 1. First, tries to fetch server's IP list from /api/server-ips (best method — gets dynamic IPs)
- * 2. Then races all candidate IPs on /api/health
- * 3. Falls back to configured IPs if auto-discovery fails
- * Returns the IP string. Falls back to the first IP if none respond.
+ * Dynamic server discovery with pure IP detection from /api/server-ips.
+ * 1. Tries localhost first (local dev/testing)
+ * 2. Fetches server's advertised IPs from /api/server-ips
+ * 3. Races all IPs on /api/health to find a working connection
+ * 4. Returns the first responding IP; no fallback to hardcoded defaults
  */
 function discoverServer() {
  if (_serverDiscoveryPromise) return _serverDiscoveryPromise;
 
  _serverDiscoveryPromise = new Promise((resolve) => {
  let settled = false;
+ const DISCOVERY_TIMEOUT = 8000; // Total time before fallback
+ const SINGLE_IP_TIMEOUT = 2500; // Per-IP timeout
 
- // Try to fetch server IPs from the server itself (works if any server is reachable)
+ // Step 1: Try localhost first (best for local development)
+ const tryLocalhost = async () => {
+  try {
+   const controller = new AbortController();
+   const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
+   const response = await fetch(`http://localhost:${SERVER_PORT}/api/health`, {
+    signal: controller.signal
+   });
+   clearTimeout(timer);
+   if (response.ok) return true;
+  } catch (err) {
+   // Localhost not available, continue to discovery
+  }
+  return false;
+ };
+
+ // Step 2: Try to fetch server IPs from the server itself
  const tryAutoDiscovery = async () => {
-  let discoveredIPs = [];
-  for (const ip of [...SERVER_IPS, 'localhost']) {
+  const candidates = ['localhost', '127.0.0.1'];
+  for (const ip of candidates) {
    try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
-
+    const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
     const response = await fetch(`http://${ip}:${SERVER_PORT}/api/server-ips`, {
      signal: controller.signal
     });
@@ -90,38 +66,50 @@ function discoverServer() {
     if (response.ok) {
      const data = await response.json();
      if (data.all_ips && Array.isArray(data.all_ips)) {
-      discoveredIPs = data.all_ips.filter(ip => ip !== 'localhost');
-      console.log('[DISCOVERY] Auto-discovered server IPs:', discoveredIPs);
-      // Update SERVER_IPS with discovered IPs for future use
+      const discoveredIPs = data.all_ips.filter(ip => ip !== 'localhost');
       if (discoveredIPs.length > 0) {
-       SERVER_IPS = discoveredIPs;
+       console.log('[DISCOVERY] Auto-discovered server IPs from', ip + ':', discoveredIPs);
+       SERVER_IPS = [...new Set([...discoveredIPs, 'localhost'])];
+       return discoveredIPs;
       }
-      return discoveredIPs;
      }
     }
    } catch (err) {
-    console.log(`[DISCOVERY] Could not reach auto-discovery at ${ip}:${SERVER_PORT}`);
+    // Continue trying other candidates
    }
   }
   return [];
  };
 
- // Also try localhost and configured servers
- const candidates = [...SERVER_IPS, 'localhost'];
+ // Main discovery flow
+ (async () => {
+  // Try localhost first
+  if (await tryLocalhost()) {
+   if (!settled) {
+    settled = true;
+    RESOLVED_SERVER_IP = 'localhost';
+    SOCKET_SERVER_URL = `http://localhost:${SERVER_PORT}`;
+    console.log('[DISCOVERY] ✓ Using localhost (local development)');
+    resolve('localhost');
+   }
+   return;
+  }
 
- // First attempt auto-discovery
- tryAutoDiscovery().then(discoveredIPs => {
-  const allCandidates = discoveredIPs.length > 0
-   ? [...new Set([...discoveredIPs, ...SERVER_IPS, 'localhost'])]
-   : candidates;
+  // Fetch IPs from server and race them
+  const discoveredIPs = await tryAutoDiscovery();
+  if (discoveredIPs.length === 0) {
+   // No IPs discovered; try localhost again as fallback
+   discoveredIPs.push('localhost', '127.0.0.1');
+  }
 
-  console.log('[DISCOVERY] Trying candidates:', allCandidates);
+  console.log('[DISCOVERY] Trying candidates:', discoveredIPs);
 
   // Race health checks against all candidates
-  allCandidates.forEach(ip => {
+  discoveredIPs.forEach(ip => {
+   if (settled) return;
    const url = `http://${ip}:${SERVER_PORT}/api/health`;
    const controller = new AbortController();
-   const timer = setTimeout(() => controller.abort(), 3000);
+   const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
 
    fetch(url, { signal: controller.signal })
    .then(r => {
@@ -137,17 +125,17 @@ function discoverServer() {
    .catch(() => { clearTimeout(timer); });
   });
 
-  // Fallback after 5 seconds — use first IP
+  // Fallback after discovery timeout
   setTimeout(() => {
    if (!settled) {
     settled = true;
-    RESOLVED_SERVER_IP = allCandidates[0] || SERVER_IPS[0];
+    RESOLVED_SERVER_IP = discoveredIPs[0] || 'localhost';
     SOCKET_SERVER_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}`;
-    console.warn('[DISCOVERY] ⚠ No server responded; falling back to', RESOLVED_SERVER_IP);
+    console.warn('[DISCOVERY] ⚠ No server responded within timeout; using', RESOLVED_SERVER_IP);
     resolve(RESOLVED_SERVER_IP);
    }
-  }, 5000);
- });
+  }, DISCOVERY_TIMEOUT);
+ })();
  });
 
  return _serverDiscoveryPromise;
