@@ -12,6 +12,8 @@ let mainWindow;
 // This allows pure dynamic discovery without any defaults or config files.
 // =====================================================
 const SERVER_PORT = 3000;
+const DISCOVERY_TIMEOUT = 3000; // Increased timeout for better reliability
+const HEALTH_CHECK_TIMEOUT = 2000;
 
 // Will be populated from auto-discovery only
 let SERVER_IPS = [];
@@ -27,59 +29,118 @@ function getAppIconPath() {
 }
 
 /**
- * Try to reach a specific server IP with a short timeout.
+ * Get all local IPv4 addresses from network interfaces
+ * Prioritizes active connections (not internal loopback)
+ */
+function getLocalNetworkIPs() {
+  const ips = [];
+  const interfaces = os.networkInterfaces();
+
+  console.log('[DISCOVERY] Scanning network interfaces...');
+
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    for (const addr of addrs) {
+      // Include both IPv4 and IPv6, but exclude internal/loopback
+      if (!addr.internal && (addr.family === 'IPv4' || addr.family === 'IPv6')) {
+        ips.push({
+          ip: addr.address,
+          family: addr.family,
+          interface: name,
+          mac: addr.mac
+        });
+        console.log(`  - ${name} (${addr.family}): ${addr.address}`);
+      }
+    }
+  }
+
+  // Sort: IPv4 first, then by interface name (to prioritize Ethernet/WiFi)
+  ips.sort((a, b) => {
+    if (a.family !== b.family) return a.family === 'IPv4' ? -1 : 1;
+    return a.interface.localeCompare(b.interface);
+  });
+
+  return ips.map(x => x.ip);
+}
+
+/**
+ * Try to reach a specific server IP with configurable timeout.
  * Returns a promise that resolves to the URL if reachable, or null if not.
  */
-function checkServerIP(ip) {
+function checkServerIP(ip, timeout = HEALTH_CHECK_TIMEOUT) {
   return new Promise((resolve) => {
     const url = `http://${ip}:${SERVER_PORT}`;
-    const req = http.get(`${url}/api/health`, { timeout: 2000 }, (res) => {
+    const req = http.get(`${url}/api/health`, { timeout }, (res) => {
       if (res.statusCode >= 200 && res.statusCode < 400) {
+        console.log(`[DISCOVERY] ✓ Server responding at ${ip}:${SERVER_PORT}`);
         resolve(url);
       } else {
+        console.log(`[DISCOVERY] ✗ Server at ${ip} returned status ${res.statusCode}`);
         resolve(null);
       }
       res.resume();
     });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.on('error', (err) => {
+      console.log(`[DISCOVERY] ✗ Cannot reach ${ip}: ${err.message}`);
+      resolve(null);
+    });
+    req.on('timeout', () => {
+      console.log(`[DISCOVERY] ✗ Timeout connecting to ${ip}`);
+      req.destroy();
+      resolve(null);
+    });
   });
 }
 
 /**
  * Discover server IPs dynamically from /api/server-ips endpoint.
- * Falls back to localhost if no IPs are discovered.
+ * Queries the server to get all available IPs (WiFi, Ethernet, etc.)
  */
 async function fetchServerIPsFromServer() {
   const candidates = ['localhost', '127.0.0.1'];
+
   for (const ip of candidates) {
     try {
       const url = `http://${ip}:${SERVER_PORT}/api/server-ips`;
       return await new Promise((resolve) => {
-        const req = http.get(url, { timeout: 2500 }, (res) => {
+        const req = http.get(url, { timeout: DISCOVERY_TIMEOUT }, (res) => {
           let data = '';
           res.on('data', (chunk) => { data += chunk; });
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
               if (parsed.all_ips && Array.isArray(parsed.all_ips)) {
-                const ips = parsed.all_ips.filter(ip => ip !== 'localhost');
-                console.log('[DISCOVERY] Auto-discovered server IPs from', ip + ':', ips);
+                // Filter out localhost and duplicates
+                const ips = Array.from(new Set(
+                  parsed.all_ips.filter(ip => ip && ip !== 'localhost' && ip !== '127.0.0.1')
+                ));
+
+                console.log(`[DISCOVERY] Server at ${ip} advertises IPs:`, ips);
+                console.log(`[DISCOVERY] Network interfaces from server:`, parsed.network_interfaces);
+
                 resolve(ips.length > 0 ? ips : [ip]);
               } else {
+                console.log(`[DISCOVERY] Invalid response format from ${ip}/api/server-ips`);
                 resolve([]);
               }
             } catch (err) {
+              console.log(`[DISCOVERY] Failed to parse response from ${ip}:`, err.message);
               resolve([]);
             }
           });
           res.resume();
         });
-        req.on('error', () => resolve([]));
-        req.on('timeout', () => { req.destroy(); resolve([]); });
+        req.on('error', (err) => {
+          console.log(`[DISCOVERY] Cannot reach ${ip}/api/server-ips: ${err.message}`);
+          resolve([]);
+        });
+        req.on('timeout', () => {
+          console.log(`[DISCOVERY] Timeout reaching ${ip}/api/server-ips`);
+          req.destroy();
+          resolve([]);
+        });
       });
     } catch (err) {
-      // Continue to next candidate
+      console.log(`[DISCOVERY] Exception fetching from ${ip}:`, err.message);
     }
   }
   return [];
@@ -88,48 +149,69 @@ async function fetchServerIPsFromServer() {
 /**
  * Discover which server IP is reachable.
  * 1. Tries localhost first (local development)
- * 2. Fetches dynamically advertised IPs from server
- * 3. Races all candidates on /api/health
- * 4. Falls back to localhost if nothing responds
+ * 2. Scans local network interfaces
+ * 3. Fetches dynamically advertised IPs from server
+ * 4. Races all candidates on /api/health
+ * 5. Falls back to localhost if nothing responds
  */
 async function discoverServer() {
   if (RESOLVED_SERVER_URL) return RESOLVED_SERVER_URL;
 
-  // Try localhost first (best for development and LAN)
-  console.log('[DISCOVERY] Starting dynamic IP discovery...');
-  let localResult = await checkServerIP('localhost');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('[DISCOVERY] Starting dynamic server discovery...');
+  console.log('═══════════════════════════════════════════════════════════');
+
+  // Step 1: Try localhost first (best for development and LAN)
+  console.log('[DISCOVERY] Step 1: Trying localhost (local development)...');
+  let localResult = await checkServerIP('localhost', HEALTH_CHECK_TIMEOUT);
   if (localResult) {
     RESOLVED_SERVER_URL = localResult;
     console.log('[DISCOVERY] ✓ Using localhost (local development)');
+    console.log('═══════════════════════════════════════════════════════════\n');
     return RESOLVED_SERVER_URL;
   }
 
-  // Fetch server IPs from the server itself
-  console.log('[DISCOVERY] Fetching server-advertised IPs from network...');
-  let discoveredIPs = await fetchServerIPsFromServer();
-  
-  if (discoveredIPs.length === 0) {
-    // No IPs discovered; fallback to localhost
-    discoveredIPs = ['localhost'];
-    console.log('[DISCOVERY] No IPs discovered; using localhost');
-  }
+  // Step 2: Get local network IPs from this machine
+  console.log('[DISCOVERY] Step 2: Scanning local network interfaces...');
+  const localIPs = getLocalNetworkIPs();
+  console.log(`[DISCOVERY] Found ${localIPs.length} local network IPs`);
 
-  console.log('[DISCOVERY] Trying candidates:', discoveredIPs);
+  // Step 3: Fetch server-advertised IPs
+  console.log('[DISCOVERY] Step 3: Fetching server-advertised IPs...');
+  let serverAdvertisedIPs = await fetchServerIPsFromServer();
+
+  // Step 4: Combine and deduplicate all candidates
+  let allCandidates = [
+    ...localIPs,  // Local network IPs (WiFi, Ethernet, etc.)
+    ...serverAdvertisedIPs  // Server's advertised IPs
+  ];
+
+  // Remove duplicates while preserving order
+  allCandidates = Array.from(new Set(allCandidates));
+
+  console.log(`[DISCOVERY] Step 4: Testing ${allCandidates.length} candidate IPs...`);
+  console.log('[DISCOVERY] Candidates:', allCandidates);
 
   // Race health checks against all discovered IPs
-  const results = await Promise.all(discoveredIPs.map(ip => checkServerIP(ip)));
+  const results = await Promise.all(
+    allCandidates.map(ip => checkServerIP(ip, HEALTH_CHECK_TIMEOUT))
+  );
 
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] ✓ Server found at ${discoveredIPs[i]}:${SERVER_PORT}`);
+      console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND at ${allCandidates[i]}:${SERVER_PORT} ✓✓✓`);
+      console.log('═══════════════════════════════════════════════════════════\n');
       return RESOLVED_SERVER_URL;
     }
   }
 
-  // Fallback to localhost
+  // Step 5: Fallback to localhost if nothing responded
   RESOLVED_SERVER_URL = `http://localhost:${SERVER_PORT}`;
-  console.warn('[DISCOVERY] ⚠ No server responded; falling back to localhost');
+  console.warn('═══════════════════════════════════════════════════════════');
+  console.warn('[DISCOVERY] ⚠ No server responded to health checks');
+  console.warn('[DISCOVERY] Falling back to localhost (offline mode)');
+  console.warn('═══════════════════════════════════════════════════════════\n');
   return RESOLVED_SERVER_URL;
 }
 
@@ -139,15 +221,26 @@ async function discoverServer() {
 function isServerReachable() {
   return new Promise((resolve) => {
     if (!RESOLVED_SERVER_URL) {
+      console.log('[SERVER-CHECK] No resolved server URL');
       resolve(false);
       return;
     }
-    const req = http.get(`${RESOLVED_SERVER_URL}/api/health`, { timeout: 2000 }, (res) => {
-      resolve(res.statusCode >= 200 && res.statusCode < 400);
+    console.log(`[SERVER-CHECK] Checking if server is reachable at ${RESOLVED_SERVER_URL}`);
+    const req = http.get(`${RESOLVED_SERVER_URL}/api/health`, { timeout: HEALTH_CHECK_TIMEOUT }, (res) => {
+      const isReachable = res.statusCode >= 200 && res.statusCode < 400;
+      console.log(`[SERVER-CHECK] Server health check: ${res.statusCode} - ${isReachable ? '✓ REACHABLE' : '✗ NOT REACHABLE'}`);
+      resolve(isReachable);
       res.resume();
     });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.on('error', (err) => {
+      console.log(`[SERVER-CHECK] ✗ Server check failed: ${err.message}`);
+      resolve(false);
+    });
+    req.on('timeout', () => {
+      console.log('[SERVER-CHECK] ✗ Server check timed out');
+      req.destroy();
+      resolve(false);
+    });
   });
 }
 
@@ -173,9 +266,17 @@ async function createWindow() {
   // Hide the menu bar visually but keep keyboard shortcuts (Ctrl+Shift+I for DevTools)
   mainWindow.setMenuBarVisibility(false);
 
-  // --- Dual-Network Server Discovery ---
+  // --- Dynamic Server Discovery ---
+  console.log('\n');
+  console.log('╔════════════════════════════════════════════════════════════╗');
+  console.log('║  PROCUREMENT PLAN SYSTEM - SERVER DISCOVERY                ║');
+  console.log('╚════════════════════════════════════════════════════════════╝');
+
   // Discover which server IP is reachable on the current network
   await discoverServer();
+
+  console.log('\n[STARTUP] Server resolved to:', RESOLVED_SERVER_URL);
+  console.log('[STARTUP] Checking server reachability...\n');
 
   // --- Dynamic UI loading ---
   // Try loading the frontend from the server so that any HTML/JS/CSS changes
@@ -183,12 +284,15 @@ async function createWindow() {
   // Falls back to the bundled local files if the server is unreachable.
   const serverUp = await isServerReachable();
   if (serverUp && RESOLVED_SERVER_URL) {
-    console.log('[UI] Loading frontend from server:', RESOLVED_SERVER_URL);
+    console.log('[UI] ✓ Server is UP - Loading frontend from:', RESOLVED_SERVER_URL);
     mainWindow.loadURL(RESOLVED_SERVER_URL);
   } else {
-    console.log('[UI] Server unreachable — loading bundled local files');
+    console.log('[UI] ⚠ Server is DOWN or unreachable - Loading bundled local files');
+    console.log('[UI] Frontend will be served from:', path.join(__dirname, 'renderer', 'index.html'));
     mainWindow.loadFile('renderer/index.html');
   }
+
+  console.log('[UI] Window created and content loading...\n');
 
   // --- Inject local logo files into the renderer ---
   // When loading from the server, the renderer's __dirname won't resolve to
@@ -197,9 +301,11 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.maximize();
+    console.log('[UI] ✓ Window displayed and maximized');
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[UI] ✓ Page content loaded successfully');
     try {
       const fs = require('fs');
       const assetsDir = path.join(__dirname, 'renderer', 'assets');
@@ -254,6 +360,7 @@ async function createWindow() {
             }
           })();
         `).catch(() => {});
+        console.log('[UI] ✓ Logo assets injected');
       }
     } catch (e) {
       console.warn('[Logos] Could not inject logos:', e.message);
