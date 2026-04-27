@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const os = require('os');
 const http = require('http');
+const dgram = require('dgram');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -979,7 +980,7 @@ app.get('/api/divisions', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/divisions/:id', authenticateToken, async (req, res) => {
+app.get('/api/divisions/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM divisions WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Division not found' });
@@ -1753,24 +1754,6 @@ app.get('/api/plans/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DEBUG ENDPOINT: Check unit/unit_price data in procurementplans table
-app.get('/api/debug/plans-unit-data', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT pp.id, pp.description, pp.procurement_source, pp.unit, pp.unit_price, pp.item_id,
-             pi.unit as plan_item_unit, pi.unit_price as plan_item_unit_price,
-             it.unit as items_table_unit, it.unit_price as items_table_unit_price
-      FROM procurementplans pp
-      LEFT JOIN plan_items pi ON pi.plan_id = pp.id
-      LEFT JOIN items it ON pp.item_id = it.id
-      WHERE pp.ppmp_no IS NOT NULL
-      ORDER BY pp.id DESC
-      LIMIT 20
-    `);
-    console.log('[DEBUG] Plans unit data:', JSON.stringify(result.rows, null, 2));
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
 
 app.post('/api/plans', authenticateToken, async (req, res) => {
   const client = await pool.connect();
@@ -4235,15 +4218,6 @@ app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/purchase-orders/:id/set-status', authenticateToken, async (req, res) => {
-  try {
-    const { status } = req.body;
-    const result = await pool.query('UPDATE purchaseorders SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PO not found' });
-    res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // ==============================================================================
 // IAR (Inspection and Acceptance Report) - FULL INVENTORY INTEGRATION
 // ==============================================================================
@@ -6352,6 +6326,65 @@ const PORT = parseInt(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 // ==============================================================================
+// AUTOMATIC UDP BROADCAST DISCOVERY
+// Server announces itself on the network so clients can auto-discover
+// ==============================================================================
+
+const DISCOVERY_PORT = 5555; // UDP broadcast port for discovery
+const BROADCAST_INTERVAL = 5000; // Broadcast every 5 seconds
+let broadcastSocket = null;
+let broadcastInterval = null;
+
+function startBroadcastDiscovery() {
+  try {
+    broadcastSocket = dgram.createSocket('udp4');
+
+    // Get all network IPs
+    const interfaces = os.networkInterfaces();
+    const ips = [];
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        if (iface.family === 'IPv4' && !iface.internal && !iface.address.startsWith('169.254.')) {
+          ips.push(iface.address);
+        }
+      }
+    }
+
+    const primaryIP = ips.length > 0 ? ips[0] : 'localhost';
+
+    console.log(`[DISCOVERY] Starting UDP broadcast on port ${DISCOVERY_PORT}...`);
+    console.log(`[DISCOVERY] Will broadcast: "DMW-SERVER|${primaryIP}|${PORT}"`);
+
+    // Broadcast server presence every 5 seconds
+    broadcastInterval = setInterval(() => {
+      const message = `DMW-SERVER|${primaryIP}|${PORT}|${ips.join(',')}`;
+
+      // Broadcast to 255.255.255.255 on all network interfaces
+      broadcastSocket.setBroadcast(true);
+      broadcastSocket.send(message, 0, message.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
+        if (err) {
+          console.log(`[DISCOVERY] Broadcast error: ${err.message}`);
+        }
+      });
+    }, BROADCAST_INTERVAL);
+
+    broadcastSocket.on('error', (err) => {
+      console.error(`[DISCOVERY] UDP Socket error:`, err);
+    });
+
+  } catch (err) {
+    console.warn(`[DISCOVERY] Could not start UDP broadcast:`, err.message);
+  }
+}
+
+function stopBroadcastDiscovery() {
+  if (broadcastInterval) clearInterval(broadcastInterval);
+  if (broadcastSocket) broadcastSocket.close();
+}
+
+// ==============================================================================
+
+// ==============================================================================
 // SOCKET.IO — Real-time communication with all Electron client apps
 // ==============================================================================
 const io = new SocketIOServer(httpServer, {
@@ -6627,6 +6660,9 @@ const server = httpServer.listen(PORT, HOST, () => {
   console.log('  Health:        GET /api/health');
   console.log('  Clients:       GET /api/connected-clients');
   console.log('========================================');
+
+  // Start broadcasting server presence on the network
+  startBroadcastDiscovery();
 });
 
 // Graceful shutdown — lets pm2 restart cleanly

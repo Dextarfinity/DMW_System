@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
+const dgram = require('dgram');
 const fs = require('fs');
 const os = require('os');
 
@@ -8,11 +9,13 @@ let mainWindow;
 
 // =====================================================
 // DYNAMIC SERVER DISCOVERY (No Hardcoded IPs)
-// Server advertises its actual network IPs via /api/server-ips
-// This allows pure dynamic discovery without any defaults or config files.
+// Server advertises its actual network IPs via:
+// 1. UDP Broadcast (automatic, fastest)
+// 2. /api/server-ips endpoint (fallback)
 // =====================================================
 const SERVER_PORT = 3000;
-const DISCOVERY_TIMEOUT = 3000; // Increased timeout for better reliability
+const DISCOVERY_PORT = 5555; // UDP broadcast port
+const DISCOVERY_TIMEOUT = 3000;
 const HEALTH_CHECK_TIMEOUT = 2000;
 
 // Will be populated from auto-discovery only
@@ -29,37 +32,65 @@ function getAppIconPath() {
 }
 
 /**
- * Get all local IPv4 addresses from network interfaces
- * Prioritizes active connections (not internal loopback)
+ * Listen for UDP broadcast from server
+ * Server broadcasts: "DMW-SERVER|192.168.x.x|3000|192.168.x.x,..."
+ * This is the FASTEST way to discover the server automatically
  */
-function getLocalNetworkIPs() {
-  const ips = [];
-  const interfaces = os.networkInterfaces();
+function listenForBroadcast(timeout = 3000) {
+  return new Promise((resolve) => {
+    const discoverySocket = dgram.createSocket('udp4');
 
-  console.log('[DISCOVERY] Scanning network interfaces...');
+    // Set a timeout for broadcast listening
+    const timeoutHandle = setTimeout(() => {
+      console.log('[BROADCAST] No broadcast received (timeout)');
+      discoverySocket.close();
+      resolve(null);
+    }, timeout);
 
-  for (const [name, addrs] of Object.entries(interfaces)) {
-    for (const addr of addrs) {
-      // Include both IPv4 and IPv6, but exclude internal/loopback
-      if (!addr.internal && (addr.family === 'IPv4' || addr.family === 'IPv6')) {
-        ips.push({
-          ip: addr.address,
-          family: addr.family,
-          interface: name,
-          mac: addr.mac
-        });
-        console.log(`  - ${name} (${addr.family}): ${addr.address}`);
+    discoverySocket.on('message', (msg, info) => {
+      try {
+        const message = msg.toString();
+        if (message.startsWith('DMW-SERVER')) {
+          const parts = message.split('|');
+          if (parts.length >= 3) {
+            const primaryIP = parts[1];
+            const port = parts[2];
+            const allIPs = parts[3] ? parts[3].split(',') : [primaryIP];
+
+            console.log(`[BROADCAST] ✓ Received broadcast from ${info.address}`);
+            console.log(`[BROADCAST] Primary IP: ${primaryIP}:${port}`);
+            console.log(`[BROADCAST] All IPs: ${allIPs.join(', ')}`);
+
+            clearTimeout(timeoutHandle);
+            discoverySocket.close();
+
+            resolve(allIPs);
+          }
+        }
+      } catch (err) {
+        console.log(`[BROADCAST] Error parsing message: ${err.message}`);
       }
+    });
+
+    discoverySocket.on('error', (err) => {
+      console.log(`[BROADCAST] Socket error: ${err.message}`);
+      clearTimeout(timeoutHandle);
+      discoverySocket.close();
+      resolve(null);
+    });
+
+    try {
+      discoverySocket.bind(DISCOVERY_PORT, () => {
+        discoverySocket.setBroadcast(true);
+        console.log(`[BROADCAST] Listening for server broadcasts on port ${DISCOVERY_PORT}...`);
+      });
+    } catch (err) {
+      console.log(`[BROADCAST] Could not bind to port ${DISCOVERY_PORT}: ${err.message}`);
+      clearTimeout(timeoutHandle);
+      discoverySocket.close();
+      resolve(null);
     }
-  }
-
-  // Sort: IPv4 first, then by interface name (to prioritize Ethernet/WiFi)
-  ips.sort((a, b) => {
-    if (a.family !== b.family) return a.family === 'IPv4' ? -1 : 1;
-    return a.interface.localeCompare(b.interface);
   });
-
-  return ips.map(x => x.ip);
 }
 
 /**
@@ -149,8 +180,8 @@ async function fetchServerIPsFromServer() {
 /**
  * Discover which server IP is reachable.
  * 1. Tries localhost first (local development)
- * 2. Scans local network interfaces
- * 3. Fetches dynamically advertised IPs from server
+ * 2. Listens for UDP broadcast from server (AUTOMATIC, FASTEST)
+ * 3. Fetches dynamically advertised IPs from HTTP endpoint (FALLBACK)
  * 4. Races all candidates on /api/health
  * 5. Falls back to localhost if nothing responds
  */
@@ -171,25 +202,35 @@ async function discoverServer() {
     return RESOLVED_SERVER_URL;
   }
 
-  // Step 2: Get local network IPs from this machine
-  console.log('[DISCOVERY] Step 2: Scanning local network interfaces...');
-  const localIPs = getLocalNetworkIPs();
-  console.log(`[DISCOVERY] Found ${localIPs.length} local network IPs`);
+  // Step 2: Listen for UDP broadcast (FASTEST)
+  console.log('[DISCOVERY] Step 2: Listening for UDP server broadcast...');
+  let broadcastIPs = await listenForBroadcast(3000);
+  if (broadcastIPs && broadcastIPs.length > 0) {
+    console.log('[DISCOVERY] ✓ Got IPs from broadcast, testing...');
+    const results = await Promise.all(broadcastIPs.map(ip => checkServerIP(ip, HEALTH_CHECK_TIMEOUT)));
+    for (let i = 0; i < results.length; i++) {
+      if (results[i]) {
+        RESOLVED_SERVER_URL = results[i];
+        console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND via BROADCAST at ${broadcastIPs[i]}:${SERVER_PORT} ✓✓✓`);
+        console.log('═══════════════════════════════════════════════════════════\n');
+        return RESOLVED_SERVER_URL;
+      }
+    }
+  }
 
-  // Step 3: Fetch server-advertised IPs
-  console.log('[DISCOVERY] Step 3: Fetching server-advertised IPs...');
+  // Step 3: Fallback to HTTP endpoint (if broadcast failed)
+  console.log('[DISCOVERY] Step 3: Fetching server-advertised IPs via HTTP...');
   let serverAdvertisedIPs = await fetchServerIPsFromServer();
 
-  // Step 4: Combine and deduplicate all candidates
-  let allCandidates = [
-    ...localIPs,  // Local network IPs (WiFi, Ethernet, etc.)
-    ...serverAdvertisedIPs  // Server's advertised IPs
-  ];
+  if (serverAdvertisedIPs.length === 0) {
+    console.log('[DISCOVERY] No server-advertised IPs found.');
+    console.log('[DISCOVERY] Falling back to localhost...');
+  }
 
-  // Remove duplicates while preserving order
-  allCandidates = Array.from(new Set(allCandidates));
+  // Step 4: Test advertised IPs
+  let allCandidates = serverAdvertisedIPs;
 
-  console.log(`[DISCOVERY] Step 4: Testing ${allCandidates.length} candidate IPs...`);
+  console.log(`[DISCOVERY] Step 4: Testing ${allCandidates.length} candidate IP(s)...`);
   console.log('[DISCOVERY] Candidates:', allCandidates);
 
   // Race health checks against all discovered IPs
@@ -200,7 +241,7 @@ async function discoverServer() {
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND at ${allCandidates[i]}:${SERVER_PORT} ✓✓✓`);
+      console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND via HTTP at ${allCandidates[i]}:${SERVER_PORT} ✓✓✓`);
       console.log('═══════════════════════════════════════════════════════════\n');
       return RESOLVED_SERVER_URL;
     }

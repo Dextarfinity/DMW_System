@@ -144,62 +144,8 @@ function discoverServer() {
 // Socket instance (created once, reconnects automatically)
 let socket = null;
 let _socketReconnectTimer = null;
-let _ipRefreshTimer = null;
 
-/**
- * Periodic IP refresh — detects WiFi network changes and updates server IPs automatically.
- * Runs every 30 seconds to check if server IPs have changed (e.g., WiFi reconnection).
- * If socket is disconnected and IP changed, triggers reconnection.
- */
-function startPeriodicIPRefresh() {
- if (_ipRefreshTimer) clearInterval(_ipRefreshTimer);
 
- _ipRefreshTimer = setInterval(async () => {
-  try {
-   // Try to fetch the latest server IPs from the current connection
-   if (RESOLVED_SERVER_IP) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
-
-    const response = await fetch(`http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api/server-ips`, {
-     signal: controller.signal
-    });
-    clearTimeout(timer);
-    if (response.ok) {
-     const data = await response.json();
-     if (data.all_ips && Array.isArray(data.all_ips)) {
-      const newIPs = data.all_ips.filter(ip => ip !== 'localhost');
-      // Check if IPs have changed
-      const ipsChanged = newIPs.length !== SERVER_IPS.length ||
-       !newIPs.every(ip => SERVER_IPS.includes(ip));
-      if (ipsChanged) {
-       console.log('[IP-REFRESH] ⚡ Server IPs updated:', newIPs);
-       SERVER_IPS = newIPs;
-       // If socket is disconnected, reset discovery to try new IPs
-       if (socket && !socket.connected) {
-        console.log('[IP-REFRESH] Socket disconnected with new IPs available, attempting reconnect...');
-        _serverDiscoveryPromise = null; // Reset discovery cache
-        connectSocket();
-       }
-      }
-     }
-    }
-   }
-  } catch (err) {
-   // Silently fail — just means server not currently reachable for refresh
-  }
- }, 30000); // Every 30 seconds
-}
-
-/**
- * Stop the periodic IP refresh
- */
-function stopPeriodicIPRefresh() {
- if (_ipRefreshTimer) {
-  clearInterval(_ipRefreshTimer);
-  _ipRefreshTimer = null;
- }
-}
 
 /**
  * Connect to the Socket.IO server. Called after login or session restore.
@@ -322,8 +268,6 @@ function disconnectSocket() {
  socket.disconnect();
  socket = null;
  }
- // Stop periodic IP refresh when disconnecting
- stopPeriodicIPRefresh();
 }
 
 /**
@@ -6131,9 +6075,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Connect to Socket.IO for real-time sync across all Electron clients
  connectSocket();
-
- // Start periodic IP refresh to detect WiFi network changes
- startPeriodicIPRefresh();
 
  // Navigate to previous page from hash/localStorage, or dashboard if none exists
  navigateToFromHash();
