@@ -308,10 +308,7 @@ async function createWindow() {
   mainWindow.setMenuBarVisibility(false);
 
   // --- Dynamic Server Discovery ---
-  console.log('\n');
-  console.log('╔════════════════════════════════════════════════════════════╗');
-  console.log('║  PROCUREMENT PLAN SYSTEM - SERVER DISCOVERY                ║');
-  console.log('╚════════════════════════════════════════════════════════════╝');
+  console.log('\n[STARTUP] Starting server discovery...\n');
 
   // Discover which server IP is reachable on the current network
   await discoverServer();
