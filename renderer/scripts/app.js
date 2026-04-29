@@ -5972,11 +5972,35 @@ document.addEventListener('DOMContentLoaded', () => {
  // Initialize the app
  async function init() {
  console.log('[INIT] Starting application initialization...');
- // Discover which server IP is reachable BEFORE any API calls
- await discoverServer();
- API_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api`;
- console.log('[INIT] API_URL resolved to', API_URL);
- console.log('[INIT] Client is connected to server at:', RESOLVED_SERVER_IP);
+
+ // NEW: Wait for server URL from main process (IPC) with timeout fallback
+ let serverUrlFromMain = await new Promise((resolve) => {
+   const { ipcRenderer } = require('electron');
+   const timeout = setTimeout(() => {
+     console.log('[INIT] Main process did not send server URL, using discovery');
+     resolve(null);
+   }, 3000);
+
+   ipcRenderer.on('server-discovered', (event, data) => {
+     clearTimeout(timeout);
+     console.log('[INIT] Received server URL from main process:', data.url);
+     resolve(data.url);
+   });
+ });
+
+ // If we got the server URL from main process, use it directly
+ if (serverUrlFromMain) {
+   API_URL = serverUrlFromMain + '/api';
+   RESOLVED_SERVER_IP = serverUrlFromMain.replace('http://', '').replace(':3000', '');
+   console.log('[INIT] API_URL resolved to', API_URL);
+   console.log('[INIT] Client is connected to server at:', RESOLVED_SERVER_IP);
+ } else {
+   // Fall back to discovery if main process didn't send URL
+   await discoverServer();
+   API_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}/api`;
+   console.log('[INIT] API_URL resolved to', API_URL);
+   console.log('[INIT] Client is connected to server at:', RESOLVED_SERVER_IP);
+ }
 
  setCurrentDate();
  setupEventListeners();
