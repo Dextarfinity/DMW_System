@@ -385,3 +385,6 @@ main.js
 app.js
 
 
+
+
+New-NetFirewallRule -DisplayName "DMW Server Discovery UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 5555
