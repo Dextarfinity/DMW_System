@@ -1,5 +1,5 @@
 # CLAUDE.md
-
+# Comprehensive documentation for the DMW Procurement Plan System application, covering architecture, setup, deployment, and troubleshooting.
 **⚠️ LIVING DOCUMENT:** This file tracks all major changes, architecture decisions, and setup details. Update this file whenever significant changes are made to the repository so Claude can track the application's evolution.
 
 **Last Updated:** 2026-04-29 (CRITICAL FIXES IMPLEMENTED & COMMITTED)
