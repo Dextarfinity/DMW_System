@@ -6458,6 +6458,7 @@ function stopBroadcastDiscovery() {
     }
     broadcastSocket = null;
   }
+}
 
 // ==============================================================================
 
