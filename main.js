@@ -72,7 +72,7 @@ function listenForBroadcast(timeout = 3000) {
       }
     });
 
-    req.on('error', (err) => {
+    discoverySocket.on('error', (err) => {
       console.log(`[BROADCAST] Socket error: ${err.message}`);
       clearTimeout(timeoutHandle);
       discoverySocket.close();
