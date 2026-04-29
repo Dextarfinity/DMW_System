@@ -158,10 +158,13 @@ let _socketReconnectTimer = null;
 function connectSocket() {
  // Ensure we have a resolved URL
  if (!SOCKET_SERVER_URL) {
- console.warn('[SOCKET] Server not yet discovered, deferring connect');
+ console.warn('[SOCKET] Server not yet discovered, starting discovery...');
  discoverServer().then(() => connectSocket());
  return;
  }
+
+ console.log('[SOCKET] Using server URL:', SOCKET_SERVER_URL);
+
  // Prevent duplicate connections
  if (socket && socket.connected) return;
  if (socket) { socket.disconnect(); socket = null; }
@@ -5991,8 +5994,10 @@ document.addEventListener('DOMContentLoaded', () => {
  // If we got the server URL from main process, use it directly
  if (serverUrlFromMain) {
    API_URL = serverUrlFromMain + '/api';
+   SOCKET_SERVER_URL = serverUrlFromMain;  // <-- ADD THIS LINE
    RESOLVED_SERVER_IP = serverUrlFromMain.replace('http://', '').replace(':3000', '');
    console.log('[INIT] API_URL resolved to', API_URL);
+   console.log('[INIT] SOCKET_SERVER_URL resolved to', SOCKET_SERVER_URL);
    console.log('[INIT] Client is connected to server at:', RESOLVED_SERVER_IP);
  } else {
    // Fall back to discovery if main process didn't send URL
