@@ -388,3 +388,39 @@ app.js
 
 
 New-NetFirewallRule -DisplayName "DMW Server Discovery UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 5555
+
+
+
+
+
+
+
+
+
+PS C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System> npm start
+
+> procurement-plan-system@1.0.0 start
+> electron .
+
+
+
+[STARTUP] Starting server discovery...
+
+[DISCOVERY] Starting dynamic server discovery...
+[DISCOVERY] Step 1: Trying localhost (local development)...
+[DISCOVERY] [FAIL] Cannot reach localhost: connect ECONNREFUSED ::1:3000
+[DISCOVERY] Step 1.5: Scanning local network interfaces...
+[DISCOVERY] Found 1 network candidate(s): 192.168.1.184
+[DISCOVERY] [TIMEOUT] Timeout connecting to 192.168.1.184
+[DISCOVERY] Step 2: Listening for UDP server broadcast...
+(node:18028) UnhandledPromiseRejectionWarning: ReferenceError: req is not defined
+    at C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System\main.js:75:5
+    at new Promise (<anonymous>)
+    at listenForBroadcast (C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System\main.js:40:10)
+    at discoverServer (C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System\main.js:244:28)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async createWindow (C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System\main.js:347:3)
+(Use `electron --trace-warnings ...` to show where the warning was created)
+(node:18028) UnhandledPromiseRejectionWarning: Unhandled promise rejection. This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). To terminate the node process on unhandled promise rejection, use the CLI flag `--unhandled-rejections=strict` (see https://nodejs.org/api/cli.html#cli_unhandled_rejections_mode). (rejection id: 2)
+[DISCOVERY] [FAIL] Cannot reach 192.168.1.184: socket hang up
+[BROADCAST] No broadcast received (timeout)
