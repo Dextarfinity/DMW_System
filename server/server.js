@@ -6342,7 +6342,21 @@ app.use((err, req, res, _next) => {
 // ==============================================================================
 
 const PORT = parseInt(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+
+// Get the actual network IP instead of using 0.0.0.0
+function getNetworkIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal && !iface.address.startsWith('169.254.')) {
+        return iface.address;
+      }
+    }
+  }
+  return process.env.HOST || 'localhost';
+}
+
+const HOST = getNetworkIP();
 
 // ==============================================================================
 // AUTOMATIC UDP BROADCAST DISCOVERY
@@ -6353,10 +6367,14 @@ const DISCOVERY_PORT = 5555; // UDP broadcast port for discovery
 const BROADCAST_INTERVAL = 5000; // Broadcast every 5 seconds
 let broadcastSocket = null;
 let broadcastInterval = null;
+let broadcastActive = false; // Track if broadcasting is active
 
 function startBroadcastDiscovery() {
   try {
+    if (broadcastActive) return; // Already running
+
     broadcastSocket = dgram.createSocket('udp4');
+    broadcastActive = true;
 
     // Get all network IPs
     const interfaces = os.networkInterfaces();
