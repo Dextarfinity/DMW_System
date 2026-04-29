@@ -57,7 +57,7 @@ function listenForBroadcast(timeout = 3000) {
             const port = parts[2];
             const allIPs = parts[3] ? parts[3].split(',') : [primaryIP];
 
-            console.log(`[BROADCAST] ✓ Received broadcast from ${info.address}`);
+            console.log(`[BROADCAST] [OK] Received broadcast from ${info.address}`);
             console.log(`[BROADCAST] Primary IP: ${primaryIP}:${port}`);
             console.log(`[BROADCAST] All IPs: ${allIPs.join(', ')}`);
 
@@ -72,7 +72,7 @@ function listenForBroadcast(timeout = 3000) {
       }
     });
 
-    discoverySocket.on('error', (err) => {
+    req.on('error', (err) => {
       console.log(`[BROADCAST] Socket error: ${err.message}`);
       clearTimeout(timeoutHandle);
       discoverySocket.close();
@@ -102,20 +102,20 @@ function checkServerIP(ip, timeout = HEALTH_CHECK_TIMEOUT) {
     const url = `http://${ip}:${SERVER_PORT}`;
     const req = http.get(`${url}/api/health`, { timeout }, (res) => {
       if (res.statusCode >= 200 && res.statusCode < 400) {
-        console.log(`[DISCOVERY] ✓ Server responding at ${ip}:${SERVER_PORT}`);
+        console.log(`[DISCOVERY] [OK] Server responding at ${ip}:${SERVER_PORT}`);
         resolve(url);
       } else {
-        console.log(`[DISCOVERY] ✗ Server at ${ip} returned status ${res.statusCode}`);
+        console.log(`[DISCOVERY] [FAIL] Server at ${ip} returned status ${res.statusCode}`);
         resolve(null);
       }
       res.resume();
     });
     req.on('error', (err) => {
-      console.log(`[DISCOVERY] ✗ Cannot reach ${ip}: ${err.message}`);
+      console.log(`[DISCOVERY] [FAIL] Cannot reach ${ip}: ${err.message}`);
       resolve(null);
     });
     req.on('timeout', () => {
-      console.log(`[DISCOVERY] ✗ Timeout connecting to ${ip}`);
+      console.log(`[DISCOVERY] [TIMEOUT] Timeout connecting to ${ip}`);
       req.destroy();
       resolve(null);
     });
@@ -178,6 +178,31 @@ async function fetchServerIPsFromServer() {
 }
 
 /**
+ * Get local network IP candidates from all network interfaces.
+ * Returns IPv4 addresses from Ethernet, WiFi, and other non-loopback interfaces.
+ */
+function getLocalNetworkCandidates() {
+  const candidates = new Set();
+
+  try {
+    const interfaces = os.networkInterfaces();
+
+    Object.keys(interfaces).forEach(iface => {
+      interfaces[iface].forEach(addr => {
+        // Only consider IPv4 addresses
+        if (addr.family === 'IPv4' && !addr.internal) {
+          candidates.add(addr.address);
+        }
+      });
+    });
+  } catch (err) {
+    console.log(`[DISCOVERY] Error scanning network interfaces: ${err.message}`);
+  }
+
+  return Array.from(candidates);
+}
+
+/**
  * Discover which server IP is reachable.
  * 1. Tries localhost first (local development)
  * 2. Listens for UDP broadcast from server (AUTOMATIC, FASTEST)
@@ -195,8 +220,23 @@ async function discoverServer() {
   let localResult = await checkServerIP('localhost', HEALTH_CHECK_TIMEOUT);
   if (localResult) {
     RESOLVED_SERVER_URL = localResult;
-    console.log('[DISCOVERY] ✓ Using localhost (local development)');
+    console.log('[DISCOVERY] [OK] Using localhost (local development)');
     return RESOLVED_SERVER_URL;
+  }
+
+  // Step 1.5: Scan local network IPs (WiFi and Ethernet)
+  console.log('[DISCOVERY] Step 1.5: Scanning local network interfaces...');
+  let networkCandidates = getLocalNetworkCandidates();
+  if (networkCandidates.length > 0) {
+    console.log(`[DISCOVERY] Found ${networkCandidates.length} network candidate(s): ${networkCandidates.join(', ')}`);
+    const networkResults = await Promise.all(networkCandidates.map(ip => checkServerIP(ip, HEALTH_CHECK_TIMEOUT)));
+    for (let i = 0; i < networkResults.length; i++) {
+      if (networkResults[i]) {
+        RESOLVED_SERVER_URL = networkResults[i];
+        console.log(`[DISCOVERY] [OK] SERVER FOUND on local network at ${networkCandidates[i]}:${SERVER_PORT}`);
+        return RESOLVED_SERVER_URL;
+      }
+    }
   }
 
   // Step 2: Listen for UDP broadcast (FASTEST)
@@ -262,16 +302,16 @@ function isServerReachable() {
     console.log(`[SERVER-CHECK] Checking if server is reachable at ${RESOLVED_SERVER_URL}`);
     const req = http.get(`${RESOLVED_SERVER_URL}/api/health`, { timeout: HEALTH_CHECK_TIMEOUT }, (res) => {
       const isReachable = res.statusCode >= 200 && res.statusCode < 400;
-      console.log(`[SERVER-CHECK] Server health check: ${res.statusCode} - ${isReachable ? '✓ REACHABLE' : '✗ NOT REACHABLE'}`);
+      console.log(`[SERVER-CHECK] Server health check: ${res.statusCode} - ${isReachable ? '[OK] REACHABLE' : '[FAIL] NOT REACHABLE'}`);
       resolve(isReachable);
       res.resume();
     });
     req.on('error', (err) => {
-      console.log(`[SERVER-CHECK] ✗ Server check failed: ${err.message}`);
+      console.log(`[SERVER-CHECK] [FAIL] Server check failed: ${err.message}`);
       resolve(false);
     });
     req.on('timeout', () => {
-      console.log('[SERVER-CHECK] ✗ Server check timed out');
+      console.log('[SERVER-CHECK] [TIMEOUT] Server check timed out');
       req.destroy();
       resolve(false);
     });
