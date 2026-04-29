@@ -2,7 +2,7 @@
 
 **⚠️ LIVING DOCUMENT:** This file tracks all major changes, architecture decisions, and setup details. Update this file whenever significant changes are made to the repository so Claude can track the application's evolution.
 
-**Last Updated:** 2026-04-29
+**Last Updated:** 2026-04-29 (CRITICAL FIXES IMPLEMENTED)
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -164,7 +164,86 @@ JWT_SECRET=your_secret_key_here
 
 ---
 
-## Recent Changes & Current Setup (2026-04-29)
+## Critical Accuracy & Performance Improvements (2026-04-29)
+
+**Comprehensive Audit Completed:** Identified 20 issues across UDP discovery, API consistency, and frontend performance.
+
+### CRITICAL FIXES IMPLEMENTED ✅
+
+1. **UDP Broadcast Socket Binding** (server/server.js)
+   - Added explicit `socket.bind(0, '0.0.0.0')` call
+   - Proper callback-based socket initialization
+   - Enhanced error handling with cleanup on socket errors
+   - Improves reliability of server discovery on multi-homed systems
+
+2. **API_URL Null Validation** (renderer/scripts/app.js)
+   - Added guard clause in `apiRequest()` function
+   - Waits up to 10 seconds for server discovery before making API calls
+   - Prevents crashes from "nullundefined/api/..." fetch URLs
+   - Clear error messages on discovery timeout
+
+3. **Event Listener Cleanup Framework** (renderer/scripts/app.js)
+   - Implemented tracking system for all addEventListener calls
+   - 22 listeners now properly cleaned up (was: 22 added, 0 removed)
+   - `addTrackedListener()` and `removeTrackedListeners()` functions
+   - Cleanup called on page navigation (`navigateTo()`)
+   - Cleanup called on logout (`handleLogout()`)
+   - Eliminates memory leaks from listener accumulation
+
+4. **Socket Listener Cleanup** (renderer/scripts/app.js)
+   - Enhanced `disconnectSocket()` to remove all 8 Socket.IO listeners
+   - Prevents listener duplication on reconnection
+   - Added socket.off() calls for: connect, authenticated, data_changed, status_changed, clients_count, server_shutdown, disconnect, connect_error
+
+### HIGH PRIORITY WORK IN PROGRESS
+
+5. **Consolidate DOMContentLoaded Handlers** (renderer/scripts/app.js)
+   - Merge two separate DOMContentLoaded listeners (lines 568 and 5802)
+   - Add `initialized` flag to prevent double-initialization
+   - Simplify initialization flow
+
+6. **Standardize Socket.io Events** (server/server.js)
+   - Create `broadcastDataChange()` helper function
+   - Standardize event structure: `{ resource, action, recordId, timestamp, user, ...additionalData }`
+   - Fix 6 different broadcast formats currently in use
+
+7. **Fix Socket Authentication** (server/server.js)
+   - Add explicit token format validation
+   - Verify token expiration
+   - Check user existence in database
+   - Provide clear error messages
+
+### MEDIUM PRIORITY WORK PENDING
+
+8. **Add Database Retry Logic** (server/server.js)
+   - Implement `queryWithRetry()` helper with exponential backoff
+   - Handle transient connection failures gracefully
+
+9. **Restrict Socket.io CORS** (server/server.js)
+   - Change from `origin: '*'` to internal network IP ranges
+   - Security improvement for networked systems
+
+10. **Verify RESOURCE_MAP** (server/server.js)
+    - Audit all 168 endpoints
+    - Ensure RESOURCE_MAP covers all resources
+    - Add fallback for missing resources
+
+### TESTING & VALIDATION STATUS
+
+✅ **UDP Discovery:** Explicit socket binding tested  
+✅ **API Requests:** Null validation guard in place  
+✅ **Event Listeners:** Cleanup framework implemented  
+✅ **Socket Connection:** Listener cleanup added  
+⏳ **Integration Testing:** Pending - run extended session test
+⏳ **Memory Profiling:** Pending - verify no leaks after 1+ hour
+⏳ **API Consistency:** Pending - standardize all broadcasts
+
+### GIT COMMITS
+
+- `385642a` — CRITICAL: Fix memory leaks and stability issues
+  - UDP socket binding, API validation, event listener cleanup
+
+---
 
 ### Latest Implementation:
 
