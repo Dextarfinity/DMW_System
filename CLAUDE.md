@@ -9,8 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Key Components
 
 - **Desktop Client** (Electron): `main.js` + `renderer/` folder
-  - Dynamic server discovery (tries localhost, then discovers IPs from server)
-  - Real-time updates via Socket.io
+  - Automatic server discovery via UDP broadcast (see "Network Server Discovery" section below)
+  - Real-time updates via Socket.IO
   
 - **Backend API** (Express.js): `server/` folder
   - RESTful API endpoints
@@ -104,13 +104,6 @@ HOST=0.0.0.0               # for LAN access
 JWT_SECRET=your_secret_key_here
 ```
 
-### Server Auto-Discovery (Electron)
-
-- `main.js` implements **dynamic IP discovery**
-- Client tries localhost first, then calls `server/api/server-ips` for network IPs
-- Falls back to localhost if no IPs discovered
-- No hardcoded IP addresses needed
-
 ---
 
 ## Architecture Details
@@ -118,14 +111,14 @@ JWT_SECRET=your_secret_key_here
 ### Electron App Flow
 
 1. `main.js` creates BrowserWindow and loads `renderer/index.html`
-2. Calls `discoverServer()` to find backend API (localhost → LAN IPs)
-3. Establishes Socket.io connection for real-time updates
+2. Calls `discoverServer()` to find backend API via UDP broadcast or HTTP fallback
+3. Establishes Socket.IO connection for real-time updates
 4. IPC communication between main process and renderer
 
 ### Frontend (renderer/)
 
 - `renderer/index.html` — Single-page app with 25+ hidden divs (one per module)
-- `renderer/scripts/app.js` — Page navigation, API calls, role-based visibility, Socket.io listeners
+- `renderer/scripts/app.js` — Page navigation, API calls, role-based visibility, Socket.IO listeners
 - `renderer/styles/main.css` — All styling (no component framework, vanilla JS)
 - `renderer/assets/` — Images and icons
 
@@ -133,7 +126,7 @@ JWT_SECRET=your_secret_key_here
 
 - `server.js` — Express setup, middleware (CORS, auth), API route registration
 - `server/database/` — SQL schema and migrations
-- Socket.io listener for real-time updates
+- Socket.IO listener for real-time updates
 - JWT authentication middleware
 - File upload handling with Multer
 
@@ -181,6 +174,7 @@ curl http://192.168.x.x:3000/api/health
 
 Windows Firewall must allow:
 - Port **3000** (Express API)
+- Port **5555** (UDP broadcast for server discovery)
 - Port **5432** (PostgreSQL, if accessed from LAN)
 
 ---
@@ -192,7 +186,7 @@ Windows Firewall must allow:
 1. Add HTML section in `renderer/index.html` with unique `id="newPageId"`
 2. Add role permissions to `rolePermissions` object in `renderer/scripts/app.js`
 3. Add menu item in nav with `onclick="navigateTo('newPageId')"`
-4. Implement page functions (form handlers, data loading, Socket.io listeners)
+4. Implement page functions (form handlers, data loading, Socket.IO listeners)
 5. Add corresponding API endpoints in `server/` if needed
 6. Test navigation and refresh persistence (uses browser hash + localStorage)
 
@@ -202,7 +196,7 @@ Windows Firewall must allow:
 2. Register route in `server.js` with `app.post('/api/...', authMiddleware, handler)`
 3. Add JWT authentication middleware where needed (`authMiddleware`)
 4. Test with curl or Postman
-5. Call from frontend via `fetch()` or Socket.io emit
+5. Call from frontend via `fetch()` or Socket.IO emit
 
 ### Database Schema Changes
 
@@ -213,36 +207,76 @@ Windows Firewall must allow:
 
 ---
 
-## Network Server Discovery (Enhanced)
+## Network Server Discovery (Automatic via UDP Broadcast)
 
 **How It Works:**
 
-The Electron app uses a 5-step dynamic discovery process to find the backend server across any network:
+The Electron app uses automatic server discovery with ZERO manual IP configuration:
 
-1. **Localhost First** — Tries `localhost:3000` (local development mode)
-2. **Local Network Scan** — Scans all active network interfaces on the client PC (Ethernet, WiFi, etc.)
-3. **Server Advertisement** — Queries server's `/api/server-ips` endpoint to get all advertised IPs
-4. **Candidate Racing** — Tests all discovered IPs in parallel via `/api/health`
-5. **Fallback** — Falls back to localhost if no server responds
+1. **UDP Broadcast (Fastest)** — Server broadcasts "DMW-SERVER|192.168.x.x|3000" every 5 seconds on port 5555
+2. **Client Listener** — Clients listen for broadcasts and auto-connect
+3. **HTTP Fallback** — If broadcast fails, falls back to `http://api.local:3000` or localhost
+4. **No Restart Needed** — If server IP changes (WiFi reconnection), clients auto-reconnect
 
-**See:** `main.js` — `getLocalNetworkIPs()`, `fetchServerIPsFromServer()`, `discoverServer()`
+**Setup Instructions:**
+
+See `AUTOMATIC_DISCOVERY_SETUP.md` for detailed setup, testing, and troubleshooting:
+- Server PC: `npm run dev` starts broadcasting
+- Client PC: `npm start` auto-discovers and connects
+- Multiple clients all discover the same server automatically
 
 **Server-Side Detection:**
 
 The backend detects all available network IPs via:
 - `server/server.js` → `getLocalIP()` — returns primary IPv4 address
 - `server/server.js` → `getAllLocalIPs()` — returns all non-internal IPv4 addresses
-- `GET /api/server-ips` endpoint — advertises all available IPs and network interfaces
+- `GET /api/server-ips` endpoint — advertises all available IPs (fallback if broadcast fails)
+- `startBroadcastDiscovery()` — Broadcasts server info on UDP port 5555 every 5 seconds
+
+**Client-Side Discovery:**
+
+- `main.js` → `listenForBroadcast()` — Listens for UDP broadcasts
+- `main.js` → `discoverServer()` — Implements multi-step discovery with candidate racing
+- Logs visible in DevTools console (Ctrl+Shift+I): `[BROADCAST]`, `[DISCOVERY]` messages
 
 **Debugging:**
 
 Open DevTools (Ctrl+Shift+I) to see discovery logs:
 ```
-[DISCOVERY] Starting dynamic server discovery...
-[DISCOVERY] Scanning local network interfaces...
-[DISCOVERY] Testing X candidate IPs...
-[DISCOVERY] ✓✓✓ SERVER FOUND at 192.168.x.x:3000 ✓✓✓
+[BROADCAST] Listening for server broadcasts on port 5555...
+[BROADCAST] ✓ Received broadcast from 192.168.100.50
+[DISCOVERY] ✓✓✓ SERVER FOUND via BROADCAST at 192.168.100.50:3000 ✓✓✓
+[UI] ✓ Server is UP - Loading frontend
 ```
+
+---
+
+## Build & Deployment (Build Once, Distribute to All Clients)
+
+**The Deployment Model:**
+
+1. **Build Once** (Server PC): `npm run dist` creates installers
+   - Output: `dist/Procurement Plan System Setup X.X.X.exe` (NSIS installer)
+   - Output: `dist/Procurement Plan System X.X.X.exe` (portable .exe)
+
+2. **Copy to USB**: Copy `dist/` files to USB flash drive
+   - Label USB with version number and date
+   - Distribute USB to all client PCs
+
+3. **Client Installation**: Each client installs from USB
+   - Run .exe installer from USB
+   - Installation takes ~2-3 minutes
+   - Application launches and auto-discovers server (no IP configuration)
+
+4. **Real-Time Updates (No Rebuild Needed)**:
+   - Make changes to `renderer/` (HTML/JS/CSS) or `server/` (API)
+   - Restart server (or it auto-reloads with nodemon)
+   - All connected clients see changes immediately via Socket.IO
+   - **No client restart, rebuild, or reinstall needed!**
+
+**See:** 
+- `SERVER_DISTRIBUTION_GUIDE.md` — Complete step-by-step distribution workflow
+- `DEPLOYMENT_WORKFLOW.md` — Real-time update examples and scenarios
 
 ---
 
@@ -269,22 +303,6 @@ Open DevTools (Ctrl+Shift+I) to see discovery logs:
 | officer1 | admin123 | Officer |
 
 ⚠️ Change after first login in production.
-
----
-
-## Build & Distribution
-
-### Create Windows Installer
-
-```bash
-npm run dist
-```
-
-Creates:
-- `dist/Procurement Plan System Setup X.X.X.exe` — NSIS installer
-- `dist/Procurement Plan System X.X.X.exe` — Portable executable
-
-Configuration in `package.json` under `"build"` key.
 
 ---
 
@@ -320,7 +338,7 @@ Configuration in `package.json` under `"build"` key.
 - Ensure backend is running: `npm run dev` in `server/` folder
 - Check `server/.env` database credentials
 - Verify PostgreSQL is running and accessible
-- For LAN issues: ensure `HOST=0.0.0.0` in `.env` and firewall allows port 3000
+- For LAN issues: ensure `HOST=0.0.0.0` in `.env` and firewall allows port 3000 and UDP port 5555
 
 ### Page resets to dashboard on refresh
 - Check that hash-based routing is implemented in `renderer/scripts/app.js`
@@ -329,7 +347,7 @@ Configuration in `package.json` under `"build"` key.
 
 ### Form data not persisting
 - Backend must be running and connected
-- Check Socket.io connection in browser console
+- Check Socket.IO connection in browser console
 - Verify API endpoint is defined and returns correct status codes
 
 ### Database migration issues
