@@ -243,12 +243,12 @@ async function discoverServer() {
   console.log('[DISCOVERY] Step 2: Listening for UDP server broadcast...');
   let broadcastIPs = await listenForBroadcast(3000);
   if (broadcastIPs && broadcastIPs.length > 0) {
-    console.log('[DISCOVERY] ✓ Got IPs from broadcast, testing...');
+    console.log('[DISCOVERY] [OK] Got IPs from broadcast, testing...');
     const results = await Promise.all(broadcastIPs.map(ip => checkServerIP(ip, HEALTH_CHECK_TIMEOUT)));
     for (let i = 0; i < results.length; i++) {
       if (results[i]) {
         RESOLVED_SERVER_URL = results[i];
-        console.log(`[DISCOVERY] ✓ SERVER FOUND via BROADCAST at ${broadcastIPs[i]}:${SERVER_PORT} ✓`);
+        console.log(`[DISCOVERY] [OK] SERVER FOUND via BROADCAST at ${broadcastIPs[i]}:${SERVER_PORT}`);
         return RESOLVED_SERVER_URL;
       }
     }
@@ -277,14 +277,14 @@ async function discoverServer() {
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] ✓ SERVER FOUND via HTTP at ${allCandidates[i]}:${SERVER_PORT} ✓`);
+      console.log(`[DISCOVERY] [OK] SERVER FOUND via HTTP at ${allCandidates[i]}:${SERVER_PORT}`);
       return RESOLVED_SERVER_URL;
     }
   }
 
   // Step 5: Fallback to localhost if nothing responded
   RESOLVED_SERVER_URL = `http://localhost:${SERVER_PORT}`;
-  console.warn('[DISCOVERY] ⚠ No server responded to health checks');
+  console.warn('[DISCOVERY] [WARNING] No server responded to health checks');
   console.warn('[DISCOVERY] Falling back to localhost (offline mode)');
   return RESOLVED_SERVER_URL;
 }
@@ -355,10 +355,10 @@ async function createWindow() {
   // Falls back to the bundled local files if the server is unreachable.
   const serverUp = await isServerReachable();
   if (serverUp && RESOLVED_SERVER_URL) {
-    console.log('[UI] ✓ Server is UP - Loading frontend from:', RESOLVED_SERVER_URL);
+    console.log('[UI] [OK] Server is UP - Loading frontend from:', RESOLVED_SERVER_URL);
     mainWindow.loadURL(RESOLVED_SERVER_URL);
   } else {
-    console.log('[UI] ⚠ Server is DOWN or unreachable - Loading bundled local files');
+    console.log('[UI] [WARNING] Server is DOWN or unreachable - Loading bundled local files');
     console.log('[UI] Frontend will be served from:', path.join(__dirname, 'renderer', 'index.html'));
     mainWindow.loadFile('renderer/index.html');
   }
@@ -372,11 +372,11 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.maximize();
-    console.log('[UI] ✓ Window displayed and maximized');
+    console.log('[UI] [OK] Window displayed and maximized');
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[UI] ✓ Page content loaded successfully');
+    console.log('[UI] [OK] Page content loaded successfully');
     // Send the resolved server URL to the renderer immediately after page load
     if (RESOLVED_SERVER_URL) {
       mainWindow.webContents.send('server-discovered', { url: RESOLVED_SERVER_URL });
@@ -437,7 +437,7 @@ async function createWindow() {
             }
           })();
         `).catch(() => {});
-        console.log('[UI] ✓ Logo assets injected');
+        console.log('[UI] [OK] Logo assets injected');
       }
     } catch (e) {
       console.warn('[Logos] Could not inject logos:', e.message);
