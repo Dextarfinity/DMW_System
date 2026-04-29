@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+**⚠️ LIVING DOCUMENT:** This file tracks all major changes, architecture decisions, and setup details. Update this file whenever significant changes are made to the repository so Claude can track the application's evolution.
+
+**Last Updated:** 2026-04-29
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -61,12 +65,21 @@ cd server
 # Install dependencies (run once)
 npm install
 
-# Run production mode
-npm start
-
-# Run development mode with auto-reload
+# DEVELOPMENT: Run with auto-reload
 npm run dev
+
+# PRODUCTION: Server runs continuously via PM2
+# (Set up once, then restart with: pm2 restart dmw-server)
+pm2 start server.js --name "dmw-server"
+
+# Watch production logs
+pm2 logs dmw-server
+
+# Restart server (after making changes)
+pm2 restart dmw-server
 ```
+
+**Important:** In production, the server runs continuously with PM2. To update the server after code changes, just run `pm2 restart dmw-server` — clients will auto-reconnect and get updates via Socket.IO.
 
 ### Database Setup
 
@@ -146,10 +159,76 @@ JWT_SECRET=your_secret_key_here
 - `socket.io` — Real-time communication
 - `pdf-lib` — PDF generation
 - `nodemon` — Auto-reload during development
+- `pm2` — Production process manager (server runs continuously)
+- `dgram` — UDP broadcast for server discovery
 
 ---
 
-## Testing & Validation
+## Recent Changes & Current Setup (2026-04-29)
+
+### Latest Implementation:
+
+1. **UDP Broadcast Server Discovery** ✅
+   - Server broadcasts on UDP port 5555 every 5 seconds
+   - Clients listen for broadcasts and auto-discover server IP
+   - Zero manual IP configuration needed
+   - Fallback to HTTP if UDP fails
+
+2. **Production Server with PM2** ✅
+   - Server runs continuously via PM2 process manager
+   - No need for `npm run dev` in production
+   - Restart with: `pm2 restart dmw-server`
+   - Logs available via: `pm2 logs dmw-server`
+
+3. **Windows Firewall Configuration** ✅
+   - Added UDP port 5555 rule on SERVER PC
+   - Added UDP port 5555 rule on CLIENT PC
+   - Added TCP port 3000 rule for Express API
+   - Command: `New-NetFirewallRule -DisplayName "DMW Server Discovery UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 5555`
+
+4. **Comprehensive Deployment Documentation** ✅
+   - `SERVER_DISTRIBUTION_GUIDE.md` — USB distribution workflow
+   - `DEPLOYMENT_CHECKLIST.md` — Admin quick reference
+   - `DEPLOYMENT_WORKFLOW.md` — Real-time update examples
+
+### How the System Works Now:
+
+```
+SERVER PC:
+├─ Server runs continuously: pm2 restart dmw-server
+├─ Broadcasts UDP on port 5555 every 5 seconds
+├─ Serves frontend files dynamically (no rebuild needed for changes)
+└─ Accepts client connections via Socket.IO
+
+CLIENT PC:
+├─ Application starts: npm start
+├─ Listens for UDP broadcasts on port 5555
+├─ Auto-discovers server IP (zero config)
+├─ Connects to server and loads frontend
+└─ Real-time updates via Socket.IO (no restart needed for server changes)
+```
+
+### Update Workflow:
+
+**To update the application after changes:**
+
+1. **Edit files** on SERVER PC:
+   - `renderer/scripts/app.js` (frontend logic)
+   - `renderer/styles/main.css` (styling)
+   - `server/server.js` (API logic)
+   - Database files, etc.
+
+2. **Restart server:**
+   ```bash
+   pm2 restart dmw-server
+   ```
+
+3. **All connected clients** automatically get:
+   - New frontend from server (no rebuild)
+   - New data via Socket.IO (real-time)
+   - No client restart needed!
+
+---
 
 ### Testing Database Connection
 
@@ -173,9 +252,24 @@ curl http://192.168.x.x:3000/api/health
 ### Firewall Configuration
 
 Windows Firewall must allow:
-- Port **3000** (Express API)
-- Port **5555** (UDP broadcast for server discovery)
-- Port **5432** (PostgreSQL, if accessed from LAN)
+- Port **3000** (Express API) - TCP
+- Port **5555** (UDP broadcast for server discovery) - UDP
+- Port **5432** (PostgreSQL, if accessed from LAN) - TCP
+
+**Setup commands (run as Administrator in PowerShell):**
+
+```powershell
+# Allow Express API
+New-NetFirewallRule -DisplayName "DMW API Server" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000
+
+# Allow UDP server discovery
+New-NetFirewallRule -DisplayName "DMW Server Discovery UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 5555
+
+# Verify rules
+Get-NetFirewallRule -DisplayName "DMW*"
+```
+
+**Apply on both SERVER PC and CLIENT PC** for full connectivity.
 
 ---
 
@@ -221,23 +315,27 @@ The Electron app uses automatic server discovery with ZERO manual IP configurati
 **Setup Instructions:**
 
 See `AUTOMATIC_DISCOVERY_SETUP.md` for detailed setup, testing, and troubleshooting:
-- Server PC: `npm run dev` starts broadcasting
+- Server PC: Runs continuously via `pm2 restart dmw-server`
+- Server PC: Firewall allows UDP 5555 (see Firewall Configuration section)
 - Client PC: `npm start` auto-discovers and connects
+- Client PC: Firewall allows UDP 5555
 - Multiple clients all discover the same server automatically
 
-**Server-Side Detection:**
+**Server-Side Broadcasting:**
 
 The backend detects all available network IPs via:
 - `server/server.js` → `getLocalIP()` — returns primary IPv4 address
 - `server/server.js` → `getAllLocalIPs()` — returns all non-internal IPv4 addresses
 - `GET /api/server-ips` endpoint — advertises all available IPs (fallback if broadcast fails)
 - `startBroadcastDiscovery()` — Broadcasts server info on UDP port 5555 every 5 seconds
+- Automatically starts when server starts with PM2
 
 **Client-Side Discovery:**
 
-- `main.js` → `listenForBroadcast()` — Listens for UDP broadcasts
+- `main.js` → `listenForBroadcast()` — Listens for UDP broadcasts on port 5555
 - `main.js` → `discoverServer()` — Implements multi-step discovery with candidate racing
 - Logs visible in DevTools console (Ctrl+Shift+I): `[BROADCAST]`, `[DISCOVERY]` messages
+- Auto-connects when server broadcast is received
 
 **Debugging:**
 
@@ -247,6 +345,12 @@ Open DevTools (Ctrl+Shift+I) to see discovery logs:
 [BROADCAST] ✓ Received broadcast from 192.168.100.50
 [DISCOVERY] ✓✓✓ SERVER FOUND via BROADCAST at 192.168.100.50:3000 ✓✓✓
 [UI] ✓ Server is UP - Loading frontend
+```
+
+**On SERVER PC, check UDP broadcast:**
+```bash
+pm2 logs dmw-server
+# Look for: [DISCOVERY] Starting UDP broadcast on port 5555...
 ```
 
 ---
@@ -335,10 +439,17 @@ Open DevTools (Ctrl+Shift+I) to see discovery logs:
 ## Troubleshooting
 
 ### "Cannot connect to server"
-- Ensure backend is running: `npm run dev` in `server/` folder
-- Check `server/.env` database credentials
+- Ensure backend is running: `pm2 restart dmw-server` on SERVER PC
+- Check server is broadcasting: `pm2 logs dmw-server` should show `[DISCOVERY] Starting UDP broadcast`
+- Verify firewall allows UDP 5555 on both SERVER and CLIENT PC
 - Verify PostgreSQL is running and accessible
-- For LAN issues: ensure `HOST=0.0.0.0` in `.env` and firewall allows port 3000 and UDP port 5555
+- For LAN issues: ensure `HOST=0.0.0.0` in `server/.env` and firewall allows ports 3000 and 5555
+
+### "No broadcast received (timeout)"
+- Add firewall rule on both SERVER and CLIENT PC (see Firewall Configuration section)
+- Verify server is running: `pm2 status dmw-server`
+- Check server logs: `pm2 logs dmw-server`
+- Verify both PCs on same network: `ipconfig` should show similar IP ranges
 
 ### Page resets to dashboard on refresh
 - Check that hash-based routing is implemented in `renderer/scripts/app.js`
@@ -354,3 +465,33 @@ Open DevTools (Ctrl+Shift+I) to see discovery logs:
 - Always test migrations on a backup database first
 - Ensure `psql` is in PATH or use full path to command
 - Verify user permissions with `GRANT` statements in schema.sql
+
+---
+
+## Maintaining This Document
+
+**This is a LIVING DOCUMENT** — Update it whenever:
+
+✅ **Major architecture changes** (new modules, systems, setup)
+✅ **Production setup changes** (firewall rules, PM2 config, deployment model)
+✅ **New deployment workflows** (added documentation files, new processes)
+✅ **Important bug fixes** (solutions to common issues, troubleshooting additions)
+✅ **New dependencies** (packages added to package.json)
+✅ **API changes** (new endpoints, workflow changes)
+
+**DO NOT update for:**
+- Minor UI tweaks
+- Small refactorings
+- Bug fixes that don't affect setup/deployment
+- Temporary debugging changes
+
+**Update Process:**
+
+1. Make significant changes to the codebase
+2. Test thoroughly
+3. Commit changes to git
+4. Update `CLAUDE.md` with new information
+5. Add to git commit: `git add CLAUDE.md && git commit -m "Update CLAUDE.md with [new information]"`
+
+**Purpose:**
+Claude uses this file to understand the application architecture, setup, and recent changes. Keeping it current helps Claude provide better assistance and make informed decisions about the codebase.
