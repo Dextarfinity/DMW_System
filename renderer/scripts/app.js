@@ -6907,7 +6907,7 @@ document.addEventListener('DOMContentLoaded', () => {
  budget_consultant: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'purchase-orders', 'items', 'reports'],
  ord_manager: ['dashboard', 'ppmp', 'app', 'purchase-requests', 'rfq', 'abstract', 'post-qual', 'bac-resolution', 'noa', 'purchase-orders', 'iar', 'po-packet', 'coa', 'items', 'suppliers', 'divisions', 'users', 'stock-cards', 'property-cards', 'ics', 'par', 'ptr', 'ris', 'reports']
  };
- 
+
  const allowedPages = getMergedPermissions(rolePermissions);
 
  // Block access if user doesn't have permission
@@ -6916,8 +6916,22 @@ document.addEventListener('DOMContentLoaded', () => {
  return;
  }
 
- // NEW: Clean up old page event listeners before navigating
- removeTrackedListeners();
+ // CRITICAL FIX: Only remove listeners from the OLD page content, NOT global nav listeners
+ // Find old page and remove only its listeners
+ const oldPage = document.querySelector('.page.active');
+ if (oldPage) {
+   // Remove listeners from elements inside the old page only
+   elementListeners.forEach((handlers, el) => {
+     if (oldPage.contains(el)) {
+       handlers.forEach(({ event, handler }) => {
+         try {
+           el.removeEventListener(event, handler);
+         } catch (e) {}
+       });
+       elementListeners.delete(el);
+     }
+   });
+ }
 
  // Store current page in hash and localStorage for persistence
  window.location.hash = pageId;
