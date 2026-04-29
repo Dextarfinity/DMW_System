@@ -347,6 +347,12 @@ async function createWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[UI] ✓ Page content loaded successfully');
+    // Send the resolved server URL to the renderer immediately after page load
+    if (RESOLVED_SERVER_URL) {
+      mainWindow.webContents.send('server-discovered', { url: RESOLVED_SERVER_URL });
+      console.log('[IPC] Sent resolved server URL to renderer:', RESOLVED_SERVER_URL);
+    }
+  });
     try {
       const fs = require('fs');
       const assetsDir = path.join(__dirname, 'renderer', 'assets');
