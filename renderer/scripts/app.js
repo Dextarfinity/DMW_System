@@ -28,114 +28,40 @@ let _serverDiscoveryPromise = null;
  * 3. Races all IPs on /api/health to find a working connection
  * 4. Returns the first responding IP; no fallback to hardcoded defaults
  */
+/**
+ * SIMPLIFIED: Frontend only uses server URL from main.js (Electron process).
+ * Main.js already discovered the correct server IP via UDP broadcast.
+ * This function is now a fallback only if IPC fails.
+ */
 function discoverServer() {
  if (_serverDiscoveryPromise) return _serverDiscoveryPromise;
 
  _serverDiscoveryPromise = new Promise((resolve) => {
- let settled = false;
- const DISCOVERY_TIMEOUT = 8000; // Total time before fallback
- const SINGLE_IP_TIMEOUT = 2500; // Per-IP timeout
+   // CRITICAL: This should rarely run - main.js should always provide the server URL
+   console.warn('[DISCOVERY] Frontend fallback discovery (main.js should have provided URL)');
 
- // Step 1: Try localhost first (best for local development)
- const tryLocalhost = async () => {
-  try {
-   const controller = new AbortController();
-   const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
-   const response = await fetch(`http://localhost:${SERVER_PORT}/api/health`, {
-    signal: controller.signal
-   });
-   clearTimeout(timer);
-   if (response.ok) return true;
-  } catch (err) {
-   // Localhost not available, continue to discovery
-  }
-  return false;
- };
+   // Fallback: Try localhost only
+   console.log('[DISCOVERY] Attempting localhost fallback...');
+   const testUrl = `http://localhost:${SERVER_PORT}/api/health`;
 
- // Step 2: Try to fetch server IPs from the server itself
- const tryAutoDiscovery = async () => {
-  const candidates = ['localhost', '127.0.0.1'];
-  for (const ip of candidates) {
-   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
-    const response = await fetch(`http://${ip}:${SERVER_PORT}/api/server-ips`, {
-     signal: controller.signal
-    });
-    clearTimeout(timer);
-    if (response.ok) {
-     const data = await response.json();
-     if (data.all_ips && Array.isArray(data.all_ips)) {
-      const discoveredIPs = data.all_ips.filter(ip => ip !== 'localhost');
-      if (discoveredIPs.length > 0) {
-       console.log('[DISCOVERY] Auto-discovered server IPs from', ip + ':', discoveredIPs);
-       SERVER_IPS = [...new Set([...discoveredIPs, 'localhost'])];
-       return discoveredIPs;
-      }
-     }
-    }
-   } catch (err) {
-    // Continue trying other candidates
-   }
-  }
-  return [];
- };
-
- // Main discovery flow
- (async () => {
-  // Try localhost first
-  if (await tryLocalhost()) {
-   if (!settled) {
-    settled = true;
-    RESOLVED_SERVER_IP = 'localhost';
-    SOCKET_SERVER_URL = `http://localhost:${SERVER_PORT}`;
-    console.log('[DISCOVERY] ✓ Using localhost (local development)');
-    resolve('localhost');
-   }
-   return;
-  }
-
-  // Fetch IPs from server and race them
-  const discoveredIPs = await tryAutoDiscovery();
-  if (discoveredIPs.length === 0) {
-   // No IPs discovered; try localhost again as fallback
-   discoveredIPs.push('localhost', '127.0.0.1');
-  }
-
-  console.log('[DISCOVERY] Trying candidates:', discoveredIPs);
-
-  // Race health checks against all candidates
-  discoveredIPs.forEach(ip => {
-   if (settled) return;
-   const url = `http://${ip}:${SERVER_PORT}/api/health`;
-   const controller = new AbortController();
-   const timer = setTimeout(() => controller.abort(), SINGLE_IP_TIMEOUT);
-
-   fetch(url, { signal: controller.signal })
-   .then(r => {
-    clearTimeout(timer);
-    if (r.ok && !settled) {
-     settled = true;
-     RESOLVED_SERVER_IP = ip;
-     SOCKET_SERVER_URL = `http://${ip}:${SERVER_PORT}`;
-     console.log(`[DISCOVERY] ✓ Server found at ${ip}:${SERVER_PORT}`);
-     resolve(ip);
-    }
-   })
-   .catch(() => { clearTimeout(timer); });
-  });
-
-  // Fallback after discovery timeout
-  setTimeout(() => {
-   if (!settled) {
-    settled = true;
-    RESOLVED_SERVER_IP = discoveredIPs[0] || 'localhost';
-    SOCKET_SERVER_URL = `http://${RESOLVED_SERVER_IP}:${SERVER_PORT}`;
-    console.warn('[DISCOVERY] ⚠ No server responded within timeout; using', RESOLVED_SERVER_IP);
-    resolve(RESOLVED_SERVER_IP);
-   }
-  }, DISCOVERY_TIMEOUT);
- })();
+   fetch(testUrl, { signal: AbortSignal.timeout(2000) })
+     .then(r => {
+       if (r.ok) {
+         RESOLVED_SERVER_IP = 'localhost';
+         SOCKET_SERVER_URL = `http://localhost:${SERVER_PORT}`;
+         console.log('[DISCOVERY] [OK] Fallback using localhost');
+         resolve('localhost');
+       } else {
+         throw new Error('Not OK');
+       }
+     })
+     .catch(() => {
+       // No server found anywhere - use localhost anyway
+       RESOLVED_SERVER_IP = 'localhost';
+       SOCKET_SERVER_URL = `http://localhost:${SERVER_PORT}`;
+       console.warn('[DISCOVERY] [WARNING] No server found, defaulting to localhost (offline mode)');
+       resolve('localhost');
+     });
  });
 
  return _serverDiscoveryPromise;
