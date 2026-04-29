@@ -352,7 +352,7 @@ async function createWindow() {
       mainWindow.webContents.send('server-discovered', { url: RESOLVED_SERVER_URL });
       console.log('[IPC] Sent resolved server URL to renderer:', RESOLVED_SERVER_URL);
     }
-  });
+
     try {
       const fs = require('fs');
       const assetsDir = path.join(__dirname, 'renderer', 'assets');
