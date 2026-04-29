@@ -6389,51 +6389,75 @@ function startBroadcastDiscovery() {
 
     const primaryIP = ips.length > 0 ? ips[0] : 'localhost';
 
-    // NEW: Proper socket binding with callback
+    // Proper socket binding with callback
     broadcastSocket.bind(0, '0.0.0.0', () => {
-      console.log(`[DISCOVERY] UDP socket bound and ready for broadcast`);
-      broadcastSocket.setBroadcast(true);
-      console.log(`[DISCOVERY] Starting UDP broadcast on port ${DISCOVERY_PORT}...`);
-      console.log(`[DISCOVERY] Will broadcast: "DMW-SERVER|${primaryIP}|${PORT}"`);
+      if (!broadcastActive || !broadcastSocket) return; // Socket was closed
 
-      // Broadcast server presence every 5 seconds
-      broadcastInterval = setInterval(() => {
-        const message = `DMW-SERVER|${primaryIP}|${PORT}|${ips.join(',')}`;
+      try {
+        broadcastSocket.setBroadcast(true);
+        console.log(`[DISCOVERY] UDP socket bound and ready for broadcast`);
+        console.log(`[DISCOVERY] Starting UDP broadcast on port ${DISCOVERY_PORT}...`);
+        console.log(`[DISCOVERY] Will broadcast: "DMW-SERVER|${primaryIP}|${PORT}"`);
 
-        // Broadcast to 255.255.255.255 on all network interfaces
-        broadcastSocket.send(message, 0, message.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
-          if (err) {
-            console.log(`[DISCOVERY] Broadcast error: ${err.message}`);
+        // Broadcast server presence every 5 seconds
+        broadcastInterval = setInterval(() => {
+          // CRITICAL: Check socket is still valid before using
+          if (!broadcastActive || !broadcastSocket) {
+            if (broadcastInterval) {
+              clearInterval(broadcastInterval);
+              broadcastInterval = null;
+            }
+            return;
           }
-        });
-      }, BROADCAST_INTERVAL);
+
+          const message = `DMW-SERVER|${primaryIP}|${PORT}|${ips.join(',')}`;
+
+          // Broadcast to 255.255.255.255 on all network interfaces
+          broadcastSocket.send(message, 0, message.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
+            if (err && err.code !== 'ERR_SOCKET_CLOSED') {
+              console.log(`[DISCOVERY] Broadcast error: ${err.message}`);
+            }
+          });
+        }, BROADCAST_INTERVAL);
+      } catch (err) {
+        console.error(`[DISCOVERY] Error in bind callback:`, err.message);
+        stopBroadcastDiscovery();
+      }
     });
 
-    // NEW: Enhanced error handling
+    // Handle socket errors gracefully
     broadcastSocket.on('error', (err) => {
-      console.error(`[DISCOVERY] UDP Socket error:`, err);
-      // Cleanup on error
-      if (broadcastInterval) {
-        clearInterval(broadcastInterval);
-        broadcastInterval = null;
-      }
-      if (broadcastSocket) {
-        broadcastSocket.close();
-        broadcastSocket = null;
-      }
-      // Log warning for admin
-      console.warn(`[DISCOVERY] UDP broadcast stopped due to error. Server discovery will use HTTP fallback.`);
+      console.error(`[DISCOVERY] UDP Socket error:`, err.message);
+      stopBroadcastDiscovery();
+      console.warn(`[DISCOVERY] UDP broadcast stopped. Server discovery will use HTTP fallback.`);
+    });
+
+    // Handle socket close
+    broadcastSocket.on('close', () => {
+      console.log(`[DISCOVERY] UDP socket closed`);
+      broadcastActive = false;
     });
 
   } catch (err) {
     console.warn(`[DISCOVERY] Could not start UDP broadcast:`, err.message);
+    broadcastActive = false;
   }
 }
 
 function stopBroadcastDiscovery() {
-  if (broadcastInterval) clearInterval(broadcastInterval);
-  if (broadcastSocket) broadcastSocket.close();
-}
+  broadcastActive = false;
+  if (broadcastInterval) {
+    clearInterval(broadcastInterval);
+    broadcastInterval = null;
+  }
+  if (broadcastSocket) {
+    try {
+      broadcastSocket.close();
+    } catch (err) {
+      // Socket already closed
+    }
+    broadcastSocket = null;
+  }
 
 // ==============================================================================
 
