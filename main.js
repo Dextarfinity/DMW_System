@@ -188,9 +188,7 @@ async function fetchServerIPsFromServer() {
 async function discoverServer() {
   if (RESOLVED_SERVER_URL) return RESOLVED_SERVER_URL;
 
-  console.log('═══════════════════════════════════════════════════════════');
   console.log('[DISCOVERY] Starting dynamic server discovery...');
-  console.log('═══════════════════════════════════════════════════════════');
 
   // Step 1: Try localhost first (best for development and LAN)
   console.log('[DISCOVERY] Step 1: Trying localhost (local development)...');
@@ -198,7 +196,6 @@ async function discoverServer() {
   if (localResult) {
     RESOLVED_SERVER_URL = localResult;
     console.log('[DISCOVERY] ✓ Using localhost (local development)');
-    console.log('═══════════════════════════════════════════════════════════\n');
     return RESOLVED_SERVER_URL;
   }
 
@@ -211,8 +208,7 @@ async function discoverServer() {
     for (let i = 0; i < results.length; i++) {
       if (results[i]) {
         RESOLVED_SERVER_URL = results[i];
-        console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND via BROADCAST at ${broadcastIPs[i]}:${SERVER_PORT} ✓✓✓`);
-        console.log('═══════════════════════════════════════════════════════════\n');
+        console.log(`[DISCOVERY] ✓ SERVER FOUND via BROADCAST at ${broadcastIPs[i]}:${SERVER_PORT} ✓`);
         return RESOLVED_SERVER_URL;
       }
     }
@@ -241,18 +237,15 @@ async function discoverServer() {
   for (let i = 0; i < results.length; i++) {
     if (results[i]) {
       RESOLVED_SERVER_URL = results[i];
-      console.log(`[DISCOVERY] ✓✓✓ SERVER FOUND via HTTP at ${allCandidates[i]}:${SERVER_PORT} ✓✓✓`);
-      console.log('═══════════════════════════════════════════════════════════\n');
+      console.log(`[DISCOVERY] ✓ SERVER FOUND via HTTP at ${allCandidates[i]}:${SERVER_PORT} ✓`);
       return RESOLVED_SERVER_URL;
     }
   }
 
   // Step 5: Fallback to localhost if nothing responded
   RESOLVED_SERVER_URL = `http://localhost:${SERVER_PORT}`;
-  console.warn('═══════════════════════════════════════════════════════════');
   console.warn('[DISCOVERY] ⚠ No server responded to health checks');
   console.warn('[DISCOVERY] Falling back to localhost (offline mode)');
-  console.warn('═══════════════════════════════════════════════════════════\n');
   return RESOLVED_SERVER_URL;
 }
 
