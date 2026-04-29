@@ -304,6 +304,25 @@ async function safeQuery(text, params) {
   }
 }
 
+// NEW: Helper to standardize Socket.io broadcast events
+function broadcastDataChange(resource, action, recordId, user, additionalData = {}) {
+  if (!global.io) return; // io not yet initialized
+  const event = {
+    resource,
+    action,
+    recordId,
+    timestamp: new Date().toISOString(),
+    user: {
+      id: user?.id,
+      username: user?.username,
+      role: user?.role
+    },
+    ...additionalData
+  };
+  global.io.emit('data_changed', event);
+  console.log(`[BROADCAST] ${resource} ${action} (record ${recordId}) by ${user?.username || 'system'}`);
+}
+
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
@@ -6405,8 +6424,10 @@ function stopBroadcastDiscovery() {
 // ==============================================================================
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    // NEW: Restrict CORS to internal networks only (security improvement)
+    origin: /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[01]\.)/,
+    methods: ['GET', 'POST'],
+    credentials: true
   },
   // Electron apps connect over the LAN — keep connections alive aggressively
   pingInterval: 10000,   // ping every 10s
@@ -6434,9 +6455,37 @@ io.on('connection', (socket) => {
   io.emit('clients_count', { count: connectedClients.size });
 
   // Client can authenticate with their JWT after connecting
-  socket.on('authenticate', (data) => {
+  socket.on('authenticate', async (data) => {
     try {
-      const decoded = jwt.verify(data.token, JWT_SECRET);
+      // NEW: Validate token exists
+      if (!data?.token || typeof data.token !== 'string') {
+        socket.emit('authenticated', { success: false, error: 'No token provided' });
+        return;
+      }
+
+      // NEW: Verify JWT signature and expiration
+      let decoded;
+      try {
+        decoded = jwt.verify(data.token, JWT_SECRET);
+      } catch (jwtErr) {
+        if (jwtErr.name === 'TokenExpiredError') {
+          socket.emit('authenticated', { success: false, error: 'Token expired' });
+        } else if (jwtErr.name === 'JsonWebTokenError') {
+          socket.emit('authenticated', { success: false, error: 'Invalid token format' });
+        } else {
+          socket.emit('authenticated', { success: false, error: 'Token verification failed' });
+        }
+        return;
+      }
+
+      // NEW: Verify user still exists in database
+      const userCheck = await pool.query('SELECT id, username, role FROM users WHERE id = $1', [decoded.id]);
+      if (userCheck.rows.length === 0) {
+        socket.emit('authenticated', { success: false, error: 'User not found' });
+        console.warn(`[SOCKET] Auth failed: user ${decoded.id} not found (${clientIP})`);
+        return;
+      }
+
       const info = connectedClients.get(socket.id);
       if (info) {
         info.username = decoded.username;
@@ -6446,7 +6495,8 @@ io.on('connection', (socket) => {
       socket.emit('authenticated', { success: true, username: decoded.username });
       console.log(`[SOCKET] Authenticated: ${decoded.username} (${clientIP})`);
     } catch (err) {
-      socket.emit('authenticated', { success: false, error: 'Invalid token' });
+      console.error(`[SOCKET] Auth error:`, err.message);
+      socket.emit('authenticated', { success: false, error: 'Authentication failed' });
     }
   });
 
