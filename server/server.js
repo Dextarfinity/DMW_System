@@ -6352,24 +6352,40 @@ function startBroadcastDiscovery() {
 
     const primaryIP = ips.length > 0 ? ips[0] : 'localhost';
 
-    console.log(`[DISCOVERY] Starting UDP broadcast on port ${DISCOVERY_PORT}...`);
-    console.log(`[DISCOVERY] Will broadcast: "DMW-SERVER|${primaryIP}|${PORT}"`);
-
-    // Broadcast server presence every 5 seconds
-    broadcastInterval = setInterval(() => {
-      const message = `DMW-SERVER|${primaryIP}|${PORT}|${ips.join(',')}`;
-
-      // Broadcast to 255.255.255.255 on all network interfaces
+    // NEW: Proper socket binding with callback
+    broadcastSocket.bind(0, '0.0.0.0', () => {
+      console.log(`[DISCOVERY] UDP socket bound and ready for broadcast`);
       broadcastSocket.setBroadcast(true);
-      broadcastSocket.send(message, 0, message.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
-        if (err) {
-          console.log(`[DISCOVERY] Broadcast error: ${err.message}`);
-        }
-      });
-    }, BROADCAST_INTERVAL);
+      console.log(`[DISCOVERY] Starting UDP broadcast on port ${DISCOVERY_PORT}...`);
+      console.log(`[DISCOVERY] Will broadcast: "DMW-SERVER|${primaryIP}|${PORT}"`);
 
+      // Broadcast server presence every 5 seconds
+      broadcastInterval = setInterval(() => {
+        const message = `DMW-SERVER|${primaryIP}|${PORT}|${ips.join(',')}`;
+
+        // Broadcast to 255.255.255.255 on all network interfaces
+        broadcastSocket.send(message, 0, message.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
+          if (err) {
+            console.log(`[DISCOVERY] Broadcast error: ${err.message}`);
+          }
+        });
+      }, BROADCAST_INTERVAL);
+    });
+
+    // NEW: Enhanced error handling
     broadcastSocket.on('error', (err) => {
       console.error(`[DISCOVERY] UDP Socket error:`, err);
+      // Cleanup on error
+      if (broadcastInterval) {
+        clearInterval(broadcastInterval);
+        broadcastInterval = null;
+      }
+      if (broadcastSocket) {
+        broadcastSocket.close();
+        broadcastSocket = null;
+      }
+      // Log warning for admin
+      console.warn(`[DISCOVERY] UDP broadcast stopped due to error. Server discovery will use HTTP fallback.`);
     });
 
   } catch (err) {

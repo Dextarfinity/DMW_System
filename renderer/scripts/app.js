@@ -265,8 +265,19 @@ function connectSocket() {
 /** Disconnect socket (on logout) */
 function disconnectSocket() {
  if (socket) {
- socket.disconnect();
- socket = null;
+   // NEW: Remove all socket listeners before disconnecting (prevents memory leaks)
+   socket.off('connect');
+   socket.off('authenticated');
+   socket.off('data_changed');
+   socket.off('status_changed');
+   socket.off('clients_count');
+   socket.off('server_shutdown');
+   socket.off('disconnect');
+   socket.off('connect_error');
+
+   socket.disconnect();
+   socket = null;
+   console.log('[SOCKET] Disconnected and listeners cleaned up');
  }
 }
 
@@ -734,6 +745,57 @@ function getApiUrl() {
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
 
+// NEW: Event listener tracking for cleanup (prevents memory leaks)
+const elementListeners = new Map(); // Maps element -> [{ event, handler }, ...]
+const documentListeners = [];       // Track document-level listeners
+
+function addTrackedListener(element, event, handler) {
+  if (!element) return; // Safety check
+  if (!elementListeners.has(element)) {
+    elementListeners.set(element, []);
+  }
+  elementListeners.get(element).push({ event, handler });
+  element.addEventListener(event, handler);
+}
+
+function removeTrackedListeners(element = null) {
+  if (element) {
+    // Remove specific element's listeners
+    if (elementListeners.has(element)) {
+      elementListeners.get(element).forEach(({ event, handler }) => {
+        element.removeEventListener(event, handler);
+      });
+      elementListeners.delete(element);
+    }
+  } else {
+    // Remove ALL tracked listeners (logout/page change)
+    elementListeners.forEach((handlers, el) => {
+      handlers.forEach(({ event, handler }) => {
+        try {
+          el.removeEventListener(event, handler);
+        } catch (e) {
+          // Element may have been removed from DOM
+        }
+      });
+    });
+    elementListeners.clear();
+
+    documentListeners.forEach(({ event, handler }) => {
+      try {
+        document.removeEventListener(event, handler);
+      } catch (e) {
+        // Safety
+      }
+    });
+    documentListeners.length = 0;
+  }
+}
+
+function addTrackedDocumentListener(event, handler) {
+  documentListeners.push({ event, handler });
+  document.addEventListener(event, handler);
+}
+
 // --- Dual-role helper functions ---
 // Check if the current user has a specific role (primary or secondary)
 function userHasRole(r) {
@@ -929,12 +991,28 @@ async function populateSignupDivision() {
 
 // API Helper Functions
 async function apiRequest(endpoint, method = 'GET', data = null) {
+ // NEW: Guard clause - ensure API_URL is set before making requests
+ if (!API_URL) {
+   console.warn(`[API] API_URL not initialized yet, waiting for server discovery...`);
+   // Wait up to 10 seconds for discovery to complete
+   let attempts = 0;
+   while (!API_URL && attempts < 100) {
+     await new Promise(r => setTimeout(r, 100));
+     attempts++;
+   }
+   if (!API_URL) {
+     const error = 'Server discovery timeout - API_URL not available';
+     console.error(`[API] ${error}`);
+     throw new Error(error);
+   }
+ }
+
  const headers = { 'Content-Type': 'application/json' };
  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
- 
+
  const options = { method, headers };
  if (data && method !== 'GET') options.body = JSON.stringify(data);
- 
+
  try {
  const response = await fetch(`${API_URL}${endpoint}`, options);
  if (!response.ok) {
@@ -5919,14 +5997,16 @@ document.addEventListener('DOMContentLoaded', () => {
  function setupEventListeners() {
  // Login form — handled by inline onsubmit in HTML; do NOT add a second listener here
 
+ // NEW: Use tracked listeners for cleanup on page change/logout
+
  // Sidebar toggle
  if (toggleSidebarBtn) {
- toggleSidebarBtn.addEventListener('click', toggleSidebar);
+ addTrackedListener(toggleSidebarBtn, 'click', toggleSidebar);
  }
 
  // Navigation
  navItems.forEach(item => {
- item.addEventListener('click', () => {
+ addTrackedListener(item, 'click', () => {
  const page = item.dataset.page;
  if (page) {
  navigateTo(page);
@@ -5936,7 +6016,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Collapsible sidebar sections
  document.querySelectorAll('.nav-section[data-section]').forEach(section => {
- section.addEventListener('click', () => {
+ addTrackedListener(section, 'click', () => {
  const sectionName = section.dataset.section;
  section.classList.toggle('collapsed');
  // Toggle visibility of items in this section
@@ -5956,15 +6036,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Logout
  if (logoutBtn) {
- logoutBtn.addEventListener('click', handleLogout);
+ addTrackedListener(logoutBtn, 'click', handleLogout);
  }
 
  // Modal close
  if (closeModalBtn) {
- closeModalBtn.addEventListener('click', closeModal);
+ addTrackedListener(closeModalBtn, 'click', closeModal);
  }
  if (modalOverlay) {
- modalOverlay.addEventListener('click', (e) => {
+ addTrackedListener(modalOverlay, 'click', (e) => {
  if (e.target === modalOverlay && !window._modalPreventOutsideClose) {
  closeModal();
  }
@@ -5972,17 +6052,17 @@ document.addEventListener('DOMContentLoaded', () => {
  }
 
  // Keyboard shortcuts
- document.addEventListener('keydown', (e) => {
+ addTrackedDocumentListener('keydown', (e) => {
  if (e.key === 'Escape') {
  closeModal();
  }
  });
 
  // Browser back/forward navigation (hash change)
- window.addEventListener('hashchange', navigateToFromHash);
+ addTrackedDocumentListener('hashchange', navigateToFromHash);
 
  // Handle browser back button (popstate)
- window.addEventListener('popstate', navigateToFromHash);
+ addTrackedDocumentListener('popstate', navigateToFromHash);
  }
 
  // Check if user has a session
@@ -6807,6 +6887,9 @@ document.addEventListener('DOMContentLoaded', () => {
  return;
  }
 
+ // NEW: Clean up old page event listeners before navigating
+ removeTrackedListeners();
+
  // Store current page in hash and localStorage for persistence
  window.location.hash = pageId;
  localStorage.setItem('dmw_active_page', pageId);
@@ -7141,6 +7224,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Stop notification polling
  stopNotificationPolling();
+
+ // NEW: Clean up all DOM event listeners
+ removeTrackedListeners();
 
  // Disconnect Socket.IO
  disconnectSocket();
