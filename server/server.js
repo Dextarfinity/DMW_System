@@ -6575,7 +6575,10 @@ app.get('/api/connected-clients', authenticateToken, (req, res) => {
 // AUTO-MIGRATION: Add text-based supplier/bidder name columns
 // ==============================================================================
 
+let migrationsInProgress = true; // Track migration status
+
 async function runMigrations() {
+  migrationsInProgress = true;
   const migrations = [
     `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
