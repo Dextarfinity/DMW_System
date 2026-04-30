@@ -6,7 +6,6 @@ The client application now has **automatic IP detection** - it no longer needs m
 1. **Server discovers its own network IPs** via `/api/server-ips` endpoint
 2. **Client queries this endpoint** to get all available server IPs
 3. **Client tests all IPs** and connects to the first one that responds
-4. **Periodic refresh** (every 30 seconds) keeps the IP list fresh when network changes occur
 
 ## What Changed in the Client
 
@@ -17,9 +16,8 @@ The client application now has **automatic IP detection** - it no longer needs m
 
 ✅ **New Features:**
 - Auto-discovery endpoint: `/api/server-ips` (already implemented on server)
-- Periodic IP refresh every 30 seconds
 - Automatic reconnection when new IPs are available
-- Console logging for debugging (look in DevTools: `[DISCOVERY]`, `[IP-REFRESH]` tags)
+- Console logging for debugging (look in DevTools: `[DISCOVERY]` tags)
 
 ## How to Deploy to Server PC
 
@@ -114,8 +112,6 @@ Open DevTools (F12) and look for:
 [DISCOVERY] Trying candidates: ['192.168.1.100', '192.168.1.117', ...]
 
 [DISCOVERY] ✓ Server found at 192.168.1.100:3000
-
-[IP-REFRESH] ⚡ Server IPs updated: ['192.168.1.100']
 ```
 
 ## Files Changed
@@ -136,5 +132,4 @@ Open DevTools (F12) and look for:
 
 **Status:** Ready for deployment
 **Compatibility:** Node.js 12+ (tested), Electron latest
-**Auto-IP Refresh:** Every 30 seconds
 
