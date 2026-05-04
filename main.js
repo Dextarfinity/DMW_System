@@ -561,7 +561,8 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
       </div>
     </div>
     <style>
-      * { margin:0; padding:0; box-sizing:border-box; }
+      * { margin:0; padding:0; box-sizing:border-box; background: white !important; }
+      html, body { background: white !important; background-color: white !important; }
       #pp-toolbar {
         position:fixed; top:0; left:0; right:0; z-index:99999;
         background:#fff; height:44px; padding:0 16px;
@@ -600,7 +601,13 @@ ipcMain.handle('show-print-preview', async (event, htmlContent, options = {}) =>
       }
       .pp-btn:hover { background:#f0f0f0; }
       @media print { #pp-toolbar { display:none !important; } body { padding-top:10px !important; } }
-      body { padding-top:44px !important; background:#fff !important; }
+      body { padding-top:44px !important; background: white !important; }
+      [contenteditable] { background: white !important; outline: none !important; }
+      [contenteditable]:hover { background: white !important; outline: none !important; }
+      [contenteditable]:focus { background: white !important; outline: none !important; }
+      tbody[contenteditable] { background: white !important; }
+      tbody[contenteditable] tr { background: white !important; }
+      tbody[contenteditable] td { background: white !important; }
     </style>
     <script>
       const { ipcRenderer: ppIpc } = require('electron');
