@@ -3907,15 +3907,15 @@ app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders, philgeps_posted_from, philgeps_posted_until } = req.body;
     // Map full procurement mode names to short codes accepted by DB constraint
     const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
     const rawMode = (procurement_mode || 'SVP').trim();
     const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
-      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]']
+      `INSERT INTO bac_resolutions (resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, created_by, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders, philgeps_posted_from, philgeps_posted_until)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount||0, recommended_supplier_id, recommended_awardee_name||null, bid_amount||0, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status||'on_going', req.user.id, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', philgeps_posted_from||null, philgeps_posted_until||null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3923,15 +3923,15 @@ app.post('/api/bac-resolutions', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
-    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders } = req.body;
+    const { resolution_number, abstract_id, resolution_date, procurement_mode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type, status, bac_chairperson_id, bac_vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, hope_id, subject, description, bidders, philgeps_posted_from, philgeps_posted_until } = req.body;
     // Map full procurement mode names to short codes accepted by DB constraint
     const procModeMap = { 'small value procurement': 'SVP', 'svp': 'SVP', 'direct contracting': 'SVPDC', 'svpdc': 'SVPDC', 'shopping': 'DC_SHOPPING', 'dc_shopping': 'DC_SHOPPING', 'competitive bidding': 'OTHERS', 'negotiated procurement': 'OTHERS', 'others': 'OTHERS' };
     const rawMode = (procurement_mode || 'SVP').trim();
     const mappedMode = procModeMap[rawMode.toLowerCase()] || (['SVP','SVPDC','DC_SHOPPING','OTHERS'].includes(rawMode) ? rawMode : 'SVP');
     const result = await pool.query(
-      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, subject=$17, description=$18, bidders=$19, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$20 RETURNING *`,
-      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', req.params.id]
+      `UPDATE bac_resolutions SET resolution_number=$1, abstract_id=$2, resolution_date=$3, procurement_mode=$4, abc_amount=$5, recommended_supplier_id=$6, recommended_awardee_name=$7, bid_amount=$8, bidder_type=$9, status=$10, bac_chairperson_id=$11, bac_vice_chairperson_id=$12, bac_member1_id=$13, bac_member2_id=$14, bac_member3_id=$15, hope_id=$16, subject=$17, description=$18, bidders=$19, philgeps_posted_from=$20, philgeps_posted_until=$21, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$22 RETURNING *`,
+      [resolution_number, abstract_id, resolution_date, mappedMode, abc_amount, recommended_supplier_id, recommended_awardee_name, bid_amount, bidder_type||'LOWEST CALCULATED AND RESPONSIVE (LCRB)', status, bac_chairperson_id||null, bac_vice_chairperson_id||null, bac_member1_id||null, bac_member2_id||null, bac_member3_id||null, hope_id||null, subject||null, description||null, bidders ? JSON.stringify(bidders) : '[]', philgeps_posted_from||null, philgeps_posted_until||null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

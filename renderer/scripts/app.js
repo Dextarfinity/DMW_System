@@ -23786,7 +23786,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       const supplierName = (bacRes.recommended_awardee_name || bacRes.supplier_name || abstract?.recommended_supplier_name || '_______________');
       const bidAmount = parseFloat(bacRes.bid_amount || bacRes.contract_price || abstract?.recommended_amount || 0);
-      const procurementDescription = bacRes.description || bacRes.subject || abstract?.description || '';
+      const procurementDescription = (bacRes.description || bacRes.subject || abstract?.description || '').trim();
       const procurementMode = bacRes.procurement_mode || abstract?.procurement_mode || 'SVP';
       const procModeFullName = {'SVP': 'Small Value Procurement', 'SVPDC': 'Small Value Procurement / Direct Contracting', 'DC_SHOPPING': 'Shopping', 'OTHERS': 'Competitive Bidding'}[procurementMode] || 'Small Value Procurement';
       const resolutionDate = bacRes.resolution_date || bacRes.date_prepared || new Date();
@@ -23970,13 +23970,13 @@ Failure to submit the above requirements within the prescribed period shall cons
               <strong>WHEREAS,</strong> Section 34, Rule IV of the IRR authorizes the use of <em>${procModeFullName}</em> (${procurementMode}) for goods, infrastructure projects, and consulting services not available in the Procurement Service\u2013DBM, where the amount involved does not exceed Two Million Pesos (\u20b12,000,000.00), subject to prescribed conditions;
             </p>
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
-              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
+              <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of ${procurementDescription}, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
             </p>
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
-              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure <strong><u contenteditable="true">${procurementDescription}</u></strong> with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure ${procurementDescription} with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
             </p>
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
-              <strong>WHEREAS,</strong> the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
+              <strong>WHEREAS,</strong> the procurement of ${procurementDescription} is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
             </p>
 
             ${postingClause}
@@ -24045,10 +24045,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             </p>
             <ol style="margin:10px 0 10px 40px;">
               <li style="margin:8px 0;text-align:justify;">
-                <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
+                <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of ${procurementDescription}, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
               </li>
               <li style="margin:8px 0;text-align:justify;">
-                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
+                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of ${procurementDescription}.
               </li>
             </ol>
           </div>
@@ -24079,7 +24079,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
           <div style="margin:15px 0;">
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
-              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
+              <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of ${procurementDescription}, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
             </p>
             <p style="text-align:justify;text-indent:40px;margin:8px 0;">
               <strong>WHEREAS,</strong> the BAC, after conducting the procurement process in accordance with Section 34.3, Rule IV of the IRR of RA 12009, evaluated the quotation submitted and determined that <strong><u>${supplierName}</u></strong> offered the <strong><u>${bidderTypeForResolve}</u></strong> in the amount of <strong><u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges;
@@ -24098,7 +24098,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             </p>
             <ol style="margin:10px 0 10px 40px;">
               <li style="margin:8px 0;text-align:justify;">
-                <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
+                <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of ${procurementDescription} <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
               </li>
               <li style="margin:8px 0;text-align:justify;">
                 <strong>To authorize</strong> the issuance of the corresponding Notice of Award to the said supplier.
@@ -40641,13 +40641,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  <strong>WHEREAS,</strong> Section 34, Rule IV of the IRR authorizes the use of <em>${procModeFullName}</em> (${procurementMode}) for goods, infrastructure projects, and consulting services not available in the Procurement Service\u2013DBM, where the amount involved does not exceed Two Million Pesos (\u20b12,000,000.00), subject to prescribed conditions;
  </p>
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
+ <strong>WHEREAS,</strong> the Bids and Awards Committee (BAC) has determined that the procurement of ${procurementDescription}, falls within the parameters for ${procurementMode}, and that this modality will promote economy, efficiency, and value for money;
  </p>
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure <strong><u contenteditable="true">${procurementDescription}</u></strong> with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
+ <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII intends to procure ${procurementDescription} with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>;
  </p>
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
+ <strong>WHEREAS,</strong> the procurement of ${procurementDescription} is deemed necessary to effectively implement and support the statutory mandate, programs, and services of the <strong>Department of Migrant Workers (DMW)</strong>.
  </p>
 
  ${postingClause}
@@ -40716,10 +40716,10 @@ Failure to submit the above requirements within the prescribed period shall cons
  </p>
  <ol style="margin:10px 0 10px 40px;">
  <li style="margin:8px 0;text-align:justify;">
- <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
+ <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of ${procurementDescription}, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
  </li>
  <li style="margin:8px 0;text-align:justify;">
- <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
+ <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of ${procurementDescription}.
  </li>
  </ol>
  </div>
@@ -40750,7 +40750,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
  <div style="margin:15px 0;">
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
+ <strong>WHEREAS,</strong> the Department of Migrant Workers \u2013 Regional Office XIII, through its Bids and Awards Committee (BAC), conducted the procurement of ${procurementDescription}, with an <strong>Approved Budget for the Contract (ABC)</strong> of <strong><u>${numberToWords(abcAmount)}</u></strong>; using ${procModeFullName}, pursuant to Section 34, Rule IV of RA 12009 and its Implementing Rules and Regulations (IRR);
  </p>
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
  <strong>WHEREAS,</strong> the BAC, after conducting the procurement process in accordance with Section 34.3, Rule IV of the IRR of RA 12009, evaluated the quotation submitted and determined that <strong><u>${supplierName}</u></strong> offered the <strong><u>${bidderTypeForResolve}</u></strong> in the amount of <strong><u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges;
@@ -40769,7 +40769,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </p>
  <ol style="margin:10px 0 10px 40px;">
  <li style="margin:8px 0;text-align:justify;">
- <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong> <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
+ <strong>To recommend</strong> to the Head of the Procuring Entity the approval of the award of contract for the procurement of ${procurementDescription} <strong>in the amount of <u>${numberToWords(bidAmount)}</u></strong>, inclusive of all applicable taxes and charges; and
  </li>
  <li style="margin:8px 0;text-align:justify;">
  <strong>To authorize</strong> the issuance of the corresponding Notice of Award to the said supplier.
