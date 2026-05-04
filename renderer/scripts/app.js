@@ -40531,14 +40531,26 @@ Failure to submit the above requirements within the prescribed period shall cons
   '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
   '</tr>';
   }
- postingClause = `
- <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, procurement projects with ABCs of \u20b1200,000.00 and below are not subject to mandatory posting requirements;
- </p>
- <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of known qualifications, in accordance with the IRR;
- </p>`;
- }
+
+  // Build posting-specific WHEREAS clause
+  let postingClause = '';
+  if (requiresPosting) {
+    postingClause = `
+    <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+      <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be <strong>posted for a period of three (3) calendar days</strong> on the <strong>PhilGEPS website</strong>, the <strong>website of the Procuring Entity</strong>, if available, and at any conspicuous place reserved for this purpose within the premises of the Procuring Entity;
+    </p>
+    <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+      <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC <strong>posted the RFQ on the PhilGEPS website,</strong> starting <strong><span contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span></strong> until <strong><span contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span></strong>;
+    </p>`;
+  } else {
+    postingClause = `
+    <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+      <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, procurement projects with ABCs of ₱200,000.00 and below are not subject to mandatory posting requirements;
+    </p>
+    <p style="text-align:justify;text-indent:40px;margin:8px 0;">
+      <strong>WHEREAS,</strong> the BAC prepared and sent Requests for Quotation (RFQ) to at least three (3) suppliers of known qualifications, in accordance with the IRR;
+    </p>`;
+  }
 
  // SIGNATURE BLOCK (shared across pages)
  const signaturesHTML = `
