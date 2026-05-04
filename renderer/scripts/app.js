@@ -40531,6 +40531,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   '<td style="border:1px solid #000;padding:4px;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true">' + procurementDescription + '</td>' +
   '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
   '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
+  '</tr>';
+  }
+
+ // Build posting-specific WHEREAS clause
+ let postingClause = '';
+ if (requiresPosting) {
+ postingClause = `
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
  <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be <strong>posted for a period of three (3) calendar days</strong> on the <strong>PhilGEPS website</strong>, the <strong>website of the Procuring Entity</strong>, if available, and at any conspicuous place reserved for this purpose within the premises of the Procuring Entity;
  </p>
