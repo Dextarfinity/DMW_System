@@ -23949,7 +23949,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div style="text-align:center;margin:15px 0;">
             <p style="margin:0;font-weight:bold;text-transform:uppercase;">
-              A RESOLUTION DECLARING THE <span style="background:#ffff00;">${bidderTypeForTitle}</span> BIDDER FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+              A RESOLUTION DECLARING THE ${bidderTypeForTitle} BIDDER FOR THE PROCUREMENT OF <span contenteditable="true">${procurementDescription.toUpperCase()}</span>
             </p>
           </div>
 
@@ -24039,7 +24039,7 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
               </li>
               <li style="margin:8px 0;text-align:justify;">
-                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong><span style="background:#ffff00;">${bidderTypeForResolve}</span></strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
+                <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
               </li>
             </ol>
           </div>
@@ -24064,7 +24064,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
           <div style="text-align:center;margin:15px 0;">
             <p style="margin:0;font-weight:bold;text-transform:uppercase;">
-              A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+              A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span contenteditable="true">${procurementDescription.toUpperCase()}</span>
             </p>
           </div>
 
@@ -40613,7 +40613,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div style="text-align:center;margin:15px 0;">
  <p style="margin:0;font-weight:bold;text-transform:uppercase;">
- A RESOLUTION DECLARING THE <span style="background:#ffff00;">${bidderTypeForTitle}</span> BIDDER FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+ A RESOLUTION DECLARING THE ${bidderTypeForTitle} BIDDER FOR THE PROCUREMENT OF <span contenteditable="true">${procurementDescription.toUpperCase()}</span>
  </p>
  </div>
 
@@ -40703,7 +40703,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <strong>To recommend</strong> to the Head of the Procuring Entity the adoption of <em>${procModeFullName}</em> as the appropriate mode for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>, pursuant to Sections 26.1 and 34, Rule IV of the IRR of RA 12009; and
  </li>
  <li style="margin:8px 0;text-align:justify;">
- <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong><span style="background:#ffff00;">${bidderTypeForResolve}</span></strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
+ <strong>To declare</strong> <strong>${supplierName}</strong> as the <strong>${bidderTypeForResolve}</strong> for the procurement of <strong><u contenteditable="true">${procurementDescription}</u></strong>.
  </li>
  </ol>
  </div>
@@ -40728,7 +40728,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div style="text-align:center;margin:15px 0;">
  <p style="margin:0;font-weight:bold;text-transform:uppercase;">
- A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span style="background:#ffff00;" contenteditable="true">${procurementDescription.toUpperCase()}</span>
+ A RESOLUTION RECOMMENDING THE APPROVAL, AND APPROVING BY THE HEAD OF THE PROCURING ENTITY, THE AWARD OF CONTRACT FOR THE PROCUREMENT OF <span contenteditable="true">${procurementDescription.toUpperCase()}</span>
  </p>
  </div>
 
