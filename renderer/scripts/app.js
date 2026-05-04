@@ -40481,22 +40481,21 @@ Failure to submit the above requirements within the prescribed period shall cons
  let biddersTableRows = '';
  if (mergedBidders.length > 0) {
  mergedBidders.forEach((b, idx) => {
- const isBold = idx === 0;
  const fmtAmt = '₱' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:0, maximumFractionDigits:0});
  biddersTableRows += '<tr>' +
- '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + (idx + 1) + '</td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true">' + (b.name || '') + '</td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + fmtAmt + '</td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true">' + (b.remarks || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:center;font-size:10pt;width:5%;min-width:30px;max-width:30px;word-wrap:break-word;overflow-wrap:break-word;">' + (idx + 1) + '</td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:50%;min-width:200px;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + (b.name || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:right;font-size:10pt;width:25%;min-width:100px;word-wrap:break-word;overflow-wrap:break-word;">' + fmtAmt + '</td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:20%;min-width:80px;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + (b.remarks || '') + '</td>' +
  '</tr>';
  });
  } else {
  for (let i = 1; i <= 3; i++) {
  biddersTableRows += '<tr>' +
- '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + i + '</td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true"></td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;"></td>' +
- '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true"></td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:center;font-size:10pt;width:5%;min-width:30px;max-width:30px;height:40px;"></td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:50%;min-width:200px;height:40px;" contenteditable="true"></td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:right;font-size:10pt;width:25%;min-width:100px;height:40px;"></td>' +
+ '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:20%;min-width:80px;height:40px;" contenteditable="true"></td>' +
  '</tr>';
  }
  }
@@ -40512,38 +40511,26 @@ Failure to submit the above requirements within the prescribed period shall cons
  const contractUnitCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) / (qty || 1) : bidAmount / (qty || 1);
  const contractTotalCost = mergedBidders.length > 0 ? parseFloat(mergedBidders[0].amount || bidAmount) : bidAmount;
  detailTableRows += '<tr>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(abcUnitCost) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(abcTotalCost) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + qty + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + (item.unit || '') + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(contractUnitCost) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(contractTotalCost) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(abcUnitCost) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(abcTotalCost) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + qty + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + (item.unit || '') + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + (item.item_name || item.item_description || procurementDescription) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(contractUnitCost) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(contractTotalCost) + '</td>' +
   '</tr>';
   });
   } else {
   detailTableRows = '<tr>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(abcAmount) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(abcAmount) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">1</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Lot</td>' +
-  '<td style="border:1px solid #000;padding:4px;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true">' + procurementDescription + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
-  '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(abcAmount) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(abcAmount) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">1</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">Lot</td>' +
+  '<td style="border:1px solid #000;padding:6px;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + procurementDescription + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
+  '<td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;word-wrap:break-word;overflow-wrap:break-word;">' + fmtCurrency(bidAmount) + '</td>' +
   '</tr>';
   }
-
- // Build posting-specific WHEREAS clause
- let postingClause = '';
- if (requiresPosting) {
- postingClause = `
- <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, the Request for Quotation (RFQ) or Request for Proposal (RFP) shall be <strong>posted for a period of three (3) calendar days</strong> on the <strong>PhilGEPS website</strong>, the <strong>website of the Procuring Entity</strong>, if available, and at any conspicuous place reserved for this purpose within the premises of the Procuring Entity;
- </p>
- <p style="text-align:justify;text-indent:40px;margin:8px 0;">
- <strong>WHEREAS,</strong> in compliance with the foregoing requirement, the BAC <strong>posted the RFQ on the PhilGEPS website,</strong> starting <strong><span contenteditable="true">${philgepsStartDate ? fmtDate(philgepsStartDate) : '_______________'}</span></strong> until <strong><span contenteditable="true">${philgepsEndDate ? fmtDate(philgepsEndDate) : '_______________'}</span></strong>;
- </p>`;
- } else {
  postingClause = `
  <p style="text-align:justify;text-indent:40px;margin:8px 0;">
  <strong>WHEREAS,</strong> pursuant to Section 34.3(b), Rule IV of the Implementing Rules and Regulations (IRR) of Republic Act No. 12009, procurement projects with ABCs of \u20b1200,000.00 and below are not subject to mandatory posting requirements;
@@ -40631,19 +40618,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
 
  <!-- Bidders Table -->
- <table style="width:100%;border-collapse:collapse;margin:15px 0;font-size:11pt;">
- <colgroup>
- <col style="width:8%;">
- <col style="width:37%;">
- <col style="width:20%;">
- <col style="width:35%;">
- </colgroup>
+ <table style="width:100%;border-collapse:collapse;margin:15px 0;font-size:10pt;table-layout:fixed;">
  <thead>
- <tr style="background-color:#ffffff;">
- <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">NO.</th>
- <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">NAME OF THE BIDDER</th>
- <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">TOTAL BID AMOUNT</th>
- <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">REMARKS</th>
+ <tr style="background-color:#f0f0f0;">
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:10pt;width:5%;min-width:30px;max-width:30px;">NO.</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:10pt;width:50%;min-width:200px;">NAME OF THE BIDDER</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:10pt;width:25%;min-width:100px;">TOTAL BID AMOUNT</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:10pt;width:20%;min-width:80px;">REMARKS</th>
  </tr>
  </thead>
  <tbody>${biddersTableRows}</tbody>
@@ -40656,28 +40637,28 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
 
  <!-- ABC / Contract Price Detail Table -->
- <table style="width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed;box-sizing:border-box;">
+ <table style="width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed;">
  <thead>
  <tr>
- <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">ABC</th>
- <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Qty.</th>
- <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Unit</th>
- <th rowspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Description</th>
- <th colspan="2" style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Contract Price</th>
+ <th colspan="2" style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:20%;">ABC</th>
+ <th rowspan="2" style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:8%;">Qty.</th>
+ <th rowspan="2" style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:8%;">Unit</th>
+ <th rowspan="2" style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:26%;">Description</th>
+ <th colspan="2" style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:20%;">Contract Price</th>
  </tr>
  <tr>
- <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Unit Cost</th>
- <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Total Cost</th>
- <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Unit Cost</th>
- <th style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Total Cost</th>
+ <th style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:10%;">Unit Cost</th>
+ <th style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:10%;">Total Cost</th>
+ <th style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:10%;">Unit Cost</th>
+ <th style="border:1px solid #000;padding:6px;text-align:center;font-size:9pt;font-weight:bold;width:10%;">Total Cost</th>
  </tr>
  </thead>
  <tbody>
  ${detailTableRows}
  <tr>
- <td colspan="5" style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Total Contract Price</td>
- <td style="border:1px solid #000;padding:4px;box-sizing:border-box;overflow:hidden;word-wrap:break-word;"></td>
- <td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">${fmtCurrency(bidAmount)}</td>
+ <td colspan="5" style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;font-weight:bold;">Total Contract Price</td>
+ <td style="border:1px solid #000;padding:6px;"></td>
+ <td style="border:1px solid #000;padding:6px;text-align:right;font-size:9pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
  </tr>
  </tbody>
  </table>
