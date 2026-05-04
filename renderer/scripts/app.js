@@ -40482,22 +40482,21 @@ Failure to submit the above requirements within the prescribed period shall cons
  if (mergedBidders.length > 0) {
  mergedBidders.forEach((b, idx) => {
  const isBold = idx === 0;
- const st = isBold ? 'font-weight:bold;' : '';
- const fmtAmt = '₱ ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+ const fmtAmt = '₱' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:0, maximumFractionDigits:0});
  biddersTableRows += '<tr>' +
- '<td style="text-align:center;padding:8px;border:1px solid #000;' + st + 'box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + (idx + 1) + '</td>' +
- '<td style="padding:8px;border:1px solid #000;' + st + 'box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true">' + (b.name || '') + '</td>' +
- '<td style="text-align:right;padding:8px;border:1px solid #000;' + st + 'box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + fmtAmt + '</td>' +
- '<td style="padding:8px;border:1px solid #000;' + st + 'box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true">' + (b.remarks || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + (idx + 1) + '</td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true">' + (b.name || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + fmtAmt + '</td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true">' + (b.remarks || '') + '</td>' +
  '</tr>';
  });
  } else {
  for (let i = 1; i <= 3; i++) {
  biddersTableRows += '<tr>' +
- '<td style="text-align:center;padding:8px;border:1px solid #000;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">' + i + '</td>' +
- '<td style="padding:8px;border:1px solid #000;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true"></td>' +
- '<td style="text-align:right;padding:8px;border:1px solid #000;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true"></td>' +
- '<td style="padding:8px;border:1px solid #000;box-sizing:border-box;overflow:hidden;word-wrap:break-word;" contenteditable="true"></td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;">' + i + '</td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true"></td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:center;font-size:11pt;"></td>' +
+ '<td style="border:1px solid #000;padding:10px;text-align:left;font-size:11pt;" contenteditable="true"></td>' +
  '</tr>';
  }
  }
@@ -40632,19 +40631,19 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
 
  <!-- Bidders Table -->
- <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:10px 0;font-size:11pt;box-sizing:border-box;">
+ <table style="width:100%;border-collapse:collapse;margin:15px 0;font-size:11pt;">
  <colgroup>
  <col style="width:8%;">
- <col style="width:35%;">
- <col style="width:22%;">
+ <col style="width:37%;">
+ <col style="width:20%;">
  <col style="width:35%;">
  </colgroup>
  <thead>
- <tr>
- <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">No.</th>
- <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Name of the Bidder</th>
- <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Total Bid Amount</th>
- <th style="border:1px solid #000;padding:8px;font-weight:bold;text-align:center;box-sizing:border-box;overflow:hidden;word-wrap:break-word;">Remarks</th>
+ <tr style="background-color:#ffffff;">
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">NO.</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">NAME OF THE BIDDER</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">TOTAL BID AMOUNT</th>
+ <th style="border:1px solid #000;padding:10px;font-weight:bold;text-align:center;font-size:11pt;">REMARKS</th>
  </tr>
  </thead>
  <tbody>${biddersTableRows}</tbody>
