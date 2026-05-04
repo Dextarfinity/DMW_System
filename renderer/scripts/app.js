@@ -23828,10 +23828,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
           const remarksDisplay = (b.remarks && typeof b.remarks === 'string') ? b.remarks : '';
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;background:white;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;background:white;' + st + '">' + fmtAmt + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;background:white;overflow:hidden;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;background:white;overflow:hidden;word-break:break-word;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;background:white;overflow:hidden;' + st + '">' + fmtAmt + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;background:white;overflow:hidden;word-break:break-word;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
             '</tr>';
         });
       } else {
@@ -40492,10 +40492,10 @@ Failure to submit the above requirements within the prescribed period shall cons
  const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
  const remarksDisplay = (b.remarks && typeof b.remarks === 'string') ? b.remarks : '';
  biddersTableRows += '<tr>' +
- '<td style="text-align:center;padding:8px;border:1px solid #000;background:white;' + st + '">' + (idx + 1) + '</td>' +
- '<td style="padding:8px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
- '<td style="text-align:right;padding:8px;border:1px solid #000;background:white;' + st + '">' + fmtAmt + '</td>' +
- '<td style="padding:8px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
+ '<td style="text-align:center;padding:8px;border:1px solid #000;background:white;overflow:hidden;' + st + '">' + (idx + 1) + '</td>' +
+ '<td style="padding:8px;border:1px solid #000;background:white;overflow:hidden;word-break:break-word;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+ '<td style="text-align:right;padding:8px;border:1px solid #000;background:white;overflow:hidden;' + st + '">' + fmtAmt + '</td>' +
+ '<td style="padding:8px;border:1px solid #000;background:white;overflow:hidden;word-break:break-word;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
  '</tr>';
  });
  } else {
