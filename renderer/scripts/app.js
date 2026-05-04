@@ -23334,7 +23334,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           .twg-body .twg-sig-row { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 8px; }
           .twg-body .twg-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 14px; }
           .twg-body .twg-sb-full { width: 100%; text-align: center; margin-bottom: 14px; }
-          .twg-body .twg-sn { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 30px; }
+          .twg-body .twg-sn { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 30px; text-decoration: underline; }
           .twg-body .twg-st { font-size: 11pt; font-style: italic; }
           .twg-body .bidder-list { margin: 4px 0 4px 72px; padding-left: 20px; }
           .twg-body .bidder-list li { font-size: 12pt; font-weight: bold; margin-bottom: 2px; }
@@ -23483,7 +23483,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Copy Furnished -->
           <div style="margin-top: 40px;">
             <em style="font-size: 11pt;">Copy Furnished:</em><br>
-            <strong style="font-size: 12pt;">Mr. ${bacSecName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</strong><br>
+            <strong style="font-size: 12pt; text-decoration: underline;">Mr. ${bacSecName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</strong><br>
             <span style="font-size: 11pt;">${bacSecTitle}</span>
           </div>
 
@@ -40005,7 +40005,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  .twg-body .twg-sig-row { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 8px; }
  .twg-body .twg-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 14px; }
  .twg-body .twg-sb-full { width: 100%; text-align: center; margin-bottom: 14px; }
- .twg-body .twg-sn { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 30px; }
+ .twg-body .twg-sn { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 30px; text-decoration: underline; }
  .twg-body .twg-st { font-size: 11pt; font-style: italic; }
  .twg-body .bidder-list { margin: 4px 0 4px 72px; padding-left: 20px; }
  .twg-body .bidder-list li { font-size: 12pt; font-weight: bold; margin-bottom: 2px; }
@@ -40154,7 +40154,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <!-- Copy Furnished -->
  <div style="margin-top: 40px;">
  <em style="font-size: 11pt;">Copy Furnished:</em><br>
- <strong style="font-size: 12pt;">Mr. ${bacSecName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</strong><br>
+ <strong style="font-size: 12pt; text-decoration: underline;">Mr. ${bacSecName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</strong><br>
  <span style="font-size: 11pt;">${bacSecTitle}</span>
  </div>
 
