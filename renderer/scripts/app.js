@@ -23820,23 +23820,21 @@ Failure to submit the above requirements within the prescribed period shall cons
       let biddersTableRows = '';
       if (mergedBidders.length > 0) {
         mergedBidders.forEach((b, idx) => {
-          const isBold = idx === 0;
-          const st = isBold ? 'font-weight:bold;' : '';
-          const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+          const fmtAmt = '\u20b1' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:0, maximumFractionDigits:0});
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.remarks || '') + '</td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;">' + (idx + 1) + '</td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;">' + (b.name || '') + '</td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;">' + fmtAmt + '</td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;">' + (b.remarks || '') + '</td>' +
             '</tr>';
         });
       } else {
         for (let i = 1; i <= 3; i++) {
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;">' + i + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;" contenteditable="true"></td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;">' + i + '</td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;"></td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;"></td>' +
+            '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:11pt;vertical-align:middle;"></td>' +
             '</tr>';
         }
       }
@@ -40481,21 +40479,21 @@ Failure to submit the above requirements within the prescribed period shall cons
  let biddersTableRows = '';
  if (mergedBidders.length > 0) {
  mergedBidders.forEach((b, idx) => {
- const fmtAmt = '₱' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:0, maximumFractionDigits:0});
+ const fmtAmt = '\u20b1' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:0, maximumFractionDigits:0});
  biddersTableRows += '<tr>' +
- '<td style="border:1px solid #000;padding:8px;text-align:center;font-size:10pt;width:5%;min-width:30px;max-width:30px;word-wrap:break-word;overflow-wrap:break-word;">' + (idx + 1) + '</td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:50%;min-width:200px;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + (b.name || '') + '</td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:right;font-size:10pt;width:25%;min-width:100px;word-wrap:break-word;overflow-wrap:break-word;">' + fmtAmt + '</td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:20%;min-width:80px;word-wrap:break-word;overflow-wrap:break-word;" contenteditable="true">' + (b.remarks || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;">' + (idx + 1) + '</td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;">' + (b.name || '') + '</td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;">' + fmtAmt + '</td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;">' + (b.remarks || '') + '</td>' +
  '</tr>';
  });
  } else {
  for (let i = 1; i <= 3; i++) {
  biddersTableRows += '<tr>' +
- '<td style="border:1px solid #000;padding:8px;text-align:center;font-size:10pt;width:5%;min-width:30px;max-width:30px;height:40px;"></td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:50%;min-width:200px;height:40px;" contenteditable="true"></td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:right;font-size:10pt;width:25%;min-width:100px;height:40px;"></td>' +
- '<td style="border:1px solid #000;padding:8px;text-align:left;font-size:10pt;width:20%;min-width:80px;height:40px;" contenteditable="true"></td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;">' + i + '</td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;"></td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;"></td>' +
+ '<td style="border:1px solid #000;padding:10px 8px;text-align:center;font-size:10pt;vertical-align:middle;"></td>' +
  '</tr>';
  }
  }
