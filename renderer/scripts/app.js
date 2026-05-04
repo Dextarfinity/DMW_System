@@ -14636,6 +14636,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
     const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+    const philgepsFrom = document.getElementById('bacResPhilgepsFrom')?.value || null;
+    const philgepsUntil = document.getElementById('bacResPhilgepsUntil')?.value || null;
 
     // BAC member employee IDs
     const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
@@ -14682,6 +14684,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: 'draft',
         subject: subject,
         description: description,
+        philgeps_posted_from: philgepsFrom,
+        philgeps_posted_until: philgepsUntil,
         recommended_awardee_name: recommendedAwardeeName,
         bidders: bidders,
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
@@ -14884,6 +14888,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
     const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
     const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+    const philgepsFrom = document.getElementById('bacResPhilgepsFrom')?.value || null;
+    const philgepsUntil = document.getElementById('bacResPhilgepsUntil')?.value || null;
     const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
     const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
     const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
@@ -14920,6 +14926,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         resolution_date: new Date().toISOString().split('T')[0], procurement_mode: mappedProcMode,
         abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
         subject: subject, description: description,
+        philgeps_posted_from: philgepsFrom, philgeps_posted_until: philgepsUntil,
         recommended_awardee_name: recommendedAwardeeName, bidders: bidders,
         bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
         bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
@@ -31092,6 +31099,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
  const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
  const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+ const philgepsFrom = document.getElementById('bacResPhilgepsFrom')?.value || null;
+ const philgepsUntil = document.getElementById('bacResPhilgepsUntil')?.value || null;
 
  // BAC member employee IDs
  const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
@@ -31138,6 +31147,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  status: 'draft',
  subject: subject,
  description: description,
+ philgeps_posted_from: philgepsFrom,
+ philgeps_posted_until: philgepsUntil,
  recommended_awardee_name: recommendedAwardeeName,
  bidders: bidders,
  bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
@@ -31340,6 +31351,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  const abcAmount = parseFloat(document.getElementById('bacResABC')?.value) || 0;
  const contractPrice = parseFloat(document.getElementById('bacResContractPrice')?.value) || 0;
  const bidderType = document.getElementById('bacResBidderType')?.value || 'LOWEST CALCULATED AND RESPONSIVE (LCRB)';
+ const philgepsFrom = document.getElementById('bacResPhilgepsFrom')?.value || null;
+ const philgepsUntil = document.getElementById('bacResPhilgepsUntil')?.value || null;
  const bacChairpersonId = document.getElementById('bacChairpersonId')?.value || null;
  const bacViceChairpersonId = document.getElementById('bacViceChairpersonId')?.value || null;
  const bacMember1Id = document.getElementById('bacMember1Id')?.value || null;
@@ -31376,6 +31389,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  resolution_date: new Date().toISOString().split('T')[0], procurement_mode: mappedProcMode,
  abc_amount: abcAmount, bid_amount: contractPrice, bidder_type: bidderType, status: 'on_going',
  subject: subject, description: description,
+ philgeps_posted_from: philgepsFrom, philgeps_posted_until: philgepsUntil,
  recommended_awardee_name: recommendedAwardeeName, bidders: bidders,
  bac_chairperson_id: bacChairpersonId ? parseInt(bacChairpersonId) : null,
  bac_vice_chairperson_id: bacViceChairpersonId ? parseInt(bacViceChairpersonId) : null,
