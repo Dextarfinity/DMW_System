@@ -20156,7 +20156,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Est. Budget</label>
-                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" oninput="syncEditEstBudget('manualEstBudget')">
               </div>
             </div>
           </div>
@@ -20208,7 +20208,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Est. Budget</label>
-                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" oninput="syncEditEstBudget('papManualEstBudget')">
               </div>
             </div>
           </div>
@@ -20522,11 +20522,14 @@ Failure to submit the above requirements within the prescribed period shall cons
    * Calculate estimated budget for manual item entry in Edit modal
    */
   window.calcEditManualEstBudget = function() {
+    const budgetField = document.getElementById('manualEstBudget');
+    // Skip auto-calculation if user manually edited this field
+    if (budgetField && budgetField.dataset.manualEdit === 'true') return;
+
     const price = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
     const qtyStr = document.getElementById('manualItemQty')?.value || '1';
     const qty = parseFloat(qtyStr) || 1;
     const estBudget = isNaN(price) ? 0 : price * qty;
-    const budgetField = document.getElementById('manualEstBudget');
     const totalField = document.getElementById('ppmpEditBudget');
     if (budgetField) budgetField.value = estBudget.toFixed(2);
     if (totalField) totalField.value = estBudget.toFixed(2);
@@ -20536,17 +20539,34 @@ Failure to submit the above requirements within the prescribed period shall cons
    * Calculate estimated budget for PAP entry in Edit modal
    */
   window.calcEditPAPEstBudget = function() {
+    const budgetField = document.getElementById('papManualEstBudget');
+    // Skip auto-calculation if user manually edited this field
+    if (budgetField && budgetField.dataset.manualEdit === 'true') return;
+
     const price = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
     const qtyStr = document.getElementById('papManualItemQty')?.value || '1';
     const qty = parseFloat(qtyStr) || 1;
     const estBudget = isNaN(price) ? 0 : price * qty;
-    const budgetField = document.getElementById('papManualEstBudget');
     const totalField = document.getElementById('ppmpEditBudget');
     if (budgetField) budgetField.value = estBudget.toFixed(2);
     if (totalField) totalField.value = estBudget.toFixed(2);
   };
 
   /**
+   * Handle manual EST. BUDGET edit in Edit modal
+   * Sets flag to prevent auto-recalculation when user manually edits
+   */
+  window.syncEditEstBudget = function(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      el.dataset.manualEdit = 'true';
+      // Sync the manual edit value to the main ppmpEditBudget field
+      const mainBudgetField = document.getElementById('ppmpEditBudget');
+      if (mainBudgetField) {
+        mainBudgetField.value = parseFloat(el.value || 0).toFixed(2);
+      }
+    }
+  };
    * Sync PAP Name with General Description & Objective field
    * Called when PAP Name input changes - combines PAP Name + PAP Description
    */
