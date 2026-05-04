@@ -22575,23 +22575,24 @@ Failure to submit the above requirements within the prescribed period shall cons
           <title>${title}</title>
           <style>
             ${getPrintHeaderCSS()}
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; padding: 0; font-size: 10px; line-height: 1.4; color: #222; background: #fff; }
+            * { margin: 0; padding: 0; box-sizing: border-box; background: white; }
+            body { font-family: Arial, sans-serif; padding: 0; font-size: 10px; line-height: 1.4; color: #222; background: white; }
             h3 { margin: 12px 0 8px; font-size: 12px; text-align: center; text-transform: uppercase; border-bottom: 1.5px solid #333; padding-bottom: 6px; }
-            table { width: 100%; border-collapse: collapse; margin: 8px 0; page-break-inside: auto; table-layout: auto; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; page-break-inside: auto; table-layout: fixed; }
             tr { page-break-inside: avoid; page-break-after: auto; }
-            th, td { border: 1px solid #333; padding: 3px 4px; text-align: left; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; vertical-align: top; }
+            th, td { border: 1px solid #333; padding: 3px 4px; text-align: left; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; vertical-align: top; background: white; }
             th { background: #e8e8e8; font-weight: bold; font-size: 7.5px; text-transform: uppercase; text-align: center; }
             td { font-size: 8px; }
+            td[contenteditable] { overflow: hidden; word-break: break-word; }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
             .footer { margin-top: 10px; text-align: center; font-size: 8px; color: #888; padding-top: 4px; }
             .doc-title { font-size: 14px; font-weight: bold; margin: 12px 0; text-align: center; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 8px; }
             .doc-subtitle { text-align: center; font-style: italic; margin-bottom: 12px; font-size: 10px; }
             .info-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            .info-table td { padding: 4px 8px; border: 1px solid #ddd; font-size: 10px; }
+            .info-table td { padding: 4px 8px; border: 1px solid #ddd; font-size: 10px; background: white; }
             .items-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-            .items-table th, .items-table td { border: 1px solid #333; padding: 5px; text-align: left; font-size: 9px; }
+            .items-table th, .items-table td { border: 1px solid #333; padding: 5px; text-align: left; font-size: 9px; background: white; }
             .items-table th { background: #f0f0f0; font-weight: bold; }
             .signature-box { margin-top: 30px; display: flex; justify-content: space-between; flex-wrap: wrap; }
             .sig-line { width: 45%; margin-bottom: 25px; }
@@ -22604,17 +22605,17 @@ Failure to submit the above requirements within the prescribed period shall cons
             @page { margin: 8mm; }
 
             /* === Repeating header on every printed page === */
-            .page-wrapper { display: table; width: 100%; }
+            .page-wrapper { display: table; width: 100%; background: white; }
             .page-header-group { display: table-header-group; }
-            .page-header-group > tr > td { border: none; padding: 0 15px; }
-            .page-body-group { display: table-row-group; }
-            .page-body-group > tr > td { border: none; padding: 0 15px; }
+            .page-header-group > tr > td { border: none; padding: 0 15px; background: white; }
+            .page-body-group { display: table-row-group; background: white; }
+            .page-body-group > tr > td { border: none; padding: 0 15px; background: white; }
             .page-footer-group { display: table-footer-group; }
-            .page-footer-group > tr > td { border: none; padding: 0 15px; }
+            .page-footer-group > tr > td { border: none; padding: 0 15px; background: white; }
 
             /* Reset inner tables so they keep their borders */
             .page-body-group table th,
-            .page-body-group table td { border: 1px solid #333; }
+            .page-body-group table td { border: 1px solid #333; background: white; }
           </style>
         </head>
         <body>
@@ -23827,10 +23828,10 @@ Failure to submit the above requirements within the prescribed period shall cons
           const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
           const remarksDisplay = (b.remarks && typeof b.remarks === 'string') ? b.remarks : '';
           biddersTableRows += '<tr>' +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
-            '<td style="padding:4px 3px;border:1px solid #000;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;background:white;' + st + '">' + (idx + 1) + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;background:white;' + st + '">' + fmtAmt + '</td>' +
+            '<td style="padding:4px 3px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
             '</tr>';
         });
       } else {
@@ -40491,10 +40492,10 @@ Failure to submit the above requirements within the prescribed period shall cons
  const fmtAmt = '\u20b1 ' + parseFloat(b.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
  const remarksDisplay = (b.remarks && typeof b.remarks === 'string') ? b.remarks : '';
  biddersTableRows += '<tr>' +
- '<td style="text-align:center;padding:8px;border:1px solid #000;' + st + '">' + (idx + 1) + '</td>' +
- '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
- '<td style="text-align:right;padding:8px;border:1px solid #000;' + st + '">' + fmtAmt + '</td>' +
- '<td style="padding:8px;border:1px solid #000;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
+ '<td style="text-align:center;padding:8px;border:1px solid #000;background:white;' + st + '">' + (idx + 1) + '</td>' +
+ '<td style="padding:8px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + (b.name || '') + '</td>' +
+ '<td style="text-align:right;padding:8px;border:1px solid #000;background:white;' + st + '">' + fmtAmt + '</td>' +
+ '<td style="padding:8px;border:1px solid #000;background:white;' + st + '" contenteditable="true">' + remarksDisplay + '</td>' +
  '</tr>';
  });
  } else {
