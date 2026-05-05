@@ -2405,7 +2405,7 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
 
     // Emit real-time update to all clients
     console.log('[BUDGET-API] 📡 Broadcasting real-time update to all clients...');
-    io.emit('data_changed', { type: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id), newAmount });
+    io.emit('data_changed', { resource: 'plan-items', action: 'budget_adjusted', id: parseInt(req.params.id), newAmount });
 
     console.log('========== BUDGET ADJUSTMENT SUCCESS ==========\n');
 
