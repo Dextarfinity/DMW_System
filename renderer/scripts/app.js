@@ -33679,7 +33679,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <div class="po-sig-designation">${accountantDesignation}</div>
             </td>
             <td class="po-fund-label">Amount :</td>
-            <td>₱${parseFloat(totalAmount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+            <td style="text-align: center; font-weight: bold;"><b>₱${parseFloat(totalAmount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</b></td>
           </tr>
           <tr>
             <td colspan="2"></td>
@@ -55108,7 +55108,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="po-sig-designation">${accountantDesignation}</div>
  </td>
  <td class="po-fund-label">Amount :</td>
- <td>₱${parseFloat(totalAmount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+ <td style="text-align: center; font-weight: bold;"><b>₱${parseFloat(totalAmount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2})}</b></td>
  </tr>
  <tr>
  <td colspan="2"></td>
