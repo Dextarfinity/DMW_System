@@ -31063,6 +31063,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
             @page { margin: 8mm; background: white !important; }
             .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; display: block; background: white !important; }
+            .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+            .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
+            .iar-main-table .no-border-lr { border-left: none; border-right: none; }
+            .iar-main-table .no-border { border: none; }
+            .iar-items-table { width: 100%; border-collapse: collapse; }
+            .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
+            .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
+            .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
+            .iar-label { font-size: 9px; }
+            .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
             /* === Repeating header on every printed page === */
             .page-wrapper { display: table; width: 100%; background: white !important; }
@@ -31174,20 +31184,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
       const bodyContent = `
-        <style>
-          .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; }
-          .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
-          .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
-          .iar-main-table .no-border-lr { border-left: none; border-right: none; }
-          .iar-main-table .no-border { border: none; }
-          .iar-items-table { width: 100%; border-collapse: collapse; }
-          .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
-          .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
-          .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
-          .iar-label { font-size: 9px; }
-          .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
-        </style>
-
         <div class="iar-doc-wrapper">
         ${getPrintHeaderHTML()}
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
@@ -52501,6 +52497,17 @@ Failure to submit the above requirements within the prescribed period shall cons
  .report-date { text-align: center; margin-bottom: 10px; color: #666; font-size: 9px; }
  .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
  @page { margin: 8mm; }
+ .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; display: block; background: white !important; }
+ .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+ .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
+ .iar-main-table .no-border-lr { border-left: none; border-right: none; }
+ .iar-main-table .no-border { border: none; }
+ .iar-items-table { width: 100%; border-collapse: collapse; }
+ .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
+ .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
+ .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
+ .iar-label { font-size: 9px; }
+ .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
  /* === Repeating header on every printed page === */
  .page-wrapper { display: table; width: 100%; }
@@ -52612,21 +52619,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
       const bodyContent = `
- <style>
- .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; }
- .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
- .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
- .iar-main-table .no-border-lr { border-left: none; border-right: none; }
- .iar-main-table .no-border { border: none; }
- .iar-items-table { width: 100%; border-collapse: collapse; }
- .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
- .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
- .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
- .iar-label { font-size: 9px; }
- .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
- </style>
-
  <div class="iar-doc-wrapper">
+ ${getPrintHeaderHTML()}
 
  <!-- Appendix 62 label -->
  <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
