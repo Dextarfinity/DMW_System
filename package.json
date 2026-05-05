@@ -20,9 +20,17 @@
     ],
     "win": {
       "target": [
+        "nsis",
         "portable"
       ],
       "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Procurement Plan System"
     },
     "nsis": {
       "oneClick": false,

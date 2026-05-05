@@ -16,8 +16,17 @@ files:
 # Windows-specific build settings
 win:
   target:
+    - nsis
     - portable
   icon: build/icon.ico
+
+# NSIS Installer configuration
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Procurement Plan System"
 
 # Portable executable configuration
 portable:
@@ -32,4 +41,5 @@ extraMetadata:
 directories:
   buildResources: build
   output: dist
+
 
