@@ -437,3 +437,30 @@ PS C:\Users\Kurt\Desktop\PROCUREMENT SYSTEM - Copy\DMW_System> npm start
 
 
 
+PS C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System> npm run dist
+
+> procurement-plan-system@1.0.0 dist
+> electron-builder
+
+  • electron-builder  version=24.13.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • writing effective config  file=dist\builder-effective-config.yaml
+  • packaging       platform=win32 arch=x64 electron=28.3.3 appOutDir=dist\win-unpacked
+  • building        target=nsis file=dist\Procurement Plan System Setup 1.0.0.exe archs=x64 oneClick=false perMachine=false
+  ⨯ spawn UNKNOWN   failedTask=build stackTrace=Error: spawn UNKNOWN
+    at ChildProcess.spawn (node:internal/child_process:420:11)
+    at spawn (node:child_process:796:9)
+    at execFile (node:child_process:349:17)
+    at C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\builder-util\src\util.ts:96:13
+    at new Promise (<anonymous>)
+    at exec (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\builder-util\src\util.ts:95:10)
+    at execWine (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\wine.ts:11:16)
+    at NsisTarget.computeScriptAndSignUninstaller (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:403:21)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at NsisTarget.buildInstaller (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:322:9)
+    at NsisTarget.finishBuild (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:138:9)
+    at Packager.doBuild (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\packager.ts:464:7)
+    at executeFinally (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\builder-util\src\promise.ts:12:14)
+    at Packager._build (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\packager.ts:379:31)
+    at Packager.build (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\packager.ts:340:12)
+    at executeFinally (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\builder-util\src\promise.ts:12:14)
