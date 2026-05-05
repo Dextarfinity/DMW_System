@@ -5960,13 +5960,11 @@ function updateAPPSummary(items, budgetSummary) {
     }
 
     if (cardEl) {
-      // Always update progress bar - remove old one first
-      const oldProgressBar = cardEl.querySelector(".budget-progress-bar");
-      if (oldProgressBar) {
-        oldProgressBar.remove();
-      }
+      // ALWAYS remove ALL old progress bars first
+      const allProgressBars = cardEl.querySelectorAll(".budget-progress-bar");
+      allProgressBars.forEach(bar => bar.remove());
 
-      // Then add the new progress bar with updated color
+      // Then add the NEW progress bar with updated color
       if (progressBarHtml) {
         const progressDiv = document.createElement("div");
         progressDiv.className = "budget-progress-bar";
