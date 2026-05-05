@@ -31075,7 +31075,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
             /* === Repeating header on every printed page === */
-            .page-wrapper { display: table; width: 100%; background: white !important; border: 2px solid #333; }
+            .page-wrapper { display: table; width: 100%; background: white !important; }
             .page-header-group { display: table-header-group; background: white !important; }
             .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; background: white !important; }
             .page-body-group { display: table-row-group; background: white !important; }
@@ -31184,8 +31184,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
       const bodyContent = `
-        <div class="iar-doc-wrapper">
-        ${getPrintHeaderHTML()}
+        <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
         <!-- Main Title -->
@@ -31303,7 +31302,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </tr>
         </table>
 
-        </div>  <!-- end iar-doc-wrapper -->
+        </div>  <!-- end border wrapper -->
       `;
 
       const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
@@ -52510,7 +52509,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
  /* === Repeating header on every printed page === */
- .page-wrapper { display: table; width: 100%; border: 2px solid #333; }
+ .page-wrapper { display: table; width: 100%; }
  .page-header-group { display: table-header-group; }
  .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; }
  .page-body-group { display: table-row-group; }
@@ -52619,8 +52618,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
       const bodyContent = `
- <div class="iar-doc-wrapper">
- ${getPrintHeaderHTML()}
+ <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
 
  <!-- Appendix 62 label -->
  <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
@@ -52740,7 +52738,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </tr>
  </table>
 
- </div>  <!-- end iar-doc-wrapper -->
+ </div>  <!-- end border wrapper -->
  `;
 
       const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
