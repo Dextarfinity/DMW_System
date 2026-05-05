@@ -52626,6 +52626,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
  </style>
 
+ <div class="iar-doc-wrapper">
+
  <!-- Appendix 62 label -->
  <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
@@ -52743,6 +52745,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  </td>
  </tr>
  </table>
+
+ </div>  <!-- end iar-doc-wrapper -->
  `;
 
       const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
