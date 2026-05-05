@@ -31062,6 +31062,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             .report-date { text-align: center; margin-bottom: 10px; color: #666; font-size: 9px; }
             .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
             @page { margin: 8mm; background: white !important; }
+            .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; display: block; background: white !important; }
 
             /* === Repeating header on every printed page === */
             .page-wrapper { display: table; width: 100%; background: white !important; }
