@@ -48145,7 +48145,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="detail-row"><label>Supplier:</label><span>${i.supplier_name || "-"}</span></div>
  <div class="detail-row"><label>Invoice No.:</label><span>${i.invoice_number || "-"}</span></div>
 <div class="detail-row"><label>Purpose:</label><span>${i.purpose || i.po_purpose || "-"}</span></div>
-<div class="detail-row"><label>Req. Office:</label><span>${i.requisitioning_office || "-"}</span></div>
+<div class="detail-row"><label>Req. Office:</label><span>${i.dept_name || i.requisitioning_office || "-"}</span></div>
  <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(i.status)}</span></div>
  <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
  </div>
