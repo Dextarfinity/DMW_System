@@ -1,0 +1,1 @@
+ALTER TABLE public.iars ADD COLUMN IF NOT EXISTS requisitioning_office VARCHAR(100);

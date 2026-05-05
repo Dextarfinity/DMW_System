@@ -3766,7 +3766,8 @@ app.get('/api/post-qualifications', authenticateToken, async (req, res) => {
         COALESCE(pq.bidder1_name, s1.name) as bidder1_name,
         COALESCE(pq.bidder2_name, s2.name) as bidder2_name,
         COALESCE(pq.bidder3_name, s3.name) as bidder3_name,
-        pr.dept_id as pr_dept_id, dept.code as department_code
+        pr.dept_id as pr_dept_id, dept.code as department_code,
+        ((pq.bidder1_name IS NOT NULL AND pq.bidder1_name != '')::int + (pq.bidder2_name IS NOT NULL AND pq.bidder2_name != '')::int + (pq.bidder3_name IS NOT NULL AND pq.bidder3_name != '')::int) as bidders_evaluated_count
        FROM post_qualifications pq
        LEFT JOIN abstracts a ON pq.abstract_id = a.id
        LEFT JOIN rfqs r ON a.rfq_id = r.id
@@ -4260,15 +4261,23 @@ app.get('/api/iars', authenticateToken, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT iar.*, po.po_number, s.name as supplier_name,
-              u1.username as inspected_by_name, u2.username as received_by_name
+      `SELECT iar.id, iar.iar_number, iar.po_id, iar.inspection_date, iar.delivery_date,
+        iar.invoice_number, iar.invoice_date, iar.delivery_receipt_number,
+        iar.inspection_result, iar.findings, iar.purpose, iar.inspected_by,
+        iar.date_inspected, iar.received_by, iar.date_received, iar.acceptance,
+        iar.created_by, iar.created_at, iar.updated_at,
+        iar.requisitioning_office, iar.property_custodian, iar.inspector_name,
+              po.po_number, po.purpose as po_purpose, s.name as supplier_name,
+              u1.username as inspected_by_name, u2.username as received_by_name,
+              d.name as dept_name
        FROM iars iar
        LEFT JOIN purchaseorders po ON iar.po_id = po.id
        LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON iar.inspected_by = u1.id
        LEFT JOIN users u2 ON iar.received_by = u2.id
-       WHERE (iar.status != 'draft' OR iar.created_by = $1 OR $2 = true)${divisionCondition}
+       WHERE (iar.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY iar.created_at DESC`,
       params
     );
@@ -4279,20 +4288,41 @@ app.get('/api/iars', authenticateToken, async (req, res) => {
 app.get('/api/iars/:id', authenticateToken, async (req, res) => {
   try {
     const iar = await pool.query(
-      `SELECT iar.*, po.po_number, po.po_date, s.name as supplier_name,
-              u1.username as inspected_by_name, u2.username as received_by_name
+      `SELECT iar.id, iar.iar_number, iar.po_id, iar.inspection_date, iar.delivery_date,
+              iar.invoice_number, iar.invoice_date, iar.delivery_receipt_number,
+              iar.inspection_result, iar.findings, iar.purpose, iar.inspected_by,
+              iar.date_inspected, iar.received_by, iar.date_received, iar.acceptance,
+              iar.created_by, iar.created_at, iar.updated_at,
+              iar.item_specifications, iar.requisitioning_office, iar.property_custodian, iar.inspector_name,
+              po.po_number, po.po_date, po.purpose as po_purpose, s.name as supplier_name,
+              u1.username as inspected_by_name, u2.username as received_by_name,
+              d.name as dept_name
        FROM iars iar LEFT JOIN purchaseorders po ON iar.po_id = po.id
+       LEFT JOIN purchaserequests pr ON po.pr_id = pr.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON iar.inspected_by = u1.id
        LEFT JOIN users u2 ON iar.received_by = u2.id
        WHERE iar.id = $1`, [req.params.id]
     );
     if (iar.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
     const items = await pool.query(
-      `SELECT ii.*, i.category as item_category, i.uacs_code, i.stock_no, i.procurement_source as item_procurement_source
-       FROM iar_items ii LEFT JOIN items i ON ii.item_id = i.id WHERE ii.iar_id = $1 ORDER BY ii.id`,
+      `SELECT ii.*,
+              COALESCE(ii.item_description, i.description) AS item_description,
+              i.unit AS item_unit,
+              i.category as item_category, i.uacs_code, i.stock_no,
+              i.procurement_source as item_procurement_source
+       FROM iar_items ii
+       LEFT JOIN items i ON ii.item_id = i.id
+       WHERE ii.iar_id = $1 ORDER BY ii.id`,
       [req.params.id]
     );
+    console.log('[IAR API] iar columns returned:', Object.keys(iar.rows[0]));
+    console.log('[IAR API] items count:', items.rows.length);
+    if (items.rows.length > 0) {
+      console.log('[IAR API] first item columns:', Object.keys(items.rows[0]));
+      console.log('[IAR API] first item data:', items.rows[0]);
+    }
     res.json({ ...iar.rows[0], items: items.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4317,10 +4347,11 @@ app.post('/api/iars', authenticateToken, async (req, res) => {
     if (items && items.length > 0) {
       for (const item of items) {
         await client.query(
-          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source, item_description, unit)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [iar.id, item.item_id, item.item_code, item.item_name, item.quantity, item.unit_cost||0,
-           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null]
+           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null,
+           item.item_description || null, item.unit || null]
         );
       }
     }
@@ -4362,10 +4393,11 @@ app.put('/api/iars/:id', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM iar_items WHERE iar_id = $1', [req.params.id]);
       for (const item of items) {
         await client.query(
-          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          `INSERT INTO iar_items (iar_id, item_id, item_code, item_name, quantity, unit_cost, category, brand, model, serial_no, ppe_no, inventory_no, generated_item_id, remarks, procurement_source, item_description, unit)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [req.params.id, item.item_id, item.item_code, item.item_name, item.quantity, item.unit_cost||0,
-           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null]
+           item.category, item.brand, item.model, item.serial_no, item.ppe_no, item.inventory_no, item.generated_item_id, item.remarks, item.procurement_source || null,
+           item.item_description || null, item.unit || null]
         );
       }
     }
