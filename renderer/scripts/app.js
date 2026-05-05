@@ -31174,6 +31174,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       const bodyContent = `
         <style>
+          .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; }
           .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
           .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
           .iar-main-table .no-border-lr { border-left: none; border-right: none; }
