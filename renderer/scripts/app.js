@@ -5960,8 +5960,13 @@ function updateAPPSummary(items, budgetSummary) {
     }
 
     const cardContent = cardEl ? cardEl.innerHTML : "";
-    if (cardEl && !cardEl.querySelector(".budget-progress-bar")) {
-      // Only add if not already present
+    if (cardEl) {
+      // Remove old progress bar if it exists
+      const oldProgressBar = cardEl.querySelector(".budget-progress-bar");
+      if (oldProgressBar) {
+        oldProgressBar.remove();
+      }
+      // Always add updated progress bar
       if (progressBarHtml) {
         cardEl.innerHTML =
           cardContent +
