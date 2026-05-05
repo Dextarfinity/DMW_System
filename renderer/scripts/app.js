@@ -295,21 +295,43 @@ function handleRealtimeDataChange(event) {
  return;
  }
 
- // PPMP safe real-time fallback: force refresh when PPMP-related resources change
+ // PPMP safe real-time update: use incremental row update when possible
  if (
  activePageId === 'ppmp' &&
- (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items' || resource === 'paps' || resource === 'app-settings')
+ (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items')
  ) {
- console.log('[SYNC] Reloading PPMP...');
+ console.log('[SYNC] Updating PPMP row - recordId:', event.recordId);
+ if (event.recordId && typeof updatePPMPRow === 'function') {
+ // Try incremental update for single record changes
+ updatePPMPRow(event.recordId).catch(() => {
+ // Fallback to full reload if incremental update fails
+ console.log('[SYNC] Incremental update failed, falling back to full reload');
  if (typeof loadPPMP === 'function') loadPPMP();
+ });
+ } else {
+ // Full reload if no recordId (batch changes or app-settings)
+ console.log('[SYNC] No recordId or resource type requires full reload - reloading PPMP...');
+ if (typeof loadPPMP === 'function') loadPPMP();
+ }
  if (typeof pollNotificationCount === 'function') pollNotificationCount();
  return;
  }
 
- // APP-related resources always refresh the APP page if it's active
+ // APP-related resources: use incremental update when possible
  if ((resource === 'plan-items' || resource === 'app-settings' || resource === 'app-budget-summary') && activePageId === 'app') {
- console.log('[SYNC] Reloading APP...');
+ console.log('[SYNC] Updating APP row - recordId:', event.recordId);
+ if (event.recordId && resource === 'plan-items' && typeof updateAPPRow === 'function') {
+ // Try incremental update for plan-items changes
+ updateAPPRow(event.recordId).catch(() => {
+ // Fallback to full reload if incremental update fails
+ console.log('[SYNC] Incremental update failed, falling back to full reload');
  if (typeof loadAPP === 'function') loadAPP();
+ });
+ } else {
+ // Full reload if no recordId or for app-settings/budget changes (broader impact)
+ console.log('[SYNC] Resource type requires full reload - reloading APP...');
+ if (typeof loadAPP === 'function') loadAPP();
+ }
  if (typeof pollNotificationCount === 'function') pollNotificationCount();
  return;
  }
@@ -1794,6 +1816,140 @@ async function loadAPPStatus(year) {
  return { fiscal_year: year, app_type: 'indicative', update_count: 0 };
  }
 }
+
+/**
+ * Update a single PPMP row in the table (incremental update instead of full reload)
+ */
+async function updatePPMPRow(planId) {
+ try {
+ console.log('[PPMP SYNC] Updating row for plan ID:', planId);
+ // Fetch the updated plan from server
+ const plan = await apiRequest('/plans/' + planId);
+ if (!plan) {
+ console.log('[PPMP SYNC] Plan not found, triggering full reload');
+ loadPPMP();
+ return;
+ }
+
+ // Find the row in the current table
+ const tbody = document.getElementById('ppmpTableBody');
+ if (!tbody) return;
+
+ const rows = tbody.querySelectorAll('tr');
+ let rowFound = false;
+
+ rows.forEach(row => {
+ const rowPlanId = row.getAttribute('data-plan-id');
+ if (rowPlanId === String(planId)) {
+ // Update this row's data
+ updatePPMPRowElement(row, plan);
+ rowFound = true;
+ }
+ });
+
+ if (!rowFound) {
+ console.log('[PPMP SYNC] Row not found in current view, reloading');
+ loadPPMP();
+ }
+ } catch (err) {
+ console.error('[PPMP SYNC] Error updating row:', err);
+ // Fallback to full reload on error
+ loadPPMP();
+ }
+}
+
+/**
+ * Update DOM element for a PPMP row
+ */
+function updatePPMPRowElement(row, plan) {
+ try {
+ // Get cells - structure depends on your table HTML
+ // Update visible columns with new data
+ const cells = row.querySelectorAll('td');
+ if (cells.length >= 8) {
+ // Update EST. BUDGET column (typically around column 7)
+ const budgetCell = cells[7];
+ if (budgetCell) {
+ budgetCell.textContent = '₱' + parseFloat(plan.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ }
+
+ // Update row data attributes if used
+ row.setAttribute('data-plan-id', plan.id);
+ row.setAttribute('data-total-amount', plan.total_amount || 0);
+
+ console.log('[PPMP SYNC] Row updated for plan:', plan.id);
+ } catch (err) {
+ console.error('[PPMP SYNC] Error updating row element:', err);
+ }
+}
+
+/**
+ * Update a single APP row in the table (incremental update instead of full reload)
+ */
+async function updateAPPRow(planItemId) {
+ try {
+ console.log('[APP SYNC] Updating row for plan item ID:', planItemId);
+ // Fetch the updated plan item from server
+ const item = await apiRequest('/plan-items/' + planItemId);
+ if (!item) {
+ console.log('[APP SYNC] Item not found, triggering full reload');
+ loadAPP();
+ return;
+ }
+
+ // Find the row in the current table
+ const tbody = document.getElementById('appTableBody');
+ if (!tbody) return;
+
+ const rows = tbody.querySelectorAll('tr');
+ let rowFound = false;
+
+ rows.forEach(row => {
+ const rowItemId = row.getAttribute('data-item-id');
+ if (rowItemId === String(planItemId)) {
+ // Update this row's data
+ updateAPPRowElement(row, item);
+ rowFound = true;
+ }
+ });
+
+ if (!rowFound) {
+ console.log('[APP SYNC] Row not found in current view, reloading');
+ loadAPP();
+ }
+ } catch (err) {
+ console.error('[APP SYNC] Error updating row:', err);
+ // Fallback to full reload on error
+ loadAPP();
+ }
+}
+
+/**
+ * Update DOM element for an APP row
+ */
+function updateAPPRowElement(row, item) {
+ try {
+ // Get cells - update visible columns
+ const cells = row.querySelectorAll('td');
+ if (cells.length >= 6) {
+ // Update EST. BUDGET column
+ const budgetCell = cells[5];
+ if (budgetCell) {
+ budgetCell.textContent = '₱' + parseFloat(item.total_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ }
+
+ // Update row data attributes if used
+ row.setAttribute('data-item-id', item.id);
+ row.setAttribute('data-budget', item.total_price || 0);
+
+ console.log('[APP SYNC] Row updated for item:', item.id);
+ } catch (err) {
+ console.error('[APP SYNC] Error updating row element:', err);
+ }
+}
+
 
 async function loadPR() {
  try {
@@ -3337,7 +3493,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
  const statusDisplayText = p.status === 'rejected' ? 'Needs Revision' : p.status;
 
  html += `
- <tr class="ppmp-item-row" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
+ <tr class="ppmp-item-row" data-plan-id="${p.id}" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
  <td class="ppmp-no-cell">${ppmpNo}</td>
  <td class="ppmp-desc-cell">${formatPPMPDescription(p)}<div style="margin-top:3px;">${sourceBadge}</div></td>
  <td>${p.project_type || 'Goods'}</td>
@@ -3651,7 +3807,7 @@ function renderAPPTable(items, appStatus) {
  }
 
  return `
- <tr>
+ <tr data-item-id="${item.id}">
  <td>${item.item_code || '-'}</td>
  <td style="min-width:320px;">${item.item_name || '-'}</td>
  <td>${deptCode}</td>
@@ -43268,21 +43424,15 @@ Failure to submit the above requirements within the prescribed period shall cons
  }
  }
 
- // Start real-time polling (every 30 seconds)
+ // Initialize notification polling - called on page load after login
+ // Real-time updates now handled via Socket.IO data_changed events
  function startNotificationPolling() {
- if (notificationPollTimer) clearInterval(notificationPollTimer);
- // Initial load
+ // Initial load of notification count
  pollNotificationCount();
- // Poll every 30 seconds
- notificationPollTimer = setInterval(pollNotificationCount, 30000);
  }
 
  // Stop polling (on logout)
  function stopNotificationPolling() {
- if (notificationPollTimer) {
- clearInterval(notificationPollTimer);
- notificationPollTimer = null;
- }
  notificationsCache = [];
  const badge = document.getElementById('notificationCount');
  if (badge) badge.style.display = 'none';
