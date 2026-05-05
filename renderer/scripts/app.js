@@ -31290,13 +31290,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <tr>
             <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
-                <strong>${iar.inspected_by_name || ""}</strong>
+                <strong>${iar.inspected_by_name || iar.inspector_name || ""}</strong>
               </div>
               <div style="font-size:8px; margin-top:2px;">Inspection Officer/Inspection Committee</div>
             </td>
             <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
-                <strong>${iar.received_by_name || ""}</strong>
+                <strong>${iar.received_by_name || iar.property_custodian || ""}</strong>
               </div>
               <div style="font-size:8px; margin-top:2px;">Supply and/or Property Custodian</div>
             </td>
