@@ -5835,8 +5835,10 @@ function updateAPPSummary(items, budgetSummary) {
       0,
     );
   } else if (budgetSummary) {
+    // Use PPMP budget as overall allocated (original allocation from PPMP)
+    // This ensures: available = ppmp - current_app_total
     overallAllocatedBudget = parseFloat(
-      budgetSummary.total_budget || budgetSummary.active_budget || 0,
+      budgetSummary.ppmp_budget || budgetSummary.total_budget || budgetSummary.active_budget || 0,
     );
   }
 
