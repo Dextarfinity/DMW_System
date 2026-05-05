@@ -20544,6 +20544,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
+      procurement_source: si.procurement_source || si.item_procurement_source || 'NON PS-DBM',
     }));
 
     if (!confirm("Are you sure you want to complete this IAR?")) return;
@@ -41717,6 +41718,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
+      procurement_source: si.procurement_source || si.item_procurement_source || 'NON PS-DBM',
     }));
 
     if (!confirm("Are you sure you want to complete this IAR?")) return;
