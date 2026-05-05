@@ -31075,13 +31075,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
             /* === Repeating header on every printed page === */
-            .page-wrapper { display: table; width: 100%; background: white !important; }
+            .page-wrapper { display: table; width: 100%; background: white !important; border: 2px solid #333; }
             .page-header-group { display: table-header-group; background: white !important; }
-            .page-header-group > tr > td { border: none; padding: 0 15px; background: white !important; }
+            .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; background: white !important; }
             .page-body-group { display: table-row-group; background: white !important; }
             .page-body-group > tr > td { border: none; padding: 0 15px; background: white !important; }
             .page-footer-group { display: table-footer-group; background: white !important; }
-            .page-footer-group > tr > td { border: none; padding: 0 15px; background: white !important; }
+            .page-footer-group > tr > td { border: none; padding: 0 15px 15px 15px; background: white !important; }
 
             /* Reset inner tables so they keep their borders */
             .page-body-group table th,
@@ -52510,13 +52510,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
  /* === Repeating header on every printed page === */
- .page-wrapper { display: table; width: 100%; }
+ .page-wrapper { display: table; width: 100%; border: 2px solid #333; }
  .page-header-group { display: table-header-group; }
- .page-header-group > tr > td { border: none; padding: 0 15px; }
+ .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; }
  .page-body-group { display: table-row-group; }
  .page-body-group > tr > td { border: none; padding: 0 15px; }
  .page-footer-group { display: table-footer-group; }
- .page-footer-group > tr > td { border: none; padding: 0 15px; }
+ .page-footer-group > tr > td { border: none; padding: 0 15px 15px 15px; }
 
  /* Reset inner tables so they keep their borders */
  .page-body-group table th,
