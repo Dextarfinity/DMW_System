@@ -71,6 +71,37 @@ function discoverServer() {
 let socket = null;
 let _socketReconnectTimer = null;
 
+// =====================================================
+// HOT RELOAD CONFIGURATION
+// =====================================================
+const CONFIG = {
+  VERSION_CHECK_INTERVAL: 45000,   // Check every 45 seconds
+  HOT_RELOAD_TIMEOUT: 5000,        // 5 second timeout for reload
+  HOT_RELOAD_DELAY: 500            // Delay before reloading page
+};
+
+// Hot reload manager instance
+let hotReloadManager = null;
+
+// =====================================================
+// IPC EVENT LISTENERS (Electron Process Communication)
+// =====================================================
+
+// Listen for server URL changes (when server IP changes or network reconnects)
+if (typeof window !== 'undefined' && window.ipcRenderer) {
+  window.ipcRenderer.on('server-changed', (event, data) => {
+    console.log('[CLIENT] Server URL changed:', data.url);
+    SOCKET_SERVER_URL = data.url;
+    API_URL = data.url + '/api';
+
+    // Reconnect Socket.IO with new URL
+    if (socket) {
+      console.log('[CLIENT] Disconnecting from old server...');
+      socket.disconnect();
+    }
+    connectSocket();
+  });
+}
 
 
 /**
@@ -112,6 +143,46 @@ function connectSocket() {
  const token = authToken || sessionStorage.getItem('dmw_token');
  if (token) {
  socket.emit('authenticate', { token });
+ }
+
+ // Check for version updates when reconnecting
+ (async () => {
+ try {
+ const versionInfo = await apiRequest('/app-version');
+ if (versionInfo && versionInfo.version) {
+ console.log('[AUTO-UPDATE] Server version:', versionInfo.version, 'Client version:', CURRENT_APP_VERSION);
+
+ if (CURRENT_APP_VERSION && versionInfo.version !== CURRENT_APP_VERSION) {
+ console.log('[AUTO-UPDATE] New version detected! Reloading app...');
+
+ // Check if modal is open
+ const modalOverlay = document.querySelector('.modal-overlay');
+ const isModalOpen = modalOverlay && modalOverlay.style.display !== 'none';
+
+ if (isModalOpen) {
+ // Schedule reload after modal closes
+ _pendingReload = true;
+ console.log('[AUTO-UPDATE] Modal is open, reload scheduled for when modal closes');
+ } else {
+ // Reload immediately
+ window.location.reload(true);
+ }
+ } else if (!CURRENT_APP_VERSION) {
+ // First connection - store version
+ CURRENT_APP_VERSION = versionInfo.version;
+ console.log('[AUTO-UPDATE] Initial version stored:', CURRENT_APP_VERSION);
+ }
+ }
+ } catch (err) {
+ console.error('[AUTO-UPDATE] Error checking version:', err);
+ }
+ })();
+
+ // Initialize hot reload manager (checks for frontend/backend updates)
+ if (!window.hotReloadManager && typeof HotReloadManager !== 'undefined') {
+   console.log('[CLIENT] Initializing hot reload manager');
+   window.hotReloadManager = new HotReloadManager(socket, CONFIG);
+   window.hotReloadManager.start();
  }
  });
 
@@ -695,6 +766,10 @@ function getApiUrl() {
 
 let authToken = null;
 let currentUser = { name: '', role: '', roles: [], division: '' };
+
+// Auto-update tracking
+let CURRENT_APP_VERSION = null;
+let _pendingReload = false;
 
 // NEW: Event listener tracking for cleanup (prevents memory leaks)
 const elementListeners = new Map(); // Maps element -> [{ event, handler }, ...]
@@ -7403,6 +7478,15 @@ document.addEventListener('DOMContentLoaded', () => {
  window._modalPreventOutsideClose = false; // Reset flag when closing
  if (modalOverlay) {
  modalOverlay.classList.remove('show');
+ }
+
+ // Check if there's a pending app reload (from auto-update)
+ if (window._pendingReload) {
+ console.log('[AUTO-UPDATE] Modal closed, executing pending reload');
+ window._pendingReload = false;
+ setTimeout(() => {
+ window.location.reload(true);
+ }, 500);
  }
  }
 

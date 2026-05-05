@@ -203,17 +203,17 @@ function getLocalNetworkCandidates() {
 }
 
 /**
- * Discover which server IP is reachable.
+ * Discover which server IP is reachable with exponential backoff retry.
  * 1. Tries localhost first (local development)
  * 2. Listens for UDP broadcast from server (AUTOMATIC, FASTEST)
  * 3. Fetches dynamically advertised IPs from HTTP endpoint (FALLBACK)
  * 4. Races all candidates on /api/health
  * 5. Falls back to localhost if nothing responds
  */
-async function discoverServer() {
-  if (RESOLVED_SERVER_URL) return RESOLVED_SERVER_URL;
+async function discoverServer(attempt = 1, maxAttempts = 10) {
+  if (RESOLVED_SERVER_URL && attempt === 1) return RESOLVED_SERVER_URL;
 
-  console.log('[DISCOVERY] Starting dynamic server discovery...');
+  console.log(`[DISCOVERY] Attempt ${attempt}/${maxAttempts}: Starting server discovery...`);
 
   // Step 1: Try localhost first (best for development and LAN)
   console.log('[DISCOVERY] Step 1: Trying localhost (local development)...');
@@ -284,7 +284,16 @@ async function discoverServer() {
 
   // Step 5: Fallback to localhost if nothing responded
   RESOLVED_SERVER_URL = `http://localhost:${SERVER_PORT}`;
-  console.warn('[DISCOVERY] [WARNING] No server responded to health checks');
+
+  // Retry with exponential backoff if this is not the last attempt
+  if (attempt < maxAttempts) {
+    const backoffDelay = Math.min(1000 * Math.pow(1.5, attempt - 1), 10000);
+    console.warn(`[DISCOVERY] [RETRY] No server found, retrying in ${backoffDelay}ms (attempt ${attempt + 1}/${maxAttempts})`);
+    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    return discoverServer(attempt + 1, maxAttempts);
+  }
+
+  console.warn('[DISCOVERY] [WARNING] All discovery attempts exhausted');
   console.warn('[DISCOVERY] Falling back to localhost (offline mode)');
   return RESOLVED_SERVER_URL;
 }
@@ -316,6 +325,40 @@ function isServerReachable() {
       resolve(false);
     });
   });
+}
+
+/**
+ * Start periodic re-discovery check.
+ * Detects when server IP changes (e.g., WiFi reconnection) and updates RESOLVED_SERVER_URL.
+ * Notifies renderer if IP changes via IPC.
+ */
+function startPeriodicRediscovery() {
+  const REDISCOVERY_INTERVAL = 30000; // Check every 30 seconds
+
+  setInterval(async () => {
+    if (!mainWindow) return;
+
+    const isReachable = await isServerReachable();
+    if (!isReachable) {
+      console.log('[PERIODIC-DISCOVERY] Server unreachable, attempting re-discovery...');
+      try {
+        const newUrl = await discoverServer(1, 3); // Retry up to 3 times
+        if (newUrl && newUrl !== RESOLVED_SERVER_URL) {
+          console.log('[PERIODIC-DISCOVERY] 🔄 Server IP changed!', {
+            old: RESOLVED_SERVER_URL,
+            new: newUrl
+          });
+          RESOLVED_SERVER_URL = newUrl;
+          // Notify renderer of server URL change
+          mainWindow.webContents.send('server-changed', { url: newUrl });
+        }
+      } catch (err) {
+        console.error('[PERIODIC-DISCOVERY] Re-discovery failed:', err.message);
+      }
+    }
+  }, REDISCOVERY_INTERVAL);
+
+  console.log('[PERIODIC-DISCOVERY] Started periodic re-discovery check (every 30 seconds)');
 }
 
 async function createWindow() {
@@ -447,6 +490,9 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Start periodic re-discovery to handle server IP changes
+  startPeriodicRediscovery();
 }
 
 app.whenReady().then(() => {

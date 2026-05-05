@@ -1,0 +1,56 @@
+# Electron Builder Configuration
+# Explicit file inclusion and build settings for production builds
+
+appId: com.dmwfad.procurement
+productName: Procurement Plan System
+
+# Files to include in the build
+files:
+  - main.js
+  - config/
+  - renderer/
+  - build/
+  - package.json
+  - node_modules/
+
+# Windows-specific build settings
+win:
+  certificateFile:
+  certificatePassword:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+  signingHashAlgorithms:
+    - sha256
+  certificateChain:
+
+# NSIS Installer configuration
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Procurement Plan System"
+  include: nsis.installer.nsh
+  license: LICENSE
+
+# Portable executable configuration
+portable:
+  artifactName: ${productName}-${version}-portable.exe
+
+# Archive configuration
+publish:
+  provider: generic
+  url: https://updates.example.com
+
+# Extra build options
+extraMetadata:
+  nodeIntegration: false
+  enableRemoteModule: false
+  contextIsolation: true
+  preload: preload.js
+
+directories:
+  buildResources: build
+  output: dist
