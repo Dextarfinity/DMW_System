@@ -20540,7 +20540,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "IAR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
@@ -26705,7 +26705,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             const itemDesc = it.item_description
               ? it.item_description
               : (descLines.length > 0 ? descLines[0] : '-');
-            const itemUnit = it.item_unit || '-';
+            const itemUnit = it.unit || it.item_unit || '-';
 
             return (
               "<tr>" +
@@ -41713,7 +41713,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "IAR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
@@ -48101,7 +48101,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             const itemDesc = it.item_description
               ? it.item_description
               : (descLines.length > 0 ? descLines[0] : '-');
-            const itemUnit = it.item_unit || '-';
+            const itemUnit = it.unit || it.item_unit || '-';
 
             return (
               "<tr>" +
