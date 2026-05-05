@@ -31187,6 +31187,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
         </style>
 
+        <div class="iar-doc-wrapper">
+
         <!-- Appendix 62 label -->
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
@@ -52609,6 +52611,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       const bodyContent = `
  <style>
+ .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; }
  .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
  .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
  .iar-main-table .no-border-lr { border-left: none; border-right: none; }
