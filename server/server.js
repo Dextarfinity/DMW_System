@@ -6022,6 +6022,28 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Get current app version for real-time auto-update detection
+app.get('/api/app-version', (req, res) => {
+  try {
+    res.json({
+      status: 'OK',
+      version: APP_VERSION,
+      buildTime: new Date().toISOString(),
+      frontend_updated: true,
+      backend_updated: true,
+      server_ip: getLocalIP(),
+      port: PORT,
+      timestamp: new Date().toISOString(),
+      uptime_seconds: Math.floor(process.uptime())
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: err.message
+    });
+  }
+});
+
 // Auto IP Detection — returns all available server IPs for dynamic network discovery
 app.get('/api/server-ips', (req, res) => {
   try {
@@ -6043,6 +6065,64 @@ app.get('/api/server-ips', (req, res) => {
     });
   }
 });
+
+// Frontend hash endpoint for real-time auto-update detection
+app.get('/api/app-version-hash', (req, res) => {
+  try {
+    const hash = computeFrontendHash();
+    const version = require('../package.json').version;
+    res.json({
+      status: 'OK',
+      version: version,
+      frontend_hash: hash,
+      server_timestamp: new Date().toISOString(),
+      build_info: {
+        node_version: process.version,
+        platform: process.platform,
+        uptime: process.uptime()
+      }
+    });
+  } catch (err) {
+    console.error('[VERSION HASH] Error computing hash:', err.message);
+    res.status(500).json({
+      status: 'ERROR',
+      error: err.message
+    });
+  }
+});
+
+// Helper function to compute hash of frontend directory
+function computeFrontendHash() {
+  const crypto = require('crypto');
+  const fs = require('fs');
+  const path = require('path');
+
+  const rendererPath = path.join(__dirname, '../renderer');
+  let hash = crypto.createHash('md5');
+
+  // Hash all files in renderer directory recursively (alphabetical order for consistency)
+  function hashDirectory(dir) {
+    const files = fs.readdirSync(dir).sort();
+    files.forEach(file => {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        hashDirectory(filePath);
+      } else {
+        const content = fs.readFileSync(filePath);
+        hash.update(content);
+      }
+    });
+  }
+
+  try {
+    hashDirectory(rendererPath);
+  } catch (err) {
+    console.warn('[VERSION HASH] Warning: Could not compute full hash:', err.message);
+  }
+
+  return hash.digest('hex');
+}
 
 // ==============================================================================
 // ==============================================================================

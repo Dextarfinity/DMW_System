@@ -10,6 +10,14 @@
   "build": {
     "appId": "com.dmwfad.procurement",
     "productName": "Procurement Plan System",
+    "files": [
+      "main.js",
+      "config/**/*",
+      "renderer/**/*",
+      "build/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
     "win": {
       "target": [
         "nsis",
@@ -20,6 +28,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "extraMetadata": {
+      "nodeIntegration": false,
+      "enableRemoteModule": false,
+      "contextIsolation": true
     }
   },
   "keywords": [

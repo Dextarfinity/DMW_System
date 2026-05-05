@@ -77,6 +77,42 @@ function discoverServer() {
 let socket = null;
 let _socketReconnectTimer = null;
 
+<<<<<<< HEAD
+=======
+// =====================================================
+// HOT RELOAD CONFIGURATION
+// =====================================================
+const CONFIG = {
+  VERSION_CHECK_INTERVAL: 45000,   // Check every 45 seconds
+  HOT_RELOAD_TIMEOUT: 5000,        // 5 second timeout for reload
+  HOT_RELOAD_DELAY: 500            // Delay before reloading page
+};
+
+// Hot reload manager instance
+let hotReloadManager = null;
+
+// =====================================================
+// IPC EVENT LISTENERS (Electron Process Communication)
+// =====================================================
+
+// Listen for server URL changes (when server IP changes or network reconnects)
+if (typeof window !== 'undefined' && window.ipcRenderer) {
+  window.ipcRenderer.on('server-changed', (event, data) => {
+    console.log('[CLIENT] Server URL changed:', data.url);
+    SOCKET_SERVER_URL = data.url;
+    API_URL = data.url + '/api';
+
+    // Reconnect Socket.IO with new URL
+    if (socket) {
+      console.log('[CLIENT] Disconnecting from old server...');
+      socket.disconnect();
+    }
+    connectSocket();
+  });
+}
+
+
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
 /**
  * Connect to the Socket.IO server. Called after login or session restore.
  * Authenticates with JWT and listens for real-time data_changed events
@@ -114,6 +150,7 @@ function connectSocket() {
     timeout: 20000,
   });
 
+<<<<<<< HEAD
   socket.on("connect", () => {
     console.log("[SOCKET] Connected to server:", socket.id);
     // Authenticate with JWT
@@ -124,6 +161,56 @@ function connectSocket() {
       });
     }
   });
+=======
+ socket.on('connect', () => {
+ console.log('[SOCKET] Connected to server:', socket.id);
+ // Authenticate with JWT
+ const token = authToken || sessionStorage.getItem('dmw_token');
+ if (token) {
+ socket.emit('authenticate', { token });
+ }
+
+ // Check for version updates when reconnecting
+ (async () => {
+ try {
+ const versionInfo = await apiRequest('/app-version');
+ if (versionInfo && versionInfo.version) {
+ console.log('[AUTO-UPDATE] Server version:', versionInfo.version, 'Client version:', CURRENT_APP_VERSION);
+
+ if (CURRENT_APP_VERSION && versionInfo.version !== CURRENT_APP_VERSION) {
+ console.log('[AUTO-UPDATE] New version detected! Reloading app...');
+
+ // Check if modal is open
+ const modalOverlay = document.querySelector('.modal-overlay');
+ const isModalOpen = modalOverlay && modalOverlay.style.display !== 'none';
+
+ if (isModalOpen) {
+ // Schedule reload after modal closes
+ _pendingReload = true;
+ console.log('[AUTO-UPDATE] Modal is open, reload scheduled for when modal closes');
+ } else {
+ // Reload immediately
+ window.location.reload(true);
+ }
+ } else if (!CURRENT_APP_VERSION) {
+ // First connection - store version
+ CURRENT_APP_VERSION = versionInfo.version;
+ console.log('[AUTO-UPDATE] Initial version stored:', CURRENT_APP_VERSION);
+ }
+ }
+ } catch (err) {
+ console.error('[AUTO-UPDATE] Error checking version:', err);
+ }
+ })();
+
+ // Initialize hot reload manager (checks for frontend/backend updates)
+ if (!window.hotReloadManager && typeof HotReloadManager !== 'undefined') {
+   console.log('[CLIENT] Initializing hot reload manager');
+   window.hotReloadManager = new HotReloadManager(socket, CONFIG);
+   window.hotReloadManager.start();
+ }
+ });
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
 
   socket.on("authenticated", (resp) => {
     if (resp.success) {
@@ -340,6 +427,7 @@ function handleRealtimeDataChange(event) {
   window._ppmpData = null;
   console.log("[SYNC] Cleared caches - fresh data will load");
 
+<<<<<<< HEAD
   // Always refresh dashboard stats (it aggregates all tables)
   if (activePageId === "dashboard") {
     console.log("[SYNC] Reloading dashboard...");
@@ -361,6 +449,48 @@ function handleRealtimeDataChange(event) {
     if (typeof pollNotificationCount === "function") pollNotificationCount();
     return;
   }
+=======
+ // PPMP safe real-time update: use incremental row update when possible
+ if (
+ activePageId === 'ppmp' &&
+ (resource === 'plans' || resource === 'ppmp' || resource === 'plan-items')
+ ) {
+ console.log('[SYNC] Updating PPMP row - recordId:', event.recordId);
+ if (event.recordId && typeof updatePPMPRow === 'function') {
+ // Try incremental update for single record changes
+ updatePPMPRow(event.recordId).catch(() => {
+ // Fallback to full reload if incremental update fails
+ console.log('[SYNC] Incremental update failed, falling back to full reload');
+ if (typeof loadPPMP === 'function') loadPPMP();
+ });
+ } else {
+ // Full reload if no recordId (batch changes or app-settings)
+ console.log('[SYNC] No recordId or resource type requires full reload - reloading PPMP...');
+ if (typeof loadPPMP === 'function') loadPPMP();
+ }
+ if (typeof pollNotificationCount === 'function') pollNotificationCount();
+ return;
+ }
+
+ // APP-related resources: use incremental update when possible
+ if ((resource === 'plan-items' || resource === 'app-settings' || resource === 'app-budget-summary') && activePageId === 'app') {
+ console.log('[SYNC] Updating APP row - recordId:', event.recordId);
+ if (event.recordId && resource === 'plan-items' && typeof updateAPPRow === 'function') {
+ // Try incremental update for plan-items changes
+ updateAPPRow(event.recordId).catch(() => {
+ // Fallback to full reload if incremental update fails
+ console.log('[SYNC] Incremental update failed, falling back to full reload');
+ if (typeof loadAPP === 'function') loadAPP();
+ });
+ } else {
+ // Full reload if no recordId or for app-settings/budget changes (broader impact)
+ console.log('[SYNC] Resource type requires full reload - reloading APP...');
+ if (typeof loadAPP === 'function') loadAPP();
+ }
+ if (typeof pollNotificationCount === 'function') pollNotificationCount();
+ return;
+ }
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
 
   // APP-related resources always refresh the APP page if it's active
   if (
@@ -789,6 +919,10 @@ let currentUser = {
   roles: [],
   division: "",
 };
+
+// Auto-update tracking
+let CURRENT_APP_VERSION = null;
+let _pendingReload = false;
 
 // NEW: Event listener tracking for cleanup (prevents memory leaks)
 const elementListeners = new Map(); // Maps element -> [{ event, handler }, ...]
@@ -2290,6 +2424,140 @@ async function loadAPPStatus(year) {
     };
   }
 }
+
+/**
+ * Update a single PPMP row in the table (incremental update instead of full reload)
+ */
+async function updatePPMPRow(planId) {
+ try {
+ console.log('[PPMP SYNC] Updating row for plan ID:', planId);
+ // Fetch the updated plan from server
+ const plan = await apiRequest('/plans/' + planId);
+ if (!plan) {
+ console.log('[PPMP SYNC] Plan not found, triggering full reload');
+ loadPPMP();
+ return;
+ }
+
+ // Find the row in the current table
+ const tbody = document.getElementById('ppmpTableBody');
+ if (!tbody) return;
+
+ const rows = tbody.querySelectorAll('tr');
+ let rowFound = false;
+
+ rows.forEach(row => {
+ const rowPlanId = row.getAttribute('data-plan-id');
+ if (rowPlanId === String(planId)) {
+ // Update this row's data
+ updatePPMPRowElement(row, plan);
+ rowFound = true;
+ }
+ });
+
+ if (!rowFound) {
+ console.log('[PPMP SYNC] Row not found in current view, reloading');
+ loadPPMP();
+ }
+ } catch (err) {
+ console.error('[PPMP SYNC] Error updating row:', err);
+ // Fallback to full reload on error
+ loadPPMP();
+ }
+}
+
+/**
+ * Update DOM element for a PPMP row
+ */
+function updatePPMPRowElement(row, plan) {
+ try {
+ // Get cells - structure depends on your table HTML
+ // Update visible columns with new data
+ const cells = row.querySelectorAll('td');
+ if (cells.length >= 8) {
+ // Update EST. BUDGET column (typically around column 7)
+ const budgetCell = cells[7];
+ if (budgetCell) {
+ budgetCell.textContent = '₱' + parseFloat(plan.total_amount || 0).toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ }
+
+ // Update row data attributes if used
+ row.setAttribute('data-plan-id', plan.id);
+ row.setAttribute('data-total-amount', plan.total_amount || 0);
+
+ console.log('[PPMP SYNC] Row updated for plan:', plan.id);
+ } catch (err) {
+ console.error('[PPMP SYNC] Error updating row element:', err);
+ }
+}
+
+/**
+ * Update a single APP row in the table (incremental update instead of full reload)
+ */
+async function updateAPPRow(planItemId) {
+ try {
+ console.log('[APP SYNC] Updating row for plan item ID:', planItemId);
+ // Fetch the updated plan item from server
+ const item = await apiRequest('/plan-items/' + planItemId);
+ if (!item) {
+ console.log('[APP SYNC] Item not found, triggering full reload');
+ loadAPP();
+ return;
+ }
+
+ // Find the row in the current table
+ const tbody = document.getElementById('appTableBody');
+ if (!tbody) return;
+
+ const rows = tbody.querySelectorAll('tr');
+ let rowFound = false;
+
+ rows.forEach(row => {
+ const rowItemId = row.getAttribute('data-item-id');
+ if (rowItemId === String(planItemId)) {
+ // Update this row's data
+ updateAPPRowElement(row, item);
+ rowFound = true;
+ }
+ });
+
+ if (!rowFound) {
+ console.log('[APP SYNC] Row not found in current view, reloading');
+ loadAPP();
+ }
+ } catch (err) {
+ console.error('[APP SYNC] Error updating row:', err);
+ // Fallback to full reload on error
+ loadAPP();
+ }
+}
+
+/**
+ * Update DOM element for an APP row
+ */
+function updateAPPRowElement(row, item) {
+ try {
+ // Get cells - update visible columns
+ const cells = row.querySelectorAll('td');
+ if (cells.length >= 6) {
+ // Update EST. BUDGET column
+ const budgetCell = cells[5];
+ if (budgetCell) {
+ budgetCell.textContent = '₱' + parseFloat(item.total_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2});
+ }
+ }
+
+ // Update row data attributes if used
+ row.setAttribute('data-item-id', item.id);
+ row.setAttribute('data-budget', item.total_price || 0);
+
+ console.log('[APP SYNC] Row updated for item:', item.id);
+ } catch (err) {
+ console.error('[APP SYNC] Error updating row element:', err);
+ }
+}
+
 
 async function loadPR() {
   try {
@@ -4662,8 +4930,13 @@ function renderPPMPTable(ppmp, allPPMPItems) {
         const statusDisplayText =
           p.status === "rejected" ? "Needs Revision" : p.status;
 
+<<<<<<< HEAD
         html += `
  <tr class="ppmp-item-row" data-division="${deptCode}" data-mode="${p.procurement_mode || ""}" data-category="${cat}">
+=======
+ html += `
+ <tr class="ppmp-item-row" data-plan-id="${p.id}" data-division="${deptCode}" data-mode="${p.procurement_mode || ''}" data-category="${cat}">
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
  <td class="ppmp-no-cell">${ppmpNo}</td>
  <td class="ppmp-desc-cell">${formatPPMPDescription(p)}<div style="margin-top:3px;">${sourceBadge}</div></td>
  <td>${p.project_type || "Goods"}</td>
@@ -5111,6 +5384,7 @@ function renderAPPTable(items, appStatus) {
     }
   }
 
+<<<<<<< HEAD
   console.log("[APP TABLE] Rendering " + displayItems.length + " items");
 
   tbody.innerHTML =
@@ -5166,6 +5440,12 @@ function renderAPPTable(items, appStatus) {
  <tr>
  <td>${item.item_code || "-"}</td>
  <td style="min-width:320px;">${item.item_name || "-"}</td>
+=======
+ return `
+ <tr data-item-id="${item.id}">
+ <td>${item.item_code || '-'}</td>
+ <td style="min-width:320px;">${item.item_name || '-'}</td>
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
  <td>${deptCode}</td>
  <td>${item.item_description && item.item_description !== item.item_name ? item.item_description : summarizeProjectTitle(item.item_name)}</td>
  <td><span class="mode-badge ${mode.css}">${mode.label}</span></td>
@@ -11283,8 +11563,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+<<<<<<< HEAD
   // Alias for report functions that use showModal
   const showModal = openModal;
+=======
+ // Close modal
+ function closeModal() {
+ window._modalPreventOutsideClose = false; // Reset flag when closing
+ if (modalOverlay) {
+ modalOverlay.classList.remove('show');
+ }
+
+ // Check if there's a pending app reload (from auto-update)
+ if (window._pendingReload) {
+ console.log('[AUTO-UPDATE] Modal closed, executing pending reload');
+ window._pendingReload = false;
+ setTimeout(() => {
+ window.location.reload(true);
+ }, 500);
+ }
+ }
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
 
   // Close modal
   function closeModal() {
@@ -27739,7 +28038,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Est. Budget</label>
-                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+                <input type="number" id="manualEstBudget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" oninput="syncEditEstBudget('manualEstBudget')">
               </div>
             </div>
           </div>
@@ -27791,7 +28090,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               </div>
               <div class="form-group">
                 <label>Est. Budget</label>
-                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" readonly style="background:#f5f5f5;">
+                <input type="number" id="papManualEstBudget" name="pap_manual_est_budget" value="${totalAmt.toFixed(2)}" step="0.01" min="0" style="font-size:13px;" oninput="syncEditEstBudget('papManualEstBudget')">
               </div>
             </div>
           </div>
@@ -28179,6 +28478,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Calculate estimated budget for manual item entry in Edit modal
    */
+<<<<<<< HEAD
   window.calcEditManualEstBudget = function () {
     const price = parseFloat(
       document.getElementById("manualItemPrice")?.value || 0,
@@ -28188,6 +28488,18 @@ Failure to submit the above requirements within the prescribed period shall cons
     const estBudget = isNaN(price) ? 0 : price * qty;
     const budgetField = document.getElementById("manualEstBudget");
     const totalField = document.getElementById("ppmpEditBudget");
+=======
+  window.calcEditManualEstBudget = function() {
+    const budgetField = document.getElementById('manualEstBudget');
+    // Skip auto-calculation if user manually edited this field
+    if (budgetField && budgetField.dataset.manualEdit === 'true') return;
+
+    const price = parseFloat(document.getElementById('manualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('manualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const totalField = document.getElementById('ppmpEditBudget');
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
     if (budgetField) budgetField.value = estBudget.toFixed(2);
     if (totalField) totalField.value = estBudget.toFixed(2);
   };
@@ -28195,6 +28507,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Calculate estimated budget for PAP entry in Edit modal
    */
+<<<<<<< HEAD
   window.calcEditPAPEstBudget = function () {
     const price = parseFloat(
       document.getElementById("papManualItemPrice")?.value || 0,
@@ -28204,11 +28517,38 @@ Failure to submit the above requirements within the prescribed period shall cons
     const estBudget = isNaN(price) ? 0 : price * qty;
     const budgetField = document.getElementById("papManualEstBudget");
     const totalField = document.getElementById("ppmpEditBudget");
+=======
+  window.calcEditPAPEstBudget = function() {
+    const budgetField = document.getElementById('papManualEstBudget');
+    // Skip auto-calculation if user manually edited this field
+    if (budgetField && budgetField.dataset.manualEdit === 'true') return;
+
+    const price = parseFloat(document.getElementById('papManualItemPrice')?.value || 0);
+    const qtyStr = document.getElementById('papManualItemQty')?.value || '1';
+    const qty = parseFloat(qtyStr) || 1;
+    const estBudget = isNaN(price) ? 0 : price * qty;
+    const totalField = document.getElementById('ppmpEditBudget');
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
     if (budgetField) budgetField.value = estBudget.toFixed(2);
     if (totalField) totalField.value = estBudget.toFixed(2);
   };
 
   /**
+   * Handle manual EST. BUDGET edit in Edit modal
+   * Sets flag to prevent auto-recalculation when user manually edits
+   */
+  window.syncEditEstBudget = function(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      el.dataset.manualEdit = 'true';
+      // Sync the manual edit value to the main ppmpEditBudget field
+      const mainBudgetField = document.getElementById('ppmpEditBudget');
+      if (mainBudgetField) {
+        mainBudgetField.value = parseFloat(el.value || 0).toFixed(2);
+      }
+    }
+  };
+  /*
    * Sync PAP Name with General Description & Objective field
    * Called when PAP Name input changes - combines PAP Name + PAP Description
    */
@@ -57286,6 +57626,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   }
 
+<<<<<<< HEAD
   // Start real-time polling (every 30 seconds)
   function startNotificationPolling() {
     if (notificationPollTimer) clearInterval(notificationPollTimer);
@@ -57305,6 +57646,21 @@ Failure to submit the above requirements within the prescribed period shall cons
     const badge = document.getElementById("notificationCount");
     if (badge) badge.style.display = "none";
   }
+=======
+ // Initialize notification polling - called on page load after login
+ // Real-time updates now handled via Socket.IO data_changed events
+ function startNotificationPolling() {
+ // Initial load of notification count
+ pollNotificationCount();
+ }
+
+ // Stop polling (on logout)
+ function stopNotificationPolling() {
+ notificationsCache = [];
+ const badge = document.getElementById('notificationCount');
+ if (badge) badge.style.display = 'none';
+ }
+>>>>>>> af26dfd0deaa3e16654ff933e8f51629955d13c1
 
   // =====================================================
   // REPORT GENERATION FUNCTIONS
