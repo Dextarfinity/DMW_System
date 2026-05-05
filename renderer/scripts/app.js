@@ -31306,6 +31306,8 @@ Failure to submit the above requirements within the prescribed period shall cons
             </td>
           </tr>
         </table>
+
+        </div>  <!-- end iar-doc-wrapper -->
       `;
 
       const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
