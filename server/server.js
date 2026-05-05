@@ -2339,28 +2339,48 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
     console.log('[BUDGET-API] Old amount:', oldAmount);
     console.log('[BUDGET-API] New amount:', newAmount);
 
-    // Update procurementplans
-    console.log('[BUDGET-API] ⏳ Updating procurementplans table (id=' + req.params.id + ')...');
-    const ppUpdate = await pool.query(
-      `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, total_amount`,
-      [newAmount, req.params.id]
-    );
-    console.log('[BUDGET-API] ✅ procurementplans updated. Rows affected:', ppUpdate.rowCount);
-    if (ppUpdate.rowCount > 0) {
-      console.log('[BUDGET-API] ✅ procurementplans new value:', ppUpdate.rows[0].total_amount);
-    }
+    // Check if this item has been consolidated (has an app_entry)
+    const checkApp = await pool.query('SELECT plan_id FROM app_entries WHERE plan_id = $1', [req.params.id]);
+    const isConsolidated = checkApp.rows.length > 0;
+    console.log('[BUDGET-API] Item consolidated:', isConsolidated);
 
-    // Update app_entries using plan_id
-    console.log('[BUDGET-API] ⏳ Updating app_entries table (plan_id=' + req.params.id + ')...');
-    const appUpdate = await pool.query(
-      `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING plan_id, estimated_budget`,
-      [newAmount, req.params.id]
-    );
-    console.log('[BUDGET-API] ✅ app_entries updated. Rows affected:', appUpdate.rowCount);
-    if (appUpdate.rowCount > 0) {
-      console.log('[BUDGET-API] ✅ app_entries new value:', appUpdate.rows[0].estimated_budget);
+    // CRITICAL: After consolidation, keep procurementplans.total_amount as ORIGINAL PPMP amount
+    // Only update app_entries.estimated_budget for adjustments
+    // This ensures: available_budget = original_ppmp_total - current_app_total
+
+    let ppUpdate, appUpdate;
+
+    if (isConsolidated) {
+      // After consolidation: ONLY update app_entries (NOT procurementplans)
+      console.log('[BUDGET-API] ⏳ Updating ONLY app_entries (consolidation mode)...');
+      appUpdate = await pool.query(
+        `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING plan_id, estimated_budget`,
+        [newAmount, req.params.id]
+      );
+      console.log('[BUDGET-API] ✅ app_entries updated. Rows affected:', appUpdate.rowCount);
+      if (appUpdate.rowCount > 0) {
+        console.log('[BUDGET-API] ✅ app_entries new value:', appUpdate.rows[0].estimated_budget);
+      }
     } else {
-      console.warn('[BUDGET-API] ⚠️ WARNING: No app_entries row found with plan_id=' + req.params.id);
+      // Before consolidation: Update both (for pre-consolidation adjustments)
+      console.log('[BUDGET-API] ⏳ Updating both tables (pre-consolidation mode)...');
+      ppUpdate = await pool.query(
+        `UPDATE procurementplans SET total_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, total_amount`,
+        [newAmount, req.params.id]
+      );
+      console.log('[BUDGET-API] ✅ procurementplans updated. Rows affected:', ppUpdate.rowCount);
+      if (ppUpdate.rowCount > 0) {
+        console.log('[BUDGET-API] ✅ procurementplans new value:', ppUpdate.rows[0].total_amount);
+      }
+
+      appUpdate = await pool.query(
+        `UPDATE app_entries SET estimated_budget = $1, updated_at = CURRENT_TIMESTAMP WHERE plan_id = $2 RETURNING plan_id, estimated_budget`,
+        [newAmount, req.params.id]
+      );
+      console.log('[BUDGET-API] ✅ app_entries updated. Rows affected:', appUpdate.rowCount);
+      if (appUpdate.rowCount > 0) {
+        console.log('[BUDGET-API] ✅ app_entries new value:', appUpdate.rows[0].estimated_budget);
+      }
     }
 
     // Verify both updates
@@ -2392,8 +2412,7 @@ app.put('/api/plan-items/:id/adjust-budget', authenticateToken, async (req, res)
     res.json({
       message: 'Budget adjusted successfully',
       old_amount: oldAmount,
-      new_amount: newAmount,
-      plan: ppUpdate.rows[0]
+      new_amount: newAmount
     });
   } catch (err) {
     console.error('[BUDGET-API] ❌ ERROR:', err.message);
@@ -2653,11 +2672,31 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
     }));
     
     console.log('[APP-BUDGET] Returning: active=' + row.active_budget + ', departments=' + departments.length);
-    
+
+    // Calculate PPMP budget (original allocation from procurementplans)
+    let ppmpBudget = 0;
+    try {
+      const ppmpResult = await pool.query(
+        `SELECT COALESCE(SUM(total_amount), 0) as total FROM procurementplans
+         WHERE ppmp_no IS NOT NULL AND fiscal_year = $1 AND status = 'approved'`,
+        [fy]
+      );
+      ppmpBudget = parseFloat(ppmpResult.rows[0].total || 0);
+      console.log('[APP-BUDGET] ppmpBudget (original PPMP):', ppmpBudget);
+    } catch (e) {
+      console.warn('[APP-BUDGET] Could not fetch PPMP budget:', e.message);
+      ppmpBudget = parseFloat(row.active_budget || 0);
+    }
+
+    // Available budget = PPMP total - APP current total (what's left to use)
+    const availableBudget = Math.max(0, ppmpBudget - row.active_budget);
+    console.log('[APP-BUDGET] availableBudget = ' + ppmpBudget + ' - ' + row.active_budget + ' = ' + availableBudget);
+
     res.json({
       total_budget: row.total_budget,
       active_budget: row.active_budget,
-      available_budget: '0',
+      available_budget: availableBudget.toString(),
+      ppmp_budget: ppmpBudget,
       active_count: row.active_count,
       removed_count: removed.removed_count,
       removed_budget: removed.removed_budget,
