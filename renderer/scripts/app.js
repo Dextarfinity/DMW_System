@@ -31305,7 +31305,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       const wrappedBody = `
         <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
           ${getPrintHeaderHTML()}
-          <hr style="border:none; border-top:2px solid #333; margin:8px 0 10px;">
           ${bodyContent}
         </div>
       `;
@@ -52745,7 +52744,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       const wrappedBody = `
  <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
  ${getPrintHeaderHTML()}
- <hr style="border:none; border-top:2px solid #333; margin:8px 0 10px;">
  ${bodyContent}
  </div>
  `;
