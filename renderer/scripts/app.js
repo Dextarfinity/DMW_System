@@ -5959,20 +5959,20 @@ function updateAPPSummary(items, budgetSummary) {
  </div>`;
     }
 
-    const cardContent = cardEl ? cardEl.innerHTML : "";
     if (cardEl) {
-      // Remove old progress bar if it exists
+      // Always update progress bar - remove old one first
       const oldProgressBar = cardEl.querySelector(".budget-progress-bar");
       if (oldProgressBar) {
         oldProgressBar.remove();
       }
-      // Always add updated progress bar
+
+      // Then add the new progress bar with updated color
       if (progressBarHtml) {
-        cardEl.innerHTML =
-          cardContent +
-          '<div class="budget-progress-bar" style="margin-top:8px;">' +
-          progressBarHtml +
-          "</div>";
+        const progressDiv = document.createElement("div");
+        progressDiv.className = "budget-progress-bar";
+        progressDiv.style.marginTop = "8px";
+        progressDiv.innerHTML = progressBarHtml;
+        cardEl.appendChild(progressDiv);
       }
     }
   }
