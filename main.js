@@ -183,6 +183,7 @@ async function fetchServerIPsFromServer() {
  */
 function getLocalNetworkCandidates() {
   const candidates = new Set();
+  let primaryIP = null;
 
   try {
     const interfaces = os.networkInterfaces();
@@ -192,9 +193,26 @@ function getLocalNetworkCandidates() {
         // Only consider IPv4 addresses
         if (addr.family === 'IPv4' && !addr.internal) {
           candidates.add(addr.address);
+          if (!primaryIP) primaryIP = addr.address;
         }
       });
     });
+
+    // If only found own IP, scan the entire subnet for other servers
+    if (candidates.size === 1 && primaryIP) {
+      console.log(`[DISCOVERY] Only found local IP ${primaryIP}, scanning full subnet...`);
+      const parts = primaryIP.split('.');
+      const subnet = parts.slice(0, 3).join('.');
+
+      // Add all IPs on subnet (.1 to .254, skip own IP)
+      for (let i = 1; i <= 254; i++) {
+        const ip = `${subnet}.${i}`;
+        if (ip !== primaryIP) {
+          candidates.add(ip);
+        }
+      }
+      console.log(`[DISCOVERY] Expanded to scan ${candidates.size} IPs on ${subnet}.x`);
+    }
   } catch (err) {
     console.log(`[DISCOVERY] Error scanning network interfaces: ${err.message}`);
   }
