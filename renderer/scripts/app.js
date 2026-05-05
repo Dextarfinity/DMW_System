@@ -31188,7 +31188,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </style>
 
         <div class="iar-doc-wrapper">
-        <!-- Appendix 62 label -->
+        ${getPrintHeaderHTML()}
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
         <!-- Main Title -->
