@@ -31218,7 +31218,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Row: Requisitioning Office/Dept. | Invoice No. -->
           <tr>
             <td style="font-size:9px;"><strong>Requisitioning Office/Dept.:</strong></td>
-            <td style="font-size:9px;">${iar.purpose || ""}</td>
+            <td style="font-size:9px;">${iar.requisitioning_office || iar.dept_name || ""}</td>
             <td style="font-size:9px;"><strong>Invoice No.:</strong></td>
             <td style="font-size:9px;">${iar.invoice_number || ""}${iar.invoice_date ? " / " + fmtDate(iar.invoice_date) : ""}</td>
           </tr>
