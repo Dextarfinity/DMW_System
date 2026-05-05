@@ -33620,7 +33620,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <table style="width:100%;border-collapse:collapse;margin:0;font-family:Arial,sans-serif;">
           <tr class="po-total-row">
             <td style="width:65%; font-size:8pt; vertical-align:middle;">
-              <span style="font-weight:bold; font-style:italic; text-transform:uppercase;"> ${totalAmountWords}</span>
+              <span style="font-weight:bold; font-style:italic; text-transform:uppercase;"> ${totalAmountWords.split(" Pesos")[0]}</span>
             </td>
             <td style="width:35%; text-align:right; font-size:11pt; padding-right:8px;">
               ${fmtCurrency(totalAmount)}
@@ -55048,7 +55048,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <table style="width:100%;border-collapse:collapse;margin:0;font-family:Arial,sans-serif;">
  <tr class="po-total-row">
  <td style="width:65%; font-size:8pt; vertical-align:middle;">
- <span style="font-weight:bold; font-style:italic; text-transform:uppercase;"> ${totalAmountWords}</span>
+ <span style="font-weight:bold; font-style:italic; text-transform:uppercase;"> ${totalAmountWords.split(" Pesos")[0]}</span>
  </td>
  <td style="width:35%; text-align:right; font-size:11pt; padding-right:8px;">
  ${fmtCurrency(totalAmount)}
