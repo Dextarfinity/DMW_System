@@ -1786,6 +1786,21 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
 
+    // Validate PPMP creation deadline
+    const today = new Date();
+    const deadlineYear = fy - 1;
+    const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+    const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+    if (today < creationStartDate || today > deadlineDate) {
+      return res.status(400).json({
+        error: 'PPMP creation deadline has passed',
+        message: today > deadlineDate
+          ? `Cannot create PPMP ${fy}. Deadline was September 30, ${deadlineYear}`
+          : `Cannot create PPMP ${fy} yet. Deadline: September 30, ${deadlineYear}`
+      });
+    }
+
     // Auto-generate PPMP number or validate uniqueness of provided one
     let finalPpmpNo = ppmp_no;
     const deptResult2 = deptId ? await client.query('SELECT code FROM departments WHERE id = $1', [deptId]) : { rows: [] };
@@ -1858,6 +1873,22 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
+
+      // Validate PPMP creation deadline
+      const today = new Date();
+      const deadlineYear = fy - 1;
+      const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+      const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+      if (today < creationStartDate || today > deadlineDate) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'PPMP creation deadline has passed',
+          message: today > deadlineDate
+            ? `Cannot create PPMP ${fy}. Deadline was September 30, ${deadlineYear}`
+            : `Cannot create PPMP ${fy} yet. Deadline: September 30, ${deadlineYear}`
+        });
+      }
 
       // Auto-generate PPMP number or validate uniqueness
       let finalPpmpNo = ppmp_no;

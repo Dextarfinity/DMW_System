@@ -356,6 +356,15 @@ function handleRealtimeDataChange(event) {
       resource === "paps" ||
       resource === "app-settings")
   ) {
+    // For budget adjustments on PPMP page, just refresh the budget summary (faster)
+    if (event.action === "budget_adjusted" && resource === "plan-items") {
+      console.log("[SYNC] Updating PPMP budget summary only...");
+      const fy = window._ppmpFilterYear || getCurrentFiscalYear();
+      apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now())
+        .then(budgetSummary => updatePPMPBudgetSummary(budgetSummary))
+        .catch(err => console.warn('[SYNC] Budget update failed:', err));
+      return;
+    }
     console.log("[SYNC] Reloading PPMP...");
     if (typeof loadPPMP === "function") loadPPMP();
     if (typeof pollNotificationCount === "function") pollNotificationCount();
@@ -2034,6 +2043,16 @@ async function loadPPMP() {
 
     // Render the filtered PPMP data to the table
     renderPPMPTable(filtered, ppmp);
+
+    // Fetch and display available budget from APP
+    const fy = window._ppmpFilterYear || getCurrentFiscalYear();
+    try {
+      const budgetSummary = await apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now());
+      updatePPMPBudgetSummary(budgetSummary);
+    } catch (err) {
+      console.warn('[PPMP] Could not fetch budget summary:', err);
+    }
+
     return filtered;
   } catch (err) {
     console.error("Error loading PPMP:", err);
@@ -2044,6 +2063,125 @@ async function loadPPMP() {
     return [];
   }
 }
+
+// Update PPMP available budget display in real-time
+function updatePPMPBudgetSummary(budgetSummary) {
+  const elAvailableBudget = document.getElementById("ppmpAvailableBudget");
+  if (!budgetSummary || !elAvailableBudget) return;
+
+  const ppmpBudget = parseFloat(budgetSummary.ppmp_budget || 0);
+  const activeBudget = parseFloat(budgetSummary.active_budget || 0);
+  const availableBudget = Math.max(0, ppmpBudget - activeBudget);
+
+  // Calculate budget percentage
+  const budgetPercentage = ppmpBudget > 0 ? (availableBudget / ppmpBudget) * 100 : 0;
+
+  // Determine status and color
+  let statusBadge = "";
+  let statusColor = "#28a745";
+
+  if (availableBudget === 0) {
+    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+    statusColor = "#c53030";
+  } else if (budgetPercentage < 10) {
+    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+    statusColor = "#f6ad55";
+  } else if (budgetPercentage < 25) {
+    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+    statusColor = "#ed8936";
+  } else {
+    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+    statusColor = "#38a169";
+  }
+
+  // Update the available budget display
+  elAvailableBudget.innerHTML = "₱" + availableBudget.toLocaleString("en-PH", { minimumFractionDigits: 2 }) + statusBadge;
+  elAvailableBudget.style.color = statusColor;
+
+  // Update card border color
+  const cardEl = elAvailableBudget.closest(".summary-card");
+  if (cardEl) {
+    cardEl.style.borderLeftColor = statusColor;
+  }
+
+  // Add/update progress bar visual indicator
+  let progressBarHtml = "";
+  if (ppmpBudget > 0) {
+    progressBarHtml = `<div style="margin-top:8px;background:#e2e8f0;border-radius:3px;height:4px;overflow:hidden;">
+ <div style="background:${statusColor};height:100%;width:${Math.min(budgetPercentage, 100)}%;transition:width 0.3s ease;"></div>
+ </div>`;
+  }
+
+  if (cardEl) {
+    // Remove all old progress bars
+    const allProgressBars = cardEl.querySelectorAll(".ppmp-budget-progress-bar");
+    allProgressBars.forEach(bar => bar.remove());
+
+    // Add the new progress bar with updated color
+    if (progressBarHtml) {
+      const progressDiv = document.createElement("div");
+      progressDiv.className = "ppmp-budget-progress-bar";
+      progressDiv.style.marginTop = "8px";
+      progressDiv.innerHTML = progressBarHtml;
+      cardEl.appendChild(progressDiv);
+    }
+  }
+}
+
+// Check if PPMP creation is within deadline window
+function checkPPMPDeadline(fiscalYear) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  const fyNum = parseInt(fiscalYear);
+  const deadlineYear = fyNum - 1;
+  const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+  const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+  if (today < creationStartDate) {
+    return {
+      allowed: false,
+      message: `Cannot create PPMP ${fyNum} yet. Deadline: September 30, ${deadlineYear}`
+    };
+  }
+
+  if (today > deadlineDate) {
+    return {
+      allowed: false,
+      message: `PPMP creation deadline passed (Sep 30, ${deadlineYear}). Next deadline: September 30, ${deadlineYear + 1}`
+    };
+  }
+
+  return {
+    allowed: true,
+    message: `✓ PPMP ${fyNum} can be created until September 30, ${deadlineYear}`
+  };
+}
+
+// Update deadline info display in PPMP modal
+window.updatePPMPDeadlineInfo = function() {
+  const fySelect = document.getElementById("ppmpFiscalYear");
+  const deadlineInfoDiv = document.getElementById("ppmpDeadlineInfo");
+
+  if (!fySelect || !deadlineInfoDiv) return;
+
+  const selectedFY = fySelect.value;
+  if (!selectedFY) {
+    deadlineInfoDiv.innerHTML = "";
+    return;
+  }
+
+  const deadlineCheck = checkPPMPDeadline(selectedFY);
+  const bgColor = deadlineCheck.allowed ? "#d1f0e8" : "#fde4e4";
+  const textColor = deadlineCheck.allowed ? "#1b5e20" : "#b71c1c";
+  const icon = deadlineCheck.allowed ? "✓" : "⚠";
+
+  deadlineInfoDiv.innerHTML = `<span style="color: ${textColor};">${icon} ${deadlineCheck.message}</span>`;
+  deadlineInfoDiv.style.backgroundColor = bgColor;
+  deadlineInfoDiv.style.padding = "4px 8px";
+  deadlineInfoDiv.style.borderRadius = "3px";
+};
 
 // Initialize PPMP filter event listeners (called once after login)
 async function initPPMPFilters() {
@@ -12210,9 +12348,10 @@ document.addEventListener("DOMContentLoaded", () => {
  </div>
  <div class="form-group">
  <label>Fiscal Year <span class="text-danger">*</span></label>
- <select class="form-select" id="ppmpFiscalYear" required onchange="generatePPMPNumber()">
+ <select class="form-select" id="ppmpFiscalYear" required onchange="generatePPMPNumber(); updatePPMPDeadlineInfo()">
  ${getFiscalYearOptions("CY")}
  </select>
+ <div id="ppmpDeadlineInfo" style="margin-top: 6px; font-size: 12px; color: #666;"></div>
  </div>
  <div class="form-group">
  <label>End-User / Division <span class="text-danger">*</span></label>
@@ -17336,6 +17475,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fiscalYear =
       document.getElementById("ppmpFiscalYear")?.value ||
       new Date().getFullYear();
+
+    // Check deadline for PPMP creation
+    const deadlineCheck = checkPPMPDeadline(fiscalYear);
+    if (!deadlineCheck.allowed) {
+      alert(deadlineCheck.message);
+      return;
+    }
+
     const division =
       document.getElementById("ppmpDivisionSelect")?.value ||
       document.querySelector('input[name="division"]')?.value ||
