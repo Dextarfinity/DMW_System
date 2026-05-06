@@ -378,6 +378,18 @@ function handleRealtimeDataChange(event) {
       resource === "app-budget-summary") &&
     activePageId === "app"
   ) {
+    // For budget adjustments on APP page, just refresh budget summaries (faster)
+    if (event.action === "budget_adjusted" && resource === "plan-items") {
+      console.log("[SYNC] Updating APP budget summaries only...");
+      const fy = window._appFilterYear || getCurrentFiscalYear();
+      apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now())
+        .then(budgetSummary => {
+          updateAPPSummary(null, budgetSummary);
+          updateAPPDivisionBudgetBreakdown(budgetSummary);
+        })
+        .catch(err => console.warn('[SYNC] Budget update failed:', err));
+      return;
+    }
     console.log("[SYNC] Reloading APP...");
     if (typeof loadAPP === "function") loadAPP();
     if (typeof pollNotificationCount === "function") pollNotificationCount();
@@ -6276,6 +6288,119 @@ function updateAPPSummary(items, budgetSummary) {
       .join("");
     modeStatsContainer.innerHTML = modeCards;
   }
+}
+
+// Update Division Budget Allocation section in real-time
+function updateAPPDivisionBudgetBreakdown(budgetSummary) {
+  const divBudgetContainer = document.getElementById("appDivisionBudgets");
+  if (!divBudgetContainer || !budgetSummary || !budgetSummary.by_department) return;
+
+  const allowedBudgetRoles = [
+    "admin",
+    "hope",
+    "ord_manager",
+    "budget_consultant",
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+
+  const chiefRoles2 = [
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+  const isChief2 = userHasAnyRole(chiefRoles2);
+  const shouldFilter = isChief2;
+  const chiefRole2 = isChief2 ? getUserChiefRole() : null;
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+
+  // Show/hide division budget panel based on role
+  if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
+    divBudgetContainer.innerHTML = "";
+    divBudgetContainer.style.display = "none";
+    return;
+  }
+
+  divBudgetContainer.style.display = "";
+
+  // Filter departments based on role
+  let departments = budgetSummary.by_department;
+  if (shouldFilter) {
+    if (chiefRole2 === "chief_wrsd") {
+      departments = departments.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      departments = departments.filter((d) => d.department_code !== "WRSD");
+    } else {
+      departments = departments.filter(
+        (d) => d.department_code === userDivCode,
+      );
+    }
+  }
+
+  const headerLabel = shouldFilter
+    ? chiefRole2 === "chief_fad"
+      ? "FAD & Other Divisions Budget"
+      : chiefRole2 === "chief_wrsd"
+        ? "WRSD Division Budget"
+        : `${userDivCode} Division Budget`
+    : "Division Budget Allocation";
+
+  const tableRows = departments
+    .map((dept) => {
+      const code = dept.department_code || "N/A";
+      const total = parseFloat(dept.total || 0);
+      const active = parseFloat(dept.active || 0);
+      const available = parseFloat(dept.available || 0);
+      return `<tr>
+ <td style="font-weight:600;">${code}</td>
+ <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:#28a745;font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+    })
+    .join("");
+
+  // Totals row (when viewing multiple divisions)
+  let totalsRow = "";
+  if (departments.length > 1) {
+    const tTotal = departments.reduce(
+      (s, d) => s + parseFloat(d.total || 0),
+      0,
+    );
+    const tActive = departments.reduce(
+      (s, d) => s + parseFloat(d.active || 0),
+      0,
+    );
+    const tAvail = departments.reduce(
+      (s, d) => s + parseFloat(d.available || 0),
+      0,
+    );
+    totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
+ <td>TOTAL</td>
+ <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:#28a745;">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+  }
+
+  divBudgetContainer.innerHTML = `
+ <div class="div-budget-panel">
+ <div class="div-budget-title"><i class="fas fa-landmark"></i> ${headerLabel}</div>
+ <table class="div-budget-table">
+ <thead>
+ <tr>
+ <th>Division</th>
+ <th class="text-right">Total Budget</th>
+ <th class="text-right">Active Budget</th>
+ <th class="text-right">Available Budget</th>
+ </tr>
+ </thead>
+ <tbody>${tableRows}${totalsRow}</tbody>
+ </table>
+ </div>`;
 }
 
 function updateAPPVersionBanner(status) {
