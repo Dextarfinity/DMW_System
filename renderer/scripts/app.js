@@ -57318,6 +57318,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Use showApp() which handles overlay, user info, RBAC, and navigation
       showApp();
+
+      // Explicitly navigate to dashboard after login
+      setTimeout(() => navigateTo('dashboard'), 500);
     } catch (err) {
       console.error("Login error:", err);
       if (loginError) {
@@ -57551,6 +57554,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         sessionStorage.setItem("dmw_token", data.token);
         sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
         showApp();
+        // Explicitly navigate to dashboard after signup
+        navigateTo('dashboard');
       }, 1500);
     } catch (err) {
       console.error("Signup error:", err);
