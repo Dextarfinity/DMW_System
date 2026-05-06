@@ -11706,7 +11706,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Show spinner on logout button
     if (logoutBtn) {
       logoutBtn.disabled = true;
-      logoutBtn.innerHTML = '<span class="btn-loader"></span> Logging out...';
+      logoutBtn.innerHTML = 'Logging out... <span class="btn-loader"></span>';
     }
 
     // Log logout on server BEFORE clearing token
@@ -57271,7 +57271,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (loginBtn) {
       loginBtn.disabled = true;
-      loginBtn.innerHTML = '<span class="btn-loader"></span> Signing in...';
+      loginBtn.innerHTML = 'Signing in... <span class="btn-loader"></span>';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -57495,7 +57495,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (signupBtn) {
       signupBtn.disabled = true;
-      signupBtn.innerHTML = '<span class="btn-loader"></span> Creating account...';
+      signupBtn.innerHTML = 'Creating account... <span class="btn-loader"></span>';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
