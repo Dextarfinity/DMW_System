@@ -8750,6 +8750,15 @@ document.addEventListener("DOMContentLoaded", () => {
     console.warn("[INIT] ️ appLoader element NOT found!");
   }
 
+  // FIX 1: Add safety timeout to hide stuck loader
+  const loaderSafetyTimeout = setTimeout(() => {
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader && appLoader.style.display !== "none") {
+      console.warn("[LOADER] Safety timeout: hiding stuck loader after 10s");
+      appLoader.style.display = "none";
+    }
+  }, 10000); // 10 second timeout
+
   // DOM Elements
   const loginOverlay = document.getElementById("loginOverlay");
   const loginForm = document.getElementById("loginForm");
