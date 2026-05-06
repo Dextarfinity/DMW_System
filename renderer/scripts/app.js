@@ -27779,6 +27779,52 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
+  };
+
+  /**
    * Delete a COA submission
    */
   window.deleteCOASubmission = async function (coaId) {
@@ -49177,6 +49223,52 @@ Failure to submit the above requirements within the prescribed period shall cons
       title: toFilename(title),
       editable: true,
     });
+  };
+
+  /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
   };
 
   /**
