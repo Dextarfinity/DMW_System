@@ -8622,60 +8622,8 @@ function filterTripTickets(status) {
   });
 }
 
-// Page content loading overlay — simple spinner on blurry white
-function showPageLoader() {
-  console.log("[LOADER] Showing page loader...");
-  let overlay = document.getElementById("pageLoadingOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "pageLoadingOverlay";
-    overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
- <div class="loader"></div>
- <div style="color:#1a365d;font-size:14px;font-weight:500;">Loading</div>
- </div>`;
-    Object.assign(overlay.style, {
-      position: "fixed",
-      top: "0",
-      left: "0",
-      right: "0",
-      bottom: "0",
-      background: "rgba(255,255,255,0.95)",
-      backdropFilter: "blur(3px)",
-      WebkitBackdropFilter: "blur(3px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: "8888",
-    });
-    document.body.appendChild(overlay);
-    console.log("[LOADER] pageLoadingOverlay created and appended");
-  }
-  overlay.style.display = "flex";
-  console.log("[LOADER] pageLoadingOverlay visible");
-
-  // Hide the fullscreen appLoader when page loader shows
-  const appLoader = document.getElementById("appLoader");
-  if (appLoader) {
-    appLoader.style.display = "none";
-    console.log("[LOADER] appLoader hidden, pageLoadingOverlay now showing");
-  } else {
-    console.warn("[LOADER] ️ appLoader not found to hide");
-  }
-}
-
-function hidePageLoader() {
-  console.log("[LOADER] Hiding page loader");
-  const overlay = document.getElementById("pageLoadingOverlay");
-  if (overlay) {
-    overlay.style.display = "none";
-    console.log("[LOADER] pageLoadingOverlay hidden");
-  }
-}
-
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
-  showPageLoader();
   try {
     switch (pageId) {
       case "dashboard":
@@ -8778,7 +8726,7 @@ async function loadPageData(pageId) {
         break;
     }
   } finally {
-    hidePageLoader();
+    // Data loading complete
   }
   // Apply action permissions AFTER data has fully loaded into the DOM
   applyActionPermissions();
@@ -9152,9 +9100,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Navigate to previous page from hash/localStorage, or dashboard if none exists
     navigateToFromHash();
-
-    // NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
-    // This prevents the loader from disappearing before page content is ready
   }
 
   // Format role for display (As-Is Roles)
@@ -11713,11 +11658,14 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleLogout() {
     const logoutBtn = document.getElementById("logoutBtn");
 
+    // Show original loader
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) appLoader.style.display = "flex";
+
     // Show spinner on logout button
     if (logoutBtn) {
       logoutBtn.disabled = true;
-      logoutBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span><span>Logging out...</span>';
+      logoutBtn.innerHTML = '<span>Logging out...</span>';
     }
 
     // Log logout on server BEFORE clearing token
@@ -11755,6 +11703,9 @@ document.addEventListener("DOMContentLoaded", () => {
         "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
       )
       .forEach((el) => el.remove());
+
+    // Hide loader before showing login
+    if (appLoader) appLoader.style.display = "none";
 
     // Show login overlay
     if (loginOverlay) {
@@ -57264,6 +57215,11 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.doLogin = async function () {
     if (_loginInProgress) return; // prevent double-submit
     _loginInProgress = true;
+
+    // Show original loader
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) appLoader.style.display = "flex";
+
     const username = document.getElementById("username")?.value?.trim();
     const password = document.getElementById("password")?.value;
     const loginBtn = document.getElementById("loginBtn");
@@ -57282,8 +57238,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (loginBtn) {
       loginBtn.disabled = true;
-      loginBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Signing in...';
+      loginBtn.innerHTML = 'Signing in...';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -57327,6 +57282,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
 
       console.log("Login successful:", currentUser);
+
+      // Hide loader before showing app
+      if (appLoader) appLoader.style.display = "none";
 
       // Use showApp() which handles overlay, user info, RBAC, and navigation
       showApp();
@@ -57472,6 +57430,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const signupError = document.getElementById("signupError");
     const signupSuccess = document.getElementById("signupSuccess");
 
+    // Show original loader
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) appLoader.style.display = "flex";
+
     // Validate inputs
     if (!fullName || !username || !password) {
       if (signupError) {
@@ -57507,8 +57469,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (signupBtn) {
       signupBtn.disabled = true;
-      signupBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Creating account...';
+      signupBtn.innerHTML = 'Creating account...';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
@@ -57563,6 +57524,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         // Persist session
         sessionStorage.setItem("dmw_token", data.token);
         sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
+        // Hide loader before showing app
+        if (appLoader) appLoader.style.display = "none";
         showApp();
       }, 1500);
     } catch (err) {
