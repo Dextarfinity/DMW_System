@@ -11386,12 +11386,6 @@ document.addEventListener("DOMContentLoaded", () => {
       appLoader.style.display = "flex";
     }
 
-    // Add safety timeout for page transition (30s max)
-    const pageTransitionTimeout = setTimeout(() => {
-      console.warn("[LOADER] Page transition timeout for", pageId);
-      if (appLoader) appLoader.style.display = "none";
-    }, 30000);
-
     // Load data from API for this page (applyActionPermissions is called inside after data loads)
     loadPageData(pageId);
   }
