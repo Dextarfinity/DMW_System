@@ -1,0 +1,1 @@
+ALTER TABLE public.iar_items ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
