@@ -8954,15 +8954,18 @@ document.addEventListener("DOMContentLoaded", () => {
       addTrackedListener(toggleSidebarBtn, "click", toggleSidebar);
     }
 
-    // Navigation
-    navItems.forEach((item) => {
-      addTrackedListener(item, "click", () => {
-        const page = item.dataset.page;
-        if (page) {
-          navigateTo(page);
+    // Navigation - Use event delegation on sidebar for persistent listeners
+    if (sidebar) {
+      sidebar.addEventListener("click", (e) => {
+        const navItem = e.target.closest(".nav-item[data-page]");
+        if (navItem) {
+          const page = navItem.dataset.page;
+          if (page) {
+            navigateTo(page);
+          }
         }
       });
-    });
+    }
 
     // Collapsible sidebar sections
     document
