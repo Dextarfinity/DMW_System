@@ -2690,14 +2690,35 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
     
     const row = result.rows[0];
     const removed = removedResult.rows[0];
-    
+
     // Merge removed data into department breakdown
     const removedMap = {};
     deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
+
+    // Get PPMP budget breakdown by department for calculating available per division
+    let ppmpByDept = {};
+    try {
+      const ppmpDeptResult = await pool.query(
+        `SELECT d.code as department_code,
+                COALESCE(SUM(pp.total_amount), 0) as ppmp_total
+         FROM procurementplans pp
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+         GROUP BY d.code`,
+        [fy]
+      );
+      ppmpDeptResult.rows.forEach(row => {
+        ppmpByDept[row.department_code] = parseFloat(row.ppmp_total || 0);
+      });
+    } catch (e) {
+      console.warn('[APP-BUDGET] Could not fetch PPMP department breakdown:', e.message);
+    }
+
+    // Calculate available per department: ppmp_dept_budget - active_dept_budget
     const departments = deptResult.rows.map(d => ({
       ...d,
-      total: d.active,  // total = sum of app_entries for this dept
-      available: 0,  // available = 0 when all apps are deleted (no budget allocation from previous PPMP)
+      total: d.active,  // total = sum of app_entries (active) for this dept
+      available: Math.max(0, (ppmpByDept[d.department_code] || 0) - parseFloat(d.active || 0)),
       removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
       removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
     }));
