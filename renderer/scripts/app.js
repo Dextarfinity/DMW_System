@@ -2081,8 +2081,37 @@ function updatePPMPBudgetSummary(budgetSummary) {
   const elAvailableBudget = document.getElementById("ppmpAvailableBudget");
   if (!budgetSummary || !elAvailableBudget) return;
 
-  const ppmpBudget = parseFloat(budgetSummary.ppmp_budget || 0);
-  const activeBudget = parseFloat(budgetSummary.active_budget || 0);
+  // Determine division filtering (same logic as updateAPPSummary)
+  const chiefRoles = ["chief_fad", "chief_wrsd", "chief_mwpsd", "chief_mwptd"];
+  const isChief = userHasAnyRole(chiefRoles);
+  const chiefRole2 = getUserChiefRole();
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+  const canSeeAll = userHasAnyRole(["admin", "hope", "ord_manager", "budget_consultant", "bac_secretariat"]);
+  const shouldFilter = !canSeeAll && (isChief || userDivCode);
+
+  // Calculate available budget for user's division (or overall if can see all)
+  let ppmpBudget = 0;
+  let activeBudget = 0;
+
+  if (shouldFilter && budgetSummary.by_department) {
+    // Filter by division
+    let filteredDepts = budgetSummary.by_department;
+    if (chiefRole2 === "chief_wrsd") {
+      filteredDepts = filteredDepts.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      filteredDepts = filteredDepts.filter((d) => d.department_code !== "WRSD");
+    } else {
+      filteredDepts = filteredDepts.filter((d) => d.department_code === userDivCode);
+    }
+    // Sum for filtered divisions
+    ppmpBudget = filteredDepts.reduce((s, d) => s + (parseFloat(d.total || 0) + parseFloat(d.available || 0)), 0);
+    activeBudget = filteredDepts.reduce((s, d) => s + parseFloat(d.active || 0), 0);
+  } else {
+    // Use overall budget (can see all divisions)
+    ppmpBudget = parseFloat(budgetSummary.ppmp_budget || 0);
+    activeBudget = parseFloat(budgetSummary.active_budget || 0);
+  }
+
   const availableBudget = Math.max(0, ppmpBudget - activeBudget);
 
   // Calculate budget percentage
@@ -6125,8 +6154,9 @@ function updateAPPSummary(items, budgetSummary) {
         (d) => d.department_code === userDivCode,
       );
     }
+    // Calculate PPMP allocation for filtered divisions (total = active, available = ppmp - active)
     overallAllocatedBudget = filteredDepts.reduce(
-      (s, d) => s + parseFloat(d.total || d.active || 0),
+      (s, d) => s + (parseFloat(d.total || 0) + parseFloat(d.available || 0)),
       0,
     );
   } else if (budgetSummary) {
