@@ -9,28 +9,6 @@
  to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes l27 {
- 100% { transform: rotate(1turn); }
-}
-
-.loader {
- --d: 22px;
- width: 4px;
- height: 4px;
- border-radius: 50%;
- color: var(--primary-color);
- box-shadow:
-   calc(1 * var(--d)) calc(0 * var(--d)) 0 0,
-   calc(0.707 * var(--d)) calc(0.707 * var(--d)) 0 0,
-   calc(0 * var(--d)) calc(1 * var(--d)) 0 0,
-   calc(-0.707 * var(--d)) calc(0.707 * var(--d)) 0 0,
-   calc(-1 * var(--d)) calc(0 * var(--d)) 0 0,
-   calc(-0.707 * var(--d)) calc(-0.707 * var(--d)) 0 0,
-   calc(0 * var(--d)) calc(-1 * var(--d)) 0 0,
-   calc(0.707 * var(--d)) calc(-0.707 * var(--d)) 0 0;
- animation: l27 1s infinite steps(8);
-}
-
 :root {
  --primary-color: #1a365d;
  --primary-light: #2c5282;
