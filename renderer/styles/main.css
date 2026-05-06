@@ -9,6 +9,66 @@
  to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes dots-spin {
+ 0% { transform: rotate(0deg); }
+ 100% { transform: rotate(360deg); }
+}
+
+@keyframes dot-fade {
+ 0%, 100% { opacity: 0.4; }
+ 50% { opacity: 1; }
+}
+
+.dots-spinner {
+ display: inline-block;
+ width: 40px;
+ height: 40px;
+ position: relative;
+}
+
+.dots-spinner::before,
+.dots-spinner::after,
+.dots-spinner {
+ content: '';
+ position: absolute;
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+ animation: dots-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.dots-spinner::before {
+ left: 16px;
+ top: 0;
+ background-color: var(--primary-color);
+ animation-delay: -0.24s;
+}
+
+.dots-spinner::after {
+ left: 0;
+ top: 50%;
+ transform: translateY(-50%);
+ background-color: var(--primary-color);
+ animation-delay: -0.12s;
+}
+
+.dots-spinner {
+ left: 50%;
+ top: 50%;
+ transform: translate(-50%, -50%);
+ background-color: var(--primary-color);
+ box-shadow:
+   24px 0 0 -6px var(--primary-color),
+   32px 8px 0 -6px var(--primary-color),
+   32px 24px 0 -6px var(--primary-color),
+   24px 32px 0 -6px var(--primary-color),
+   0 32px 0 -6px var(--primary-color),
+   -8px 32px 0 -6px var(--primary-color),
+   -16px 24px 0 -6px var(--primary-color),
+   -16px 0 0 -6px var(--primary-color);
+ animation: dots-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
 :root {
  --primary-color: #1a365d;
  --primary-light: #2c5282;
