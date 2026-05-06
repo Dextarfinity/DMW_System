@@ -11658,14 +11658,10 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleLogout() {
     const logoutBtn = document.getElementById("logoutBtn");
 
-    // Show original loader
-    const appLoader = document.getElementById("appLoader");
-    if (appLoader) appLoader.style.display = "flex";
-
     // Show spinner on logout button
     if (logoutBtn) {
       logoutBtn.disabled = true;
-      logoutBtn.innerHTML = '<span>Logging out...</span>';
+      logoutBtn.innerHTML = '<span class="btn-loader"></span> Logging out...';
     }
 
     // Log logout on server BEFORE clearing token
@@ -11703,9 +11699,6 @@ document.addEventListener("DOMContentLoaded", () => {
         "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
       )
       .forEach((el) => el.remove());
-
-    // Hide loader before showing login
-    if (appLoader) appLoader.style.display = "none";
 
     // Show login overlay
     if (loginOverlay) {
@@ -57215,11 +57208,6 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.doLogin = async function () {
     if (_loginInProgress) return; // prevent double-submit
     _loginInProgress = true;
-
-    // Show original loader
-    const appLoader = document.getElementById("appLoader");
-    if (appLoader) appLoader.style.display = "flex";
-
     const username = document.getElementById("username")?.value?.trim();
     const password = document.getElementById("password")?.value;
     const loginBtn = document.getElementById("loginBtn");
@@ -57238,7 +57226,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (loginBtn) {
       loginBtn.disabled = true;
-      loginBtn.innerHTML = 'Signing in...';
+      loginBtn.innerHTML = '<span class="btn-loader"></span> Signing in...';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -57282,9 +57270,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
 
       console.log("Login successful:", currentUser);
-
-      // Hide loader before showing app
-      if (appLoader) appLoader.style.display = "none";
 
       // Use showApp() which handles overlay, user info, RBAC, and navigation
       showApp();
@@ -57430,10 +57415,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     const signupError = document.getElementById("signupError");
     const signupSuccess = document.getElementById("signupSuccess");
 
-    // Show original loader
-    const appLoader = document.getElementById("appLoader");
-    if (appLoader) appLoader.style.display = "flex";
-
     // Validate inputs
     if (!fullName || !username || !password) {
       if (signupError) {
@@ -57469,7 +57450,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (signupBtn) {
       signupBtn.disabled = true;
-      signupBtn.innerHTML = 'Creating account...';
+      signupBtn.innerHTML = '<span class="btn-loader"></span> Creating account...';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
@@ -57524,8 +57505,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         // Persist session
         sessionStorage.setItem("dmw_token", data.token);
         sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
-        // Hide loader before showing app
-        if (appLoader) appLoader.style.display = "none";
         showApp();
       }, 1500);
     } catch (err) {
