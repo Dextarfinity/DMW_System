@@ -2260,13 +2260,12 @@ function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
       const active = parseFloat(dept.active || 0);
       const available = parseFloat(dept.available || 0);
       const availableColor = getAvailableColor(available, total);
-      const statusBadge = getStatusBadge(available, total);
 
       return `<tr>
  <td style="font-weight:600;">${code}</td>
  <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
     })
     .join("");
@@ -2287,13 +2286,12 @@ function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
       0,
     );
     const totalAvailColor = getAvailableColor(tAvail, tTotal);
-    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
 
     totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
  <td>TOTAL</td>
  <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
   }
 
@@ -6457,13 +6455,12 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
       const active = parseFloat(dept.active || 0);
       const available = parseFloat(dept.available || 0);
       const availableColor = getAvailableColor(available, total);
-      const statusBadge = getStatusBadge(available, total);
 
       return `<tr>
  <td style="font-weight:600;">${code}</td>
  <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
     })
     .join("");
@@ -6484,13 +6481,12 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
       0,
     );
     const totalAvailColor = getAvailableColor(tAvail, tTotal);
-    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
 
     totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
  <td>TOTAL</td>
  <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
   }
 
