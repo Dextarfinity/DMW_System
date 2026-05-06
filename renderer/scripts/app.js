@@ -11380,6 +11380,18 @@ document.addEventListener("DOMContentLoaded", () => {
       pageTitle.textContent = pageTitles[pageId] || "Dashboard";
     }
 
+    // FIX 3: Show loader before loading data
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "flex";
+    }
+
+    // Add safety timeout for page transition (30s max)
+    const pageTransitionTimeout = setTimeout(() => {
+      console.warn("[LOADER] Page transition timeout for", pageId);
+      if (appLoader) appLoader.style.display = "none";
+    }, 30000);
+
     // Load data from API for this page (applyActionPermissions is called inside after data loads)
     loadPageData(pageId);
   }
