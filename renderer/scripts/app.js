@@ -8630,33 +8630,31 @@ function showPageLoader() {
     overlay = document.createElement("div");
     overlay.id = "pageLoadingOverlay";
     overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;">
- <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
- <div style="margin-top:12px;color:#718096;font-size:13px;">Loading...</div>
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+ <div style="width:50px;height:50px;margin-bottom:20px;">
+ <span class="dots-spinner"></span>
+ </div>
+ <div style="text-align:center;">
+ <div style="color:#1a365d;font-size:16px;font-weight:600;margin-bottom:8px;">Loading Page</div>
+ <div style="color:#718096;font-size:13px;">Please wait...</div>
+ </div>
  </div>`;
     Object.assign(overlay.style, {
-      position: "absolute",
+      position: "fixed",
       top: "0",
       left: "0",
       right: "0",
       bottom: "0",
-      background: "rgba(255,255,255,0.82)",
-      backdropFilter: "blur(2px)",
-      WebkitBackdropFilter: "blur(2px)",
+      background: "rgba(255,255,255,0.95)",
+      backdropFilter: "blur(3px)",
+      WebkitBackdropFilter: "blur(3px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      zIndex: "100",
-      borderRadius: "8px",
+      zIndex: "8888",
     });
-    const mainContent = document.querySelector(".main-content");
-    if (mainContent) {
-      mainContent.style.position = "relative";
-      mainContent.appendChild(overlay);
-      console.log("[LOADER] pageLoadingOverlay created and appended");
-    } else {
-      console.warn("[LOADER] ️ .main-content not found!");
-    }
+    document.body.appendChild(overlay);
+    console.log("[LOADER] pageLoadingOverlay created and appended");
   }
   overlay.style.display = "flex";
   console.log("[LOADER] pageLoadingOverlay visible");
