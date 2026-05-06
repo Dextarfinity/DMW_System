@@ -7514,7 +7514,13 @@ window.pktConsolidateFiles = async function (rowId) {
   ];
 
   // Show loading modal immediately
-  const loadingHtml = `<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--primary-color);"></i><p style="margin-top:12px;color:#666;">Fetching all attached files across ${docChain.length} document types...</p></div>`;
+  const loadingHtml = `<div style="text-align:center;padding:40px 30px;">
+    <div style="margin-bottom:20px;">
+      <i class="fas fa-spinner fa-spin" style="font-size:36px;color:var(--primary-color);"></i>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:16px;font-weight:600;color:#2d3748;">Consolidating Files...</p>
+    <p style="margin:0;font-size:14px;color:#718096;">Fetching all attached files across ${docChain.length} document types...</p>
+  </div>`;
   window.openModal(
     "Consolidated Files — " + (r.pr_number || "Transaction"),
     loadingHtml,
@@ -46913,14 +46919,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="gov-dialog" style="max-width:400px;text-align:center;">
  <div class="gov-dialog-header confirm">
  <i class="fas fa-cog fa-spin"></i>
- <h4>Consolidating...</h4>
+ <h4 style="margin:0;">Consolidating...</h4>
  </div>
- <div class="gov-dialog-body" style="padding:30px;">
- <div style="margin-bottom:15px;">
+ <div class="gov-dialog-body" style="padding:40px 30px;">
+ <div style="margin-bottom:20px;">
  <i class="fas fa-spinner fa-spin" style="font-size:36px;color:#1a365d;"></i>
  </div>
- <p style="margin:0;color:#4a5568;font-size:14px;">Processing approved PPMP entries for FY ${fy}...</p>
- <p style="margin:8px 0 0 0;color:#a0aec0;font-size:12px;">Please wait while entries are being consolidated.</p>
+ <p style="margin:0 0 8px 0;color:#2d3748;font-size:14px;font-weight:600;">Processing approved PPMP entries...</p>
+ <p style="margin:0;color:#718096;font-size:13px;">Fiscal Year ${fy}</p>
  </div>
  </div>
  `;
