@@ -2138,6 +2138,151 @@ function updatePPMPBudgetSummary(budgetSummary) {
       cardEl.appendChild(progressDiv);
     }
   }
+
+  // Update division budget breakdown with status badges
+  updatePPMPDivisionBudgetBreakdown(budgetSummary);
+}
+
+// Update PPMP Division Budget Breakdown section with status badges
+function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
+  const divBudgetContainer = document.getElementById("ppmpDivisionBudgets");
+  if (!divBudgetContainer || !budgetSummary || !budgetSummary.by_department) return;
+
+  const allowedBudgetRoles = [
+    "admin",
+    "hope",
+    "ord_manager",
+    "budget_consultant",
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+
+  const chiefRoles2 = [
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+  const isChief2 = userHasAnyRole(chiefRoles2);
+  const shouldFilter = isChief2;
+  const chiefRole2 = isChief2 ? getUserChiefRole() : null;
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+
+  // Show/hide division budget panel based on role
+  if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
+    divBudgetContainer.innerHTML = "";
+    divBudgetContainer.style.display = "none";
+    return;
+  }
+
+  divBudgetContainer.style.display = "";
+
+  // Filter departments based on role
+  let departments = budgetSummary.by_department;
+  if (shouldFilter) {
+    if (chiefRole2 === "chief_wrsd") {
+      departments = departments.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      departments = departments.filter((d) => d.department_code !== "WRSD");
+    } else {
+      departments = departments.filter(
+        (d) => d.department_code === userDivCode,
+      );
+    }
+  }
+
+  const headerLabel = shouldFilter
+    ? chiefRole2 === "chief_fad"
+      ? "FAD & Other Divisions Budget"
+      : chiefRole2 === "chief_wrsd"
+        ? "WRSD Division Budget"
+        : `${userDivCode} Division Budget`
+    : "Division Budget Allocation";
+
+  // Helper function to get status badge
+  const getStatusBadge = (available, total) => {
+    if (available === 0) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+    }
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+    } else if (percentage < 25) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+    }
+    return '<span style="display:inline-block;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+  };
+
+  // Helper function to get color for available budget
+  const getAvailableColor = (available, total) => {
+    if (available === 0) return "#c53030";
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) return "#f6ad55";
+    if (percentage < 25) return "#ed8936";
+    return "#28a745";
+  };
+
+  const tableRows = departments
+    .map((dept) => {
+      const code = dept.department_code || "N/A";
+      const total = parseFloat(dept.total || 0);
+      const active = parseFloat(dept.active || 0);
+      const available = parseFloat(dept.available || 0);
+      const availableColor = getAvailableColor(available, total);
+      const statusBadge = getStatusBadge(available, total);
+
+      return `<tr>
+ <td style="font-weight:600;">${code}</td>
+ <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
+ </tr>`;
+    })
+    .join("");
+
+  // Totals row (when viewing multiple divisions)
+  let totalsRow = "";
+  if (departments.length > 1) {
+    const tTotal = departments.reduce(
+      (s, d) => s + parseFloat(d.total || 0),
+      0,
+    );
+    const tActive = departments.reduce(
+      (s, d) => s + parseFloat(d.active || 0),
+      0,
+    );
+    const tAvail = departments.reduce(
+      (s, d) => s + parseFloat(d.available || 0),
+      0,
+    );
+    const totalAvailColor = getAvailableColor(tAvail, tTotal);
+    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
+
+    totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
+ <td>TOTAL</td>
+ <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
+ </tr>`;
+  }
+
+  divBudgetContainer.innerHTML = `
+ <div class="div-budget-panel">
+ <div class="div-budget-title"><i class="fas fa-landmark"></i> ${headerLabel}</div>
+ <table class="div-budget-table">
+ <thead>
+ <tr>
+ <th>Division</th>
+ <th class="text-right">Total Budget</th>
+ <th class="text-right">Active Budget</th>
+ <th class="text-right">Available Budget</th>
+ </tr>
+ </thead>
+ <tbody>${tableRows}${totalsRow}</tbody>
+ </table>
+ </div>`;
 }
 
 // Check if PPMP creation is within deadline window
