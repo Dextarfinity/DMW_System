@@ -1881,7 +1881,7 @@ async function loadPPMP() {
     // Show loading indicator
     if (tbody) {
       tbody.innerHTML =
-        '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><i class="fas fa-spinner fa-spin" style="font-size:20px;margin-right:8px;"></i>Loading PPMP data from database...</td></tr>';
+        '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><span class="dots-spinner" style="display:inline-block;margin-right:8px;"></span>Loading PPMP data from database...</td></tr>';
     }
 
     // Build server query with all filters
@@ -2260,13 +2260,12 @@ function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
       const active = parseFloat(dept.active || 0);
       const available = parseFloat(dept.available || 0);
       const availableColor = getAvailableColor(available, total);
-      const statusBadge = getStatusBadge(available, total);
 
       return `<tr>
  <td style="font-weight:600;">${code}</td>
  <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
     })
     .join("");
@@ -2287,13 +2286,12 @@ function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
       0,
     );
     const totalAvailColor = getAvailableColor(tAvail, tTotal);
-    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
 
     totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
  <td>TOTAL</td>
  <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
   }
 
@@ -6457,13 +6455,12 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
       const active = parseFloat(dept.active || 0);
       const available = parseFloat(dept.available || 0);
       const availableColor = getAvailableColor(available, total);
-      const statusBadge = getStatusBadge(available, total);
 
       return `<tr>
  <td style="font-weight:600;">${code}</td>
  <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
     })
     .join("");
@@ -6484,13 +6481,12 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
       0,
     );
     const totalAvailColor = getAvailableColor(tAvail, tTotal);
-    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
 
     totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
  <td>TOTAL</td>
  <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  </tr>`;
   }
 
@@ -7518,7 +7514,13 @@ window.pktConsolidateFiles = async function (rowId) {
   ];
 
   // Show loading modal immediately
-  const loadingHtml = `<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--primary-color);"></i><p style="margin-top:12px;color:#666;">Fetching all attached files across ${docChain.length} document types...</p></div>`;
+  const loadingHtml = `<div style="text-align:center;padding:60px 30px;">
+    <div style="margin-bottom:30px;">
+      <span class="dots-spinner" style="display:inline-block;width:50px;height:50px;"></span>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:16px;font-weight:600;color:#2d3748;">Consolidating Files...</p>
+    <p style="margin:0;font-size:14px;color:#718096;">Fetching all attached files across ${docChain.length} document types...</p>
+  </div>`;
   window.openModal(
     "Consolidated Files — " + (r.pr_number || "Transaction"),
     loadingHtml,
@@ -8628,33 +8630,26 @@ function showPageLoader() {
     overlay = document.createElement("div");
     overlay.id = "pageLoadingOverlay";
     overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;">
- <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
- <div style="margin-top:12px;color:#718096;font-size:13px;">Loading...</div>
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+ <div class="loader"></div>
+ <div style="color:#1a365d;font-size:14px;font-weight:500;">Loading</div>
  </div>`;
     Object.assign(overlay.style, {
-      position: "absolute",
+      position: "fixed",
       top: "0",
       left: "0",
       right: "0",
       bottom: "0",
-      background: "rgba(255,255,255,0.82)",
-      backdropFilter: "blur(2px)",
-      WebkitBackdropFilter: "blur(2px)",
+      background: "rgba(255,255,255,0.95)",
+      backdropFilter: "blur(3px)",
+      WebkitBackdropFilter: "blur(3px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      zIndex: "100",
-      borderRadius: "8px",
+      zIndex: "8888",
     });
-    const mainContent = document.querySelector(".main-content");
-    if (mainContent) {
-      mainContent.style.position = "relative";
-      mainContent.appendChild(overlay);
-      console.log("[LOADER] pageLoadingOverlay created and appended");
-    } else {
-      console.warn("[LOADER] ️ .main-content not found!");
-    }
+    document.body.appendChild(overlay);
+    console.log("[LOADER] pageLoadingOverlay created and appended");
   }
   overlay.style.display = "flex";
   console.log("[LOADER] pageLoadingOverlay visible");
@@ -11571,7 +11566,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    submitBtn.innerHTML = '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Saving...';
 
     try {
       const updated = await apiRequest("/auth/profile", "PUT", {
@@ -11691,7 +11686,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Disable button
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    submitBtn.innerHTML = '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Updating...';
 
     try {
       await apiRequest("/auth/change-password", "PUT", {
@@ -11722,7 +11717,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (logoutBtn) {
       logoutBtn.disabled = true;
       logoutBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i><span>Logging out...</span>';
+        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span><span>Logging out...</span>';
     }
 
     // Log logout on server BEFORE clearing token
@@ -12213,7 +12208,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <i class="fas fa-paperclip" style="margin-right:4px;"></i> Attached Files
  </h4>
  <div id="${containerId}" style="min-height:30px;">
- <small style="color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading attachments...</small>
+ <small style="color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading attachments...</small>
  </div>
  </div>`;
   };
@@ -12241,7 +12236,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments</div>
  <div style="padding:12px 14px;border-bottom:1px solid var(--border-color);">
  <div id="${containerId}" style="margin-bottom:12px;">
- <small style="color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading existing attachments...</small>
+ <small style="color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading existing attachments...</small>
  </div>
  <div class="attachment-box" style="background:#f0f4ff;padding:10px;border-radius:6px;border:2px dashed #64b5f6;">
  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -12316,7 +12311,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <button class="att-popover-close" onclick="document.getElementById('attPopover_${uid}').remove()"><i class="fas fa-times"></i></button>
  </div>
  <div class="att-popover-body" id="attPopList_${uid}">
- <div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+ <div style="text-align:center;padding:10px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</div>
  </div>
  <div class="att-popover-upload">
  <label class="att-upload-label">
@@ -15501,7 +15496,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     container.innerHTML =
-      '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+      '<span style="color:#888;font-size:13px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PR items...</span>';
     try {
       const prDetail = await apiRequest("/purchase-requests/" + prId);
       const items = prDetail.items || [];
@@ -18294,7 +18289,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("ppmpNonPSDBMTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      '<tr><td colspan="9" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -18349,7 +18344,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("papTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading PAP data...</td></tr>';
+      '<tr><td colspan="8" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PAP data...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -27296,7 +27291,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <td>${d.signer || "-"}</td>
               <td>
                 <div id="pktAtt_${d.key}" style="min-height:28px;">
-                  ${d.id ? '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
+                  ${d.id ? '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
                 </div>
               </td>
               <td>
@@ -27459,10 +27454,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const cellContainer = document.getElementById("pktCell_" + key);
     if (modalContainer)
       modalContainer.innerHTML =
-        '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
     if (cellContainer)
       cellContainer.innerHTML =
-        '<span class="pkt-cell-loading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span class="pkt-cell-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
 
     const formData = new FormData();
     formData.append("entity_type", entityType);
@@ -29763,7 +29758,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewItemModal = async function (itemId) {
     openModal(
       "Item Details",
-      '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>',
+      '<div class="view-details"><p style="padding:12px;color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</p></div>',
     );
     try {
       const item = await apiRequest("/items/" + itemId);
@@ -36730,7 +36725,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     container.innerHTML =
-      '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+      '<span style="color:#888;font-size:13px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PR items...</span>';
     try {
       const prDetail = await apiRequest("/purchase-requests/" + prId);
       const items = prDetail.items || [];
@@ -39469,7 +39464,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("ppmpNonPSDBMTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      '<tr><td colspan="9" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -39524,7 +39519,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("papTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading PAP data...</td></tr>';
+      '<tr><td colspan="8" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PAP data...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -46917,14 +46912,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="gov-dialog" style="max-width:400px;text-align:center;">
  <div class="gov-dialog-header confirm">
  <i class="fas fa-cog fa-spin"></i>
- <h4>Consolidating...</h4>
+ <h4 style="margin:0;">Consolidating...</h4>
  </div>
- <div class="gov-dialog-body" style="padding:30px;">
- <div style="margin-bottom:15px;">
- <i class="fas fa-spinner fa-spin" style="font-size:36px;color:#1a365d;"></i>
+ <div class="gov-dialog-body" style="padding:60px 30px;">
+ <div style="margin-bottom:30px;">
+ <span class="dots-spinner" style="display:inline-block;width:50px;height:50px;"></span>
  </div>
- <p style="margin:0;color:#4a5568;font-size:14px;">Processing approved PPMP entries for FY ${fy}...</p>
- <p style="margin:8px 0 0 0;color:#a0aec0;font-size:12px;">Please wait while entries are being consolidated.</p>
+ <p style="margin:0 0 8px 0;color:#2d3748;font-size:14px;font-weight:600;">Processing approved PPMP entries...</p>
+ <p style="margin:0;color:#718096;font-size:13px;">Fiscal Year ${fy}</p>
  </div>
  </div>
  `;
@@ -48697,7 +48692,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <td>${d.signer || "-"}</td>
  <td>
  <div id="pktAtt_${d.key}" style="min-height:28px;">
- ${d.id ? '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
+ ${d.id ? '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
  </div>
  </td>
  <td>
@@ -48860,10 +48855,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const cellContainer = document.getElementById("pktCell_" + key);
     if (modalContainer)
       modalContainer.innerHTML =
-        '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
     if (cellContainer)
       cellContainer.innerHTML =
-        '<span class="pkt-cell-loading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span class="pkt-cell-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
 
     const formData = new FormData();
     formData.append("entity_type", entityType);
@@ -51238,7 +51233,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewItemModal = async function (itemId) {
     openModal(
       "Item Details",
-      '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>',
+      '<div class="view-details"><p style="padding:12px;color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</p></div>',
     );
     try {
       const item = await apiRequest("/items/" + itemId);
@@ -57288,7 +57283,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (loginBtn) {
       loginBtn.disabled = true;
       loginBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Signing in...';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -57513,7 +57508,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     if (signupBtn) {
       signupBtn.disabled = true;
       signupBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Creating account...';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
@@ -57634,7 +57629,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Show loading on first load
     if (notificationsCache.length === 0) {
       listEl.innerHTML =
-        '<div class="notif-loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+        '<div class="notif-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</div>';
     }
 
     try {
@@ -58494,7 +58489,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Current Stock Levels Report",
       `
  <div class="view-details">
- <div id="stockLevelReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading stock data...</p></div>
+ <div id="stockLevelReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading stock data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('StockLevels', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58544,7 +58539,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Property Accountability Report",
       `
  <div class="view-details">
- <div id="propAcctReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading property data...</p></div>
+ <div id="propAcctReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading property data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('PropertyAccountability', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58570,7 +58565,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "ICS Summary Report",
       `
  <div class="view-details">
- <div id="icsReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading ICS data...</p></div>
+ <div id="icsReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading ICS data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('ICSSummary', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58596,7 +58591,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Low Stock / Reorder Alert Report",
       `
  <div class="view-details">
- <div id="lowStockReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading low stock data...</p></div>
+ <div id="lowStockReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading low stock data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('LowStock', 'excel')"><i class="fas fa-file-download"></i> Export</button>
