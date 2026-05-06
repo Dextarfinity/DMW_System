@@ -8624,6 +8624,11 @@ function filterTripTickets(status) {
 
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
+  // FIX 2: Add 30s safety timeout for data loading
+  const dataLoadTimeout = setTimeout(() => {
+    console.warn("[LOADER] Data load timeout after 30s for page:", pageId);
+  }, 30000);
+
   try {
     switch (pageId) {
       case "dashboard":
@@ -8725,11 +8730,21 @@ async function loadPageData(pageId) {
         /* Static page with report generators */
         break;
     }
+  } catch (err) {
+    console.error("[PAGE-DATA] Error loading page data for", pageId, err);
+    if (pageId === "dashboard") {
+      console.log("[PAGE-DATA] Using fallback dashboard");
+    }
   } finally {
-    // Data loading complete
+    clearTimeout(dataLoadTimeout);
+    // FIX 4: Hide loader when data load completes
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "none";
+    }
+    // Apply action permissions AFTER data has fully loaded into the DOM
+    applyActionPermissions();
   }
-  // Apply action permissions AFTER data has fully loaded into the DOM
-  applyActionPermissions();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -9024,6 +9039,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "roles:",
           currentUser.roles,
         );
+        clearTimeout(loaderSafetyTimeout);
         showApp();
         return;
       }
@@ -9037,6 +9053,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const appLoader = document.getElementById("appLoader");
     if (appLoader) appLoader.style.display = "none";
+    clearTimeout(loaderSafetyTimeout);
     console.log("[AUTH] No saved session - showing login screen");
   }
 
@@ -9052,63 +9069,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Show the main app
   function showApp() {
-    console.log("Showing main app");
-    if (loginOverlay) {
-      loginOverlay.classList.remove("visible");
-      loginOverlay.style.display = "";
-    }
-
-    // Ensure no stale modal overlay is blocking the UI
-    if (modalOverlay) {
-      modalOverlay.classList.remove("show");
-    }
-    // Remove any leftover sub-modal overlays from previous session
-    document
-      .querySelectorAll(
-        "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
-      )
-      .forEach((el) => el.remove());
-
-    // Update user info in sidebar
-    if (userNameEl) {
-      userNameEl.textContent = currentUser.name;
-    }
-    if (userRoleEl) {
-      const div = currentUser.department_code || currentUser.division || "";
-      const designation = currentUser.designation || "";
-      // Build role display — show designation if available, otherwise format roles
-      let roleText;
-      if (designation) {
-        roleText = designation;
-      } else {
-        roleText = (currentUser.roles || [currentUser.role])
-          .map((r) => formatRole(r))
-          .join(" / ");
+    try {
+      console.log("Showing main app");
+      if (loginOverlay) {
+        loginOverlay.classList.remove("visible");
+        loginOverlay.style.display = "";
       }
-      userRoleEl.textContent = roleText + (div ? " - " + div : "");
+
+      // Ensure no stale modal overlay is blocking the UI
+      if (modalOverlay) {
+        modalOverlay.classList.remove("show");
+      }
+      // Remove any leftover sub-modal overlays from previous session
+      document
+        .querySelectorAll(
+          "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
+        )
+        .forEach((el) => el.remove());
+
+      // Update user info in sidebar
+      if (userNameEl) {
+        userNameEl.textContent = currentUser.name;
+      }
+      if (userRoleEl) {
+        const div = currentUser.department_code || currentUser.division || "";
+        const designation = currentUser.designation || "";
+        // Build role display — show designation if available, otherwise format roles
+        let roleText;
+        if (designation) {
+          roleText = designation;
+        } else {
+          roleText = (currentUser.roles || [currentUser.role])
+            .map((r) => formatRole(r))
+            .join(" / ");
+        }
+        userRoleEl.textContent = roleText + (div ? " - " + div : "");
+      }
+      // Update avatar initials
+      const avatarEl = document.getElementById("userAvatarInitials");
+      if (avatarEl && currentUser.name) {
+        const parts = currentUser.name.trim().split(/\s+/);
+        const initials =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : parts[0].substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+
+      // Apply role-based visibility
+      applyRoleVisibility();
+
+      // Start real-time notification polling
+      startNotificationPolling();
+
+      // Connect to Socket.IO for real-time sync across all Electron clients
+      connectSocket();
+
+      // Navigate to previous page from hash/localStorage, or dashboard if none exists
+      navigateToFromHash();
+    } catch (err) {
+      console.error("[SHOWAPP] Error in showApp():", err);
+      // Hide loader on error to prevent stuck UI
+      const appLoader = document.getElementById("appLoader");
+      if (appLoader) appLoader.style.display = "none";
     }
-    // Update avatar initials
-    const avatarEl = document.getElementById("userAvatarInitials");
-    if (avatarEl && currentUser.name) {
-      const parts = currentUser.name.trim().split(/\s+/);
-      const initials =
-        parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : parts[0].substring(0, 2).toUpperCase();
-      avatarEl.textContent = initials;
-    }
-
-    // Apply role-based visibility
-    applyRoleVisibility();
-
-    // Start real-time notification polling
-    startNotificationPolling();
-
-    // Connect to Socket.IO for real-time sync across all Electron clients
-    connectSocket();
-
-    // Navigate to previous page from hash/localStorage, or dashboard if none exists
-    navigateToFromHash();
   }
 
   // Format role for display (As-Is Roles)
