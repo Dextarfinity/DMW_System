@@ -464,3 +464,94 @@ PS C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System> npm run dist
     at Packager._build (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\packager.ts:379:31)
     at Packager.build (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\app-builder-lib\src\packager.ts:340:12)
     at executeFinally (C:\Users\SAO25\OneDrive\Desktop\PROCUREMENT SERVER\DMW_System\node_modules\builder-util\src\promise.ts:12:14)
+
+
+
+
+
+
+
+
+
+
+
+
+
+    @workspace @terminal I need to fully restore the original global loader, reflect it 
+in the running application in real time, and push the changes to the current GitHub 
+repository automatically.
+
+─────────────────────────────────────────
+STEP 1 — TRACE COMMIT HISTORY
+─────────────────────────────────────────
+Search all commits for the original global loader:
+
+  git log --all --oneline --grep="loader"
+  git log --all --oneline --grep="loading"
+  git log --all --oneline --grep="GlobalLoader"
+
+Then find the exact first commit it appeared in and retrieve its original content:
+
+  git show <earliest-commit-hash>:<path/to/GlobalLoader>
+
+─────────────────────────────────────────
+STEP 2 — RESTORE THE ORIGINAL LOADER
+─────────────────────────────────────────
+- Recreate the original loader file exactly as it was in its first commit
+- Place it in the correct original directory (e.g., src/components/GlobalLoader.tsx)
+- Restore all original styles, CSS modules, or Tailwind classes it used
+- If a separate CSS/SCSS file existed for it, restore that too
+
+─────────────────────────────────────────
+STEP 3 — RE-WIRE TO THE APPLICATION
+─────────────────────────────────────────
+- Find all files that previously imported or rendered the loader:
+    git log --all -p | grep -A5 -B5 "GlobalLoader"
+- Restore those import statements and JSX usage in:
+    App.tsx / _app.tsx / main.tsx / layout.tsx / index.tsx
+- Ensure it wraps or overlays the application at the root level
+- Confirm it is triggered by the correct global state, context, Redux store,
+  or loading flag (e.g., isLoading, isFetching, appLoading)
+
+─────────────────────────────────────────
+STEP 4 — REAL-TIME REFLECTION
+─────────────────────────────────────────
+- Confirm the dev server is running (npm run dev / yarn dev / vite)
+- If not running, start it:
+    npm run dev
+- Verify hot module replacement (HMR) is active so changes reflect instantly
+- Trigger the loader manually in the browser to confirm it renders correctly
+- If HMR is not working, identify why and fix the vite.config / webpack config
+- Check browser console for any errors related to the restored loader
+
+─────────────────────────────────────────
+STEP 5 — COMMIT AND PUSH TO GITHUB
+─────────────────────────────────────────
+Once the loader is confirmed working in real time, run:
+
+  git add .
+  git status
+  git commit -m "restore: bring back original global loader and re-wire to app root"
+  git push origin <current-branch>
+
+Use this to detect the current branch automatically:
+  git rev-parse --abbrev-ref HEAD
+
+Then push to that branch:
+  git push origin $(git rev-parse --abbrev-ref HEAD)
+
+─────────────────────────────────────────
+STEP 6 — FINAL SUMMARY
+─────────────────────────────────────────
+After completing all steps, give me:
+
+1. A table of all commits that touched the loader:
+   Commit Hash | Date | Author | Change Summary
+
+2. The exact file path and content of the restored loader
+
+3. All files that were re-wired with their specific changes
+
+4. Confirmation that the dev server reflected the change in real time
+
+5. The Git push result (branch name, commit hash, remote URL)
