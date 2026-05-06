@@ -6348,17 +6348,43 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
         : `${userDivCode} Division Budget`
     : "Division Budget Allocation";
 
+  // Helper function to get status badge
+  const getStatusBadge = (available, total) => {
+    if (available === 0) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+    }
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+    } else if (percentage < 25) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+    }
+    return '<span style="display:inline-block;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+  };
+
+  // Helper function to get color for available budget
+  const getAvailableColor = (available, total) => {
+    if (available === 0) return "#c53030";
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) return "#f6ad55";
+    if (percentage < 25) return "#ed8936";
+    return "#28a745";
+  };
+
   const tableRows = departments
     .map((dept) => {
       const code = dept.department_code || "N/A";
       const total = parseFloat(dept.total || 0);
       const active = parseFloat(dept.active || 0);
       const available = parseFloat(dept.available || 0);
+      const availableColor = getAvailableColor(available, total);
+      const statusBadge = getStatusBadge(available, total);
+
       return `<tr>
  <td style="font-weight:600;">${code}</td>
  <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:#28a745;font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${statusBadge}</td>
  </tr>`;
     })
     .join("");
@@ -6378,11 +6404,14 @@ function updateAPPDivisionBudgetBreakdown(budgetSummary) {
       (s, d) => s + parseFloat(d.available || 0),
       0,
     );
+    const totalAvailColor = getAvailableColor(tAvail, tTotal);
+    const totalStatusBadge = getStatusBadge(tAvail, tTotal);
+
     totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
  <td>TOTAL</td>
  <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:#28a745;">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}${totalStatusBadge}</td>
  </tr>`;
   }
 
