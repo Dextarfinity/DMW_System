@@ -27658,6 +27658,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div style="font-size:13px;font-weight:600;">Select document to print for ${coa.submission_number || ""}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;background:#e8f5e9;" onclick="coaDownloadMergedProc(${coaId})">
+          <i class="fas fa-file-pdf" style="color:#388e3c;margin-right:8px;"></i> <strong>Merged: PR to IAR (All Procurement Docs)</strong>
+        </button>
+        <hr style="margin:8px 0;border:none;border-top:1px solid #ddd;">
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 1)">
           <i class="fas fa-file-export" style="color:#1565c0;margin-right:8px;"></i> Step 1: Transmittal – Purchase Order
         </button>
@@ -27668,14 +27672,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           <i class="fas fa-clipboard-check" style="color:#1565c0;margin-right:8px;"></i> Step 3: Transmittal – IAR
         </button>
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintAllDocs(${coaId})">
-          <i class="fas fa-print" style="color:#388e3c;margin-right:8px;"></i> Print All 3 Documents
+          <i class="fas fa-print" style="color:#1565c0;margin-right:8px;"></i> Print All 3 COA Documents
         </button>
       </div>
       <div style="text-align:right;margin-top:16px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       </div>
     `;
-    openModal("Print COA Documents", html);
+    openModal("Print & Download COA Documents", html);
   };
 
   /**
