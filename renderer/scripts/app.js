@@ -8630,14 +8630,9 @@ function showPageLoader() {
     overlay = document.createElement("div");
     overlay.id = "pageLoadingOverlay";
     overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
- <div style="width:50px;height:50px;margin-bottom:20px;">
- <span class="dots-spinner"></span>
- </div>
- <div style="text-align:center;">
- <div style="color:#1a365d;font-size:16px;font-weight:600;margin-bottom:8px;">Loading Page</div>
- <div style="color:#718096;font-size:13px;">Please wait...</div>
- </div>
+ <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+ <div class="loader"></div>
+ <div style="color:#1a365d;font-size:14px;font-weight:500;">Loading</div>
  </div>`;
     Object.assign(overlay.style, {
       position: "fixed",
