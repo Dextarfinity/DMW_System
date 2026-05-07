@@ -37382,7 +37382,7 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     const html = `
  <form id="editPQForm" onsubmit="saveEditPostQual(event, ${id})">
- <input type="hidden" id="editPqDocumentsVerified" value="${(p.documents_verified || "{}").replace(/"/g, "&quot;")}">
+ <input type="hidden" id="editPqDocumentsVerified" value="${(typeof p.documents_verified === 'string' ? p.documents_verified : JSON.stringify(p.documents_verified || {})).replace(/"/g, "&quot;")}">
  <input type="hidden" id="editPqTechnicalCompliance" value="${(p.technical_compliance || "").replace(/"/g, "&quot;")}">
  <input type="hidden" id="editPqFinancialValidation" value="${(p.financial_validation || "").replace(/"/g, "&quot;")}">
  <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Post-Qualification</strong></div>
