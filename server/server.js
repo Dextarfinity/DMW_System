@@ -5754,7 +5754,7 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
     let bacResId = null;
     if (po.noa_id) {
       const noaResult = await pool.query(
-        'SELECT bac_resolution_id FROM notices_of_award WHERE id = $1', [po.noa_id]
+        'SELECT bac_resolution_id FROM notice_of_awards WHERE id = $1', [po.noa_id]
       );
       if (noaResult.rows.length) bacResId = noaResult.rows[0].bac_resolution_id;
     }
