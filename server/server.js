@@ -4384,7 +4384,7 @@ app.get('/api/iars/:id', authenticateToken, async (req, res) => {
               iar.inspection_result, iar.findings, iar.purpose, iar.inspected_by,
               iar.date_inspected, iar.received_by, iar.date_received, iar.acceptance,
               iar.created_by, iar.created_at, iar.updated_at,
-              iar.item_specifications, iar.requisitioning_office, iar.property_custodian, iar.inspector_name, iar.fund_cluster,
+              iar.item_specifications, iar.requisitioning_office, iar.property_custodian, iar.inspector_name,
               po.po_number, po.po_date, po.purpose as po_purpose, s.name as supplier_name,
               u1.username as inspected_by_name, u2.username as received_by_name,
               d.name as dept_name
