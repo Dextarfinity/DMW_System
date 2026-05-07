@@ -728,14 +728,14 @@ function getPrintHeaderHTML() {
 function getPrintHeaderCSS() {
   return `
  @import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
- .print-header {
- width: 720px;
- margin: 0 auto 10px auto;
- display: table;
- table-layout: fixed;
- border-bottom: 3px solid #333;
- padding-bottom: 8px;
- }
+.print-header {
+  width: 720px;
+  margin: 0 auto;
+  display: table;
+  table-layout: fixed;
+  border-bottom: 3px solid #333;
+  padding-bottom: 8px;
+}
  .print-header .header-left,
  .print-header .header-center,
  .print-header .header-right {
