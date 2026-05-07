@@ -25177,6 +25177,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             </div>
             <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
           </button>
+          <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaMergeAllFiles()">
+            <div style="width:32px;height:32px;border-radius:50%;background:#fff3e0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-file-archive" style="color:#e65100;font-size:14px;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:600;">Merge & Download All Files (PR → IAR + 3 COA Docs)</div>
+              <div style="font-size:10px;color:#888;margin-top:2px;">Combines all procurement attachments with COA letters into 1 PDF</div>
+            </div>
+            <i class="fas fa-download" style="color:#999;font-size:11px;"></i>
+          </button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #ddd;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -25340,7 +25350,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         }),
       };
-      await apiRequest("/coa-submissions", "POST", payload);
+      const saved = await apiRequest("/coa-submissions", "POST", payload);
+      window._coaWizard.coaSubmissionId = saved?.id || null;
 
       // Build Gmail compose URL with pre-filled template
       const poNum = w.poData?.po_number || w.submissionNumber;
@@ -46469,6 +46480,16 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <i class="fas fa-external-link-alt" style="color:#999;font-size:11px;"></i>
  </button>
+ <button type="button" class="btn btn-outline" style="text-align:left;padding:14px 16px;font-size:12px;display:flex;align-items:center;gap:10px;" onclick="coaMergeAllFiles()">
+ <div style="width:32px;height:32px;border-radius:50%;background:#fff3e0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+ <i class="fas fa-file-archive" style="color:#e65100;font-size:14px;"></i>
+ </div>
+ <div style="flex:1;">
+ <div style="font-weight:600;">Merge & Download All Files (PR → IAR + 3 COA Docs)</div>
+ <div style="font-size:10px;color:#888;margin-top:2px;">Combines all procurement attachments with COA letters into 1 PDF</div>
+ </div>
+ <i class="fas fa-download" style="color:#999;font-size:11px;"></i>
+ </button>
  </div>
  <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #ddd;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -46632,7 +46653,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         }),
       };
-      await apiRequest("/coa-submissions", "POST", payload);
+      const saved = await apiRequest("/coa-submissions", "POST", payload);
+      window._coaWizard.coaSubmissionId = saved?.id || null;
 
       // Build Gmail compose URL with pre-filled template
       const poNum = w.poData?.po_number || w.submissionNumber;
