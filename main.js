@@ -867,3 +867,8 @@ ${htmlContent}
     return { success: false, error: err.message };
   }
 });
+
+
+ipcMain.on('open-external', (event, url) => {
+  shell.openExternal(url);
+});
