@@ -7783,7 +7783,6 @@ function renderCOATable(coa) {
  <td><span class="status-badge signed"><i class="fas fa-check"></i> Complete</span></td>
  <td>${amtStr}</td>
  <td>${c.submission_date ? new Date(c.submission_date).toLocaleDateString() : ""}</td>
- <td>${c.coa_receipt_date ? new Date(c.coa_receipt_date).toLocaleDateString() : "-"}</td>
  <td><span class="status-badge ${c.status}">${c.status}</span></td>
  <td>
  <div class="action-buttons">
