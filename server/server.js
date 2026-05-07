@@ -5591,7 +5591,7 @@ app.get('/api/po-packets/monitoring', authenticateToken, async (req, res) => {
       LEFT JOIN users pq_u ON pq.created_by = pq_u.id
       LEFT JOIN notices_of_award noa ON noa.bac_resolution_id = br.id
       LEFT JOIN users noa_u ON noa.created_by = noa_u.id
-      LEFT JOIN purchaseorders po ON po.pr_id = pr.id
+      LEFT JOIN purchaseorders po ON (po.pr_id = pr.id OR po.noa_id = noa.id)
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN users po_creator ON po.created_by = po_creator.id
       LEFT JOIN users po_approver ON po.approved_by = po_approver.id
