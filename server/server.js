@@ -5807,17 +5807,21 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
 
     if (!sources.length) return res.json([]);
 
-    const conditions = sources.map((s, i) =>
-      `(record_type = $${i*2+1} AND record_id = $${i*2+2})`
-    ).join(' OR ');
-    const params = sources.flatMap(s => [s.type, s.id]);
+const conditions = sources.map((s, i) =>
+  `(ea.entity_type = $${i*2+1} AND ea.entity_id = $${i*2+2})`
+).join(' OR ');
+const params = sources.flatMap(s => [s.type, s.id]);
 
-    const attResult = await pool.query(
-      `SELECT * FROM attachments WHERE ${conditions} ORDER BY created_at ASC`,
-      params
-    );
+const attResult = await pool.query(
+  `SELECT a.*, ea.entity_type, ea.entity_id
+   FROM attachments a
+   JOIN entity_attachments ea ON ea.attachment_id = a.id
+   WHERE ${conditions}
+   ORDER BY a.created_at ASC`,
+  params
+);
 
-    res.json(attResult.rows);
+res.json(attResult.rows);
   } catch(err) {
     console.error('Document chain attachments error:', err);
     res.status(500).json({ error: err.message });
