@@ -5745,14 +5745,12 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
   try {
     const poId = parseInt(req.params.poId);
 
-    // Step 1: Get PO → NOA
     const poResult = await pool.query(
       'SELECT id, noa_id FROM purchaseorders WHERE id = $1', [poId]
     );
     if (!poResult.rows.length) return res.status(404).json({ error: 'PO not found' });
     const po = poResult.rows[0];
 
-    // Step 2: NOA → bac_resolution_id
     let bacResId = null;
     if (po.noa_id) {
       const noaResult = await pool.query(
@@ -5761,7 +5759,6 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
       if (noaResult.rows.length) bacResId = noaResult.rows[0].bac_resolution_id;
     }
 
-    // Step 3: BAC Resolution → abstract_id
     let abstractId = null;
     if (bacResId) {
       const brResult = await pool.query(
@@ -5770,9 +5767,7 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
       if (brResult.rows.length) abstractId = brResult.rows[0].abstract_id;
     }
 
-    // Step 4: Abstract → rfq_id, Post-Qual
-    let rfqId = null;
-    let postQualId = null;
+    let rfqId = null, postQualId = null;
     if (abstractId) {
       const abResult = await pool.query(
         'SELECT rfq_id FROM abstracts WHERE id = $1', [abstractId]
@@ -5785,7 +5780,6 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
       if (pqResult.rows.length) postQualId = pqResult.rows[0].id;
     }
 
-    // Step 5: RFQ → pr_id
     let prId = null;
     if (rfqId) {
       const rfqResult = await pool.query(
@@ -5794,23 +5788,21 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
       if (rfqResult.rows.length) prId = rfqResult.rows[0].pr_id;
     }
 
-    // Step 6: IAR linked to PO
     let iarId = null;
     const iarResult = await pool.query(
       'SELECT id FROM iars WHERE po_id = $1 ORDER BY id DESC LIMIT 1', [poId]
     );
     if (iarResult.rows.length) iarId = iarResult.rows[0].id;
 
-    // Build sources in procurement chain order
     const sources = [
-      prId        && { type: 'purchase_request',   id: prId },
-      rfqId       && { type: 'rfq',                id: rfqId },
-      abstractId  && { type: 'abstract',           id: abstractId },
-      bacResId    && { type: 'bac_resolution',     id: bacResId },
-      postQualId  && { type: 'post_qualification', id: postQualId },
-      po.noa_id   && { type: 'notice_of_award',    id: po.noa_id },
-      poId        && { type: 'purchase_order',     id: poId },
-      iarId       && { type: 'iar',                id: iarId },
+      prId       && { type: 'purchase_request',   id: prId },
+      rfqId      && { type: 'rfq',                id: rfqId },
+      abstractId && { type: 'abstract',           id: abstractId },
+      bacResId   && { type: 'bac_resolution',     id: bacResId },
+      postQualId && { type: 'post_qualification', id: postQualId },
+      po.noa_id  && { type: 'notice_of_award',    id: po.noa_id },
+      poId       && { type: 'purchase_order',     id: poId },
+      iarId      && { type: 'iar',                id: iarId },
     ].filter(Boolean);
 
     if (!sources.length) return res.json([]);
