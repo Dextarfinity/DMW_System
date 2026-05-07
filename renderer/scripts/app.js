@@ -31419,13 +31419,61 @@ Failure to submit the above requirements within the prescribed period shall cons
             .iar-items-table { width: 100%; border-collapse: collapse; }
             .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
             .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
-            .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; accent-color: #000000; }
+            .iar-check {
+              appearance: none;
+              -webkit-appearance: none;
+              width: 14px;
+              height: 14px;
+              border: 1.5px solid #000000;
+              background-color: #ffffff;
+              cursor: pointer;
+              vertical-align: middle;
+              margin-right: 4px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+            }
+
+            .iar-check:checked {
+              background-color: #000000;
+              border-color: #000000;
+            }
+
+            .iar-check:checked::after {
+              content: "";
+              position: absolute;
+              width: 4px;
+              height: 8px;
+              border: 2px solid #ffffff;
+              border-top: none;
+              border-left: none;
+              transform: rotate(45deg) translate(-1px, -1px);
+            }
+
             .iar-label { font-size: 9px; }
             .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
             /* === Print-specific styles for IAR === */
             @media print {
-              .iar-check { accent-color: #000000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .iar-check {
+                appearance: none;
+                -webkit-appearance: none;
+                background-color: #ffffff;
+                border-color: #000000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              .iar-check:checked {
+                background-color: #000000 !important;
+                border-color: #000000 !important;
+              }
+
+              .iar-check:checked::after {
+                background-color: #000000 !important;
+                border-color: #ffffff !important;
+              }
             }
 
             /* === Repeating header on every printed page === */
