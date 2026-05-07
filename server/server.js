@@ -5601,7 +5601,7 @@ app.get('/api/po-packets/monitoring', authenticateToken, async (req, res) => {
       LEFT JOIN po_packets pp ON pp.po_id = po.id
       LEFT JOIN users pp_chief ON pp.chief_signed_by = pp_chief.id
       LEFT JOIN users pp_dir ON pp.director_signed_by = pp_dir.id
-      ORDER BY pr.created_at DESC
+      ORDER BY pr.id, pr.created_at DESC
     `);
     res.json(result.rows);
   } catch (err) { 
