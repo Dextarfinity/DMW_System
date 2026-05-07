@@ -868,7 +868,6 @@ ${htmlContent}
   }
 });
 
-
 ipcMain.on('open-external', (event, url) => {
   shell.openExternal(url);
 });
