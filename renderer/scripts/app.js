@@ -730,7 +730,7 @@ function getPrintHeaderCSS() {
  @import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
  .print-header {
  width: 720px;
- margin: 0;
+ margin: 0 auto 10px auto;
  display: table;
  table-layout: fixed;
  border-bottom: 3px solid #333;
