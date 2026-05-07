@@ -5737,6 +5737,68 @@ app.delete('/api/coa-submissions/:id', authenticateToken, async (req, res) => {
 // SETTINGS / COUNTERS
 // ==============================================================================
 
+// ==============================================================================
+// DOCUMENT MONITORING - Collect all attachments from PO chain (PR → RFQ → Abstract → BAC → Post-Qual → NOA → PO → IAR)
+// ==============================================================================
+
+app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (req, res) => {
+  try {
+    const poId = parseInt(req.params.poId);
+
+    // Get the PO and its linked document IDs
+    const poResult = await pool.query(`
+      SELECT po.*, po.pr_id, po.noa_id, po.abstract_id, po.rfq_id,
+             noa.bac_resolution_id, noa.post_qual_id
+      FROM purchaseorders po
+      LEFT JOIN notice_of_awards noa ON noa.id = po.noa_id
+      WHERE po.id = $1
+    `, [poId]);
+
+    if (!poResult.rows.length) return res.status(404).json({ error: 'PO not found' });
+    const po = poResult.rows[0];
+    const noa = poResult.rows[0]; // NOA data from the query
+
+    // Build list of (record_type, record_id) pairs for all documents in chain
+    const sources = [
+      po.pr_id && { type: 'purchase_request', id: po.pr_id },
+      po.rfq_id && { type: 'rfq', id: po.rfq_id },
+      po.abstract_id && { type: 'abstract', id: po.abstract_id },
+      noa.bac_resolution_id && { type: 'bac_resolution', id: noa.bac_resolution_id },
+      noa.post_qual_id && { type: 'post_qualification', id: noa.post_qual_id },
+      po.noa_id && { type: 'notice_of_award', id: po.noa_id },
+      poId && { type: 'purchase_order', id: poId },
+    ].filter(Boolean);
+
+    // Get IAR linked to this PO
+    const iarResult = await pool.query('SELECT id FROM iars WHERE po_id = $1 ORDER BY id DESC LIMIT 1', [poId]);
+    if (iarResult.rows.length) {
+      sources.push({ type: 'iar', id: iarResult.rows[0].id });
+    }
+
+    if (!sources.length) return res.json([]);
+
+    // Fetch all attachments for these sources
+    const conditions = sources.map((s, i) =>
+      `(record_type = $${i*2+1} AND record_id = $${i*2+2})`
+    ).join(' OR ');
+    const params = sources.flatMap(s => [s.type, s.id]);
+
+    const attResult = await pool.query(
+      `SELECT * FROM attachments WHERE ${conditions} ORDER BY created_at ASC`,
+      params
+    );
+
+    res.json(attResult.rows);
+  } catch(err) {
+    console.error('Document chain attachments error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
+// SETTINGS
+// ==============================================================================
+
 app.get('/api/settings', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM settings ORDER BY id');
