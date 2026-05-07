@@ -724,73 +724,74 @@ function getPrintHeaderHTML() {
  `;
 }
 
-// Reusable print header CSS
+// Reusable print header CSS// Reusable print header CSS
 function getPrintHeaderCSS() {
   return `
- @import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
-.print-header {
-  width: 720px;
-  margin: 0 auto;
-  display: table;
-  table-layout: fixed;
-  border-bottom: 3px solid #333;
-  padding-bottom: 8px;
-}
- .print-header .header-left,
- .print-header .header-center,
- .print-header .header-right {
- display: table-cell;
- vertical-align: middle;
- text-align: center;
- }
- .print-header .header-left {
- width: 105px;
- padding-right: 0;
- }
- .print-header .header-right {
- width: 95px;
- padding-left: 0;
- }
- .print-header .header-left img {
- width: 115px;
- height: 115px;
- object-fit: contain;
- }
- .print-header .header-right img {
- width: 85px;
- height: 85px;
- object-fit: contain;
- }
- .print-header .header-center {
- text-align: center;
- padding: 0;
- }
- .print-header .header-center .republic {
- font-size: 12pt;
- font-weight: normal;
- font-family: 'Times New Roman', Times, serif;
- }
- .print-header .header-center .dept-name {
- font-family: 'Old English Text MT', 'UnifrakturMaguntia', serif;
- font-size: 20pt;
- margin: 0;
- font-weight: normal;
- line-height: 1.2;
- }
- .print-header .header-center .regional {
- font-size: 12pt;
- font-weight: bold;
- font-family: Arial, sans-serif;
- margin: 2px 0;
- }
- .print-header .header-center .address {
- font-size: 7pt;
- font-family: 'Times New Roman', Times, serif;
- color: #333;
- margin-top: 2px;
- line-height: 1.3;
- }
- `;
+    @import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
+    .print-header {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      display: table;
+      table-layout: fixed;
+      border-bottom: 3px solid #333;
+      padding-bottom: 6px;
+    }
+    .print-header .header-left,
+    .print-header .header-center,
+    .print-header .header-right {
+      display: table-cell;
+      vertical-align: middle;
+      text-align: center;
+    }
+    .print-header .header-left {
+      width: 105px;
+      padding-right: 0;
+    }
+    .print-header .header-right {
+      width: 95px;
+      padding-left: 0;
+    }
+    .print-header .header-left img {
+      width: 115px;
+      height: 115px;
+      object-fit: contain;
+    }
+    .print-header .header-right img {
+      width: 85px;
+      height: 85px;
+      object-fit: contain;
+    }
+    .print-header .header-center {
+      text-align: center;
+      padding: 0;
+    }
+    .print-header .header-center .republic {
+      font-size: 12pt;
+      font-weight: normal;
+      font-family: 'Times New Roman', Times, serif;
+    }
+    .print-header .header-center .dept-name {
+      font-family: 'Old English Text MT', 'UnifrakturMaguntia', serif;
+      font-size: 20pt;
+      margin: 0;
+      font-weight: normal;
+      line-height: 1.2;
+    }
+    .print-header .header-center .regional {
+      font-size: 12pt;
+      font-weight: bold;
+      font-family: Arial, sans-serif;
+      margin: 2px 0;
+    }
+    .print-header .header-center .address {
+      font-size: 7pt;
+      font-family: 'Times New Roman', Times, serif;
+      color: #333;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+  `;
 }
 
 // API Configuration - Resolved dynamically via discoverServer()
@@ -31605,7 +31606,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           </table>
       </html>`;
   }
-
   // ==================== PRINT FUNCTIONS ====================
 
   window.printRecord = function (recordType, recordId) {
