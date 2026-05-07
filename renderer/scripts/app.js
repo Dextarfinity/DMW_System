@@ -25388,7 +25388,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (window.ipcRenderer) {
   window.ipcRenderer.send('open-external', gmailUrl);
 } else {
-  window.location.href = gmailUrl;
+  try {
+  require('electron').shell.openExternal(gmailUrl);
+} catch(e) {
+  window.open(gmailUrl, "_blank");
+}
 }
 
       showNotification(
@@ -46766,7 +46770,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (window.ipcRenderer) {
   window.ipcRenderer.send('open-external', gmailUrl);
 } else {
-  window.location.href = gmailUrl;
+  try {
+  require('electron').shell.openExternal(gmailUrl);
+} catch(e) {
+  window.open(gmailUrl, "_blank");
+}
 }
 
       showNotification(
