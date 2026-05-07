@@ -7239,15 +7239,15 @@ function pktUpdateRowStatus(rowId) {
   const count =
     (window._pktAttCounts[rowId] && window._pktAttCounts[rowId].total) || 0;
   let badgeClass, label;
-  if (count >= 9) {
+  if (count >= 8) {
     badgeClass = "approved";
     label = "Complete";
   } else if (count >= 4) {
     badgeClass = "pending";
-    label = count + " / 9";
+    label = count + " / 8";
   } else {
     badgeClass = "rejected";
-    label = count + " / 9";
+    label = count + " / 8";
   }
   const dlBtn =
     count > 0
