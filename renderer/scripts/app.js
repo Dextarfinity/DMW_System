@@ -25385,7 +25385,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         subject +
         "&body=" +
         body;
-      window.open(gmailUrl, "_blank");
+      if (window.ipcRenderer) {
+  window.ipcRenderer.send('open-external', gmailUrl);
+} else {
+  window.open(gmailUrl, "_blank");
+}window.open(gmailUrl, "_blank");
 
       showNotification(
         "COA Submission record created! Gmail opened for sending.",
@@ -46759,7 +46763,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         subject +
         "&body=" +
         body;
-      window.open(gmailUrl, "_blank");
+      if (window.ipcRenderer) {
+  window.ipcRenderer.send('open-external', gmailUrl);
+} else {
+  window.open(gmailUrl, "_blank");
+}
 
       showNotification(
         "COA Submission record created! Gmail opened for sending.",
