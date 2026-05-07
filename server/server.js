@@ -5745,39 +5745,76 @@ app.get('/api/document-monitoring/:poId/attachments', authenticateToken, async (
   try {
     const poId = parseInt(req.params.poId);
 
-    // Get the PO and its linked document IDs
-    const poResult = await pool.query(`
-      SELECT po.*, po.pr_id, po.noa_id, po.abstract_id, po.rfq_id,
-             noa.bac_resolution_id, noa.post_qual_id
-      FROM purchaseorders po
-      LEFT JOIN notice_of_awards noa ON noa.id = po.noa_id
-      WHERE po.id = $1
-    `, [poId]);
-
+    // Step 1: Get PO → NOA
+    const poResult = await pool.query(
+      'SELECT id, noa_id FROM purchaseorders WHERE id = $1', [poId]
+    );
     if (!poResult.rows.length) return res.status(404).json({ error: 'PO not found' });
     const po = poResult.rows[0];
-    const noa = poResult.rows[0]; // NOA data from the query
 
-    // Build list of (record_type, record_id) pairs for all documents in chain
-    const sources = [
-      po.pr_id && { type: 'purchase_request', id: po.pr_id },
-      po.rfq_id && { type: 'rfq', id: po.rfq_id },
-      po.abstract_id && { type: 'abstract', id: po.abstract_id },
-      noa.bac_resolution_id && { type: 'bac_resolution', id: noa.bac_resolution_id },
-      noa.post_qual_id && { type: 'post_qualification', id: noa.post_qual_id },
-      po.noa_id && { type: 'notice_of_award', id: po.noa_id },
-      poId && { type: 'purchase_order', id: poId },
-    ].filter(Boolean);
-
-    // Get IAR linked to this PO
-    const iarResult = await pool.query('SELECT id FROM iars WHERE po_id = $1 ORDER BY id DESC LIMIT 1', [poId]);
-    if (iarResult.rows.length) {
-      sources.push({ type: 'iar', id: iarResult.rows[0].id });
+    // Step 2: NOA → bac_resolution_id
+    let bacResId = null;
+    if (po.noa_id) {
+      const noaResult = await pool.query(
+        'SELECT bac_resolution_id FROM notices_of_award WHERE id = $1', [po.noa_id]
+      );
+      if (noaResult.rows.length) bacResId = noaResult.rows[0].bac_resolution_id;
     }
+
+    // Step 3: BAC Resolution → abstract_id
+    let abstractId = null;
+    if (bacResId) {
+      const brResult = await pool.query(
+        'SELECT abstract_id FROM bac_resolutions WHERE id = $1', [bacResId]
+      );
+      if (brResult.rows.length) abstractId = brResult.rows[0].abstract_id;
+    }
+
+    // Step 4: Abstract → rfq_id, Post-Qual
+    let rfqId = null;
+    let postQualId = null;
+    if (abstractId) {
+      const abResult = await pool.query(
+        'SELECT rfq_id FROM abstracts WHERE id = $1', [abstractId]
+      );
+      if (abResult.rows.length) rfqId = abResult.rows[0].rfq_id;
+
+      const pqResult = await pool.query(
+        'SELECT id FROM post_qualifications WHERE abstract_id = $1 ORDER BY id DESC LIMIT 1', [abstractId]
+      );
+      if (pqResult.rows.length) postQualId = pqResult.rows[0].id;
+    }
+
+    // Step 5: RFQ → pr_id
+    let prId = null;
+    if (rfqId) {
+      const rfqResult = await pool.query(
+        'SELECT pr_id FROM rfqs WHERE id = $1', [rfqId]
+      );
+      if (rfqResult.rows.length) prId = rfqResult.rows[0].pr_id;
+    }
+
+    // Step 6: IAR linked to PO
+    let iarId = null;
+    const iarResult = await pool.query(
+      'SELECT id FROM iars WHERE po_id = $1 ORDER BY id DESC LIMIT 1', [poId]
+    );
+    if (iarResult.rows.length) iarId = iarResult.rows[0].id;
+
+    // Build sources in procurement chain order
+    const sources = [
+      prId        && { type: 'purchase_request',   id: prId },
+      rfqId       && { type: 'rfq',                id: rfqId },
+      abstractId  && { type: 'abstract',           id: abstractId },
+      bacResId    && { type: 'bac_resolution',     id: bacResId },
+      postQualId  && { type: 'post_qualification', id: postQualId },
+      po.noa_id   && { type: 'notice_of_award',    id: po.noa_id },
+      poId        && { type: 'purchase_order',     id: poId },
+      iarId       && { type: 'iar',                id: iarId },
+    ].filter(Boolean);
 
     if (!sources.length) return res.json([]);
 
-    // Fetch all attachments for these sources
     const conditions = sources.map((s, i) =>
       `(record_type = $${i*2+1} AND record_id = $${i*2+2})`
     ).join(' OR ');
