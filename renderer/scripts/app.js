@@ -7763,7 +7763,7 @@ function renderCOATable(coa) {
   if (!tbody) return;
   if (!coa.length) {
     tbody.innerHTML =
-      '<tr><td colspan="8" class="text-center">No COA Submissions found</td></tr>';
+      '<tr><td colspan="7" class="text-center">No COA Submissions found</td></tr>'
     return;
   }
 
