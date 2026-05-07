@@ -31419,9 +31419,14 @@ Failure to submit the above requirements within the prescribed period shall cons
             .iar-items-table { width: 100%; border-collapse: collapse; }
             .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
             .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
-            .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
+            .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; accent-color: #000000; }
             .iar-label { font-size: 9px; }
             .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
+
+            /* === Print-specific styles for IAR === */
+            @media print {
+              .iar-check { accent-color: #000000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
 
             /* === Repeating header on every printed page === */
             .page-wrapper { display: table; width: 100%; background: white !important; }
@@ -31532,6 +31537,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accComplete = iar.acceptance === "complete" ? "checked" : "";
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
+      // Extract fund cluster code from IAR data
+      const fundClusterCode = iar.fund_cluster || "N/A";
+
       const bodyContent = `
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
@@ -31542,7 +31550,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Entity Name / Fund Cluster row -->
           <tr>
             <td colspan="2" style="font-size:9px;"><strong>Entity Name:</strong> DMW Regional Office XIII (Caraga)</td>
-            <td colspan="2" style="font-size:9px;"><strong>Fund Cluster:</strong> _______________</td>
+            <td colspan="2" style="font-size:9px;"><strong>Fund Cluster:</strong> ${fundClusterCode}</td>
           </tr>
 
           <!-- Row: Supplier | IAR No. -->
