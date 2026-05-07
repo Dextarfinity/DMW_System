@@ -31422,33 +31422,31 @@ Failure to submit the above requirements within the prescribed period shall cons
             .iar-check {
               appearance: none;
               -webkit-appearance: none;
+              -moz-appearance: none;
               width: 14px;
               height: 14px;
+              min-width: 14px;
+              min-height: 14px;
               border: 1.5px solid #000000;
               background-color: #ffffff;
               cursor: pointer;
               vertical-align: middle;
               margin-right: 4px;
-              display: inline-flex;
+              display: inline-block;
               align-items: center;
               justify-content: center;
               position: relative;
+              box-sizing: border-box;
+              padding: 0;
             }
 
             .iar-check:checked {
-              background-color: #000000;
-              border-color: #000000;
-            }
-
-            .iar-check:checked::after {
-              content: "";
-              position: absolute;
-              width: 4px;
-              height: 8px;
-              border: 2px solid #ffffff;
-              border-top: none;
-              border-left: none;
-              transform: rotate(45deg) translate(-1px, -1px);
+              background-color: #000000 !important;
+              border-color: #000000 !important;
+              background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23ffffff" d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>');
+              background-repeat: no-repeat;
+              background-position: center;
+              background-size: 60%;
             }
 
             .iar-label { font-size: 9px; }
@@ -31459,20 +31457,30 @@ Failure to submit the above requirements within the prescribed period shall cons
               .iar-check {
                 appearance: none;
                 -webkit-appearance: none;
+                -moz-appearance: none;
+                width: 14px;
+                height: 14px;
+                min-width: 14px;
+                min-height: 14px;
                 background-color: #ffffff;
+                border: 1.5px solid #000000;
                 border-color: #000000;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                background-attachment: fixed;
+                box-sizing: border-box;
+                padding: 0;
+                margin: 0;
+                display: inline-block;
               }
 
               .iar-check:checked {
                 background-color: #000000 !important;
                 border-color: #000000 !important;
-              }
-
-              .iar-check:checked::after {
-                background-color: #000000 !important;
-                border-color: #ffffff !important;
+                background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23ffffff" d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>') !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+                background-size: 60% !important;
               }
             }
 
