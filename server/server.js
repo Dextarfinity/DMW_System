@@ -1786,6 +1786,21 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
     const deptId = dept_id || req.user.dept_id;
     const fy = fiscal_year || new Date().getFullYear();
 
+    // Validate PPMP creation deadline
+    const today = new Date();
+    const deadlineYear = fy - 1;
+    const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+    const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+    if (today < creationStartDate || today > deadlineDate) {
+      return res.status(400).json({
+        error: 'PPMP creation deadline has passed',
+        message: today > deadlineDate
+          ? `Cannot create PPMP ${fy}. Deadline was September 30, ${deadlineYear}`
+          : `Cannot create PPMP ${fy} yet. Deadline: September 30, ${deadlineYear}`
+      });
+    }
+
     // Auto-generate PPMP number or validate uniqueness of provided one
     let finalPpmpNo = ppmp_no;
     const deptResult2 = deptId ? await client.query('SELECT code FROM departments WHERE id = $1', [deptId]) : { rows: [] };
@@ -1858,6 +1873,22 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
 
       const deptId = dept_id || req.user.dept_id;
       const fy = fiscal_year || new Date().getFullYear();
+
+      // Validate PPMP creation deadline
+      const today = new Date();
+      const deadlineYear = fy - 1;
+      const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+      const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+      if (today < creationStartDate || today > deadlineDate) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'PPMP creation deadline has passed',
+          message: today > deadlineDate
+            ? `Cannot create PPMP ${fy}. Deadline was September 30, ${deadlineYear}`
+            : `Cannot create PPMP ${fy} yet. Deadline: September 30, ${deadlineYear}`
+        });
+      }
 
       // Auto-generate PPMP number or validate uniqueness
       let finalPpmpNo = ppmp_no;
@@ -2659,14 +2690,35 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
     
     const row = result.rows[0];
     const removed = removedResult.rows[0];
-    
+
     // Merge removed data into department breakdown
     const removedMap = {};
     deptRemovedResult.rows.forEach(r => { removedMap[r.department_code] = r; });
+
+    // Get PPMP budget breakdown by department for calculating available per division
+    let ppmpByDept = {};
+    try {
+      const ppmpDeptResult = await pool.query(
+        `SELECT d.code as department_code,
+                COALESCE(SUM(pp.total_amount), 0) as ppmp_total
+         FROM procurementplans pp
+         LEFT JOIN departments d ON pp.dept_id = d.id
+         WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = $1 AND pp.status = 'approved'
+         GROUP BY d.code`,
+        [fy]
+      );
+      ppmpDeptResult.rows.forEach(row => {
+        ppmpByDept[row.department_code] = parseFloat(row.ppmp_total || 0);
+      });
+    } catch (e) {
+      console.warn('[APP-BUDGET] Could not fetch PPMP department breakdown:', e.message);
+    }
+
+    // Calculate available per department: ppmp_dept_budget - active_dept_budget
     const departments = deptResult.rows.map(d => ({
       ...d,
-      total: d.active,  // total = sum of app_entries for this dept
-      available: 0,  // available = 0 when all apps are deleted (no budget allocation from previous PPMP)
+      total: d.active,  // total = sum of app_entries (active) for this dept
+      available: Math.max(0, (ppmpByDept[d.department_code] || 0) - parseFloat(d.active || 0)),
       removed_budget: removedMap[d.department_code] ? parseFloat(removedMap[d.department_code].removed_budget) : 0,
       removed_count: removedMap[d.department_code] ? parseInt(removedMap[d.department_code].removed_count) : 0
     }));
@@ -4332,7 +4384,7 @@ app.get('/api/iars/:id', authenticateToken, async (req, res) => {
               iar.inspection_result, iar.findings, iar.purpose, iar.inspected_by,
               iar.date_inspected, iar.received_by, iar.date_received, iar.acceptance,
               iar.created_by, iar.created_at, iar.updated_at,
-              iar.item_specifications, iar.requisitioning_office, iar.property_custodian, iar.inspector_name,
+              iar.item_specifications, iar.requisitioning_office, iar.property_custodian, iar.inspector_name, iar.fund_cluster,
               po.po_number, po.po_date, po.purpose as po_purpose, s.name as supplier_name,
               u1.username as inspected_by_name, u2.username as received_by_name,
               d.name as dept_name

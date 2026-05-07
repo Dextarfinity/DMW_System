@@ -356,6 +356,15 @@ function handleRealtimeDataChange(event) {
       resource === "paps" ||
       resource === "app-settings")
   ) {
+    // For budget adjustments on PPMP page, just refresh the budget summary (faster)
+    if (event.action === "budget_adjusted" && resource === "plan-items") {
+      console.log("[SYNC] Updating PPMP budget summary only...");
+      const fy = window._ppmpFilterYear || getCurrentFiscalYear();
+      apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now())
+        .then(budgetSummary => updatePPMPBudgetSummary(budgetSummary))
+        .catch(err => console.warn('[SYNC] Budget update failed:', err));
+      return;
+    }
     console.log("[SYNC] Reloading PPMP...");
     if (typeof loadPPMP === "function") loadPPMP();
     if (typeof pollNotificationCount === "function") pollNotificationCount();
@@ -369,6 +378,18 @@ function handleRealtimeDataChange(event) {
       resource === "app-budget-summary") &&
     activePageId === "app"
   ) {
+    // For budget adjustments on APP page, just refresh budget summaries (faster)
+    if (event.action === "budget_adjusted" && resource === "plan-items") {
+      console.log("[SYNC] Updating APP budget summaries only...");
+      const fy = window._appFilterYear || getCurrentFiscalYear();
+      apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now())
+        .then(budgetSummary => {
+          updateAPPSummary(null, budgetSummary);
+          updateAPPDivisionBudgetBreakdown(budgetSummary);
+        })
+        .catch(err => console.warn('[SYNC] Budget update failed:', err));
+      return;
+    }
     console.log("[SYNC] Reloading APP...");
     if (typeof loadAPP === "function") loadAPP();
     if (typeof pollNotificationCount === "function") pollNotificationCount();
@@ -1860,7 +1881,7 @@ async function loadPPMP() {
     // Show loading indicator
     if (tbody) {
       tbody.innerHTML =
-        '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><i class="fas fa-spinner fa-spin" style="font-size:20px;margin-right:8px;"></i>Loading PPMP data from database...</td></tr>';
+        '<tr><td colspan="15" class="text-center" style="padding:30px;color:#636e78;"><span class="dots-spinner" style="display:inline-block;margin-right:8px;"></span>Loading PPMP data from database...</td></tr>';
     }
 
     // Build server query with all filters
@@ -2034,6 +2055,16 @@ async function loadPPMP() {
 
     // Render the filtered PPMP data to the table
     renderPPMPTable(filtered, ppmp);
+
+    // Fetch and display available budget from APP
+    const fy = window._ppmpFilterYear || getCurrentFiscalYear();
+    try {
+      const budgetSummary = await apiRequest("/app-budget-summary?fiscal_year=" + fy + "&_cache_bust=" + Date.now());
+      updatePPMPBudgetSummary(budgetSummary);
+    } catch (err) {
+      console.warn('[PPMP] Could not fetch budget summary:', err);
+    }
+
     return filtered;
   } catch (err) {
     console.error("Error loading PPMP:", err);
@@ -2044,6 +2075,269 @@ async function loadPPMP() {
     return [];
   }
 }
+
+// Update PPMP available budget display in real-time
+function updatePPMPBudgetSummary(budgetSummary) {
+  const elAvailableBudget = document.getElementById("ppmpAvailableBudget");
+  if (!budgetSummary || !elAvailableBudget) return;
+
+  // Determine division filtering (same logic as updateAPPSummary)
+  const chiefRoles = ["chief_fad", "chief_wrsd", "chief_mwpsd", "chief_mwptd"];
+  const isChief = userHasAnyRole(chiefRoles);
+  const chiefRole2 = getUserChiefRole();
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+  const canSeeAll = userHasAnyRole(["admin", "hope", "ord_manager", "budget_consultant", "bac_secretariat"]);
+  const shouldFilter = !canSeeAll && (isChief || userDivCode);
+
+  // Calculate available budget for user's division (or overall if can see all)
+  let ppmpBudget = 0;
+  let activeBudget = 0;
+
+  if (shouldFilter && budgetSummary.by_department) {
+    // Filter by division
+    let filteredDepts = budgetSummary.by_department;
+    if (chiefRole2 === "chief_wrsd") {
+      filteredDepts = filteredDepts.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      filteredDepts = filteredDepts.filter((d) => d.department_code !== "WRSD");
+    } else {
+      filteredDepts = filteredDepts.filter((d) => d.department_code === userDivCode);
+    }
+    // Sum for filtered divisions
+    ppmpBudget = filteredDepts.reduce((s, d) => s + (parseFloat(d.total || 0) + parseFloat(d.available || 0)), 0);
+    activeBudget = filteredDepts.reduce((s, d) => s + parseFloat(d.active || 0), 0);
+  } else {
+    // Use overall budget (can see all divisions)
+    ppmpBudget = parseFloat(budgetSummary.ppmp_budget || 0);
+    activeBudget = parseFloat(budgetSummary.active_budget || 0);
+  }
+
+  const availableBudget = Math.max(0, ppmpBudget - activeBudget);
+
+  // Calculate budget percentage
+  const budgetPercentage = ppmpBudget > 0 ? (availableBudget / ppmpBudget) * 100 : 0;
+
+  // Determine status color (for text-only display)
+  let statusColor = "#28a745";
+
+  if (availableBudget === 0) {
+    statusColor = "#c53030";
+  } else if (budgetPercentage < 10) {
+    statusColor = "#f6ad55";
+  } else if (budgetPercentage < 25) {
+    statusColor = "#ed8936";
+  } else {
+    statusColor = "#38a169";
+  }
+
+  // Update the available budget display (text only, no badge or progress bar)
+  elAvailableBudget.innerHTML = "₱" + availableBudget.toLocaleString("en-PH", { minimumFractionDigits: 2 });
+  elAvailableBudget.style.color = statusColor;
+
+  // Update card border color
+  const cardEl = elAvailableBudget.closest(".summary-card");
+  if (cardEl) {
+    cardEl.style.borderLeftColor = statusColor;
+  }
+
+  // Update division budget breakdown with status badges
+  updatePPMPDivisionBudgetBreakdown(budgetSummary);
+}
+
+// Update PPMP Division Budget Breakdown section with status badges
+function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
+  const divBudgetContainer = document.getElementById("ppmpDivisionBudgets");
+  if (!divBudgetContainer || !budgetSummary || !budgetSummary.by_department) return;
+
+  const allowedBudgetRoles = [
+    "admin",
+    "hope",
+    "ord_manager",
+    "budget_consultant",
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+
+  const chiefRoles2 = [
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+  const isChief2 = userHasAnyRole(chiefRoles2);
+  const shouldFilter = isChief2;
+  const chiefRole2 = isChief2 ? getUserChiefRole() : null;
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+
+  // Show/hide division budget panel based on role
+  if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
+    divBudgetContainer.innerHTML = "";
+    divBudgetContainer.style.display = "none";
+    return;
+  }
+
+  divBudgetContainer.style.display = "";
+
+  // Filter departments based on role
+  let departments = budgetSummary.by_department;
+  if (shouldFilter) {
+    if (chiefRole2 === "chief_wrsd") {
+      departments = departments.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      departments = departments.filter((d) => d.department_code !== "WRSD");
+    } else {
+      departments = departments.filter(
+        (d) => d.department_code === userDivCode,
+      );
+    }
+  }
+
+  const headerLabel = shouldFilter
+    ? chiefRole2 === "chief_fad"
+      ? "FAD & Other Divisions Budget"
+      : chiefRole2 === "chief_wrsd"
+        ? "WRSD Division Budget"
+        : `${userDivCode} Division Budget`
+    : "Division Budget Allocation";
+
+  // Helper function to get status badge
+  const getStatusBadge = (available, total) => {
+    if (available === 0) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+    }
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+    } else if (percentage < 25) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+    }
+    return '<span style="display:inline-block;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+  };
+
+  // Helper function to get color for available budget
+  const getAvailableColor = (available, total) => {
+    if (available === 0) return "#c53030";
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) return "#f6ad55";
+    if (percentage < 25) return "#ed8936";
+    return "#28a745";
+  };
+
+  const tableRows = departments
+    .map((dept) => {
+      const code = dept.department_code || "N/A";
+      const total = parseFloat(dept.total || 0);
+      const active = parseFloat(dept.active || 0);
+      const available = parseFloat(dept.available || 0);
+      const availableColor = getAvailableColor(available, total);
+
+      return `<tr>
+ <td style="font-weight:600;">${code}</td>
+ <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+    })
+    .join("");
+
+  // Totals row (when viewing multiple divisions)
+  let totalsRow = "";
+  if (departments.length > 1) {
+    const tTotal = departments.reduce(
+      (s, d) => s + parseFloat(d.total || 0),
+      0,
+    );
+    const tActive = departments.reduce(
+      (s, d) => s + parseFloat(d.active || 0),
+      0,
+    );
+    const tAvail = departments.reduce(
+      (s, d) => s + parseFloat(d.available || 0),
+      0,
+    );
+    const totalAvailColor = getAvailableColor(tAvail, tTotal);
+
+    totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
+ <td>TOTAL</td>
+ <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+  }
+
+  divBudgetContainer.innerHTML = `
+ <div class="div-budget-panel">
+ <div class="div-budget-title"><i class="fas fa-landmark"></i> ${headerLabel}</div>
+ <table class="div-budget-table">
+ <thead>
+ <tr>
+ <th>Division</th>
+ <th class="text-right">Total Budget</th>
+ <th class="text-right">Active Budget</th>
+ <th class="text-right">Available Budget</th>
+ </tr>
+ </thead>
+ <tbody>${tableRows}${totalsRow}</tbody>
+ </table>
+ </div>`;
+}
+
+// Check if PPMP creation is within deadline window
+function checkPPMPDeadline(fiscalYear) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  const fyNum = parseInt(fiscalYear);
+  const deadlineYear = fyNum - 1;
+  const deadlineDate = new Date(deadlineYear, 8, 30); // September 30
+  const creationStartDate = new Date(deadlineYear, 0, 1); // January 1
+
+  if (today < creationStartDate) {
+    return {
+      allowed: false,
+      message: `Cannot create PPMP ${fyNum} yet. Deadline: September 30, ${deadlineYear}`
+    };
+  }
+
+  if (today > deadlineDate) {
+    return {
+      allowed: false,
+      message: `PPMP creation deadline passed (Sep 30, ${deadlineYear}). Next deadline: September 30, ${deadlineYear + 1}`
+    };
+  }
+
+  return {
+    allowed: true,
+    message: `✓ PPMP ${fyNum} can be created until September 30, ${deadlineYear}`
+  };
+}
+
+// Update deadline info display in PPMP modal
+window.updatePPMPDeadlineInfo = function() {
+  const fySelect = document.getElementById("ppmpFiscalYear");
+  const deadlineInfoDiv = document.getElementById("ppmpDeadlineInfo");
+
+  if (!fySelect || !deadlineInfoDiv) return;
+
+  const selectedFY = fySelect.value;
+  if (!selectedFY) {
+    deadlineInfoDiv.innerHTML = "";
+    return;
+  }
+
+  const deadlineCheck = checkPPMPDeadline(selectedFY);
+  const bgColor = deadlineCheck.allowed ? "#d1f0e8" : "#fde4e4";
+  const textColor = deadlineCheck.allowed ? "#1b5e20" : "#b71c1c";
+  const icon = deadlineCheck.allowed ? "✓" : "⚠";
+
+  deadlineInfoDiv.innerHTML = `<span style="color: ${textColor};">${icon} ${deadlineCheck.message}</span>`;
+  deadlineInfoDiv.style.backgroundColor = bgColor;
+  deadlineInfoDiv.style.padding = "4px 8px";
+  deadlineInfoDiv.style.borderRadius = "3px";
+};
 
 // Initialize PPMP filter event listeners (called once after login)
 async function initPPMPFilters() {
@@ -5830,8 +6124,9 @@ function updateAPPSummary(items, budgetSummary) {
         (d) => d.department_code === userDivCode,
       );
     }
+    // Calculate PPMP allocation for filtered divisions (total = active, available = ppmp - active)
     overallAllocatedBudget = filteredDepts.reduce(
-      (s, d) => s + parseFloat(d.total || d.active || 0),
+      (s, d) => s + (parseFloat(d.total || 0) + parseFloat(d.available || 0)),
       0,
     );
   } else if (budgetSummary) {
@@ -5912,66 +6207,32 @@ function updateAPPSummary(items, budgetSummary) {
         : 0;
 
     // Build the available budget display with status
-    let statusBadge = "";
     let statusColor = "#28a745";
 
     if (availableBudget === 0) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
       statusColor = "#c53030";
     } else if (budgetPercentage < 10) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
       statusColor = "#f6ad55";
     } else if (budgetPercentage < 25) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
       statusColor = "#ed8936";
     } else if (approvedPercentage >= 90) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> OPTIMIZED</span>';
       statusColor = "#38a169";
     } else {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#28a745;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
       statusColor = "#28a745";
     }
 
+    // Update available budget display (text only, no badge or progress bar)
     elAvailableBudget.innerHTML =
       "₱" +
       availableBudget.toLocaleString("en-PH", {
         minimumFractionDigits: 2,
-      }) +
-      statusBadge;
+      });
     elAvailableBudget.style.color = statusColor;
 
     // Update card border color
     const cardEl = elAvailableBudget.closest(".summary-card");
     if (cardEl) {
       cardEl.style.borderLeftColor = statusColor;
-    }
-
-    // Add progress bar visual indicator
-    let progressBarHtml = "";
-    if (overallAllocatedBudget > 0) {
-      progressBarHtml = `<div style="margin-top:8px;background:#e2e8f0;border-radius:3px;height:4px;overflow:hidden;">
- <div style="background:${statusColor};height:100%;width:${Math.min(approvedPercentage, 100)}%;transition:width 0.3s ease;"></div>
- </div>`;
-    }
-
-    if (cardEl) {
-      // ALWAYS remove ALL old progress bars first
-      const allProgressBars = cardEl.querySelectorAll(".budget-progress-bar");
-      allProgressBars.forEach(bar => bar.remove());
-
-      // Then add the NEW progress bar with updated color
-      if (progressBarHtml) {
-        const progressDiv = document.createElement("div");
-        progressDiv.className = "budget-progress-bar";
-        progressDiv.style.marginTop = "8px";
-        progressDiv.innerHTML = progressBarHtml;
-        cardEl.appendChild(progressDiv);
-      }
     }
   }
   if (elRemovedCount) elRemovedCount.textContent = removedCount;
@@ -6008,104 +6269,8 @@ function updateAPPSummary(items, budgetSummary) {
     "Direct Procurement for STI": "#a29bfe",
   };
 
-  // Render division budget breakdown
-  const divBudgetContainer = document.getElementById("appDivisionBudgets");
-  if (divBudgetContainer && budgetSummary && budgetSummary.by_department) {
-    const allowedBudgetRoles = [
-      "admin",
-      "hope",
-      "ord_manager",
-      "budget_consultant",
-      "chief_fad",
-      "chief_wrsd",
-      "chief_mwpsd",
-      "chief_mwptd",
-    ];
-
-    // Show division budget panel to users who have a division or global visibility
-    if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
-      divBudgetContainer.innerHTML = "";
-      divBudgetContainer.style.display = "none";
-    } else {
-      divBudgetContainer.style.display = "";
-
-      // Filter departments: chief_wrsd sees only WRSD, chief_fad sees all except WRSD, others see own division
-      let departments = budgetSummary.by_department;
-      if (shouldFilter) {
-        if (chiefRole2 === "chief_wrsd") {
-          departments = departments.filter((d) => d.department_code === "WRSD");
-        } else if (chiefRole2 === "chief_fad") {
-          departments = departments.filter((d) => d.department_code !== "WRSD");
-        } else {
-          departments = departments.filter(
-            (d) => d.department_code === userDivCode,
-          );
-        }
-      }
-
-      const headerLabel = shouldFilter
-        ? chiefRole2 === "chief_fad"
-          ? "FAD & Other Divisions Budget"
-          : chiefRole2 === "chief_wrsd"
-            ? "WRSD Division Budget"
-            : `${userDivCode} Division Budget`
-        : "Division Budget Allocation";
-
-      const tableRows = departments
-        .map((dept) => {
-          const code = dept.department_code || "N/A";
-          const total = parseFloat(dept.total || 0);
-          const active = parseFloat(dept.active || 0);
-          const available = parseFloat(dept.available || 0);
-          return `<tr>
- <td style="font-weight:600;">${code}</td>
- <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:#28a745;font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- </tr>`;
-        })
-        .join("");
-
-      // Totals row (when viewing multiple divisions)
-      let totalsRow = "";
-      if (departments.length > 1) {
-        const tTotal = departments.reduce(
-          (s, d) => s + parseFloat(d.total || 0),
-          0,
-        );
-        const tActive = departments.reduce(
-          (s, d) => s + parseFloat(d.active || 0),
-          0,
-        );
-        const tAvail = departments.reduce(
-          (s, d) => s + parseFloat(d.available || 0),
-          0,
-        );
-        totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
- <td>TOTAL</td>
- <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td class="text-right" style="color:#28a745;">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- </tr>`;
-      }
-
-      divBudgetContainer.innerHTML = `
- <div class="div-budget-panel">
- <div class="div-budget-title"><i class="fas fa-landmark"></i> ${headerLabel}</div>
- <table class="div-budget-table">
- <thead>
- <tr>
- <th>Division</th>
- <th class="text-right">Total Budget</th>
- <th class="text-right">Active Budget</th>
- <th class="text-right">Available Budget</th>
- </tr>
- </thead>
- <tbody>${tableRows}${totalsRow}</tbody>
- </table>
- </div>`;
-    }
-  }
+  // Update division budget breakdown with status badges
+  updateAPPDivisionBudgetBreakdown(budgetSummary);
 
   // Render dynamic mode stat cards (only modes with count > 0)
   const modeStatsContainer = document.getElementById("appModeStats");
@@ -6138,6 +6303,146 @@ function updateAPPSummary(items, budgetSummary) {
       .join("");
     modeStatsContainer.innerHTML = modeCards;
   }
+}
+
+// Update Division Budget Allocation section in real-time
+function updateAPPDivisionBudgetBreakdown(budgetSummary) {
+  const divBudgetContainer = document.getElementById("appDivisionBudgets");
+  if (!divBudgetContainer || !budgetSummary || !budgetSummary.by_department) return;
+
+  const allowedBudgetRoles = [
+    "admin",
+    "hope",
+    "ord_manager",
+    "budget_consultant",
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+
+  const chiefRoles2 = [
+    "chief_fad",
+    "chief_wrsd",
+    "chief_mwpsd",
+    "chief_mwptd",
+  ];
+  const isChief2 = userHasAnyRole(chiefRoles2);
+  const shouldFilter = isChief2;
+  const chiefRole2 = isChief2 ? getUserChiefRole() : null;
+  const userDivCode = currentUser.division || currentUser.department_code || "";
+
+  // Show/hide division budget panel based on role
+  if (!userHasAnyRole(allowedBudgetRoles) && !shouldFilter) {
+    divBudgetContainer.innerHTML = "";
+    divBudgetContainer.style.display = "none";
+    return;
+  }
+
+  divBudgetContainer.style.display = "";
+
+  // Filter departments based on role
+  let departments = budgetSummary.by_department;
+  if (shouldFilter) {
+    if (chiefRole2 === "chief_wrsd") {
+      departments = departments.filter((d) => d.department_code === "WRSD");
+    } else if (chiefRole2 === "chief_fad") {
+      departments = departments.filter((d) => d.department_code !== "WRSD");
+    } else {
+      departments = departments.filter(
+        (d) => d.department_code === userDivCode,
+      );
+    }
+  }
+
+  const headerLabel = shouldFilter
+    ? chiefRole2 === "chief_fad"
+      ? "FAD & Other Divisions Budget"
+      : chiefRole2 === "chief_wrsd"
+        ? "WRSD Division Budget"
+        : `${userDivCode} Division Budget`
+    : "Division Budget Allocation";
+
+  // Helper function to get status badge
+  const getStatusBadge = (available, total) => {
+    if (available === 0) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
+    }
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
+    } else if (percentage < 25) {
+      return '<span style="display:inline-block;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
+    }
+    return '<span style="display:inline-block;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;margin-left:6px;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
+  };
+
+  // Helper function to get color for available budget
+  const getAvailableColor = (available, total) => {
+    if (available === 0) return "#c53030";
+    const percentage = total > 0 ? (available / total) * 100 : 0;
+    if (percentage < 10) return "#f6ad55";
+    if (percentage < 25) return "#ed8936";
+    return "#28a745";
+  };
+
+  const tableRows = departments
+    .map((dept) => {
+      const code = dept.department_code || "N/A";
+      const total = parseFloat(dept.total || 0);
+      const active = parseFloat(dept.active || 0);
+      const available = parseFloat(dept.available || 0);
+      const availableColor = getAvailableColor(available, total);
+
+      return `<tr>
+ <td style="font-weight:600;">${code}</td>
+ <td class="text-right">₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${active.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${availableColor};font-weight:600;">₱${available.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+    })
+    .join("");
+
+  // Totals row (when viewing multiple divisions)
+  let totalsRow = "";
+  if (departments.length > 1) {
+    const tTotal = departments.reduce(
+      (s, d) => s + parseFloat(d.total || 0),
+      0,
+    );
+    const tActive = departments.reduce(
+      (s, d) => s + parseFloat(d.active || 0),
+      0,
+    );
+    const tAvail = departments.reduce(
+      (s, d) => s + parseFloat(d.available || 0),
+      0,
+    );
+    const totalAvailColor = getAvailableColor(tAvail, tTotal);
+
+    totalsRow = `<tr style="background:#f0f4f8;font-weight:700;border-top:2px solid #1a365d;">
+ <td>TOTAL</td>
+ <td class="text-right">₱${tTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right">₱${tActive.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ <td class="text-right" style="color:${totalAvailColor};">₱${tAvail.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+ </tr>`;
+  }
+
+  divBudgetContainer.innerHTML = `
+ <div class="div-budget-panel">
+ <div class="div-budget-title"><i class="fas fa-landmark"></i> ${headerLabel}</div>
+ <table class="div-budget-table">
+ <thead>
+ <tr>
+ <th>Division</th>
+ <th class="text-right">Total Budget</th>
+ <th class="text-right">Active Budget</th>
+ <th class="text-right">Available Budget</th>
+ </tr>
+ </thead>
+ <tbody>${tableRows}${totalsRow}</tbody>
+ </table>
+ </div>`;
 }
 
 function updateAPPVersionBanner(status) {
@@ -7147,7 +7452,13 @@ window.pktConsolidateFiles = async function (rowId) {
   ];
 
   // Show loading modal immediately
-  const loadingHtml = `<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--primary-color);"></i><p style="margin-top:12px;color:#666;">Fetching all attached files across ${docChain.length} document types...</p></div>`;
+  const loadingHtml = `<div style="text-align:center;padding:60px 30px;">
+    <div style="margin-bottom:30px;">
+      <span class="dots-spinner" style="display:inline-block;width:50px;height:50px;"></span>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:16px;font-weight:600;color:#2d3748;">Consolidating Files...</p>
+    <p style="margin:0;font-size:14px;color:#718096;">Fetching all attached files across ${docChain.length} document types...</p>
+  </div>`;
   window.openModal(
     "Consolidated Files — " + (r.pr_number || "Transaction"),
     loadingHtml,
@@ -8249,67 +8560,13 @@ function filterTripTickets(status) {
   });
 }
 
-// Page content loading overlay — simple spinner on blurry white
-function showPageLoader() {
-  console.log("[LOADER] Showing page loader...");
-  let overlay = document.getElementById("pageLoadingOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "pageLoadingOverlay";
-    overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;">
- <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #2b6cb0;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
- <div style="margin-top:12px;color:#718096;font-size:13px;">Loading...</div>
- </div>`;
-    Object.assign(overlay.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      right: "0",
-      bottom: "0",
-      background: "rgba(255,255,255,0.82)",
-      backdropFilter: "blur(2px)",
-      WebkitBackdropFilter: "blur(2px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: "100",
-      borderRadius: "8px",
-    });
-    const mainContent = document.querySelector(".main-content");
-    if (mainContent) {
-      mainContent.style.position = "relative";
-      mainContent.appendChild(overlay);
-      console.log("[LOADER] pageLoadingOverlay created and appended");
-    } else {
-      console.warn("[LOADER] ️ .main-content not found!");
-    }
-  }
-  overlay.style.display = "flex";
-  console.log("[LOADER] pageLoadingOverlay visible");
-
-  // Hide the fullscreen appLoader when page loader shows
-  const appLoader = document.getElementById("appLoader");
-  if (appLoader) {
-    appLoader.style.display = "none";
-    console.log("[LOADER] appLoader hidden, pageLoadingOverlay now showing");
-  } else {
-    console.warn("[LOADER] ️ appLoader not found to hide");
-  }
-}
-
-function hidePageLoader() {
-  console.log("[LOADER] Hiding page loader");
-  const overlay = document.getElementById("pageLoadingOverlay");
-  if (overlay) {
-    overlay.style.display = "none";
-    console.log("[LOADER] pageLoadingOverlay hidden");
-  }
-}
-
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
-  showPageLoader();
+  // FIX 2: Add 30s safety timeout for data loading
+  const dataLoadTimeout = setTimeout(() => {
+    console.warn("[LOADER] Data load timeout after 30s for page:", pageId);
+  }, 30000);
+
   try {
     switch (pageId) {
       case "dashboard":
@@ -8411,11 +8668,21 @@ async function loadPageData(pageId) {
         /* Static page with report generators */
         break;
     }
+  } catch (err) {
+    console.error("[PAGE-DATA] Error loading page data for", pageId, err);
+    if (pageId === "dashboard") {
+      console.log("[PAGE-DATA] Using fallback dashboard");
+    }
   } finally {
-    hidePageLoader();
+    clearTimeout(dataLoadTimeout);
+    // FIX 4: Hide loader when data load completes
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "none";
+    }
+    // Apply action permissions AFTER data has fully loaded into the DOM
+    applyActionPermissions();
   }
-  // Apply action permissions AFTER data has fully loaded into the DOM
-  applyActionPermissions();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8435,6 +8702,15 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     console.warn("[INIT] ️ appLoader element NOT found!");
   }
+
+  // FIX 1: Add safety timeout to hide stuck loader
+  const loaderSafetyTimeout = setTimeout(() => {
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader && appLoader.style.display !== "none") {
+      console.warn("[LOADER] Safety timeout: hiding stuck loader after 10s");
+      appLoader.style.display = "none";
+    }
+  }, 10000); // 10 second timeout
 
   // DOM Elements
   const loginOverlay = document.getElementById("loginOverlay");
@@ -8616,15 +8892,18 @@ document.addEventListener("DOMContentLoaded", () => {
       addTrackedListener(toggleSidebarBtn, "click", toggleSidebar);
     }
 
-    // Navigation
-    navItems.forEach((item) => {
-      addTrackedListener(item, "click", () => {
-        const page = item.dataset.page;
-        if (page) {
-          navigateTo(page);
+    // Navigation - Use event delegation on sidebar for persistent listeners
+    if (sidebar) {
+      sidebar.addEventListener("click", (e) => {
+        const navItem = e.target.closest(".nav-item[data-page]");
+        if (navItem) {
+          const page = navItem.dataset.page;
+          if (page) {
+            navigateTo(page);
+          }
         }
       });
-    });
+    }
 
     // Collapsible sidebar sections
     document
@@ -8701,6 +8980,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "roles:",
           currentUser.roles,
         );
+        clearTimeout(loaderSafetyTimeout);
         showApp();
         return;
       }
@@ -8714,6 +8994,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const appLoader = document.getElementById("appLoader");
     if (appLoader) appLoader.style.display = "none";
+    clearTimeout(loaderSafetyTimeout);
     console.log("[AUTH] No saved session - showing login screen");
   }
 
@@ -8729,66 +9010,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Show the main app
   function showApp() {
-    console.log("Showing main app");
-    if (loginOverlay) {
-      loginOverlay.classList.remove("visible");
-      loginOverlay.style.display = "";
-    }
-
-    // Ensure no stale modal overlay is blocking the UI
-    if (modalOverlay) {
-      modalOverlay.classList.remove("show");
-    }
-    // Remove any leftover sub-modal overlays from previous session
-    document
-      .querySelectorAll(
-        "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
-      )
-      .forEach((el) => el.remove());
-
-    // Update user info in sidebar
-    if (userNameEl) {
-      userNameEl.textContent = currentUser.name;
-    }
-    if (userRoleEl) {
-      const div = currentUser.department_code || currentUser.division || "";
-      const designation = currentUser.designation || "";
-      // Build role display — show designation if available, otherwise format roles
-      let roleText;
-      if (designation) {
-        roleText = designation;
-      } else {
-        roleText = (currentUser.roles || [currentUser.role])
-          .map((r) => formatRole(r))
-          .join(" / ");
+    try {
+      console.log("Showing main app");
+      if (loginOverlay) {
+        loginOverlay.classList.remove("visible");
+        loginOverlay.style.display = "";
       }
-      userRoleEl.textContent = roleText + (div ? " - " + div : "");
+
+      // Ensure no stale modal overlay is blocking the UI
+      if (modalOverlay) {
+        modalOverlay.classList.remove("show");
+      }
+      // Remove any leftover sub-modal overlays from previous session
+      document
+        .querySelectorAll(
+          "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
+        )
+        .forEach((el) => el.remove());
+
+      // Update user info in sidebar
+      if (userNameEl) {
+        userNameEl.textContent = currentUser.name;
+      }
+      if (userRoleEl) {
+        const div = currentUser.department_code || currentUser.division || "";
+        const designation = currentUser.designation || "";
+        // Build role display — show designation if available, otherwise format roles
+        let roleText;
+        if (designation) {
+          roleText = designation;
+        } else {
+          roleText = (currentUser.roles || [currentUser.role])
+            .map((r) => formatRole(r))
+            .join(" / ");
+        }
+        userRoleEl.textContent = roleText + (div ? " - " + div : "");
+      }
+      // Update avatar initials
+      const avatarEl = document.getElementById("userAvatarInitials");
+      if (avatarEl && currentUser.name) {
+        const parts = currentUser.name.trim().split(/\s+/);
+        const initials =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : parts[0].substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+
+      // Apply role-based visibility
+      applyRoleVisibility();
+
+      // Start real-time notification polling
+      startNotificationPolling();
+
+      // Connect to Socket.IO for real-time sync across all Electron clients
+      connectSocket();
+
+      // Navigate to previous page from hash/localStorage, or dashboard if none exists
+      navigateToFromHash();
+    } catch (err) {
+      console.error("[SHOWAPP] Error in showApp():", err);
+      // Hide loader on error to prevent stuck UI
+      const appLoader = document.getElementById("appLoader");
+      if (appLoader) appLoader.style.display = "none";
     }
-    // Update avatar initials
-    const avatarEl = document.getElementById("userAvatarInitials");
-    if (avatarEl && currentUser.name) {
-      const parts = currentUser.name.trim().split(/\s+/);
-      const initials =
-        parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : parts[0].substring(0, 2).toUpperCase();
-      avatarEl.textContent = initials;
-    }
-
-    // Apply role-based visibility
-    applyRoleVisibility();
-
-    // Start real-time notification polling
-    startNotificationPolling();
-
-    // Connect to Socket.IO for real-time sync across all Electron clients
-    connectSocket();
-
-    // Navigate to previous page from hash/localStorage, or dashboard if none exists
-    navigateToFromHash();
-
-    // NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
-    // This prevents the loader from disappearing before page content is ready
   }
 
   // Format role for display (As-Is Roles)
@@ -11036,6 +11321,12 @@ document.addEventListener("DOMContentLoaded", () => {
       pageTitle.textContent = pageTitles[pageId] || "Dashboard";
     }
 
+    // FIX 3: Show loader before loading data
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "flex";
+    }
+
     // Load data from API for this page (applyActionPermissions is called inside after data loads)
     loadPageData(pageId);
   }
@@ -11200,7 +11491,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    submitBtn.innerHTML = '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Saving...';
 
     try {
       const updated = await apiRequest("/auth/profile", "PUT", {
@@ -11320,7 +11611,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Disable button
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    submitBtn.innerHTML = '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Updating...';
 
     try {
       await apiRequest("/auth/change-password", "PUT", {
@@ -11350,8 +11641,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Show spinner on logout button
     if (logoutBtn) {
       logoutBtn.disabled = true;
-      logoutBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i><span>Logging out...</span>';
+      logoutBtn.innerHTML = 'Logging out... <span class="btn-loader"></span>';
     }
 
     // Log logout on server BEFORE clearing token
@@ -11842,7 +12132,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <i class="fas fa-paperclip" style="margin-right:4px;"></i> Attached Files
  </h4>
  <div id="${containerId}" style="min-height:30px;">
- <small style="color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading attachments...</small>
+ <small style="color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading attachments...</small>
  </div>
  </div>`;
   };
@@ -11870,7 +12160,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <div class="form-section-header"><i class="fas fa-paperclip"></i> Attachments</div>
  <div style="padding:12px 14px;border-bottom:1px solid var(--border-color);">
  <div id="${containerId}" style="margin-bottom:12px;">
- <small style="color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading existing attachments...</small>
+ <small style="color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading existing attachments...</small>
  </div>
  <div class="attachment-box" style="background:#f0f4ff;padding:10px;border-radius:6px;border:2px dashed #64b5f6;">
  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -11945,7 +12235,7 @@ document.addEventListener("DOMContentLoaded", () => {
  <button class="att-popover-close" onclick="document.getElementById('attPopover_${uid}').remove()"><i class="fas fa-times"></i></button>
  </div>
  <div class="att-popover-body" id="attPopList_${uid}">
- <div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+ <div style="text-align:center;padding:10px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</div>
  </div>
  <div class="att-popover-upload">
  <label class="att-upload-label">
@@ -12210,9 +12500,10 @@ document.addEventListener("DOMContentLoaded", () => {
  </div>
  <div class="form-group">
  <label>Fiscal Year <span class="text-danger">*</span></label>
- <select class="form-select" id="ppmpFiscalYear" required onchange="generatePPMPNumber()">
+ <select class="form-select" id="ppmpFiscalYear" required onchange="generatePPMPNumber(); updatePPMPDeadlineInfo()">
  ${getFiscalYearOptions("CY")}
  </select>
+ <div id="ppmpDeadlineInfo" style="margin-top: 6px; font-size: 12px; color: #666;"></div>
  </div>
  <div class="form-group">
  <label>End-User / Division <span class="text-danger">*</span></label>
@@ -15129,7 +15420,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     container.innerHTML =
-      '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+      '<span style="color:#888;font-size:13px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PR items...</span>';
     try {
       const prDetail = await apiRequest("/purchase-requests/" + prId);
       const items = prDetail.items || [];
@@ -17336,6 +17627,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     const fiscalYear =
       document.getElementById("ppmpFiscalYear")?.value ||
       new Date().getFullYear();
+
+    // Check deadline for PPMP creation
+    const deadlineCheck = checkPPMPDeadline(fiscalYear);
+    if (!deadlineCheck.allowed) {
+      alert(deadlineCheck.message);
+      return;
+    }
+
     const division =
       document.getElementById("ppmpDivisionSelect")?.value ||
       document.querySelector('input[name="division"]')?.value ||
@@ -17914,7 +18213,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("ppmpNonPSDBMTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      '<tr><td colspan="9" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -17969,7 +18268,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("papTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading PAP data...</td></tr>';
+      '<tr><td colspan="8" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PAP data...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -20540,10 +20839,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "IAR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
+      procurement_source: si.procurement_source || si.item_procurement_source || 'NON PS-DBM',
     }));
 
     if (!confirm("Are you sure you want to complete this IAR?")) return;
@@ -26705,7 +27005,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             const itemDesc = it.item_description
               ? it.item_description
               : (descLines.length > 0 ? descLines[0] : '-');
-            const itemUnit = it.item_unit || '-';
+            const itemUnit = it.unit || it.item_unit || '-';
 
             return (
               "<tr>" +
@@ -26915,7 +27215,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               <td>${d.signer || "-"}</td>
               <td>
                 <div id="pktAtt_${d.key}" style="min-height:28px;">
-                  ${d.id ? '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
+                  ${d.id ? '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
                 </div>
               </td>
               <td>
@@ -27078,10 +27378,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const cellContainer = document.getElementById("pktCell_" + key);
     if (modalContainer)
       modalContainer.innerHTML =
-        '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
     if (cellContainer)
       cellContainer.innerHTML =
-        '<span class="pkt-cell-loading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span class="pkt-cell-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
 
     const formData = new FormData();
     formData.append("entity_type", entityType);
@@ -27296,6 +27596,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div style="font-size:13px;font-weight:600;">Select document to print for ${coa.submission_number || ""}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;background:#e8f5e9;" onclick="coaDownloadMergedProc(${coaId})">
+          <i class="fas fa-file-pdf" style="color:#388e3c;margin-right:8px;"></i> <strong>Merged: PR to IAR (All Procurement Docs)</strong>
+        </button>
+        <hr style="margin:8px 0;border:none;border-top:1px solid #ddd;">
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 1)">
           <i class="fas fa-file-export" style="color:#1565c0;margin-right:8px;"></i> Step 1: Transmittal – Purchase Order
         </button>
@@ -27306,14 +27610,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           <i class="fas fa-clipboard-check" style="color:#1565c0;margin-right:8px;"></i> Step 3: Transmittal – IAR
         </button>
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintAllDocs(${coaId})">
-          <i class="fas fa-print" style="color:#388e3c;margin-right:8px;"></i> Print All 3 Documents
+          <i class="fas fa-print" style="color:#1565c0;margin-right:8px;"></i> Print All 3 COA Documents
         </button>
       </div>
       <div style="text-align:right;margin-top:16px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       </div>
     `;
-    openModal("Print COA Documents", html);
+    openModal("Print & Download COA Documents", html);
   };
 
   /**
@@ -27410,6 +27714,52 @@ Failure to submit the above requirements within the prescribed period shall cons
       title: toFilename(title),
       editable: true,
     });
+  };
+
+  /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
   };
 
   /**
@@ -29382,7 +29732,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewItemModal = async function (itemId) {
     openModal(
       "Item Details",
-      '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>',
+      '<div class="view-details"><p style="padding:12px;color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</p></div>',
     );
     try {
       const item = await apiRequest("/items/" + itemId);
@@ -31021,7 +31371,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Build a complete print-ready HTML document
    */
-  function buildPrintHTML(title, bodyContent, footerHTML) {
+  function buildPrintHTML(title, bodyContent, footerHTML, options = {}) {
     const defaultFooter = `<p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString("en-PH")}</p>`;
     const footerContent = footerHTML || defaultFooter;
     return `<!DOCTYPE html>
@@ -31061,15 +31411,79 @@ Failure to submit the above requirements within the prescribed period shall cons
             .report-date { text-align: center; margin-bottom: 10px; color: #666; font-size: 9px; }
             .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
             @page { margin: 8mm; background: white !important; }
+            .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; display: block; background: white !important; }
+            .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+            .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
+            .iar-main-table .no-border-lr { border-left: none; border-right: none; }
+            .iar-main-table .no-border { border: none; }
+            .iar-items-table { width: 100%; border-collapse: collapse; }
+            .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
+            .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
+            .iar-check {
+              appearance: none;
+              -webkit-appearance: none;
+              width: 14px;
+              height: 14px;
+              border: 1.5px solid #000000;
+              background-color: #ffffff;
+              cursor: pointer;
+              vertical-align: middle;
+              margin-right: 4px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+            }
+
+            .iar-check:checked {
+              background-color: #000000;
+              border-color: #000000;
+            }
+
+            .iar-check:checked::after {
+              content: "";
+              position: absolute;
+              width: 4px;
+              height: 8px;
+              border: 2px solid #ffffff;
+              border-top: none;
+              border-left: none;
+              transform: rotate(45deg) translate(-1px, -1px);
+            }
+
+            .iar-label { font-size: 9px; }
+            .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
+
+            /* === Print-specific styles for IAR === */
+            @media print {
+              .iar-check {
+                appearance: none;
+                -webkit-appearance: none;
+                background-color: #ffffff;
+                border-color: #000000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              .iar-check:checked {
+                background-color: #000000 !important;
+                border-color: #000000 !important;
+              }
+
+              .iar-check:checked::after {
+                background-color: #000000 !important;
+                border-color: #ffffff !important;
+              }
+            }
 
             /* === Repeating header on every printed page === */
             .page-wrapper { display: table; width: 100%; background: white !important; }
             .page-header-group { display: table-header-group; background: white !important; }
-            .page-header-group > tr > td { border: none; padding: 0 15px; background: white !important; }
+            .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; background: white !important; }
             .page-body-group { display: table-row-group; background: white !important; }
             .page-body-group > tr > td { border: none; padding: 0 15px; background: white !important; }
             .page-footer-group { display: table-footer-group; background: white !important; }
-            .page-footer-group > tr > td { border: none; padding: 0 15px; background: white !important; }
+            .page-footer-group > tr > td { border: none; padding: 0 15px 15px 15px; background: white !important; }
 
             /* Reset inner tables so they keep their borders */
             .page-body-group table th,
@@ -31079,7 +31493,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <body>
           <table class="page-wrapper">
             <thead class="page-header-group">
-              <tr><td>${getPrintHeaderHTML()}</td></tr>
+              <tr><td>${options.noHeader ? '' : getPrintHeaderHTML()}</td></tr>
             </thead>
             <tfoot class="page-footer-group">
               <tr><td>
@@ -31171,21 +31585,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accComplete = iar.acceptance === "complete" ? "checked" : "";
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
-      const bodyContent = `
-        <style>
-          .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
-          .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
-          .iar-main-table .no-border-lr { border-left: none; border-right: none; }
-          .iar-main-table .no-border { border: none; }
-          .iar-items-table { width: 100%; border-collapse: collapse; }
-          .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
-          .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
-          .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
-          .iar-label { font-size: 9px; }
-          .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
-        </style>
+      // Extract fund cluster code from IAR data
+      const fundClusterCode = iar.fund_cluster || "N/A";
 
-        <!-- Appendix 62 label -->
+      const bodyContent = `
         <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
         <!-- Main Title -->
@@ -31195,7 +31598,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Entity Name / Fund Cluster row -->
           <tr>
             <td colspan="2" style="font-size:9px;"><strong>Entity Name:</strong> DMW Regional Office XIII (Caraga)</td>
-            <td colspan="2" style="font-size:9px;"><strong>Fund Cluster:</strong> _______________</td>
+            <td colspan="2" style="font-size:9px;"><strong>Fund Cluster:</strong> ${fundClusterCode}</td>
           </tr>
 
           <!-- Row: Supplier | IAR No. -->
@@ -31217,7 +31620,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           <!-- Row: Requisitioning Office/Dept. | Invoice No. -->
           <tr>
             <td style="font-size:9px;"><strong>Requisitioning Office/Dept.:</strong></td>
-            <td style="font-size:9px;">${iar.purpose || ""}</td>
+            <td style="font-size:9px;">${iar.requisitioning_office || iar.dept_name || ""}</td>
             <td style="font-size:9px;"><strong>Invoice No.:</strong></td>
             <td style="font-size:9px;">${iar.invoice_number || ""}${iar.invoice_date ? " / " + fmtDate(iar.invoice_date) : ""}</td>
           </tr>
@@ -31290,13 +31693,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           <tr>
             <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
-                <strong>${iar.inspected_by_name || ""}</strong>
+                <strong>${iar.inspected_by_name || iar.inspector_name || ""}</strong>
               </div>
               <div style="font-size:8px; margin-top:2px;">Inspection Officer/Inspection Committee</div>
             </td>
             <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
               <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
-                <strong>${iar.received_by_name || ""}</strong>
+                <strong>${iar.received_by_name || iar.property_custodian || ""}</strong>
               </div>
               <div style="font-size:8px; margin-top:2px;">Supply and/or Property Custodian</div>
             </td>
@@ -31304,7 +31707,14 @@ Failure to submit the above requirements within the prescribed period shall cons
         </table>
       `;
 
-      const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
+      const wrappedBody = `
+        <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
+          ${getPrintHeaderHTML()}
+          ${bodyContent}
+        </div>
+      `;
+
+      const html = buildPrintHTML("IAR - " + iar.iar_number, wrappedBody, null, { noHeader: true });
       openPrintPreview(html, {
         title: toFilename("IAR_" + iar.iar_number),
         editable: true,
@@ -36345,7 +36755,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     container.innerHTML =
-      '<span style="color:#888;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading PR items...</span>';
+      '<span style="color:#888;font-size:13px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PR items...</span>';
     try {
       const prDetail = await apiRequest("/purchase-requests/" + prId);
       const items = prDetail.items || [];
@@ -39084,7 +39494,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("ppmpNonPSDBMTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      '<tr><td colspan="9" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -39139,7 +39549,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("papTableBody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading PAP data...</td></tr>';
+      '<tr><td colspan="8" class="text-center"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading PAP data...</td></tr>';
     try {
       const yearFilter = document.getElementById("ppmpYearFilter");
       const fy = yearFilter ? yearFilter.value : String(getCurrentFiscalYear());
@@ -41713,10 +42123,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "IAR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_cost: si.unit_price || 0,
       category: si.item_category || "general",
+      procurement_source: si.procurement_source || si.item_procurement_source || 'NON PS-DBM',
     }));
 
     if (!confirm("Are you sure you want to complete this IAR?")) return;
@@ -46531,14 +46942,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="gov-dialog" style="max-width:400px;text-align:center;">
  <div class="gov-dialog-header confirm">
  <i class="fas fa-cog fa-spin"></i>
- <h4>Consolidating...</h4>
+ <h4 style="margin:0;">Consolidating...</h4>
  </div>
- <div class="gov-dialog-body" style="padding:30px;">
- <div style="margin-bottom:15px;">
- <i class="fas fa-spinner fa-spin" style="font-size:36px;color:#1a365d;"></i>
+ <div class="gov-dialog-body" style="padding:60px 30px;">
+ <div style="margin-bottom:30px;">
+ <span class="dots-spinner" style="display:inline-block;width:50px;height:50px;"></span>
  </div>
- <p style="margin:0;color:#4a5568;font-size:14px;">Processing approved PPMP entries for FY ${fy}...</p>
- <p style="margin:8px 0 0 0;color:#a0aec0;font-size:12px;">Please wait while entries are being consolidated.</p>
+ <p style="margin:0 0 8px 0;color:#2d3748;font-size:14px;font-weight:600;">Processing approved PPMP entries...</p>
+ <p style="margin:0;color:#718096;font-size:13px;">Fiscal Year ${fy}</p>
  </div>
  </div>
  `;
@@ -48101,7 +48512,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             const itemDesc = it.item_description
               ? it.item_description
               : (descLines.length > 0 ? descLines[0] : '-');
-            const itemUnit = it.item_unit || '-';
+            const itemUnit = it.unit || it.item_unit || '-';
 
             return (
               "<tr>" +
@@ -48143,7 +48554,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="detail-row"><label>Supplier:</label><span>${i.supplier_name || "-"}</span></div>
  <div class="detail-row"><label>Invoice No.:</label><span>${i.invoice_number || "-"}</span></div>
 <div class="detail-row"><label>Purpose:</label><span>${i.purpose || i.po_purpose || "-"}</span></div>
-<div class="detail-row"><label>Req. Office:</label><span>${i.requisitioning_office || "-"}</span></div>
+<div class="detail-row"><label>Req. Office:</label><span>${i.dept_name || i.requisitioning_office || "-"}</span></div>
  <div class="detail-row"><label>Status:</label><span>${viewStatusBadge(i.status)}</span></div>
  <div class="detail-row" style="align-items:flex-start;"><label>Item Specifications:</label><span>${specsHtml}</span></div>
  </div>
@@ -48311,7 +48722,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <td>${d.signer || "-"}</td>
  <td>
  <div id="pktAtt_${d.key}" style="min-height:28px;">
- ${d.id ? '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
+ ${d.id ? '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</span>' : '<span style="color:#999; font-size:11px;">—</span>'}
  </div>
  </td>
  <td>
@@ -48474,10 +48885,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const cellContainer = document.getElementById("pktCell_" + key);
     if (modalContainer)
       modalContainer.innerHTML =
-        '<span style="color:#999; font-size:11px;"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span style="color:#999; font-size:11px;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
     if (cellContainer)
       cellContainer.innerHTML =
-        '<span class="pkt-cell-loading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>';
+        '<span class="pkt-cell-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Uploading...</span>';
 
     const formData = new FormData();
     formData.append("entity_type", entityType);
@@ -48806,6 +49217,52 @@ Failure to submit the above requirements within the prescribed period shall cons
       title: toFilename(title),
       editable: true,
     });
+  };
+
+  /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
   };
 
   /**
@@ -50852,7 +51309,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showViewItemModal = async function (itemId) {
     openModal(
       "Item Details",
-      '<div class="view-details"><p style="padding:12px;color:#888;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>',
+      '<div class="view-details"><p style="padding:12px;color:#888;"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</p></div>',
     );
     try {
       const item = await apiRequest("/items/" + itemId);
@@ -52457,7 +52914,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Build a complete print-ready HTML document
    */
-  function buildPrintHTML(title, bodyContent, footerHTML) {
+  function buildPrintHTML(title, bodyContent, footerHTML, options = {}) {
     const defaultFooter = `<p>Generated by DMW Caraga Procurement System | ${new Date().toLocaleString("en-PH")}</p>`;
     const footerContent = footerHTML || defaultFooter;
     return `<!DOCTYPE html>
@@ -52494,15 +52951,26 @@ Failure to submit the above requirements within the prescribed period shall cons
  .report-date { text-align: center; margin-bottom: 10px; color: #666; font-size: 9px; }
  .mode-badge, .status-badge { font-size: 7px; padding: 1px 4px; border-radius: 2px; display: inline-block; }
  @page { margin: 8mm; }
+ .iar-doc-wrapper { border: 2px solid #333; padding: 14px; box-sizing: border-box; display: block; background: white !important; }
+ .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+ .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
+ .iar-main-table .no-border-lr { border-left: none; border-right: none; }
+ .iar-main-table .no-border { border: none; }
+ .iar-items-table { width: 100%; border-collapse: collapse; }
+ .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
+ .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
+ .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
+ .iar-label { font-size: 9px; }
+ .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
 
  /* === Repeating header on every printed page === */
  .page-wrapper { display: table; width: 100%; }
  .page-header-group { display: table-header-group; }
- .page-header-group > tr > td { border: none; padding: 0 15px; }
+ .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; }
  .page-body-group { display: table-row-group; }
  .page-body-group > tr > td { border: none; padding: 0 15px; }
  .page-footer-group { display: table-footer-group; }
- .page-footer-group > tr > td { border: none; padding: 0 15px; }
+ .page-footer-group > tr > td { border: none; padding: 0 15px 15px 15px; }
 
  /* Reset inner tables so they keep their borders */
  .page-body-group table th,
@@ -52512,7 +52980,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <body>
  <table class="page-wrapper">
  <thead class="page-header-group">
- <tr><td>${getPrintHeaderHTML()}</td></tr>
+ <tr><td>${options.noHeader ? '' : getPrintHeaderHTML()}</td></tr>
  </thead>
  <tfoot class="page-footer-group">
  <tr><td>
@@ -52605,19 +53073,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       const accPartial = iar.acceptance === "partial" ? "checked" : "";
 
       const bodyContent = `
- <style>
- .iar-main-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
- .iar-main-table td { border: 1px solid #333; padding: 2px 5px; font-size: 9px; vertical-align: top; }
- .iar-main-table .no-border-lr { border-left: none; border-right: none; }
- .iar-main-table .no-border { border: none; }
- .iar-items-table { width: 100%; border-collapse: collapse; }
- .iar-items-table th { border: 1px solid #333; padding: 4px 5px; font-size: 8px; font-weight: bold; text-align: center; background: #fff; }
- .iar-items-table td { border: 1px solid #333; padding: 3px 5px; font-size: 9px; }
- .iar-check { width: 13px; height: 13px; margin-right: 4px; vertical-align: middle; cursor: pointer; }
- .iar-label { font-size: 9px; }
- .iar-sig-line { border-bottom: 1px solid #333; min-width: 180px; display: inline-block; text-align: center; }
- </style>
-
  <!-- Appendix 62 label -->
  <div style="text-align:right; font-style:italic; font-size:10px; margin-bottom:2px;">Appendix 62</div>
 
@@ -52650,7 +53105,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <!-- Row: Requisitioning Office/Dept. | Invoice No. -->
  <tr>
  <td style="font-size:9px;"><strong>Requisitioning Office/Dept.:</strong></td>
- <td style="font-size:9px;">${iar.purpose || ""}</td>
+ <td style="font-size:9px;">${iar.requisitioning_office || iar.dept_name || ""}</td>
  <td style="font-size:9px;"><strong>Invoice No.:</strong></td>
  <td style="font-size:9px;">${iar.invoice_number || ""}${iar.invoice_date ? " / " + fmtDate(iar.invoice_date) : ""}</td>
  </tr>
@@ -52723,13 +53178,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  <tr>
  <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
  <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
- <strong>${iar.inspected_by_name || ""}</strong>
+ <strong>${iar.inspected_by_name || iar.inspector_name || ""}</strong>
  </div>
  <div style="font-size:8px; margin-top:2px;">Inspection Officer/Inspection Committee</div>
  </td>
  <td colspan="2" style="text-align:center; padding:8px 10px; border-top:none; vertical-align:bottom; height:60px;">
  <div style="border-bottom:1px solid #333; margin:0 30px; padding-bottom:2px; min-height:20px;">
- <strong>${iar.received_by_name || ""}</strong>
+ <strong>${iar.received_by_name || iar.property_custodian || ""}</strong>
  </div>
  <div style="font-size:8px; margin-top:2px;">Supply and/or Property Custodian</div>
  </td>
@@ -52737,7 +53192,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  </table>
  `;
 
-      const html = buildPrintHTML("IAR - " + iar.iar_number, bodyContent);
+      const wrappedBody = `
+ <div style="border: 2px solid #333; padding: 14px; box-sizing: border-box;">
+ ${getPrintHeaderHTML()}
+ ${bodyContent}
+ </div>
+ `;
+
+      const html = buildPrintHTML("IAR - " + iar.iar_number, wrappedBody, null, { noHeader: true });
       openPrintPreview(html, {
         title: toFilename("IAR_" + iar.iar_number),
         editable: true,
@@ -56896,8 +57358,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (loginBtn) {
       loginBtn.disabled = true;
-      loginBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+      loginBtn.innerHTML = 'Signing in... <span class="btn-loader"></span>';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -56944,6 +57405,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Use showApp() which handles overlay, user info, RBAC, and navigation
       showApp();
+
+      // Explicitly navigate to dashboard after login
+      setTimeout(() => navigateTo('dashboard'), 500);
     } catch (err) {
       console.error("Login error:", err);
       if (loginError) {
@@ -57121,8 +57585,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (signupBtn) {
       signupBtn.disabled = true;
-      signupBtn.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+      signupBtn.innerHTML = 'Creating account... <span class="btn-loader"></span>';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
@@ -57178,6 +57641,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         sessionStorage.setItem("dmw_token", data.token);
         sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
         showApp();
+        // Explicitly navigate to dashboard after signup
+        navigateTo('dashboard');
       }, 1500);
     } catch (err) {
       console.error("Signup error:", err);
@@ -57243,7 +57708,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Show loading on first load
     if (notificationsCache.length === 0) {
       listEl.innerHTML =
-        '<div class="notif-loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+        '<div class="notif-loading"><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading...</div>';
     }
 
     try {
@@ -58103,7 +58568,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Current Stock Levels Report",
       `
  <div class="view-details">
- <div id="stockLevelReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading stock data...</p></div>
+ <div id="stockLevelReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading stock data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('StockLevels', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58153,7 +58618,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Property Accountability Report",
       `
  <div class="view-details">
- <div id="propAcctReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading property data...</p></div>
+ <div id="propAcctReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading property data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('PropertyAccountability', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58179,7 +58644,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "ICS Summary Report",
       `
  <div class="view-details">
- <div id="icsReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading ICS data...</p></div>
+ <div id="icsReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading ICS data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('ICSSummary', 'excel')"><i class="fas fa-file-download"></i> Export</button>
@@ -58205,7 +58670,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Low Stock / Reorder Alert Report",
       `
  <div class="view-details">
- <div id="lowStockReportContent"><p><i class="fas fa-spinner fa-spin"></i> Loading low stock data...</p></div>
+ <div id="lowStockReportContent"><p><span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Loading low stock data...</p></div>
  <div class="modal-actions">
  <button class="btn btn-secondary" onclick="closeModal()">Close</button>
  <button class="btn btn-primary" onclick="downloadReport('LowStock', 'excel')"><i class="fas fa-file-download"></i> Export</button>
