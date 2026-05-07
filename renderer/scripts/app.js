@@ -2117,55 +2117,27 @@ function updatePPMPBudgetSummary(budgetSummary) {
   // Calculate budget percentage
   const budgetPercentage = ppmpBudget > 0 ? (availableBudget / ppmpBudget) * 100 : 0;
 
-  // Determine status and color
-  let statusBadge = "";
+  // Determine status color (for text-only display)
   let statusColor = "#28a745";
 
   if (availableBudget === 0) {
-    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
     statusColor = "#c53030";
   } else if (budgetPercentage < 10) {
-    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
     statusColor = "#f6ad55";
   } else if (budgetPercentage < 25) {
-    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
     statusColor = "#ed8936";
   } else {
-    statusBadge = '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
     statusColor = "#38a169";
   }
 
-  // Update the available budget display
-  elAvailableBudget.innerHTML = "₱" + availableBudget.toLocaleString("en-PH", { minimumFractionDigits: 2 }) + statusBadge;
+  // Update the available budget display (text only, no badge or progress bar)
+  elAvailableBudget.innerHTML = "₱" + availableBudget.toLocaleString("en-PH", { minimumFractionDigits: 2 });
   elAvailableBudget.style.color = statusColor;
 
   // Update card border color
   const cardEl = elAvailableBudget.closest(".summary-card");
   if (cardEl) {
     cardEl.style.borderLeftColor = statusColor;
-  }
-
-  // Add/update progress bar visual indicator
-  let progressBarHtml = "";
-  if (ppmpBudget > 0) {
-    progressBarHtml = `<div style="margin-top:8px;background:#e2e8f0;border-radius:3px;height:4px;overflow:hidden;">
- <div style="background:${statusColor};height:100%;width:${Math.min(budgetPercentage, 100)}%;transition:width 0.3s ease;"></div>
- </div>`;
-  }
-
-  if (cardEl) {
-    // Remove all old progress bars
-    const allProgressBars = cardEl.querySelectorAll(".ppmp-budget-progress-bar");
-    allProgressBars.forEach(bar => bar.remove());
-
-    // Add the new progress bar with updated color
-    if (progressBarHtml) {
-      const progressDiv = document.createElement("div");
-      progressDiv.className = "ppmp-budget-progress-bar";
-      progressDiv.style.marginTop = "8px";
-      progressDiv.innerHTML = progressBarHtml;
-      cardEl.appendChild(progressDiv);
-    }
   }
 
   // Update division budget breakdown with status badges
@@ -6235,66 +6207,32 @@ function updateAPPSummary(items, budgetSummary) {
         : 0;
 
     // Build the available budget display with status
-    let statusBadge = "";
     let statusColor = "#28a745";
 
     if (availableBudget === 0) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#c53030;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-xmark"></i> EXHAUSTED</span>';
       statusColor = "#c53030";
     } else if (budgetPercentage < 10) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#f6ad55;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> LOW</span>';
       statusColor = "#f6ad55";
     } else if (budgetPercentage < 25) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#ed8936;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-circle-exclamation"></i> CAUTION</span>';
       statusColor = "#ed8936";
     } else if (approvedPercentage >= 90) {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#38a169;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> OPTIMIZED</span>';
       statusColor = "#38a169";
     } else {
-      statusBadge =
-        '<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#28a745;color:#fff;border-radius:3px;font-size:10px;font-weight:600;"><i class="fas fa-check-circle"></i> HEALTHY</span>';
       statusColor = "#28a745";
     }
 
+    // Update available budget display (text only, no badge or progress bar)
     elAvailableBudget.innerHTML =
       "₱" +
       availableBudget.toLocaleString("en-PH", {
         minimumFractionDigits: 2,
-      }) +
-      statusBadge;
+      });
     elAvailableBudget.style.color = statusColor;
 
     // Update card border color
     const cardEl = elAvailableBudget.closest(".summary-card");
     if (cardEl) {
       cardEl.style.borderLeftColor = statusColor;
-    }
-
-    // Add progress bar visual indicator
-    let progressBarHtml = "";
-    if (overallAllocatedBudget > 0) {
-      progressBarHtml = `<div style="margin-top:8px;background:#e2e8f0;border-radius:3px;height:4px;overflow:hidden;">
- <div style="background:${statusColor};height:100%;width:${Math.min(approvedPercentage, 100)}%;transition:width 0.3s ease;"></div>
- </div>`;
-    }
-
-    if (cardEl) {
-      // ALWAYS remove ALL old progress bars first
-      const allProgressBars = cardEl.querySelectorAll(".budget-progress-bar");
-      allProgressBars.forEach(bar => bar.remove());
-
-      // Then add the NEW progress bar with updated color
-      if (progressBarHtml) {
-        const progressDiv = document.createElement("div");
-        progressDiv.className = "budget-progress-bar";
-        progressDiv.style.marginTop = "8px";
-        progressDiv.innerHTML = progressBarHtml;
-        cardEl.appendChild(progressDiv);
-      }
     }
   }
   if (elRemovedCount) elRemovedCount.textContent = removedCount;
