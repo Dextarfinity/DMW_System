@@ -5541,8 +5541,8 @@ app.delete('/api/trip-tickets/:id', authenticateToken, async (req, res) => {
 app.get('/api/po-packets/monitoring', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT 
-        pr.id as pr_id, 
+      SELECT DISTINCT ON (pr.id)
+        pr.id as pr_id,
         pr.pr_number, pr.status as pr_status,
         pr.purpose, pr.total_amount as pr_amount, pr.created_at as pr_created_at,
         pr_req.full_name as pr_requested_by_name, pr_app.full_name as pr_approved_by_name,
