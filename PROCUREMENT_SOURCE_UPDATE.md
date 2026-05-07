@@ -555,3 +555,160 @@ After completing all steps, give me:
 4. Confirmation that the dev server reflected the change in real time
 
 5. The Git push result (branch name, commit hash, remote URL)
+
+
+PLEASE CONTINUE WITH THESE BUGS FIXING
+
+@workspace @terminal
+
+I have three critical bugs to fix in my application related to the global loader.
+Fix all of them completely, then push the changes to GitHub.
+
+═══════════════════════════════════════════════════════════
+BUG SUMMARY
+═══════════════════════════════════════════════════════════
+
+BUG 1: Loader gets stuck forever on page refresh
+BUG 2: Cannot navigate to other pages after login or account creation
+BUG 3: Loader does NOT appear when navigating on a slow network connection
+
+═══════════════════════════════════════════════════════════
+STEP 1 — LOCATE THE GLOBAL LOADER
+═══════════════════════════════════════════════════════════
+
+Search the codebase for the GlobalLoader component and its loading state:
+
+grep -r "GlobalLoader" src/ --include=".tsx" --include=".ts" -l
+grep -r "isLoading|isFetching|appLoading|showLoader" src/ -l
+
+Identify:
+
+The loader component file (e.g., src/components/GlobalLoader.tsx)
+Where loading state is stored (Context, Redux, Zustand, local state)
+Where the loader is rendered (App.tsx, layout.tsx, _app.tsx, main.tsx)
+What triggers it ON and OFF
+═══════════════════════════════════════════════════════════
+STEP 2 — FIX BUG 1: LOADER STUCK FOREVER ON REFRESH
+═══════════════════════════════════════════════════════════
+
+Root cause: Loading state is set to true on app mount but never reset
+to false after the initial data/auth check completes on refresh.
+
+Fix requirements:
+
+Find where loading is initialized (likely useState(true) or a store default)
+
+Ensure there is a useEffect or equivalent that sets loading to FALSE after:
+
+Auth state is resolved (user is confirmed logged in or out)
+Initial data fetch completes (success OR error)
+Add a timeout safety net so loader never stays on longer than 10 seconds:
+
+useEffect(() => {
+const safetyTimeout = setTimeout(() => setIsLoading(false), 10000);
+return () => clearTimeout(safetyTimeout);
+}, []);
+
+If using React Router, confirm loader is NOT blocking on every route render
+
+If using Next.js, confirm loader is not stuck in a router.events handler
+
+═══════════════════════════════════════════════════════════
+STEP 3 — FIX BUG 2: CANNOT NAVIGATE AFTER LOGIN / SIGNUP
+═══════════════════════════════════════════════════════════
+
+Root cause: After login or account creation, the loading state or a redirect
+guard is preventing navigation. The app may be stuck waiting for a state update
+that never propagates, or a ProtectedRoute is blocking incorrectly.
+
+Fix requirements:
+
+Find the login and signup handlers and confirm they set isLoading to FALSE
+after the async operation completes (both success and catch/finally)
+
+Confirm the redirect after login fires AFTER state is updated:
+
+finally {
+setIsLoading(false);
+}
+
+Check for any ProtectedRoute or AuthGuard component:
+
+It must NOT redirect while auth state is still "loading/unknown"
+Pattern: if (isAuthLoading) return null; // wait, don't redirect yet
+Check React Router or Next.js router.push() / navigate() calls:
+
+They must be called after await resolves, not before
+Confirm no logic is eating the navigation silently (missing await,
+swallowed errors, double-redirects)
+Test: after login, user should land on the correct dashboard/home page
+
+═══════════════════════════════════════════════════════════
+STEP 4 — FIX BUG 3: LOADER NOT SHOWING ON SLOW NETWORK
+═══════════════════════════════════════════════════════════
+
+Root cause: Page/route transitions do not activate the global loader,
+so on slow connections the screen appears blank or frozen.
+
+Fix requirements:
+
+Hook into the router's navigation lifecycle to show/hide the loader:
+
+FOR React Router v6:
+Use a top-level component with useNavigation():
+const navigation = useNavigation();
+useEffect(() => {
+setIsLoading(navigation.state === "loading");
+}, [navigation.state]);
+FOR Next.js (pages router):
+In _app.tsx, use router events:
+router.events.on('routeChangeStart', () => setIsLoading(true));
+router.events.on('routeChangeComplete', () => setIsLoading(false));
+router.events.on('routeChangeError', () => setIsLoading(false));
+FOR Next.js (app router):
+Use a client component with usePathname() + useEffect to detect
+route changes and trigger the loader.
+
+Ensure the GlobalLoader component renders at the ROOT level above all
+routes so it overlays everything during transitions
+
+Test by throttling network in Chrome DevTools (Network tab → Slow 3G)
+and navigating between pages — loader must appear
+
+═══════════════════════════════════════════════════════════
+STEP 5 — VERIFY IN REAL TIME
+═══════════════════════════════════════════════════════════
+
+Confirm dev server is running. If not, start it:
+npm run dev
+
+Then verify all three fixes:
+
+✅ Refresh the page → loader appears briefly, then disappears (NOT stuck)
+✅ Login or create account → user is redirected to correct page
+✅ Throttle to Slow 3G in DevTools → loader appears on every page navigation
+
+If any check fails, diagnose and fix before proceeding.
+Check browser console for errors after each test.
+
+═══════════════════════════════════════════════════════════
+STEP 6 — COMMIT AND PUSH TO GITHUB
+═══════════════════════════════════════════════════════════
+
+Once all three bugs are confirmed fixed:
+
+git add .
+git status
+git commit -m "fix: resolve loader stuck on refresh, broken post-login navigation, and missing loader on slow network transitions"
+git push origin $(git rev-parse --abbrev-ref HEAD)
+
+═══════════════════════════════════════════════════════════
+STEP 7 — FINAL REPORT
+═══════════════════════════════════════════════════════════
+
+Provide a summary with:
+
+Every file that was changed — file path + what was changed and why
+The exact fix applied for each of the 3 bugs
+Confirmation that all 3 real-time tests passed
+Git push result: branch name, commit hash, remote URL
