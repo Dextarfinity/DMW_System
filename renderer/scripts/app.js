@@ -25318,7 +25318,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         po_id: parseInt(w.poId) || null,
         iar_id: parseInt(w.iarId) || null,
         submission_date: w.dates.step1 || today,
-        status: "pending_email",
+        status: "pending",
         documents_included: JSON.stringify({
           transmittal_po: {
             date: w.dates.step1 || today,
@@ -46610,7 +46610,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         po_id: parseInt(w.poId) || null,
         iar_id: parseInt(w.iarId) || null,
         submission_date: w.dates.step1 || today,
-        status: "pending_email",
+        status: "pending",
         documents_included: JSON.stringify({
           transmittal_po: {
             date: w.dates.step1 || today,
