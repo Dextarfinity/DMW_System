@@ -57908,13 +57908,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   }
 
-  // Start real-time polling (every 30 seconds)
+  // Socket.IO handles real-time updates (polling removed for better performance)
   function startNotificationPolling() {
     if (notificationPollTimer) clearInterval(notificationPollTimer);
     // Initial load
     pollNotificationCount();
-    // Poll every 30 seconds
-    notificationPollTimer = setInterval(pollNotificationCount, 30000);
+    // Real-time updates via Socket.IO listener - no polling needed
   }
 
   // Stop polling (on logout)
