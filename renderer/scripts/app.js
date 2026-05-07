@@ -27788,6 +27788,77 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
+  /**
+   * Merge all procurement attachments + 3 COA documents into single PDF
+   */
+  window.coaMergeAllFiles = async function () {
+    const w = window._coaWizard;
+    if (!w.poId) {
+      showNotification("No PO selected.", "warning");
+      return;
+    }
+
+    try {
+      showNotification("Collecting all procurement files... Please wait.", "info");
+
+      // Step 1: Fetch all procurement chain attachments
+      const chain = await apiRequest("/document-monitoring/" + w.poId + "/attachments");
+      const procAttIds = (chain || []).map((a) => a.id).filter(Boolean);
+
+      // Step 2: Fetch COA submission attachments if already submitted
+      let coaAttIds = [];
+      if (w.coaSubmissionId) {
+        try {
+          const coaAtts = await apiRequest(
+            "/attachments?record_type=coa_submission&record_id=" + w.coaSubmissionId
+          );
+          coaAttIds = (coaAtts || []).map((a) => a.id).filter(Boolean);
+        } catch (e) {}
+      }
+
+      const allIds = [...procAttIds, ...coaAttIds];
+
+      if (allIds.length === 0) {
+        showNotification(
+          "No files found in the procurement chain. Make sure documents are attached.",
+          "warning"
+        );
+        return;
+      }
+
+      showNotification(`Merging ${allIds.length} files into PDF...`, "info");
+
+      const response = await fetch(API_URL + "/attachments/merge-download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken || ""}`,
+        },
+        body: JSON.stringify({ attachmentIds: allIds }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Merge failed");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `COA_Complete_${w.submissionNumber || w.poData?.po_number || "Submission"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification(`Successfully merged ${allIds.length} files!`, "success");
+    } catch (err) {
+      console.error("COA merge error:", err);
+      showNotification("Merge failed: " + err.message, "error");
+    }
+  };
+
   // View Supplier Details
   window.showViewSupplierModal = async function (supplierId) {
     let s = {};
@@ -49307,6 +49378,77 @@ Failure to submit the above requirements within the prescribed period shall cons
       loadCOA();
     } catch (err) {
       showNotification("Delete failed: " + (err.message || err), "error");
+    }
+  };
+
+  /**
+   * Merge all procurement attachments + 3 COA documents into single PDF
+   */
+  window.coaMergeAllFiles = async function () {
+    const w = window._coaWizard;
+    if (!w.poId) {
+      showNotification("No PO selected.", "warning");
+      return;
+    }
+
+    try {
+      showNotification("Collecting all procurement files... Please wait.", "info");
+
+      // Step 1: Fetch all procurement chain attachments
+      const chain = await apiRequest("/document-monitoring/" + w.poId + "/attachments");
+      const procAttIds = (chain || []).map((a) => a.id).filter(Boolean);
+
+      // Step 2: Fetch COA submission attachments if already submitted
+      let coaAttIds = [];
+      if (w.coaSubmissionId) {
+        try {
+          const coaAtts = await apiRequest(
+            "/attachments?record_type=coa_submission&record_id=" + w.coaSubmissionId
+          );
+          coaAttIds = (coaAtts || []).map((a) => a.id).filter(Boolean);
+        } catch (e) {}
+      }
+
+      const allIds = [...procAttIds, ...coaAttIds];
+
+      if (allIds.length === 0) {
+        showNotification(
+          "No files found in the procurement chain. Make sure documents are attached.",
+          "warning"
+        );
+        return;
+      }
+
+      showNotification(`Merging ${allIds.length} files into PDF...`, "info");
+
+      const response = await fetch(API_URL + "/attachments/merge-download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken || ""}`,
+        },
+        body: JSON.stringify({ attachmentIds: allIds }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Merge failed");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `COA_Complete_${w.submissionNumber || w.poData?.po_number || "Submission"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification(`Successfully merged ${allIds.length} files!`, "success");
+    } catch (err) {
+      console.error("COA merge error:", err);
+      showNotification("Merge failed: " + err.message, "error");
     }
   };
 
