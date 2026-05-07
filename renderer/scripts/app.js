@@ -31576,9 +31576,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             /* === Repeating header on every printed page === */
             .page-wrapper { display: table; width: 100%; background: white !important; }
             .page-header-group { display: table-header-group; background: white !important; }
-            .page-header-group > tr > td { border: none; padding: 15px 15px 0 15px; background: white !important; }
+            .page-header-group > tr > td { border: none; padding: 8px 15px 0 15px; background: white !important; }
             .page-body-group { display: table-row-group; background: white !important; }
-            .page-body-group > tr > td { border: none; padding: 0 15px; background: white !important; }
+            .page-body-group > tr > td { border: none; padding: 6px 15px 0 15px; background: white !important; }
             .page-footer-group { display: table-footer-group; background: white !important; }
             .page-footer-group > tr > td { border: none; padding: 0 15px 15px 15px; background: white !important; }
 
