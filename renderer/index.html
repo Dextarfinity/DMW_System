@@ -8,18 +8,15 @@
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
  <title>Procurement Plan System</title>
-<<<<<<< HEAD
- <link rel="stylesheet" href="styles/main.css?v=20260506001">
-=======
  <link rel="stylesheet" href="styles/main.css?v=20260507001">
->>>>>>> 6be8244716866bbbcf23d1ed6e8927b290c5ec01
  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
- <!-- Global Loader - Simple Dots Spinner -->
- <div id="appLoader" style="display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.95);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
- <div class="loader" style="margin-bottom:20px;"></div>
- <div style="color:#1a365d;font-size:14px;font-weight:500;">Loading</div>
+ <!-- Fullscreen loader shown during session restore (prevents login flash on refresh) -->
+ <div id="appLoader" style="display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.82);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
+ <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #2b6cb0;border-radius:50%;animation:appSpin 0.8s linear infinite;"></div>
+ <div style="margin-top:12px;color:#718096;font-size:13px;">Loading...</div>
+ <style>@keyframes appSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
  </div>
  <div class="app-container">
  <!-- Sidebar -->

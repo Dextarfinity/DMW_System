@@ -8560,60 +8560,13 @@ function filterTripTickets(status) {
   });
 }
 
-// Page content loading overlay — simple spinner on blurry white
-function showPageLoader() {
-  console.log("[LOADER] Showing page loader...");
-  let overlay = document.getElementById("pageLoadingOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "pageLoadingOverlay";
-    overlay.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
- <div class="loader"></div>
- <div style="color:#1a365d;font-size:14px;font-weight:500;">Loading</div>
- </div>`;
-    Object.assign(overlay.style, {
-      position: "fixed",
-      top: "0",
-      left: "0",
-      right: "0",
-      bottom: "0",
-      background: "rgba(255,255,255,0.95)",
-      backdropFilter: "blur(3px)",
-      WebkitBackdropFilter: "blur(3px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: "8888",
-    });
-    document.body.appendChild(overlay);
-    console.log("[LOADER] pageLoadingOverlay created and appended");
-  }
-  overlay.style.display = "flex";
-  console.log("[LOADER] pageLoadingOverlay visible");
-
-  // Hide the fullscreen appLoader when page loader shows
-  const appLoader = document.getElementById("appLoader");
-  if (appLoader) {
-    appLoader.style.display = "none";
-    console.log("[LOADER] appLoader hidden, pageLoadingOverlay now showing");
-  } else {
-    console.warn("[LOADER] ️ appLoader not found to hide");
-  }
-}
-
-function hidePageLoader() {
-  console.log("[LOADER] Hiding page loader");
-  const overlay = document.getElementById("pageLoadingOverlay");
-  if (overlay) {
-    overlay.style.display = "none";
-    console.log("[LOADER] pageLoadingOverlay hidden");
-  }
-}
-
 // Load all data when navigating to a page
 async function loadPageData(pageId) {
-  showPageLoader();
+  // FIX 2: Add 30s safety timeout for data loading
+  const dataLoadTimeout = setTimeout(() => {
+    console.warn("[LOADER] Data load timeout after 30s for page:", pageId);
+  }, 30000);
+
   try {
     switch (pageId) {
       case "dashboard":
@@ -8715,11 +8668,21 @@ async function loadPageData(pageId) {
         /* Static page with report generators */
         break;
     }
+  } catch (err) {
+    console.error("[PAGE-DATA] Error loading page data for", pageId, err);
+    if (pageId === "dashboard") {
+      console.log("[PAGE-DATA] Using fallback dashboard");
+    }
   } finally {
-    hidePageLoader();
+    clearTimeout(dataLoadTimeout);
+    // FIX 4: Hide loader when data load completes
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "none";
+    }
+    // Apply action permissions AFTER data has fully loaded into the DOM
+    applyActionPermissions();
   }
-  // Apply action permissions AFTER data has fully loaded into the DOM
-  applyActionPermissions();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8739,6 +8702,15 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     console.warn("[INIT] ️ appLoader element NOT found!");
   }
+
+  // FIX 1: Add safety timeout to hide stuck loader
+  const loaderSafetyTimeout = setTimeout(() => {
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader && appLoader.style.display !== "none") {
+      console.warn("[LOADER] Safety timeout: hiding stuck loader after 10s");
+      appLoader.style.display = "none";
+    }
+  }, 10000); // 10 second timeout
 
   // DOM Elements
   const loginOverlay = document.getElementById("loginOverlay");
@@ -8920,15 +8892,18 @@ document.addEventListener("DOMContentLoaded", () => {
       addTrackedListener(toggleSidebarBtn, "click", toggleSidebar);
     }
 
-    // Navigation
-    navItems.forEach((item) => {
-      addTrackedListener(item, "click", () => {
-        const page = item.dataset.page;
-        if (page) {
-          navigateTo(page);
+    // Navigation - Use event delegation on sidebar for persistent listeners
+    if (sidebar) {
+      sidebar.addEventListener("click", (e) => {
+        const navItem = e.target.closest(".nav-item[data-page]");
+        if (navItem) {
+          const page = navItem.dataset.page;
+          if (page) {
+            navigateTo(page);
+          }
         }
       });
-    });
+    }
 
     // Collapsible sidebar sections
     document
@@ -9005,6 +8980,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "roles:",
           currentUser.roles,
         );
+        clearTimeout(loaderSafetyTimeout);
         showApp();
         return;
       }
@@ -9018,6 +8994,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const appLoader = document.getElementById("appLoader");
     if (appLoader) appLoader.style.display = "none";
+    clearTimeout(loaderSafetyTimeout);
     console.log("[AUTH] No saved session - showing login screen");
   }
 
@@ -9033,66 +9010,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Show the main app
   function showApp() {
-    console.log("Showing main app");
-    if (loginOverlay) {
-      loginOverlay.classList.remove("visible");
-      loginOverlay.style.display = "";
-    }
-
-    // Ensure no stale modal overlay is blocking the UI
-    if (modalOverlay) {
-      modalOverlay.classList.remove("show");
-    }
-    // Remove any leftover sub-modal overlays from previous session
-    document
-      .querySelectorAll(
-        "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
-      )
-      .forEach((el) => el.remove());
-
-    // Update user info in sidebar
-    if (userNameEl) {
-      userNameEl.textContent = currentUser.name;
-    }
-    if (userRoleEl) {
-      const div = currentUser.department_code || currentUser.division || "";
-      const designation = currentUser.designation || "";
-      // Build role display — show designation if available, otherwise format roles
-      let roleText;
-      if (designation) {
-        roleText = designation;
-      } else {
-        roleText = (currentUser.roles || [currentUser.role])
-          .map((r) => formatRole(r))
-          .join(" / ");
+    try {
+      console.log("Showing main app");
+      if (loginOverlay) {
+        loginOverlay.classList.remove("visible");
+        loginOverlay.style.display = "";
       }
-      userRoleEl.textContent = roleText + (div ? " - " + div : "");
+
+      // Ensure no stale modal overlay is blocking the UI
+      if (modalOverlay) {
+        modalOverlay.classList.remove("show");
+      }
+      // Remove any leftover sub-modal overlays from previous session
+      document
+        .querySelectorAll(
+          "#papItemSelectOverlay, #ppmpCatalogItemOverlay, #ppmpEditCatalogItemOverlay, #risCatalogItemOverlay",
+        )
+        .forEach((el) => el.remove());
+
+      // Update user info in sidebar
+      if (userNameEl) {
+        userNameEl.textContent = currentUser.name;
+      }
+      if (userRoleEl) {
+        const div = currentUser.department_code || currentUser.division || "";
+        const designation = currentUser.designation || "";
+        // Build role display — show designation if available, otherwise format roles
+        let roleText;
+        if (designation) {
+          roleText = designation;
+        } else {
+          roleText = (currentUser.roles || [currentUser.role])
+            .map((r) => formatRole(r))
+            .join(" / ");
+        }
+        userRoleEl.textContent = roleText + (div ? " - " + div : "");
+      }
+      // Update avatar initials
+      const avatarEl = document.getElementById("userAvatarInitials");
+      if (avatarEl && currentUser.name) {
+        const parts = currentUser.name.trim().split(/\s+/);
+        const initials =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : parts[0].substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+
+      // Apply role-based visibility
+      applyRoleVisibility();
+
+      // Start real-time notification polling
+      startNotificationPolling();
+
+      // Connect to Socket.IO for real-time sync across all Electron clients
+      connectSocket();
+
+      // Navigate to previous page from hash/localStorage, or dashboard if none exists
+      navigateToFromHash();
+    } catch (err) {
+      console.error("[SHOWAPP] Error in showApp():", err);
+      // Hide loader on error to prevent stuck UI
+      const appLoader = document.getElementById("appLoader");
+      if (appLoader) appLoader.style.display = "none";
     }
-    // Update avatar initials
-    const avatarEl = document.getElementById("userAvatarInitials");
-    if (avatarEl && currentUser.name) {
-      const parts = currentUser.name.trim().split(/\s+/);
-      const initials =
-        parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : parts[0].substring(0, 2).toUpperCase();
-      avatarEl.textContent = initials;
-    }
-
-    // Apply role-based visibility
-    applyRoleVisibility();
-
-    // Start real-time notification polling
-    startNotificationPolling();
-
-    // Connect to Socket.IO for real-time sync across all Electron clients
-    connectSocket();
-
-    // Navigate to previous page from hash/localStorage, or dashboard if none exists
-    navigateToFromHash();
-
-    // NOTE: appLoader (fullscreen) will be hidden by showPageLoader() when data loading starts
-    // This prevents the loader from disappearing before page content is ready
   }
 
   // Format role for display (As-Is Roles)
@@ -11340,6 +11321,12 @@ document.addEventListener("DOMContentLoaded", () => {
       pageTitle.textContent = pageTitles[pageId] || "Dashboard";
     }
 
+    // FIX 3: Show loader before loading data
+    const appLoader = document.getElementById("appLoader");
+    if (appLoader) {
+      appLoader.style.display = "flex";
+    }
+
     // Load data from API for this page (applyActionPermissions is called inside after data loads)
     loadPageData(pageId);
   }
@@ -11654,8 +11641,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Show spinner on logout button
     if (logoutBtn) {
       logoutBtn.disabled = true;
-      logoutBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span><span>Logging out...</span>';
+      logoutBtn.innerHTML = 'Logging out... <span class="btn-loader"></span>';
     }
 
     // Log logout on server BEFORE clearing token
@@ -27610,6 +27596,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div style="font-size:13px;font-weight:600;">Select document to print for ${coa.submission_number || ""}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-outline" style="text-align:left;padding:12px 16px;background:#e8f5e9;" onclick="coaDownloadMergedProc(${coaId})">
+          <i class="fas fa-file-pdf" style="color:#388e3c;margin-right:8px;"></i> <strong>Merged: PR to IAR (All Procurement Docs)</strong>
+        </button>
+        <hr style="margin:8px 0;border:none;border-top:1px solid #ddd;">
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintCOADoc(${coaId}, 1)">
           <i class="fas fa-file-export" style="color:#1565c0;margin-right:8px;"></i> Step 1: Transmittal – Purchase Order
         </button>
@@ -27620,14 +27610,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           <i class="fas fa-clipboard-check" style="color:#1565c0;margin-right:8px;"></i> Step 3: Transmittal – IAR
         </button>
         <button class="btn btn-outline" style="text-align:left;padding:12px 16px;" onclick="coaPrintAllDocs(${coaId})">
-          <i class="fas fa-print" style="color:#388e3c;margin-right:8px;"></i> Print All 3 Documents
+          <i class="fas fa-print" style="color:#1565c0;margin-right:8px;"></i> Print All 3 COA Documents
         </button>
       </div>
       <div style="text-align:right;margin-top:16px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       </div>
     `;
-    openModal("Print COA Documents", html);
+    openModal("Print & Download COA Documents", html);
   };
 
   /**
@@ -27724,6 +27714,52 @@ Failure to submit the above requirements within the prescribed period shall cons
       title: toFilename(title),
       editable: true,
     });
+  };
+
+  /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
   };
 
   /**
@@ -49128,6 +49164,52 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
+   * Download merged PDF: All documents from Purchase Request to IAR
+   */
+  window.coaDownloadMergedProc = async function (coaId) {
+    try {
+      const allCoa = window._cachedCOA || [];
+      const coa = allCoa.find((c) => c.id === coaId) || {};
+      const filename = `Merged_PR_to_IAR_${coa.submission_number || coa.po_number || "COA"}`;
+
+      // Call backend to generate merged PDF of all procurement documents
+      const response = await fetch(
+        `${API_URL}/coa/${coaId}/download-merged-procurement?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download merged file");
+      }
+
+      // Get the PDF blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showNotification("Merged procurement document downloaded successfully", "success");
+      closeModal();
+    } catch (err) {
+      console.error("Download error:", err);
+      showNotification(
+        "Download failed. Backend merge endpoint may not be implemented yet.",
+        "error"
+      );
+    }
+  };
+
+  /**
    * Delete a COA submission
    */
   window.deleteCOASubmission = async function (coaId) {
@@ -57220,8 +57302,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (loginBtn) {
       loginBtn.disabled = true;
-      loginBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Signing in...';
+      loginBtn.innerHTML = 'Signing in... <span class="btn-loader"></span>';
     }
     if (loginError) loginError.style.display = "none";
 
@@ -57268,6 +57349,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Use showApp() which handles overlay, user info, RBAC, and navigation
       showApp();
+
+      // Explicitly navigate to dashboard after login
+      setTimeout(() => navigateTo('dashboard'), 500);
     } catch (err) {
       console.error("Login error:", err);
       if (loginError) {
@@ -57445,8 +57529,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Disable button and show loading
     if (signupBtn) {
       signupBtn.disabled = true;
-      signupBtn.innerHTML =
-        '<span class="dots-spinner" style="display:inline-block;width:16px;height:16px;"></span> Creating account...';
+      signupBtn.innerHTML = 'Creating account... <span class="btn-loader"></span>';
     }
     if (signupError) signupError.style.display = "none";
     if (signupSuccess) signupSuccess.style.display = "none";
@@ -57502,6 +57585,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         sessionStorage.setItem("dmw_token", data.token);
         sessionStorage.setItem("dmw_user", JSON.stringify(currentUser));
         showApp();
+        // Explicitly navigate to dashboard after signup
+        navigateTo('dashboard');
       }, 1500);
     } catch (err) {
       console.error("Signup error:", err);
