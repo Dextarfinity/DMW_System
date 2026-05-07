@@ -27810,7 +27810,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (w.coaSubmissionId) {
         try {
           const coaAtts = await apiRequest(
-            "/attachments?record_type=coa_submission&record_id=" + w.coaSubmissionId
+            "/attachments/coa_submission/" + w.coaSubmissionId
           );
           coaAttIds = (coaAtts || []).map((a) => a.id).filter(Boolean);
         } catch (e) {}
@@ -49403,7 +49403,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (w.coaSubmissionId) {
         try {
           const coaAtts = await apiRequest(
-            "/attachments?record_type=coa_submission&record_id=" + w.coaSubmissionId
+            "/attachments/coa_submission/" + w.coaSubmissionId
           );
           coaAttIds = (coaAtts || []).map((a) => a.id).filter(Boolean);
         } catch (e) {}
