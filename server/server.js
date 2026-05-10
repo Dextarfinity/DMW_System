@@ -21,7 +21,7 @@ require('dotenv').config();
 // In Nov–Dec the ACTIVE fiscal year is next year (advance planning period).
 // ==============================================================================
 function getServerCurrentFY() {
-  return getServerCurrentFY();
+  return new Date().getFullYear();
 }
 function getServerActiveFY() {
   const now = new Date();
@@ -4049,7 +4049,7 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN users mem1_user ON mem1_user.employee_id = br.bac_member1_id
        LEFT JOIN users mem2_user ON mem2_user.employee_id = br.bac_member2_id
        LEFT JOIN users mem3_user ON mem3_user.employee_id = br.bac_member3_id
-       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)\${divisionCondition}
+       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY br.created_at DESC`,
       params
     );
@@ -7025,14 +7025,14 @@ async function runMigrations() {
       WHERE fiscal_year IS NULL
     `);
     if (backfillResult.rowCount > 0) {
-      console.log(\`[MIGRATION] Backfilled fiscal_year for \${backfillResult.rowCount} purchase requests\`);
+      console.log(`[MIGRATION] Backfilled fiscal_year for ${backfillResult.rowCount} purchase requests`);
     }
     // Second: backfill pr_date from created_at where missing
     const prDateResult = await pool.query(`
       UPDATE purchaserequests SET pr_date = created_at::DATE WHERE pr_date IS NULL
     `);
     if (prDateResult.rowCount > 0) {
-      console.log(\`[MIGRATION] Backfilled pr_date for \${prDateResult.rowCount} purchase requests\`);
+      console.log(`[MIGRATION] Backfilled pr_date for ${prDateResult.rowCount} purchase requests`);
     }
   } catch (e) { console.error('[MIGRATION] PR fiscal_year/pr_date backfill error:', e.message); }
 
