@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
  <meta charset="UTF-8">
@@ -741,6 +741,9 @@
  <input type="text" placeholder="Search PR...">
  </div>
  <div class="filter-group">
+ <select class="form-select" id="prYearFilter" onchange="filterPRTable()">
+ <!-- Populated dynamically -->
+ </select>
  <select class="form-select" id="prStatusFilter" onchange="filterPRTable()">
  <option value="">All Status</option>
  <option value="draft">Draft</option>
@@ -762,6 +765,7 @@
  <tr>
  <th>PR No.</th>
  <th>Date</th>
+ <th>FY</th>
  <th>Office/Section</th>
  <th>Item Description</th>
  <th>Quantity</th>
@@ -1816,6 +1820,14 @@
  <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
  <div class="form-title">Reports</div>
  <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
+ </div>
+
+ <div class="page-actions" style="margin-bottom:12px;">
+ <label style="font-weight:600;margin-right:8px;"><i class="fas fa-calendar-alt"></i> Report Fiscal Year:</label>
+ <select class="form-select" id="reportFiscalYear" style="width:180px;" onchange="onReportFiscalYearChange()">
+ <!-- Populated dynamically -->
+ </select>
+ <span id="reportFYNote" style="margin-left:12px;font-size:12px;color:#888;font-style:italic;"></span>
  </div>
 
  <div class="reports-grid">

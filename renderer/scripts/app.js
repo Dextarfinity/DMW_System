@@ -465,9 +465,69 @@ const CURRENT_DATE = new Date();
 let cachedUOMs = [];
 let cachedItemCategories = [];
 
-/** Get current fiscal year (same as calendar year for Philippine govt) */
+/**
+ * Get the CURRENT fiscal year for the Philippine government.
+ * Philippine government fiscal year = calendar year (Jan 1 – Dec 31).
+ * Always returns the actual current calendar year for display/filtering.
+ */
 function getCurrentFiscalYear() {
   return new Date().getFullYear();
+}
+
+/**
+ * Get the ACTIVE fiscal year for NEW document creation.
+ * In Nov–Dec, new PRs, PPMPs, and APP entries default to NEXT year
+ * because agencies prepare for the upcoming fiscal year in advance.
+ * In Jan–Oct, returns the current year.
+ */
+function getActiveFiscalYear() {
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1 = January
+  const year = now.getFullYear();
+  return month >= 11 ? year + 1 : year;
+}
+
+/**
+ * Get the fiscal year from a date string or Date object.
+ * For Philippine gov (Jan–Dec fiscal year), this is simply the calendar year.
+ */
+function getFiscalYearFromDate(date) {
+  if (!date) return getCurrentFiscalYear();
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return isNaN(d.getTime()) ? getCurrentFiscalYear() : d.getFullYear();
+}
+
+/** Get the currently selected fiscal year for report generation.
+ *  Falls back to getActiveFiscalYear() if the selector is absent. */
+function getReportFiscalYear() {
+  const sel = document.getElementById("reportFiscalYear");
+  return sel ? parseInt(sel.value) || getActiveFiscalYear() : getActiveFiscalYear();
+}
+
+/** Called when the user changes the reports fiscal year selector. */
+function onReportFiscalYearChange() {
+  const sel = document.getElementById("reportFiscalYear");
+  const note = document.getElementById("reportFYNote");
+  if (!sel || !note) return;
+  const fy = parseInt(sel.value);
+  const currentFY = getCurrentFiscalYear();
+  if (fy > currentFY) {
+    note.textContent = "Advance planning mode — showing next fiscal year data.";
+    note.style.color = "#e07b00";
+  } else if (fy === currentFY) {
+    note.textContent = "Current fiscal year.";
+    note.style.color = "#2b6cb0";
+  } else {
+    note.textContent = `Historical data — FY ${fy}.`;
+    note.style.color = "#888";
+  }
+  // Update all fiscal-year-display spans on the reports page to match selection
+  const reportsPage = document.getElementById("reports");
+  if (reportsPage) {
+    reportsPage.querySelectorAll(".fiscal-year-display").forEach(el => {
+      el.textContent = fy;
+    });
+  }
 }
 
 /** Get short month name e.g. "Jan", "Feb" */
@@ -477,13 +537,19 @@ function getCurrentMonthShort() {
   });
 }
 
-/** Generate fiscal year options for dropdowns (current year + previous 2 years) */
+/** Generate fiscal year options for dropdowns.
+ *  Always includes: next year (for Nov–Dec advance planning), current year, and 3 previous years.
+ *  The active fiscal year (getActiveFiscalYear()) is pre-selected by default.
+ */
 function getFiscalYearOptions(prefix = "FY", selectedYear = null) {
   const cy = getCurrentFiscalYear();
-  const sel = selectedYear || cy;
+  const activeFY = getActiveFiscalYear();
+  const sel = selectedYear !== null ? parseInt(selectedYear) : activeFY;
   let html = "";
-  for (let y = cy; y >= cy - 2; y--) {
-    html += `<option value="${y}" ${y === sel ? "selected" : ""}>${prefix} ${y}</option>`;
+  // Always show next year first (useful Nov–Dec for advance planning)
+  for (let y = cy + 1; y >= cy - 3; y--) {
+    const label = y === cy + 1 ? `${prefix} ${y} (Next FY)` : `${prefix} ${y}`;
+    html += `<option value="${y}" ${y === sel ? "selected" : ""}>${label}</option>`;
   }
   return html;
 }
@@ -623,21 +689,54 @@ function initAllStickyScrollbars() {
 
 // Wait for the DOM to load — populate ALL fiscal year spans & dynamic selects
 document.addEventListener("DOMContentLoaded", function () {
-  const currentYear = getCurrentFiscalYear();
+  // ── Inject Bidder Picker CSS ──────────────────────────────────────────────
+  const bpStyle = document.createElement("style");
+  bpStyle.textContent = `
+    .bidder-picker-wrap { position: relative; }
+    .bidder-mode-toggle {
+      font-size: 10px !important;
+      padding: 1px 5px !important;
+      border: 1px solid #bbb !important;
+      border-radius: 3px !important;
+      background: #f8f9fa !important;
+      cursor: pointer !important;
+      color: #333 !important;
+      height: 20px !important;
+    }
+    .bidder-mode-toggle:focus { outline: none; border-color: #2b6cb0 !important; }
+    .bidder-manual-input, .bidder-select-input {
+      width: 100% !important;
+      font-size: 11px !important;
+    }
+    .bidder-select-input { cursor: pointer; }
+  `;
+  document.head.appendChild(bpStyle);
+  // ── End Bidder Picker CSS ─────────────────────────────────────────────────
 
-  // Set all fiscal year spans (using class instead of duplicate IDs)
+  const currentYear = getCurrentFiscalYear();
+  const activeFY = getActiveFiscalYear();
+
+  // Set all fiscal year spans — show active FY (which may be next year in Nov–Dec)
   document.querySelectorAll(".fiscal-year-display").forEach((el) => {
-    el.textContent = currentYear;
+    el.textContent = activeFY;
   });
 
   // Also handle legacy id="year" (first one only)
   const yearEl = document.getElementById("year");
-  if (yearEl) yearEl.textContent = currentYear;
+  if (yearEl) yearEl.textContent = activeFY;
 
-  // Populate all dynamic fiscal year selects
+  // If we are in advance planning period (Nov–Dec), add a visible notice
+  if (activeFY !== currentYear) {
+    document.querySelectorAll(".fiscal-year-display").forEach((el) => {
+      el.title = `Advance planning period: showing FY ${activeFY}. Current calendar year is ${currentYear}.`;
+      el.style.cursor = "help";
+    });
+  }
+
+  // Populate all dynamic fiscal year selects (default to active FY)
   document.querySelectorAll(".dynamic-fy-select").forEach((sel) => {
     const prefix = sel.dataset.prefix || "FY";
-    sel.innerHTML = getFiscalYearOptions(prefix);
+    sel.innerHTML = getFiscalYearOptions(prefix, activeFY);
   });
 });
 
@@ -882,6 +981,36 @@ function userHasRole(r) {
 function userHasAnyRole(arr) {
   return (currentUser.roles || [currentUser.role]).some((r) => arr.includes(r));
 }
+
+/**
+ * isCurrentUserAffixedSignatory — checks if the logged-in user is one of
+ * the affixed signatories on a specific document record.
+ *
+ * @param {object} record        - The document row (PR, BAC Resolution, RIS, etc.)
+ * @param {object} opts
+ *   userFields    {string[]}  - Fields on the record that store a users.id
+ *   employeeFields{string[]}  - Fields on the record that store an employees.id
+ *
+ * Admins always pass. For non-admins the current user's id must match one of
+ * the userFields, OR their employee_id must match one of the employeeFields.
+ */
+function isCurrentUserAffixedSignatory(record, { userFields = [], employeeFields = [] } = {}) {
+  if (!currentUser) return false;
+  const roles = currentUser.roles || [currentUser.role];
+  if (roles.includes('admin')) return true;
+
+  const uid = String(currentUser.id || '');
+  const empId = String(currentUser.employee_id || '');
+
+  for (const f of userFields) {
+    if (record[f] && String(record[f]) === uid) return true;
+  }
+  for (const f of employeeFields) {
+    if (record[f] && empId && String(record[f]) === empId) return true;
+  }
+  return false;
+}
+
 // Get the user's chief role (if any) from the roles array
 function getUserChiefRole() {
   const chiefRoles = ["chief_fad", "chief_wrsd", "chief_mwpsd", "chief_mwptd"];
@@ -2726,10 +2855,30 @@ function updateAPPRowElement(row, item) {
 
 async function loadPR() {
   try {
+    // Build fiscal year filter param for the API call (filter server-side too)
+    const yearFilterEl = document.getElementById("prYearFilter");
+    const yearParam = yearFilterEl?.value ? "&fiscal_year=" + yearFilterEl.value : "";
     // FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
-    const pr = await apiRequest("/pr?_cache_bust=" + Date.now());
+    const pr = await apiRequest("/pr?_cache_bust=" + Date.now() + yearParam);
     console.log("[PR] Fresh data fetched from database");
     cachedPR = pr;
+
+    // Populate year filter dropdown if it's empty (first load)
+    if (yearFilterEl && yearFilterEl.options.length <= 1) {
+      const activeFY = getActiveFiscalYear();
+      const currentFY = getCurrentFiscalYear();
+      yearFilterEl.innerHTML = '<option value="">All Years</option>';
+      // Show next year, current year, and 3 previous years
+      for (let y = currentFY + 1; y >= currentFY - 3; y--) {
+        const label = y === currentFY + 1 ? `FY ${y} (Next)` : `FY ${y}`;
+        const opt = document.createElement("option");
+        opt.value = y;
+        opt.textContent = label;
+        // Default selection: active FY
+        if (y === activeFY) opt.selected = true;
+        yearFilterEl.appendChild(opt);
+      }
+    }
 
     // Chiefs should be locked to their division even if they have other roles
     const chiefRoles = [
@@ -2777,6 +2926,7 @@ async function loadPR() {
 function filterPRTable() {
   const statusVal = document.getElementById("prStatusFilter")?.value || "";
   const divVal = document.getElementById("prDivisionFilter")?.value || "";
+  const yearVal = document.getElementById("prYearFilter")?.value || "";
   let data = cachedPR;
 
   // Chiefs should be locked to their division even if they have other roles
@@ -2830,6 +2980,15 @@ function filterPRTable() {
         (r.department_code || "").toUpperCase() === divVal.toUpperCase() ||
         (r.department_name || "").toLowerCase().includes(divVal.toLowerCase()),
     );
+  // Filter by fiscal year: use fiscal_year column if present, else derive from pr_date or created_at
+  if (yearVal) {
+    const fyNum = parseInt(yearVal);
+    data = data.filter((r) => {
+      if (r.fiscal_year) return parseInt(r.fiscal_year) === fyNum;
+      const dateStr = r.pr_date || r.created_at;
+      return getFiscalYearFromDate(dateStr) === fyNum;
+    });
+  }
   renderPRTable(data);
 }
 
@@ -6592,6 +6751,7 @@ function renderPRTable(pr) {
       return `<tr>
  <td>${p.pr_number || ""}</td>
  <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ""}</td>
+ <td><span class="badge-fy">FY ${p.fiscal_year || getFiscalYearFromDate(p.pr_date || p.created_at)}</span></td>
  <td>${p.department_name || "DMW Caraga"}</td>
  <td>${descDisplay}</td>
  <td>${qty}</td>
@@ -6602,7 +6762,7 @@ function renderPRTable(pr) {
  <td>
  <div class="action-buttons">
  <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
- ${p.status === "pending_approval" ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditPRModal(${p.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printPR(${p.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PR', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -6685,6 +6845,7 @@ function renderRFQTable(rfq) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${r.status === "on_going" && hasPermission("canSendRFQ") ? `<button class="btn-icon success" data-action="approve-rfq" title="Complete RFQ" onclick="approveRFQRecord(${r.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6746,6 +6907,7 @@ function renderAbstractTable(abstract) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${a.status === "on_going" && hasPermission("canApproveAbstract") ? `<button class="btn-icon success" data-action="approve-abstract" title="Approve Abstract" onclick="approveAbstractRecord(${a.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6793,6 +6955,7 @@ function renderPostQualTable(postQual) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printTWGReport(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${p.status === "on_going" && hasPermission("canApprovePostQual") ? `<button class="btn-icon success" data-action="approve-postqual" title="Complete Post-Qualification" onclick="approvePostQualRecord(${p.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6841,6 +7004,7 @@ function renderBACResolutionTable(bacRes) {
  <button class="btn-icon" title="Print" onclick="printBACResolution(${b.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ""}
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${b.status === "on_going" && isCurrentUserAffixedSignatory(b, { userFields: ["hope_user_id"], employeeFields: ["hope_id"] }) ? `<button class="btn-icon success" data-action="approve-bacres" title="Approve / Complete" onclick="approveBACResolution(${b.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6889,6 +7053,7 @@ function renderNOATable(noa) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printNoticeOfAward(${n.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${n.status === "awaiting_noa" && hasPermission("canApproveNOA") ? `<button class="btn-icon success" data-action="approve-noa" title="Approve NOA" onclick="approveNOARecord(${n.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6937,6 +7102,7 @@ function renderPOTable(po) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printPurchaseOrder(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
+ ${p.status === "for_signing" && hasPermission("canApprovePO") ? `<button class="btn-icon success" data-action="approve-po" title="Approve / Sign PO" onclick="approvePORecord(${p.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6998,6 +7164,7 @@ function renderIARTable(iar) {
  <button class="btn-icon" title="Edit" onclick="showEditIARModal(${i.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printIAR(${i.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('IAR', ${i.id})"><i class="fas fa-trash"></i></button>
+ ${i.inspection_result !== "verified" && hasPermission("canApproveIAR") ? `<button class="btn-icon success" data-action="approve-iar" title="Accept & Verify IAR" onclick="approveIARRecord(${i.id})"><i class="fas fa-check"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -8068,7 +8235,7 @@ function renderRISTable(ris) {
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewRISModal(${r.id})"><i class="fas fa-eye"></i></button>
  <button class="btn-icon" title="Print" onclick="printRIS(${r.id})"><i class="fas fa-print"></i></button>
- ${r.status === "draft" ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ""}
+ ${r.status === "draft" && isCurrentUserAffixedSignatory(r, { userFields: ["approved_by_supply_id"] }) ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditRISModal(${r.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RIS', ${r.id})"><i class="fas fa-trash"></i></button>
  </div>
@@ -8665,7 +8832,25 @@ async function loadPageData(pageId) {
         await loadActivityLogs();
         break;
       case "reports":
-        /* Static page with report generators */
+        /* Initialize fiscal year selector for reports */
+        (function initReportsFYSelector() {
+          const sel = document.getElementById("reportFiscalYear");
+          if (!sel) return;
+          const activeFY = getActiveFiscalYear();
+          const currentFY = getCurrentFiscalYear();
+          if (sel.options.length <= 1) {
+            sel.innerHTML = "";
+            for (let y = currentFY + 1; y >= currentFY - 4; y--) {
+              const opt = document.createElement("option");
+              opt.value = y;
+              opt.textContent = y === currentFY + 1 ? `FY ${y} (Next)` : `FY ${y}`;
+              if (y === activeFY) opt.selected = true;
+              sel.appendChild(opt);
+            }
+          }
+          // Update the note label
+          onReportFiscalYearChange();
+        })();
         break;
     }
   } catch (err) {
@@ -12930,6 +13115,28 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  </div>
  </div>
+
+ <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+ <div class="form-boxed-section">
+   <div class="form-row">
+     <div class="form-group">
+       <label style="font-size:12px;">Requested By <small style="color:#666;">(Division Chief)</small></label>
+       <select id="prRequestedById" class="form-select" onchange="prFillSignatoryName('prRequestedById','prRequestedByName','prRequestedByDesig')">
+         <option value="">-- Select Employee --</option>
+       </select>
+       <input type="text" id="prRequestedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+       <input type="text" id="prRequestedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+     </div>
+     <div class="form-group">
+       <label style="font-size:12px;">Approved By <small style="color:#666;">(HoPE)</small></label>
+       <select id="prApprovedById" class="form-select" onchange="prFillSignatoryName('prApprovedById','prApprovedByName','prApprovedByDesig')">
+         <option value="">-- Select Employee --</option>
+       </select>
+       <input type="text" id="prApprovedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+       <input type="text" id="prApprovedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+     </div>
+   </div>
+ </div>
  <div class="form-group" style="text-align: right; margin-top: 20px;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
@@ -12940,6 +13147,25 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Purchase Request (PR)", html, {
       preventOutsideClose: true,
     });
+    // Load employees into signatory dropdowns
+    (async () => {
+      try {
+        const emps = await apiRequest("/employees");
+        window._prEmpCache = emps;
+        ["prRequestedById", "prApprovedById"].forEach(selId => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            sel.appendChild(opt);
+          });
+        });
+      } catch(e) { console.warn("Could not load employees for PR signatories", e); }
+    })();
     window._docSelectedItems["pr"] = [];
 
     // Auto-populate from APP item if redirected from APP page
@@ -12997,7 +13223,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       prInput.value = generateDocNumber("PR");
       return;
     }
-    const year = getCurrentFiscalYear();
+    const year = getActiveFiscalYear();
     try {
       const prs = await apiRequest("/purchase-requests");
       const prefix = "PR-" + dept + "-" + year + "-";
@@ -13195,8 +13421,11 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
 
     (async () => {
       try {
+        const prDateVal = document.getElementById("prDate")?.value || "";
         const data = {
           pr_number: prNumber,
+          pr_date: prDateVal || getTodayISO(),
+          fiscal_year: prDateVal ? getFiscalYearFromDate(prDateVal) : getActiveFiscalYear(),
           purpose: purpose,
           total_amount: totalAmount,
           status: "pending_approval",
@@ -13349,6 +13578,38 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  </div>
  </div>
+
+ <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+ <div class="form-boxed-section">
+   <div class="form-row">
+     <div class="form-group">
+       <label style="font-size:12px;">BAC Secretariat</label>
+       <select id="rfqBacSecId" class="form-select" onchange="rfqFillSignatoryName('rfqBacSecId','rfqBacSecName','rfqBacSecDesig')">
+         <option value="">-- Select Employee --</option>
+       </select>
+       <input type="text" id="rfqBacSecName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+       <input type="text" id="rfqBacSecDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+     </div>
+     <div class="form-group">
+       <label style="font-size:12px;">BAC Chairperson</label>
+       <select id="rfqBacChairId" class="form-select" onchange="rfqFillSignatoryName('rfqBacChairId','rfqBacChairName','rfqBacChairDesig')">
+         <option value="">-- Select Employee --</option>
+       </select>
+       <input type="text" id="rfqBacChairName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+       <input type="text" id="rfqBacChairDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+     </div>
+   </div>
+   <div class="form-row">
+     <div class="form-group">
+       <label style="font-size:12px;">Noted By / Approving Authority</label>
+       <select id="rfqNotedById" class="form-select" onchange="rfqFillSignatoryName('rfqNotedById','rfqNotedByName','rfqNotedByDesig')">
+         <option value="">-- Select Employee --</option>
+       </select>
+       <input type="text" id="rfqNotedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+       <input type="text" id="rfqNotedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+     </div>
+   </div>
+ </div>
  <div class="form-group" style="text-align: right; margin-top: 0;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
@@ -13359,6 +13620,25 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Request for Quotation (RFQ)", html, {
       preventOutsideClose: true,
     });
+    // Load employees into RFQ signatory dropdowns
+    (async () => {
+      try {
+        const emps = await apiRequest("/employees");
+        window._rfqEmpCache = emps;
+        ["rfqBacSecId", "rfqBacChairId", "rfqNotedById"].forEach(selId => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            sel.appendChild(opt);
+          });
+        });
+      } catch(e) { console.warn("Could not load employees for RFQ signatories", e); }
+    })();
     window._docSelectedItems["rfq"] = [];
     // If a PR was preselected, auto-fill items
     if (preselectedPrNumber) {
@@ -13521,6 +13801,12 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         status: "on_going",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
+        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
+        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
+        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
+        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
+        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
+        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -13566,6 +13852,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         cachedRFQ = await apiRequest("/rfq");
       } catch (e) {}
     }
+    // Pre-cache suppliers for bidder picker
+    await window.ensureSuppliersCached();
     // Load UOMs from database
     let uomList = [];
     try {
@@ -13660,13 +13948,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <strong>Supplier Names:</strong>
  </td>
  <td colspan="2" style="background: #e3f2fd;">
- <input type="text" id="absSupplier1Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 1 name" oninput="onAbsSupplierChange(1, this)">
+ ${window.buildBidderPickerHTML('absSupplier1Id', '', 'Enter Bidder 1 name', 'onAbsSupplierChange(1, this)')}
  </td>
  <td colspan="2" style="background: #d0e8ff;">
- <input type="text" id="absSupplier2Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 2 name" oninput="onAbsSupplierChange(2, this)">
+ ${window.buildBidderPickerHTML('absSupplier2Id', '', 'Enter Bidder 2 name', 'onAbsSupplierChange(2, this)')}
  </td>
  <td colspan="2" style="background: #bbdefb;">
- <input type="text" id="absSupplier3Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 3 name" oninput="onAbsSupplierChange(3, this)">
+ ${window.buildBidderPickerHTML('absSupplier3Id', '', 'Enter Bidder 3 name', 'onAbsSupplierChange(3, this)')}
  </td>
  </tr>
  </tbody>
@@ -13884,6 +14172,87 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
+  // =====================================================
+  // BIDDER PICKER HELPER — shared across Abstract, BAC Resolution, Post-Qualification
+  // Renders a dual-mode input: manual text entry OR select from suppliers list.
+  // Usage: buildBidderPickerHTML(fieldId, existingValue, placeholder, onchangeJs)
+  // After injecting into DOM, call initBidderPicker(fieldId) to wire up toggle logic.
+  // =====================================================
+  window._globalSuppliersList = window._globalSuppliersList || [];
+
+  /** Ensure suppliers are cached globally (called before opening any affected modal) */
+  window.ensureSuppliersCached = async function () {
+    if (window._globalSuppliersList && window._globalSuppliersList.length > 0) return;
+    try {
+      const list = await apiRequest("/suppliers");
+      window._globalSuppliersList = Array.isArray(list) ? list : [];
+    } catch (e) {
+      window._globalSuppliersList = [];
+    }
+  };
+
+  /**
+   * Build the HTML for a bidder picker widget.
+   * @param {string} fieldId - The id of the hidden/text input that holds the final value
+   * @param {string} existingValue - Pre-filled value (for edit modals)
+   * @param {string} placeholder - Placeholder text
+   * @param {string} onchangeJs - Optional JS expression called when value changes (receives the input element)
+   */
+  window.buildBidderPickerHTML = function (fieldId, existingValue, placeholder, onchangeJs) {
+    const suppliers = window._globalSuppliersList || [];
+    const supplierOpts = suppliers
+      .map(s => `<option value="${escapeHtml(s.name || s.company_name || '')}">${escapeHtml(s.name || s.company_name || '')}</option>`)
+      .join('');
+    const escaped = escapeHtml(existingValue || '');
+    const onchangeAttr = onchangeJs
+      ? `oninput="${onchangeJs}" onchange="${onchangeJs}"`
+      : '';
+    return `<div class="bidder-picker-wrap" id="bpw_${fieldId}" style="display:flex;flex-direction:column;gap:3px;width:100%;">
+  <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+    <label style="font-size:10px;font-weight:600;color:#555;white-space:nowrap;margin:0;">Input mode:</label>
+    <select class="bidder-mode-toggle" onchange="window.onBidderModeToggle('${fieldId}',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid #bbb;border-radius:3px;background:#fff;cursor:pointer;">
+      <option value="manual">✏️ Type manually</option>
+      <option value="select"${suppliers.length === 0 ? ' disabled' : ''}>📋 Select from suppliers</option>
+    </select>
+  </div>
+  <input type="text" id="${fieldId}" class="form-select bidder-manual-input" style="width:100%;font-size:11px;" placeholder="${escapeHtml(placeholder || 'Enter Bidder name')}" value="${escaped}" ${onchangeAttr}>
+  <select id="${fieldId}_sel" class="form-select bidder-select-input" style="width:100%;font-size:11px;display:none;" onchange="window.onBidderSelectPick('${fieldId}',this)">
+    <option value="">-- Select Supplier --</option>
+    ${supplierOpts}
+  </select>
+</div>`;
+  };
+
+  /** Toggle between manual text input and supplier dropdown */
+  window.onBidderModeToggle = function (fieldId, mode) {
+    const manualEl = document.getElementById(fieldId);
+    const selectEl = document.getElementById(fieldId + '_sel');
+    if (!manualEl || !selectEl) return;
+    if (mode === 'select') {
+      manualEl.style.display = 'none';
+      selectEl.style.display = '';
+      // Pre-select if value already matches a supplier name
+      const currentVal = manualEl.value.trim().toLowerCase();
+      Array.from(selectEl.options).forEach(opt => {
+        if (opt.value.trim().toLowerCase() === currentVal) selectEl.value = opt.value;
+      });
+    } else {
+      selectEl.style.display = 'none';
+      manualEl.style.display = '';
+      manualEl.focus();
+    }
+  };
+
+  /** When a supplier is picked from the dropdown, populate the hidden text input */
+  window.onBidderSelectPick = function (fieldId, selectEl) {
+    const manualEl = document.getElementById(fieldId);
+    if (!manualEl) return;
+    manualEl.value = selectEl.value;
+    // Fire any registered oninput/onchange handler on the text input
+    manualEl.dispatchEvent(new Event('input', { bubbles: true }));
+    manualEl.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
   // Update supplier column header when a supplier dropdown changes
   window.onAbsSupplierChange = function (slotNum, inputEl) {
     const headerEl = document.getElementById(
@@ -13958,14 +14327,12 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       const td = document.createElement("td");
       td.colSpan = 2;
       td.style.background = bgHeader;
-      td.innerHTML =
-        '<input type="text" id="absSupplier' +
-        n +
-        'Id" class="form-select" style="width:100%;font-size:11px;" placeholder="Enter Bidder ' +
-        n +
-        ' name" oninput="onAbsSupplierChange(' +
-        n +
-        ', this)">';
+      td.innerHTML = window.buildBidderPickerHTML(
+        'absSupplier' + n + 'Id',
+        '',
+        'Enter Bidder ' + n + ' name',
+        'onAbsSupplierChange(' + n + ', this)'
+      );
       supplierNamesRow.appendChild(td);
     }
 
@@ -14501,7 +14868,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
-          <button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>
+          ${userHasAnyRole(["hope","admin"]) ? '<button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>' : ""}
         </div>
       </form>
     `;
@@ -15047,6 +15414,27 @@ Failure to submit the above requirements within the prescribed period shall cons
           <textarea rows="4" id="editPrItemSpecs" placeholder="Enter specifications, one per line...">${(pr.item_specifications || "").replace(/</g, "&lt;")}</textarea>
         </div>
         ${getEditAttachmentSectionHTML("purchase_request", id, "editPrAttachment")}
+        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+        <div class="form-boxed-section">
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size:12px;">Requested By <small style="color:#666;">(Division Chief)</small></label>
+              <select id="editPrRequestedById" class="form-select" onchange="prFillSignatoryName('editPrRequestedById','editPrRequestedByName','editPrRequestedByDesig')">
+                <option value="">-- Select Employee --</option>
+              </select>
+              <input type="text" id="editPrRequestedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+              <input type="text" id="editPrRequestedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size:12px;">Approved By <small style="color:#666;">(HoPE)</small></label>
+              <select id="editPrApprovedById" class="form-select" onchange="prFillSignatoryName('editPrApprovedById','editPrApprovedByName','editPrApprovedByDesig')">
+                <option value="">-- Select Employee --</option>
+              </select>
+              <input type="text" id="editPrApprovedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+              <input type="text" id="editPrApprovedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+            </div>
+          </div>
+        </div>
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
@@ -15055,6 +15443,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit Purchase Request", html, {
       preventOutsideClose: true,
     });
+    // Load employees into edit PR signatory dropdowns
+    (async () => {
+      try {
+        const emps = window._prEmpCache || await apiRequest("/employees");
+        window._prEmpCache = emps;
+        [
+          {selId: "editPrRequestedById", preselect: pr.requested_by_id || null},
+          {selId: "editPrApprovedById",  preselect: pr.approved_by_id  || null}
+        ].forEach(({selId, preselect}) => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            if (preselect && emp.id == preselect) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          // trigger fill if preselected
+          if (preselect) sel.dispatchEvent(new Event('change'));
+        });
+      } catch(e) { console.warn("Could not load employees for edit PR signatories", e); }
+    })();
   };
 
   // Dynamic helpers for Edit PR (same pattern as New PR)
@@ -15171,6 +15584,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
       item_specifications:
         document.getElementById("editPrItemSpecs")?.value.trim() || null,
+      requested_by_id: parseInt(document.getElementById("editPrRequestedById")?.value) || null,
+      requested_by_name: document.getElementById("editPrRequestedByName")?.value || null,
+      approved_by_id: parseInt(document.getElementById("editPrApprovedById")?.value) || null,
+      approved_by_name: document.getElementById("editPrApprovedByName")?.value || null,
       items: items,
     };
     try {
@@ -15388,6 +15805,37 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
 
         ${getEditAttachmentSectionHTML("rfq", id, "editRfqAttachment")}
+        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
+        <div class="form-boxed-section">
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size:12px;">BAC Secretariat</label>
+              <select id="editRfqBacSecId" class="form-select" onchange="rfqFillSignatoryName('editRfqBacSecId','editRfqBacSecName','editRfqBacSecDesig')">
+                <option value="">-- Select Employee --</option>
+              </select>
+              <input type="text" id="editRfqBacSecName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+              <input type="text" id="editRfqBacSecDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size:12px;">BAC Chairperson</label>
+              <select id="editRfqBacChairId" class="form-select" onchange="rfqFillSignatoryName('editRfqBacChairId','editRfqBacChairName','editRfqBacChairDesig')">
+                <option value="">-- Select Employee --</option>
+              </select>
+              <input type="text" id="editRfqBacChairName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+              <input type="text" id="editRfqBacChairDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size:12px;">Noted By / Approving Authority</label>
+              <select id="editRfqNotedById" class="form-select" onchange="rfqFillSignatoryName('editRfqNotedById','editRfqNotedByName','editRfqNotedByDesig')">
+                <option value="">-- Select Employee --</option>
+              </select>
+              <input type="text" id="editRfqNotedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
+              <input type="text" id="editRfqNotedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
+            </div>
+          </div>
+        </div>
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
@@ -15396,6 +15844,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit RFQ", html, {
       preventOutsideClose: true,
     });
+    // Load employees into edit RFQ signatory dropdowns
+    (async () => {
+      try {
+        const emps = window._rfqEmpCache || await apiRequest("/employees");
+        window._rfqEmpCache = emps;
+        [
+          {selId: "editRfqBacSecId",   preselect: r.bac_sec_id   || null},
+          {selId: "editRfqBacChairId", preselect: r.bac_chair_id || null},
+          {selId: "editRfqNotedById",  preselect: r.noted_by_id  || null}
+        ].forEach(({selId, preselect}) => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            if (preselect && emp.id == preselect) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          if (preselect) sel.dispatchEvent(new Event('change'));
+        });
+      } catch(e) { console.warn("Could not load employees for edit RFQ signatories", e); }
+    })();
 
     // Attach live preview for specs textarea
     const specsTA = document.getElementById("editRfqItemSpecs");
@@ -15497,6 +15970,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Send item_specifications directly to server
     const specsText = document.getElementById("editRfqItemSpecs")?.value || "";
     data.item_specifications = specsText.trim() || null;
+    data.bac_sec_id = parseInt(document.getElementById("editRfqBacSecId")?.value) || null;
+    data.bac_sec_name = document.getElementById("editRfqBacSecName")?.value || null;
+    data.bac_chair_id = parseInt(document.getElementById("editRfqBacChairId")?.value) || null;
+    data.bac_chair_name = document.getElementById("editRfqBacChairName")?.value || null;
+    data.noted_by_id = parseInt(document.getElementById("editRfqNotedById")?.value) || null;
+    data.noted_by_name = document.getElementById("editRfqNotedByName")?.value || null;
 
     try {
       await apiRequest("/rfqs/" + id, "PUT", data);
@@ -15523,11 +16002,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
 
-    // Load suppliers from DB
+    // Load suppliers from DB and update bidder picker cache
     let suppliers = [];
     try {
       suppliers = await apiRequest("/suppliers");
     } catch (e) {}
+    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
+    else await window.ensureSuppliersCached();
     const supplierOptions = suppliers
       .map(
         (s) =>
@@ -15565,9 +16046,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (idx < 3) slot[idx] = q;
     });
 
-    // Build supplier text input with pre-filled value
+    // Build supplier text input with pre-filled value (uses bidder picker widget)
     function buildSupplierInput(slotNum, existingName) {
-      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || "")}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
+      return window.buildBidderPickerHTML(
+        'editAbsSupplier' + slotNum + 'Id',
+        existingName || '',
+        'Enter Bidder ' + slotNum + ' name',
+        'onEditAbsSupplierChange(' + slotNum + ', this)'
+      );
     }
 
     // Build header labels
@@ -15950,9 +16436,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (e) {
       console.error("Failed to load suppliers:", e);
     }
+    // Update global cache for bidder picker
+    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
+    else await window.ensureSuppliersCached();
 
     function buildBidderInput(fieldId, existingName) {
-      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || "")}">`;
+      return window.buildBidderPickerHTML(fieldId, existingName || '', 'Enter Bidder name');
     }
 
     const html = `
@@ -15972,7 +16461,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Subject / Bidder Name</label><input type="text" id="editPqBidder" value="${(p.bidder_name || "").replace(/"/g, "&quot;")}"></div>
+          <div class="form-group"><label>Subject / Bidder Name</label>${window.buildBidderPickerHTML('editPqBidder', p.bidder_name || '', 'Enter Bidder / Subject name')}</div>
           <div class="form-group">
             <label>Status</label>
             <select id="editPqStatus" class="form-select">
@@ -16095,6 +16584,19 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("Error: " + err.message);
     }
   };
+
+  // --- APPROVE BAC RESOLUTION ---
+  window.approveBACResolution = async function (id) {
+    if (!confirm('Mark this BAC Resolution as completed / approved?')) return;
+    try {
+      await apiRequest('/bac-resolutions/' + id + '/approve', 'PUT');
+      showToast('BAC Resolution approved and marked as completed.', 'success');
+      await loadBACResolution();
+    } catch (err) {
+      showToast(err.message || 'Failed to approve BAC Resolution.', 'error');
+    }
+  };
+
 
   // --- EDIT BAC RESOLUTION ---
   window.showEditBACResolutionModal = async function (id) {
@@ -20389,11 +20891,17 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         pr_number: prNumber,
+        pr_date: prDate || getTodayISO(),
+        fiscal_year: prDate ? getFiscalYearFromDate(prDate) : getActiveFiscalYear(),
         purpose: purpose,
         total_amount: totalAmount,
         status: "draft",
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
+        requested_by_id: parseInt(document.getElementById("prRequestedById")?.value) || null,
+        requested_by_name: document.getElementById("prRequestedByName")?.value || null,
+        approved_by_id: parseInt(document.getElementById("prApprovedById")?.value) || null,
+        approved_by_name: document.getElementById("prApprovedByName")?.value || null,
         items: items,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
@@ -20467,6 +20975,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
+        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
+        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
+        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
+        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
+        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
+        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -20713,7 +21227,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "draft",
+        status: "awaiting_noa",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -20937,11 +21451,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      const inputs = row.querySelectorAll("input");
-      if (inputs.length >= 2) {
-        const name = inputs[0]?.value?.trim() || "";
-        const amount = parseFloat(inputs[1]?.value) || 0;
-        const remarks = inputs[2]?.value?.trim() || "";
+      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
+      const tds = row.querySelectorAll("td");
+      if (tds.length >= 3) {
+        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
+        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
+        const amountInput = tds[2]?.querySelector('input');
+        const remarksInput = tds[3]?.querySelector('input');
+        const name = nameInput?.value?.trim() || "";
+        const amount = parseFloat(amountInput?.value) || 0;
+        const remarks = remarksInput?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -21293,7 +21812,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "issued",
+        status: "awaiting_noa",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -21305,7 +21824,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         ]);
       }
-      alert("Notice of Award issued successfully!");
+      alert("Notice of Award saved successfully!");
       closeModal();
       if (typeof loadNOA === "function") loadNOA();
       else if (typeof loadPageData === "function") loadPageData("noa");
@@ -21354,11 +21873,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      const inputs = row.querySelectorAll("input");
-      if (inputs.length >= 2) {
-        const name = inputs[0]?.value?.trim() || "";
-        const amount = parseFloat(inputs[1]?.value) || 0;
-        const remarks = inputs[2]?.value?.trim() || "";
+      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
+      const tds = row.querySelectorAll("td");
+      if (tds.length >= 3) {
+        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
+        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
+        const amountInput = tds[2]?.querySelector('input');
+        const remarksInput = tds[3]?.querySelector('input');
+        const name = nameInput?.value?.trim() || "";
+        const amount = parseFloat(amountInput?.value) || 0;
+        const remarks = remarksInput?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -22284,6 +22808,28 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       console.error("Error loading items dropdown:", err);
     }
+  };
+
+  // PR signatory auto-fill helper
+  window.prFillSignatoryName = function(selectId, nameId, desigId) {
+    const sel = document.getElementById(selectId);
+    const nameField = document.getElementById(nameId);
+    const desigField = document.getElementById(desigId);
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (nameField) nameField.value = opt?.dataset?.name || "";
+    if (desigField) desigField.value = opt?.dataset?.desig || "";
+  };
+
+  // RFQ signatory auto-fill helper
+  window.rfqFillSignatoryName = function(selectId, nameId, desigId) {
+    const sel = document.getElementById(selectId);
+    const nameField = document.getElementById(nameId);
+    const desigField = document.getElementById(desigId);
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (nameField) nameField.value = opt?.dataset?.name || "";
+    if (desigField) desigField.value = opt?.dataset?.desig || "";
   };
 
   window.loadEmployeesDropdown = async function (selectId, selectedId) {
@@ -23501,6 +24047,77 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
+
+  // ============================================================
+  // APPROVAL FUNCTIONS — visible only to authorized roles
+  // ============================================================
+
+  window.approveRFQRecord = async function (id) {
+    if (!confirm("Mark this RFQ as completed?")) return;
+    try {
+      await apiRequest("/rfqs/" + id + "/set-status", "PUT", { status: "completed" });
+      showToast("RFQ marked as completed.", "success");
+      if (typeof loadRFQ === "function") loadRFQ();
+    } catch (err) {
+      showToast(err.message || "Failed to complete RFQ.", "error");
+    }
+  };
+
+  window.approveAbstractRecord = async function (id) {
+    if (!confirm("Mark this Abstract as completed/approved?")) return;
+    try {
+      await apiRequest("/abstracts/" + id + "/set-status", "PUT", { status: "completed" });
+      showToast("Abstract approved and marked as completed.", "success");
+      if (typeof loadAbstract === "function") loadAbstract();
+    } catch (err) {
+      showToast(err.message || "Failed to approve Abstract.", "error");
+    }
+  };
+
+  window.approvePostQualRecord = async function (id) {
+    if (!confirm("Mark this Post-Qualification as completed?")) return;
+    try {
+      await apiRequest("/post-qualifications/" + id + "/set-status", "PUT", { status: "completed" });
+      showToast("Post-Qualification marked as completed.", "success");
+      if (typeof loadPostQual === "function") loadPostQual();
+    } catch (err) {
+      showToast(err.message || "Failed to approve Post-Qualification.", "error");
+    }
+  };
+
+  window.approveNOARecord = async function (id) {
+    if (!confirm("Mark this Notice of Award as issued/approved?")) return;
+    try {
+      await apiRequest("/notices-of-award/" + id + "/set-status", "PUT", { status: "with_noa" });
+      showToast("Notice of Award approved.", "success");
+      if (typeof loadNOA === "function") loadNOA();
+    } catch (err) {
+      showToast(err.message || "Failed to approve NOA.", "error");
+    }
+  };
+
+  window.approvePORecord = async function (id) {
+    if (!confirm("Approve and sign this Purchase Order?")) return;
+    try {
+      await apiRequest("/purchase-orders/" + id + "/status", "PUT", { status: "signed" });
+      showToast("Purchase Order approved and signed.", "success");
+      if (typeof loadPO === "function") loadPO();
+    } catch (err) {
+      showToast(err.message || "Failed to approve Purchase Order.", "error");
+    }
+  };
+
+  window.approveIARRecord = async function (id) {
+    if (!confirm("Mark this IAR as verified and accepted?")) return;
+    try {
+      await apiRequest("/iars/" + id + "/accept", "PUT");
+      showToast("IAR verified and accepted.", "success");
+      if (typeof loadIAR === "function") loadIAR();
+    } catch (err) {
+      showToast(err.message || "Failed to accept IAR.", "error");
+    }
+  };
+
   // Trip Ticket Modals
   window.showNewTripTicketModal = function () {
     const html = `
@@ -24310,6 +24927,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // BAC Resolution Modal
   window.showNewBACResolutionModal = async function () {
+    // Pre-cache suppliers for bidder picker
+    await window.ensureSuppliersCached();
     // Load employees from DB for BAC member dropdowns
     let employees = [];
     try {
@@ -24394,19 +25013,19 @@ Failure to submit the above requirements within the prescribed period shall cons
           <tbody id="bacBiddersBody">
             <tr>
               <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
-              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td>${window.buildBidderPickerHTML('bacBidder1Name', '', 'Bidder Name')}</td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
             </tr>
             <tr>
               <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
-              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td>${window.buildBidderPickerHTML('bacBidder2Name', '', 'Bidder Name')}</td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
             </tr>
             <tr>
               <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
-              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+              <td>${window.buildBidderPickerHTML('bacBidder3Name', '', 'Bidder Name')}</td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
             </tr>
@@ -24563,9 +25182,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("bacBiddersBody");
     const nextNum = tbody.rows.length + 1;
     const row = document.createElement("tr");
+    const pickerId = 'bacDynBidder' + nextNum + '_' + Date.now();
     row.innerHTML = `
       <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
-      <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+      <td>${window.buildBidderPickerHTML(pickerId, '', 'Bidder Name')}</td>
       <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
       <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
     `;
@@ -24601,9 +25221,10 @@ Failure to submit the above requirements within the prescribed period shall cons
             const isRecommended =
               abs.recommended_supplier_name &&
               q.supplier_name === abs.recommended_supplier_name;
+            const autoPickerId = 'bacAutoBidder' + (idx + 1) + '_' + Date.now();
             row.innerHTML = `
               <td><input type="text" value="${idx + 1}" style="width: 35px; text-align: center;"></td>
-              <td><input type="text" value="${escapeHtml(q.supplier_name || "")}" style="width: 100%;"></td>
+              <td>${window.buildBidderPickerHTML(autoPickerId, q.supplier_name || '', 'Bidder Name')}</td>
               <td><input type="number" value="${bidAmount.toFixed(2)}" step="0.01" style="width: 120px;"></td>
               <td><input type="text" value="${isRecommended ? "LCRB / Responsive" : "Responsive"}" style="width: 100%;"></td>
             `;
@@ -24640,6 +25261,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = async function () {
+    // Pre-cache suppliers for bidder picker
+    await window.ensureSuppliersCached();
     // Load employees from DB for TWG member dropdowns
     let employees = [];
     try {
@@ -24729,9 +25352,9 @@ Failure to submit the above requirements within the prescribed period shall cons
               </tr>
               <tr>
                 <td></td>
-                <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
-                <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
-                <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
+                <td style="background: #f5f9ff;">${window.buildBidderPickerHTML('twgBidder1', '', 'Enter Bidder 1 name')}</td>
+                <td style="background: #dce9fc;">${window.buildBidderPickerHTML('twgBidder2', '', 'Enter Bidder 2 name')}</td>
+                <td style="background: #cddff5;">${window.buildBidderPickerHTML('twgBidder3', '', 'Enter Bidder 3 name')}</td>
               </tr>
               <tr>
                 <td>Latest Income Tax Return (ITR)</td>
@@ -24901,13 +25524,12 @@ Failure to submit the above requirements within the prescribed period shall cons
             const labelCell = row.querySelector("td[colspan]");
             if (labelCell) labelCell.setAttribute("colspan", n + 1);
           } else if (idx === 1) {
-            // Bidder name input row
-            td.innerHTML =
-              '<input type="text" id="twgBidder' +
-              n +
-              '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' +
-              n +
-              ' name">';
+            // Bidder name input row — use bidder picker widget
+            td.innerHTML = window.buildBidderPickerHTML(
+              'twgBidder' + n,
+              '',
+              'Enter Bidder ' + n + ' name'
+            );
             row.appendChild(td);
           } else {
             // Document check rows
@@ -26658,6 +27280,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div class="view-details">
         <div class="detail-row"><label>PR No.:</label><span><strong>${p.pr_number || "-"}</strong></span></div>
         <div class="detail-row"><label>Date:</label><span>${viewDate(p.pr_date || p.created_at)}</span></div>
+        <div class="detail-row"><label>Fiscal Year:</label><span><strong>FY ${p.fiscal_year || getFiscalYearFromDate(p.pr_date || p.created_at)}</strong></span></div>
         <div class="detail-row"><label>Division:</label><span>${p.department_name || p.department_code || "-"}</span></div>
         <div class="detail-row"><label>Purpose:</label><span>${p.purpose || "-"}</span></div>
         <div class="detail-row"><label>Amount:</label><span>${viewCurrency(p.total_amount)}</span></div>
@@ -26669,6 +27292,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
+        ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button type="button" class="btn btn-primary" onclick="closeModal();showApprovePRModal(${id});"><i class="fas fa-check"></i> Approve</button>` : ""}
       </div>
     `;
     openModal("View Purchase Request", html, {
@@ -30624,7 +31248,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     const html = `
-      <form id="approvePRForm">
+      <form id="approvePRForm" data-pr-id="${pr.id}">
         <div class="info-banner" style="margin-bottom: 15px;">
           <i class="fas fa-check-circle"></i>
           Approve this Purchase Request as HoPE (Head of Procuring Entity).
@@ -30637,7 +31261,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label>Approval Remarks (Optional)</label>
-          <textarea rows="2" placeholder="Any notes for record"></textarea>
+          <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record"></textarea>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -30648,6 +31272,28 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Approve Purchase Request", html, {
       preventOutsideClose: true,
     });
+    // Attach submit handler after modal is rendered
+    setTimeout(() => {
+      const form = document.getElementById("approvePRForm");
+      if (form) {
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const prId = this.dataset.prId;
+          const submitBtn = this.querySelector('button[type="submit"]');
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...'; }
+          try {
+            await apiRequest("/purchase-requests/" + prId + "/approve", "PUT");
+            closeModal();
+            showToast("Purchase Request approved successfully!", "success");
+            if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
+            else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
+          } catch (err) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Approve PR'; }
+            showToast(err.message || "Failed to approve Purchase Request.", "error");
+          }
+        });
+      }
+    }, 0);
   };
 
   // Return PR Modal
@@ -31063,6 +31709,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="doc-title">PURCHASE REQUEST</div>
         <table class="info-table">
           <tr><td width="30%"><strong>PR Number:</strong></td><td>${r.pr_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.pr_date ? new Date(r.pr_date).toLocaleDateString("en-PH") : today}</td></tr>
+          <tr><td width="30%"><strong>Fiscal Year:</strong></td><td><strong>FY ${r.fiscal_year || getFiscalYearFromDate(r.pr_date || r.created_at)}</strong></td><td></td><td></td></tr>
           <tr><td><strong>Division:</strong></td><td>${r.department_code || r.division || "N/A"}</td><td><strong>Fund Cluster:</strong></td><td>${r.fund_cluster || "N/A"}</td></tr>
           <tr><td><strong>Purpose:</strong></td><td colspan="3">${r.purpose || "Procurement of supplies/services for agency operations"}</td></tr>
         </table>
@@ -31833,34 +32480,26 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch "Requested by" and "Approved by" signatories
-      // Server already returns chief_name/chief_designation based on division rules:
-      //   WRSD → WRSD chief (MAKINANO), all others → FAD chief (ESPALDON)
-      let chiefName = pr.chief_name || "",
+      // Use saved signatory IDs from the PR record first; fall back to role/name lookup
+      let chiefName = pr.requested_by_name || pr.chief_name || "",
         chiefDesignation = pr.chief_designation || "";
-      let hopeName = pr.hope_name || "",
+      let hopeName = pr.approved_by_name || pr.hope_name || "",
         hopeDesignation = pr.hope_designation || "Regional Director";
-      // Fallback: if server didn't return names, fetch from employees
+      // Fallback: if signatory not saved, resolve from employee records
       if (!chiefName) {
         try {
           const allEmployees = await apiRequest("/employees");
-          const deptCode = (pr.department_code || "").toUpperCase();
-          if (deptCode === "WRSD") {
-            const wrsdEmp = allEmployees.find(
-              (e) =>
-                e.full_name && e.full_name.toUpperCase().includes("MAKINANO"),
-            );
-            if (wrsdEmp) {
-              chiefName = wrsdEmp.full_name || "";
-              chiefDesignation = wrsdEmp.designation_name || "";
-            }
+          if (pr.requested_by_id) {
+            const reqEmp = allEmployees.find((e) => e.id === parseInt(pr.requested_by_id));
+            if (reqEmp) { chiefName = reqEmp.full_name || ""; chiefDesignation = reqEmp.designation_name || ""; }
           } else {
-            const fadEmp = allEmployees.find(
-              (e) =>
-                e.full_name && e.full_name.toUpperCase().includes("ESPALDON"),
-            );
-            if (fadEmp) {
-              chiefName = fadEmp.full_name || "";
-              chiefDesignation = fadEmp.designation_name || "";
+            const deptCode = (pr.department_code || "").toUpperCase();
+            if (deptCode === "WRSD") {
+              const wrsdEmp = allEmployees.find((e) => e.full_name && e.full_name.toUpperCase().includes("MAKINANO"));
+              if (wrsdEmp) { chiefName = wrsdEmp.full_name || ""; chiefDesignation = wrsdEmp.designation_name || ""; }
+            } else {
+              const fadEmp = allEmployees.find((e) => e.full_name && e.full_name.toUpperCase().includes("ESPALDON"));
+              if (fadEmp) { chiefName = fadEmp.full_name || ""; chiefDesignation = fadEmp.designation_name || ""; }
             }
           }
         } catch (e) {
@@ -31869,9 +32508,15 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       if (!hopeName) {
         try {
-          const allUsers = await apiRequest("/users");
-          const hopeUser = allUsers.find((u) => u.role === "hope");
-          if (hopeUser) hopeName = hopeUser.full_name || "";
+          if (pr.approved_by_id) {
+            const allEmployees = window._prEmpCache || await apiRequest("/employees");
+            const apprEmp = allEmployees.find((e) => e.id === parseInt(pr.approved_by_id));
+            if (apprEmp) { hopeName = apprEmp.full_name || ""; hopeDesignation = apprEmp.designation_name || "Regional Director"; }
+          } else {
+            const allUsers = await apiRequest("/users");
+            const hopeUser = allUsers.find((u) => u.role === "hope");
+            if (hopeUser) hopeName = hopeUser.full_name || "";
+          }
         } catch (e) {}
       }
 
@@ -34228,6 +34873,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
+      // Use saved signatory IDs from the RFQ record; fall back to role-based lookup
       let bacSecName = "GIOVANNI S. PAREDES",
         bacSecDesignation = "";
       let bacChairName = "",
@@ -34240,44 +34886,37 @@ Failure to submit the above requirements within the prescribed period shall cons
           apiRequest("/users"),
           apiRequest("/employees"),
         ]);
-        // BAC Secretariat
-        const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
-        if (bacSecUser) {
-          bacSecName = bacSecUser.full_name || bacSecName;
-          const bacSecEmp = allEmployees.find(
-            (e) =>
-              e.full_name &&
-              bacSecUser.full_name &&
-              e.full_name.trim().toLowerCase() ===
-                bacSecUser.full_name.trim().toLowerCase(),
-          );
-          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
+        // BAC Secretariat — use saved bac_sec_id first
+        if (rfq.bac_sec_id) {
+          const savedSec = allEmployees.find((e) => e.id === parseInt(rfq.bac_sec_id));
+          if (savedSec) { bacSecName = savedSec.full_name || bacSecName; bacSecDesignation = savedSec.designation_name || ""; }
+        } else {
+          const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
+          if (bacSecUser) {
+            bacSecName = bacSecUser.full_name || bacSecName;
+            const bacSecEmp = allEmployees.find((e) => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
+            if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
+          }
         }
-        // BAC Chairperson (primary or secondary role)
-        const bacChairUser = allUsers.find(
-          (u) => u.role === "bac_chair" || u.secondary_role === "bac_chair",
-        );
-        if (bacChairUser) {
-          bacChairName = bacChairUser.full_name || "";
-          const bacChairEmp = allEmployees.find(
-            (e) =>
-              e.full_name &&
-              bacChairUser.full_name &&
-              e.full_name.trim().toLowerCase() ===
-                bacChairUser.full_name.trim().toLowerCase(),
-          );
-          if (bacChairEmp)
-            bacChairDesignation = bacChairEmp.designation_name || "";
+        // BAC Chairperson — use saved bac_chair_id first
+        if (rfq.bac_chair_id) {
+          const savedChair = allEmployees.find((e) => e.id === parseInt(rfq.bac_chair_id));
+          if (savedChair) { bacChairName = savedChair.full_name || ""; bacChairDesignation = savedChair.designation_name || ""; }
+        } else {
+          const bacChairUser = allUsers.find((u) => u.role === "bac_chair" || u.secondary_role === "bac_chair");
+          if (bacChairUser) {
+            bacChairName = bacChairUser.full_name || "";
+            const bacChairEmp = allEmployees.find((e) => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
+            if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || "";
+          }
         }
-        // Mark E. Marasigan
-        const markEmp = allEmployees.find(
-          (e) =>
-            e.full_name &&
-            e.full_name.trim().toLowerCase().includes("marasigan"),
-        );
-        if (markEmp) {
-          markName = markEmp.full_name || markName;
-          markDesignation = markEmp.designation_name || "";
+        // Noted By / Mark — use saved noted_by_id first
+        if (rfq.noted_by_id) {
+          const savedNoted = allEmployees.find((e) => e.id === parseInt(rfq.noted_by_id));
+          if (savedNoted) { markName = savedNoted.full_name || markName; markDesignation = savedNoted.designation_name || ""; }
+        } else {
+          const markEmp = allEmployees.find((e) => e.full_name && e.full_name.trim().toLowerCase().includes("marasigan"));
+          if (markEmp) { markName = markEmp.full_name || markName; markDesignation = markEmp.designation_name || ""; }
         }
       } catch (e) {
         console.warn("Could not fetch BAC/employee data:", e);
@@ -35926,7 +36565,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group" style="text-align: right; margin-top: 0;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
- <button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>
+ ${userHasAnyRole(["hope","admin"]) ? '<button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>' : ""}
  </div>
  </form>
  `;
@@ -36480,6 +37119,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit Purchase Request", html, {
       preventOutsideClose: true,
     });
+    // Load employees into edit PR signatory dropdowns
+    (async () => {
+      try {
+        const emps = window._prEmpCache || await apiRequest("/employees");
+        window._prEmpCache = emps;
+        [
+          {selId: "editPrRequestedById", preselect: pr.requested_by_id || null},
+          {selId: "editPrApprovedById",  preselect: pr.approved_by_id  || null}
+        ].forEach(({selId, preselect}) => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            if (preselect && emp.id == preselect) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          // trigger fill if preselected
+          if (preselect) sel.dispatchEvent(new Event('change'));
+        });
+      } catch(e) { console.warn("Could not load employees for edit PR signatories", e); }
+    })();
   };
 
   // Dynamic helpers for Edit PR (same pattern as New PR)
@@ -36596,6 +37260,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
       item_specifications:
         document.getElementById("editPrItemSpecs")?.value.trim() || null,
+      requested_by_id: parseInt(document.getElementById("editPrRequestedById")?.value) || null,
+      requested_by_name: document.getElementById("editPrRequestedByName")?.value || null,
+      approved_by_id: parseInt(document.getElementById("editPrApprovedById")?.value) || null,
+      approved_by_name: document.getElementById("editPrApprovedByName")?.value || null,
       items: items,
     };
     try {
@@ -36821,6 +37489,31 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit RFQ", html, {
       preventOutsideClose: true,
     });
+    // Load employees into edit RFQ signatory dropdowns
+    (async () => {
+      try {
+        const emps = window._rfqEmpCache || await apiRequest("/employees");
+        window._rfqEmpCache = emps;
+        [
+          {selId: "editRfqBacSecId",   preselect: r.bac_sec_id   || null},
+          {selId: "editRfqBacChairId", preselect: r.bac_chair_id || null},
+          {selId: "editRfqNotedById",  preselect: r.noted_by_id  || null}
+        ].forEach(({selId, preselect}) => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          emps.forEach(emp => {
+            const opt = document.createElement("option");
+            opt.value = emp.id;
+            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
+            opt.dataset.name = emp.full_name || "";
+            opt.dataset.desig = emp.designation_name || "";
+            if (preselect && emp.id == preselect) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          if (preselect) sel.dispatchEvent(new Event('change'));
+        });
+      } catch(e) { console.warn("Could not load employees for edit RFQ signatories", e); }
+    })();
 
     // Attach live preview for specs textarea
     const specsTA = document.getElementById("editRfqItemSpecs");
@@ -36922,6 +37615,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Send item_specifications directly to server
     const specsText = document.getElementById("editRfqItemSpecs")?.value || "";
     data.item_specifications = specsText.trim() || null;
+    data.bac_sec_id = parseInt(document.getElementById("editRfqBacSecId")?.value) || null;
+    data.bac_sec_name = document.getElementById("editRfqBacSecName")?.value || null;
+    data.bac_chair_id = parseInt(document.getElementById("editRfqBacChairId")?.value) || null;
+    data.bac_chair_name = document.getElementById("editRfqBacChairName")?.value || null;
+    data.noted_by_id = parseInt(document.getElementById("editRfqNotedById")?.value) || null;
+    data.noted_by_name = document.getElementById("editRfqNotedByName")?.value || null;
 
     try {
       await apiRequest("/rfqs/" + id, "PUT", data);
@@ -36948,11 +37647,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
 
-    // Load suppliers from DB
+    // Load suppliers from DB and update bidder picker cache
     let suppliers = [];
     try {
       suppliers = await apiRequest("/suppliers");
     } catch (e) {}
+    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
+    else await window.ensureSuppliersCached();
     const supplierOptions = suppliers
       .map(
         (s) =>
@@ -36990,9 +37691,14 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (idx < 3) slot[idx] = q;
     });
 
-    // Build supplier text input with pre-filled value
+    // Build supplier text input with pre-filled value (uses bidder picker widget)
     function buildSupplierInput(slotNum, existingName) {
-      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || "")}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
+      return window.buildBidderPickerHTML(
+        'editAbsSupplier' + slotNum + 'Id',
+        existingName || '',
+        'Enter Bidder ' + slotNum + ' name',
+        'onEditAbsSupplierChange(' + slotNum + ', this)'
+      );
     }
 
     // Build header labels
@@ -37375,9 +38081,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (e) {
       console.error("Failed to load suppliers:", e);
     }
+    // Update global cache for bidder picker
+    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
+    else await window.ensureSuppliersCached();
 
     function buildBidderInput(fieldId, existingName) {
-      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || "")}">`;
+      return window.buildBidderPickerHTML(fieldId, existingName || '', 'Enter Bidder name');
     }
 
     const html = `
@@ -37397,7 +38106,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  </div>
  <div class="form-row">
- <div class="form-group"><label>Subject / Bidder Name</label><input type="text" id="editPqBidder" value="${(p.bidder_name || "").replace(/"/g, "&quot;")}"></div>
+ <div class="form-group"><label>Subject / Bidder Name</label>${window.buildBidderPickerHTML('editPqBidder', p.bidder_name || '', 'Enter Bidder / Subject name')}</div>
  <div class="form-group">
  <label>Status</label>
  <select id="editPqStatus" class="form-select">
@@ -41841,6 +42550,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
+        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
+        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
+        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
+        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
+        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
+        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -42087,7 +42802,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "draft",
+        status: "awaiting_noa",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -42311,11 +43026,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      const inputs = row.querySelectorAll("input");
-      if (inputs.length >= 2) {
-        const name = inputs[0]?.value?.trim() || "";
-        const amount = parseFloat(inputs[1]?.value) || 0;
-        const remarks = inputs[2]?.value?.trim() || "";
+      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
+      const tds = row.querySelectorAll("td");
+      if (tds.length >= 3) {
+        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
+        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
+        const amountInput = tds[2]?.querySelector('input');
+        const remarksInput = tds[3]?.querySelector('input');
+        const name = nameInput?.value?.trim() || "";
+        const amount = parseFloat(amountInput?.value) || 0;
+        const remarks = remarksInput?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -42667,7 +43387,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "issued",
+        status: "awaiting_noa",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -42679,7 +43399,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         ]);
       }
-      alert("Notice of Award issued successfully!");
+      alert("Notice of Award saved successfully!");
       closeModal();
       if (typeof loadNOA === "function") loadNOA();
       else if (typeof loadPageData === "function") loadPageData("noa");
@@ -42728,11 +43448,16 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      const inputs = row.querySelectorAll("input");
-      if (inputs.length >= 2) {
-        const name = inputs[0]?.value?.trim() || "";
-        const amount = parseFloat(inputs[1]?.value) || 0;
-        const remarks = inputs[2]?.value?.trim() || "";
+      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
+      const tds = row.querySelectorAll("td");
+      if (tds.length >= 3) {
+        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
+        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
+        const amountInput = tds[2]?.querySelector('input');
+        const remarksInput = tds[3]?.querySelector('input');
+        const name = nameInput?.value?.trim() || "";
+        const amount = parseFloat(amountInput?.value) || 0;
+        const remarks = remarksInput?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -45684,6 +46409,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // BAC Resolution Modal
   window.showNewBACResolutionModal = async function () {
+    // Pre-cache suppliers for bidder picker
+    await window.ensureSuppliersCached();
     // Load employees from DB for BAC member dropdowns
     let employees = [];
     try {
@@ -45768,19 +46495,19 @@ Failure to submit the above requirements within the prescribed period shall cons
  <tbody id="bacBiddersBody">
  <tr>
  <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
- <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+ <td>${window.buildBidderPickerHTML('bacBidder1Name', '', 'Bidder Name')}</td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
  </tr>
  <tr>
  <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
- <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+ <td>${window.buildBidderPickerHTML('bacBidder2Name', '', 'Bidder Name')}</td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  </tr>
  <tr>
  <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
- <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+ <td>${window.buildBidderPickerHTML('bacBidder3Name', '', 'Bidder Name')}</td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  </tr>
@@ -45937,9 +46664,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("bacBiddersBody");
     const nextNum = tbody.rows.length + 1;
     const row = document.createElement("tr");
+    const pickerId = 'bacDynBidder' + nextNum + '_' + Date.now();
     row.innerHTML = `
  <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
- <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
+ <td>${window.buildBidderPickerHTML(pickerId, '', 'Bidder Name')}</td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  `;
@@ -46014,6 +46742,8 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = async function () {
+    // Pre-cache suppliers for bidder picker
+    await window.ensureSuppliersCached();
     // Load employees from DB for TWG member dropdowns
     let employees = [];
     try {
@@ -46103,9 +46833,9 @@ Failure to submit the above requirements within the prescribed period shall cons
  </tr>
  <tr>
  <td></td>
- <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
- <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
- <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
+ <td style="background: #f5f9ff;">${window.buildBidderPickerHTML('twgBidder1', '', 'Enter Bidder 1 name')}</td>
+ <td style="background: #dce9fc;">${window.buildBidderPickerHTML('twgBidder2', '', 'Enter Bidder 2 name')}</td>
+ <td style="background: #cddff5;">${window.buildBidderPickerHTML('twgBidder3', '', 'Enter Bidder 3 name')}</td>
  </tr>
  <tr>
  <td>Latest Income Tax Return (ITR)</td>
@@ -46275,13 +47005,12 @@ Failure to submit the above requirements within the prescribed period shall cons
             const labelCell = row.querySelector("td[colspan]");
             if (labelCell) labelCell.setAttribute("colspan", n + 1);
           } else if (idx === 1) {
-            // Bidder name input row
-            td.innerHTML =
-              '<input type="text" id="twgBidder' +
-              n +
-              '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' +
-              n +
-              ' name">';
+            // Bidder name input row — use bidder picker widget
+            td.innerHTML = window.buildBidderPickerHTML(
+              'twgBidder' + n,
+              '',
+              'Enter Bidder ' + n + ' name'
+            );
             row.appendChild(td);
           } else {
             // Document check rows
@@ -52258,7 +52987,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
     const html = `
- <form id="approvePRForm">
+ <form id="approvePRForm" data-pr-id="${pr.id}">
  <div class="info-banner" style="margin-bottom: 15px;">
  <i class="fas fa-check-circle"></i>
  Approve this Purchase Request as HoPE (Head of Procuring Entity).
@@ -52271,7 +53000,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-group" style="margin-top: 15px;">
  <label>Approval Remarks (Optional)</label>
- <textarea rows="2" placeholder="Any notes for record"></textarea>
+ <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record"></textarea>
  </div>
  <div class="form-group" style="text-align: right; margin-top: 20px;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -52282,6 +53011,28 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Approve Purchase Request", html, {
       preventOutsideClose: true,
     });
+    // Attach submit handler after modal is rendered
+    setTimeout(() => {
+      const form = document.getElementById("approvePRForm");
+      if (form) {
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const prId = this.dataset.prId;
+          const submitBtn = this.querySelector('button[type="submit"]');
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...'; }
+          try {
+            await apiRequest("/purchase-requests/" + prId + "/approve", "PUT");
+            closeModal();
+            showToast("Purchase Request approved successfully!", "success");
+            if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
+            else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
+          } catch (err) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Approve PR'; }
+            showToast(err.message || "Failed to approve Purchase Request.", "error");
+          }
+        });
+      }
+    }, 0);
   };
 
   // Return PR Modal
@@ -52697,6 +53448,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="doc-title">PURCHASE REQUEST</div>
  <table class="info-table">
  <tr><td width="30%"><strong>PR Number:</strong></td><td>${r.pr_number || recordId}</td><td width="30%"><strong>Date:</strong></td><td>${r.pr_date ? new Date(r.pr_date).toLocaleDateString("en-PH") : today}</td></tr>
+          <tr><td width="30%"><strong>Fiscal Year:</strong></td><td><strong>FY ${r.fiscal_year || getFiscalYearFromDate(r.pr_date || r.created_at)}</strong></td><td></td><td></td></tr>
  <tr><td><strong>Division:</strong></td><td>${r.department_code || r.division || "N/A"}</td><td><strong>Fund Cluster:</strong></td><td>${r.fund_cluster || "N/A"}</td></tr>
  <tr><td><strong>Purpose:</strong></td><td colspan="3">${r.purpose || "Procurement of supplies/services for agency operations"}</td></tr>
  </table>
@@ -55799,6 +56551,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
+      // Use saved signatory IDs from the RFQ record; fall back to role-based lookup
       let bacSecName = "GIOVANNI S. PAREDES",
         bacSecDesignation = "";
       let bacChairName = "",
@@ -55811,44 +56564,37 @@ Failure to submit the above requirements within the prescribed period shall cons
           apiRequest("/users"),
           apiRequest("/employees"),
         ]);
-        // BAC Secretariat
-        const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
-        if (bacSecUser) {
-          bacSecName = bacSecUser.full_name || bacSecName;
-          const bacSecEmp = allEmployees.find(
-            (e) =>
-              e.full_name &&
-              bacSecUser.full_name &&
-              e.full_name.trim().toLowerCase() ===
-                bacSecUser.full_name.trim().toLowerCase(),
-          );
-          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
+        // BAC Secretariat — use saved bac_sec_id first
+        if (rfq.bac_sec_id) {
+          const savedSec = allEmployees.find((e) => e.id === parseInt(rfq.bac_sec_id));
+          if (savedSec) { bacSecName = savedSec.full_name || bacSecName; bacSecDesignation = savedSec.designation_name || ""; }
+        } else {
+          const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
+          if (bacSecUser) {
+            bacSecName = bacSecUser.full_name || bacSecName;
+            const bacSecEmp = allEmployees.find((e) => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
+            if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
+          }
         }
-        // BAC Chairperson (primary or secondary role)
-        const bacChairUser = allUsers.find(
-          (u) => u.role === "bac_chair" || u.secondary_role === "bac_chair",
-        );
-        if (bacChairUser) {
-          bacChairName = bacChairUser.full_name || "";
-          const bacChairEmp = allEmployees.find(
-            (e) =>
-              e.full_name &&
-              bacChairUser.full_name &&
-              e.full_name.trim().toLowerCase() ===
-                bacChairUser.full_name.trim().toLowerCase(),
-          );
-          if (bacChairEmp)
-            bacChairDesignation = bacChairEmp.designation_name || "";
+        // BAC Chairperson — use saved bac_chair_id first
+        if (rfq.bac_chair_id) {
+          const savedChair = allEmployees.find((e) => e.id === parseInt(rfq.bac_chair_id));
+          if (savedChair) { bacChairName = savedChair.full_name || ""; bacChairDesignation = savedChair.designation_name || ""; }
+        } else {
+          const bacChairUser = allUsers.find((u) => u.role === "bac_chair" || u.secondary_role === "bac_chair");
+          if (bacChairUser) {
+            bacChairName = bacChairUser.full_name || "";
+            const bacChairEmp = allEmployees.find((e) => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
+            if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || "";
+          }
         }
-        // Mark E. Marasigan
-        const markEmp = allEmployees.find(
-          (e) =>
-            e.full_name &&
-            e.full_name.trim().toLowerCase().includes("marasigan"),
-        );
-        if (markEmp) {
-          markName = markEmp.full_name || markName;
-          markDesignation = markEmp.designation_name || "";
+        // Noted By / Mark — use saved noted_by_id first
+        if (rfq.noted_by_id) {
+          const savedNoted = allEmployees.find((e) => e.id === parseInt(rfq.noted_by_id));
+          if (savedNoted) { markName = savedNoted.full_name || markName; markDesignation = savedNoted.designation_name || ""; }
+        } else {
+          const markEmp = allEmployees.find((e) => e.full_name && e.full_name.trim().toLowerCase().includes("marasigan"));
+          if (markEmp) { markName = markEmp.full_name || markName; markDesignation = markEmp.designation_name || ""; }
         }
       } catch (e) {
         console.warn("Could not fetch BAC/employee data:", e);
@@ -57575,6 +58321,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         dept_id: data.user.dept_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
+        employee_id: data.user.employee_id || null,
       };
 
       // Persist session to sessionStorage (survives page refresh, clears on app close)
@@ -57813,6 +58560,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         dept_id: data.user.dept_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
+        employee_id: data.user.employee_id || null,
       };
 
       // Wait a moment then proceed to app
@@ -58114,10 +58862,13 @@ Failure to submit the above requirements within the prescribed period shall cons
   // Generate and download report
   window.downloadReport = function (reportType, format) {
     const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `${reportType}_Report_${timestamp}`;
+    // Include fiscal year in filename and in data filtering
+    const reportFY = (document.getElementById("ppmpReportYear") || document.getElementById("appReportYear") || document.getElementById("prReportYear") || {}).value
+      || getReportFiscalYear();
+    const filename = `${reportType}_Report_FY${reportFY}_${timestamp}`;
 
-    // Get report data based on type
-    const reportData = getReportData(reportType);
+    // Get report data based on type, filtered by the selected fiscal year
+    const reportData = getReportData(reportType, parseInt(reportFY) || null);
 
     if (format === "excel" || format === "csv") {
       const csvContent = convertToCSV(reportData.data, reportData.headers);
@@ -58131,7 +58882,15 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Get report data based on report type — fully dynamic from cached DB data
-  function getReportData(reportType) {
+  // fiscalYear parameter filters data to a specific fiscal year when provided
+  function getReportData(reportType, fiscalYear) {
+    // Helper: check if a record belongs to the given fiscal year
+    const matchesFY = (record) => {
+      if (!fiscalYear) return true;
+      if (record.fiscal_year) return parseInt(record.fiscal_year) === fiscalYear;
+      const dateStr = record.pr_date || record.created_at || record.date_prepared || record.po_date;
+      return getFiscalYearFromDate(dateStr) === fiscalYear;
+    };
     const fmt = (v) =>
       v != null
         ? "₱" +
@@ -58161,7 +58920,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           "Est. Budget",
           "Status",
         ],
-        data: (window._ppmpData || []).map((p) => ({
+        data: (window._ppmpData || []).filter(matchesFY).map((p) => ({
           "PPMP No": p.ppmp_number || p.code || "-",
           Description: p.description || p.item_description || "-",
           Division: p.department_name || p.division || "-",
@@ -58203,7 +58962,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           "Amount",
           "Status",
         ],
-        data: (cachedPR || []).map((p) => ({
+        data: (cachedPR || []).filter(matchesFY).map((p) => ({
           "PR No": p.pr_number || "-",
           Date: fmtDate(p.pr_date || p.created_at),
           Description: p.purpose || p.first_item_name || "-",
@@ -58223,7 +58982,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           "IAR Date",
           "Total Days",
         ],
-        data: (cachedPR || []).map((pr) => {
+        data: (cachedPR || []).filter(matchesFY).map((pr) => {
           const rfq = (cachedRFQ || []).find((r) => r.pr_id === pr.id);
           const abs = (cachedAbstract || []).find(
             (a) => a.rfq_id === (rfq || {}).id,
@@ -58298,7 +59057,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       PhilGEPS: {
         title: "PhilGEPS Compliance Report",
         headers: ["RFQ No", "ABC", "PhilGEPS Required", "Status"],
-        data: (cachedRFQ || []).map((r) => ({
+        data: (cachedRFQ || []).filter(matchesFY).map((r) => ({
           "RFQ No": r.rfq_number || "-",
           ABC: fmt(r.abc_amount || r.total_amount),
           "PhilGEPS Required": r.philgeps_required ? "Yes" : "No",
@@ -58376,7 +59135,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group">
  <label>Fiscal Year</label>
  <select class="form-select" id="ppmpReportYear">
- ${getFiscalYearOptions("")}
+ ${getFiscalYearOptions("", getReportFiscalYear())}
  </select>
  </div>
  <div class="form-group">
@@ -58421,8 +59180,8 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-grid">
  <div class="form-group">
  <label>Fiscal Year</label>
- <select class="form-select">
- ${getFiscalYearOptions("")}
+ <select class="form-select" id="appReportYear">
+ ${getFiscalYearOptions("", getReportFiscalYear())}
  </select>
  </div>
  <div class="form-group">

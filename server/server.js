@@ -15,6 +15,25 @@ const { PDFDocument } = require('pdf-lib');
 const { Server: SocketIOServer } = require('socket.io');
 require('dotenv').config();
 
+// ==============================================================================
+// FISCAL YEAR UTILITIES (server-side)
+// Philippine government fiscal year = calendar year (Jan 1 – Dec 31).
+// In Nov–Dec the ACTIVE fiscal year is next year (advance planning period).
+// ==============================================================================
+function getServerCurrentFY() {
+  return getServerCurrentFY();
+}
+function getServerActiveFY() {
+  const now = new Date();
+  return (now.getMonth() + 1) >= 11 ? now.getFullYear() + 1 : now.getFullYear();
+}
+/** Derive fiscal year from a date string — just the calendar year. */
+function getFYFromDate(dateStr) {
+  if (!dateStr) return getServerCurrentFY();
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? getServerCurrentFY() : d.getFullYear();
+}
+
 const app = express();
 const httpServer = http.createServer(app);
 
@@ -630,7 +649,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined }
+      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined, employee_id: user.employee_id || null }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -795,7 +814,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       // Basic counts — uses safeQuery so missing tables don't crash the dashboard
       safeQuery('SELECT COUNT(*) FROM items WHERE is_active = TRUE'),
       safeQuery('SELECT COUNT(*) FROM procurementplans'),
-      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery(`SELECT COUNT(*) FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${getServerCurrentFY()}`),
       safeQuery('SELECT COUNT(*) FROM purchaserequests'),
       safeQuery('SELECT COUNT(*) FROM purchaseorders'),
       safeQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE'),
@@ -825,13 +844,15 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       safeQuery("SELECT status, COUNT(*)::int as count FROM purchaseorders GROUP BY status"),
       safeQuery("SELECT acceptance, COUNT(*)::int as count FROM iars GROUP BY acceptance"),
       // PPMP by division (with status breakdown) — current fiscal year only
-      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = ${new Date().getFullYear()} GROUP BY d.code, pp.status ORDER BY d.code`),
+      safeQuery(`SELECT d.code, pp.status, COUNT(*)::int as count, COALESCE(SUM(pp.total_amount),0) as budget FROM procurementplans pp JOIN departments d ON pp.dept_id = d.id WHERE pp.ppmp_no IS NOT NULL AND pp.fiscal_year = ${getServerCurrentFY()} GROUP BY d.code, pp.status ORDER BY d.code`),
       // Total PPMP budget — current fiscal year only
-      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()}`),
+      safeQuery(`SELECT COALESCE(SUM(total_amount),0) as total FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${getServerCurrentFY()}`),
       // PPMP status breakdown — current fiscal year only
-      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${new Date().getFullYear()} GROUP BY status`),
+      safeQuery(`SELECT status, COUNT(*)::int as count, COALESCE(SUM(total_amount),0) as budget FROM procurementplans WHERE ppmp_no IS NOT NULL AND fiscal_year = ${getServerCurrentFY()} GROUP BY status`),
       // Recent PRs with department + item descriptions
-      safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount, d.code as dept_code, pr.created_at,
+      safeQuery(`SELECT pr.id, pr.pr_number, pr.purpose, pr.status, pr.total_amount,
+                       COALESCE(pr.fiscal_year, EXTRACT(YEAR FROM pr.created_at)::INTEGER) as fiscal_year,
+                       d.code as dept_code, pr.created_at,
         COALESCE(
           (SELECT string_agg(pi.item_name, ', ' ORDER BY pi.id) FROM pr_items pi WHERE pi.pr_id = pr.id),
           'N/A'
@@ -1784,7 +1805,7 @@ app.post('/api/plans', authenticateToken, async (req, res) => {
             category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = req.body;
 
     const deptId = dept_id || req.user.dept_id;
-    const fy = fiscal_year || new Date().getFullYear();
+    const fy = fiscal_year || getServerCurrentFY();
 
     // Validate PPMP creation deadline
     const today = new Date();
@@ -1872,7 +1893,7 @@ app.post('/api/plans/batch', authenticateToken, async (req, res) => {
               category, item_id, section, item_description, procurement_source, unit, unit_price, plan_type } = entry;
 
       const deptId = dept_id || req.user.dept_id;
-      const fy = fiscal_year || new Date().getFullYear();
+      const fy = fiscal_year || getServerCurrentFY();
 
       // Validate PPMP creation deadline
       const today = new Date();
@@ -2599,7 +2620,7 @@ app.put('/api/app-entries/:planId/delete', authenticateToken, async (req, res) =
 // GET APP budget summary (total allocated, active, available)
 app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
   try {
-    const fy = req.query.fiscal_year || new Date().getFullYear();
+    const fy = req.query.fiscal_year || getServerCurrentFY();
     
     // Check if consolidation has been done (check app_entries table for this FY)
     const appCheckResult = await pool.query(
@@ -2764,7 +2785,7 @@ app.get('/api/app-budget-summary', authenticateToken, async (req, res) => {
 // Records consolidation timestamp and returns summary
 app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
   try {
-    const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    const fiscalYear = req.body.fiscal_year || getServerCurrentFY();
     console.log('[CONSOLIDATE] 🔄 Starting consolidation for FY', fiscalYear);
 
     // Get all active PPMP entries for this fiscal year (hard delete means no is_deleted check)
@@ -2913,7 +2934,7 @@ app.post('/api/plan-items/consolidate', authenticateToken, async (req, res) => {
 // Sync APP status to all consolidated entries (update app_version field)
 app.post('/api/plan-items/sync-status', authenticateToken, async (req, res) => {
   try {
-    const fiscalYear = req.body.fiscal_year || new Date().getFullYear();
+    const fiscalYear = req.body.fiscal_year || getServerCurrentFY();
     const appVersion = req.body.app_version || 'indicative';
     const remarks = req.body.remarks || '';
 
@@ -3030,7 +3051,7 @@ app.post('/api/paps', authenticateToken, async (req, res) => {
     if (!pap_name) return res.status(400).json({ error: 'PAP Name is required' });
 
     const deptId = dept_id || req.user.dept_id;
-    const fy = fiscal_year || new Date().getFullYear();
+    const fy = fiscal_year || getServerCurrentFY();
 
     // Auto-generate PAP code: PAP-{DEPT}-{YEAR}-{SEQ}
     let papCode = null;
@@ -3351,17 +3372,31 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
       divisionCondition = ` AND pr.dept_id = $${params.length}`;
     }
 
+    // Fiscal year filter: ?fiscal_year=2026 — filters by stored fiscal_year or falls back to created_at year
+    let fiscalYearCondition = '';
+    if (req.query.fiscal_year) {
+      const fy = parseInt(req.query.fiscal_year);
+      if (!isNaN(fy)) {
+        params.push(fy);
+        fiscalYearCondition = ` AND (pr.fiscal_year = $${params.length} OR (pr.fiscal_year IS NULL AND EXTRACT(YEAR FROM pr.created_at) = $${params.length}))`;
+      }
+    }
+
     const result = await pool.query(
-      `SELECT pr.*, d.name as department_name, d.code as department_code, u.username as requested_by_name,
+      `SELECT pr.*,
+              COALESCE(pr.fiscal_year, EXTRACT(YEAR FROM pr.created_at)::INTEGER) as fiscal_year,
+              d.name as department_name, d.code as department_code, u.username as requested_by_name,
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
               pri.item_name as first_item_name, pri.item_description as first_item_description,
-              (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count
+              (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count,
+              hope_user.id as hope_user_id, hope_user.employee_id as hope_employee_id
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}
-       ORDER BY pr.created_at DESC`,
+       LEFT JOIN users hope_user ON (hope_user.role = 'hope' OR hope_user.secondary_role = 'hope')
+       WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}${fiscalYearCondition}
+       ORDER BY pr.fiscal_year DESC, pr.created_at DESC`,
       params
     );
     res.json(result.rows);
@@ -3371,7 +3406,9 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
 app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     const pr = await pool.query(
-      `SELECT pr.*, d.name as department_name, d.code as department_code,
+      `SELECT pr.*,
+              COALESCE(pr.fiscal_year, EXTRACT(YEAR FROM pr.created_at)::INTEGER) as fiscal_year,
+              d.name as department_name, d.code as department_code,
               u1.full_name as requested_by_name,
               u2.full_name as approved_by_name,
               -- "Requested by" signatory: WRSD uses their own chief, all others use FAD chief (ESPALDON)
@@ -3400,7 +3437,7 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
        LEFT JOIN employees wrsd_emp ON wrsd_chief.employee_id = wrsd_emp.id
        LEFT JOIN designations wrsd_desig ON wrsd_emp.designation_id = wrsd_desig.id
        -- HOPE (Approved by)
-       LEFT JOIN users hope_user ON hope_user.role = 'hope'
+       LEFT JOIN users hope_user ON (hope_user.role = 'hope' OR hope_user.secondary_role = 'hope')
        LEFT JOIN employees hope_emp ON hope_user.employee_id = hope_emp.id
        LEFT JOIN designations hope_desig ON hope_emp.designation_id = hope_desig.id
        WHERE pr.id = $1`,
@@ -3416,11 +3453,16 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items } = req.body;
+    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items,
+            fiscal_year: reqFiscalYear, pr_date: reqPrDate } = req.body;
     const deptId = dept_id || req.user.dept_id;
-    const fy = new Date().getFullYear();
 
-    // Auto-generate PR number dynamically: PR-{DEPT}-{YEAR}-{SEQ}
+    // Resolve fiscal year: use what the client sent, or derive from pr_date, or use server active FY
+    const resolvedPrDate = reqPrDate || new Date().toISOString().split('T')[0];
+    const fy = reqFiscalYear ? parseInt(reqFiscalYear) : getFYFromDate(resolvedPrDate) || getServerActiveFY();
+
+    // Auto-generate PR number dynamically: PR-{DEPT}-{FY}-{SEQ}
+    // Use the resolved fiscal year so Nov–Dec PRs get the correct next-year number
     let finalPrNumber = pr_number;
     if (!finalPrNumber || !finalPrNumber.includes('-')) {
       const deptResult = await client.query('SELECT code FROM departments WHERE id = $1', [deptId]);
@@ -3436,9 +3478,9 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
     }
 
     const prResult = await client.query(
-      `INSERT INTO purchaserequests (pr_number, purpose, total_amount, dept_id, status, requested_by, item_specifications) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [finalPrNumber, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id, item_specifications || null]
+      `INSERT INTO purchaserequests (pr_number, pr_date, fiscal_year, purpose, total_amount, dept_id, status, requested_by, item_specifications)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [finalPrNumber, resolvedPrDate, fy, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id, item_specifications || null]
     );
     const pr = prResult.rows[0];
     if (items && items.length > 0) {
@@ -3475,19 +3517,25 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items } = req.body;
+    const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items,
+            fiscal_year: reqFiscalYear, pr_date: reqPrDate } = req.body;
+
+    // Resolve fiscal year for updates: if client sent one, use it; else preserve existing DB value
+    const fyClause = reqFiscalYear ? `, fiscal_year=${parseInt(reqFiscalYear)}` : '';
+    const prDateClause = reqPrDate ? `, pr_date='${reqPrDate}'` : '';
+
     // Only update dept_id if explicitly provided, otherwise preserve existing value
     let result;
     if (dept_id !== undefined && dept_id !== null) {
       result = await client.query(
-        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, item_specifications=$6, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$7 RETURNING *`,
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, dept_id=$4, status=$5, item_specifications=$6, updated_at=CURRENT_TIMESTAMP${fyClause}${prDateClause}
+         WHERE id=$7 RETURNING *, COALESCE(fiscal_year, EXTRACT(YEAR FROM created_at)::INTEGER) as fiscal_year`,
         [pr_number, purpose, total_amount, dept_id, status, item_specifications || null, req.params.id]
       );
     } else {
       result = await client.query(
-        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, status=$4, item_specifications=$5, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$6 RETURNING *`,
+        `UPDATE purchaserequests SET pr_number=$1, purpose=$2, total_amount=$3, status=$4, item_specifications=$5, updated_at=CURRENT_TIMESTAMP${fyClause}${prDateClause}
+         WHERE id=$6 RETURNING *, COALESCE(fiscal_year, EXTRACT(YEAR FROM created_at)::INTEGER) as fiscal_year`,
         [pr_number, purpose, total_amount, status, item_specifications || null, req.params.id]
       );
     }
@@ -3523,6 +3571,28 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
 
 app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const isAdmin = userRoles.includes('admin');
+    const isHope = userRoles.includes('hope');
+
+    if (!isAdmin && !isHope) {
+      return res.status(403).json({ error: 'Only the designated HOPE signatory can approve purchase requests.' });
+    }
+
+    // For non-admins, verify this user is the affixed HOPE signatory on this specific PR
+    if (!isAdmin) {
+      const prCheck = await pool.query(
+        `SELECT hope_user.id as hope_user_id
+         FROM purchaserequests pr
+         LEFT JOIN users hope_user ON hope_user.role = 'hope' OR hope_user.secondary_role = 'hope'
+         WHERE pr.id = $1 AND hope_user.id = $2 LIMIT 1`,
+        [req.params.id, req.user.id]
+      );
+      if (prCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Only the designated HOPE signatory can approve purchase requests.' });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE purchaserequests SET status='approved', approved_by=$1, approved_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
        WHERE id=$2 RETURNING *`,
@@ -3955,7 +4025,13 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
        em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
        eh.full_name as hope_name,
-       pr.dept_id as pr_dept_id, dept.code as department_code
+       pr.dept_id as pr_dept_id, dept.code as department_code,
+       hope_user.id as hope_user_id, hope_user.employee_id as hope_user_employee_id,
+       chair_user.id as bac_chairperson_user_id,
+       vchair_user.id as bac_vice_chairperson_user_id,
+       mem1_user.id as bac_member1_user_id,
+       mem2_user.id as bac_member2_user_id,
+       mem3_user.id as bac_member3_user_id
        FROM bac_resolutions br LEFT JOIN abstracts a ON br.abstract_id = a.id
        LEFT JOIN rfqs r ON a.rfq_id = r.id
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
@@ -3967,7 +4043,13 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
        LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
        LEFT JOIN employees eh ON br.hope_id = eh.id
-       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)${divisionCondition}
+       LEFT JOIN users hope_user ON hope_user.employee_id = br.hope_id
+       LEFT JOIN users chair_user ON chair_user.employee_id = br.bac_chairperson_id
+       LEFT JOIN users vchair_user ON vchair_user.employee_id = br.bac_vice_chairperson_id
+       LEFT JOIN users mem1_user ON mem1_user.employee_id = br.bac_member1_id
+       LEFT JOIN users mem2_user ON mem2_user.employee_id = br.bac_member2_id
+       LEFT JOIN users mem3_user ON mem3_user.employee_id = br.bac_member3_id
+       WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)\${divisionCondition}
        ORDER BY br.created_at DESC`,
       params
     );
@@ -4031,6 +4113,24 @@ app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id/approve', authenticateToken, async (req, res) => {
   try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const isAdmin = userRoles.includes('admin');
+
+    if (!isAdmin) {
+      // Only the user whose employee_id matches bac_resolutions.hope_id may approve
+      const brCheck = await pool.query(
+        `SELECT br.hope_id, u.employee_id FROM bac_resolutions br
+         LEFT JOIN users u ON u.id = $1
+         WHERE br.id = $2`,
+        [req.user.id, req.params.id]
+      );
+      if (brCheck.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
+      const { hope_id, employee_id } = brCheck.rows[0];
+      if (!hope_id || String(employee_id) !== String(hope_id)) {
+        return res.status(403).json({ error: 'Only the affixed HOPE signatory can approve this BAC Resolution.' });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE bac_resolutions SET status='completed', approved_by=$1, approved_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
       [req.user.id, req.params.id]
@@ -4966,7 +5066,7 @@ app.post('/api/ics', authenticateToken, async (req, res) => {
     // Auto-generate ICS number if not provided
     let finalIcsNo = ics_no;
     if (!finalIcsNo) {
-      const year = new Date().getFullYear();
+      const year = getServerCurrentFY();
       let countersResult = await client.query("SELECT data FROM settings WHERE id = 'globalCounters'");
       let counters = countersResult.rows.length > 0 ? countersResult.rows[0].data : {};
       counters.icsCounters = counters.icsCounters || {};
@@ -5061,7 +5161,7 @@ app.post('/api/pars', authenticateToken, async (req, res) => {
 
     let finalParNo = par_no;
     if (!finalParNo) {
-      const year = new Date().getFullYear();
+      const year = getServerCurrentFY();
       let countersResult = await client.query("SELECT data FROM settings WHERE id = 'globalCounters'");
       let counters = countersResult.rows.length > 0 ? countersResult.rows[0].data : {};
       counters.parCounters = counters.parCounters || {};
@@ -5258,7 +5358,7 @@ app.post('/api/ris', authenticateToken, async (req, res) => {
 
     let finalRisNo = ris_no;
     if (!finalRisNo) {
-      const year = new Date().getFullYear();
+      const year = getServerCurrentFY();
       let countersResult = await client.query("SELECT data FROM settings WHERE id = 'globalCounters'");
       let counters = countersResult.rows.length > 0 ? countersResult.rows[0].data : {};
       counters.risCounters = counters.risCounters || {};
@@ -5299,6 +5399,14 @@ app.put('/api/ris/:id/post', authenticateToken, async (req, res) => {
     const risResult = await client.query('SELECT * FROM requisition_issue_slips WHERE id = $1', [risId]);
     if (risResult.rows.length === 0) throw new Error('RIS not found');
     const ris = risResult.rows[0];
+
+    // Signatory enforcement: only the supply officer set as approved_by_supply_id (or admin) may post
+    const _risUserRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    if (!_risUserRoles.includes("admin") && ris.approved_by_supply_id && String(ris.approved_by_supply_id) !== String(req.user.id)) {
+      await client.query("ROLLBACK");
+      client.release();
+      return res.status(403).json({ error: "Only the affixed supply officer signatory can post this RIS." });
+    }
 
     const risItemsResult = await client.query(
       `SELECT ri.*, i.code, i.name as item_name, i.unit, i.unit_price FROM ris_items ri LEFT JOIN items i ON ri.item_id = i.id WHERE ri.ris_id = $1`,
@@ -6879,6 +6987,10 @@ let migrationsInProgress = true; // Track migration status
 async function runMigrations() {
   migrationsInProgress = true;
   const migrations = [
+    // Fiscal year tracking on purchase requests
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS fiscal_year INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS pr_date DATE`,
+    `CREATE INDEX IF NOT EXISTS idx_pr_fiscal_year ON purchaserequests(fiscal_year)`,
     `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
@@ -6899,6 +7011,30 @@ async function runMigrations() {
     try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }
   }
   console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+
+  // ── Backfill fiscal_year on purchaserequests from pr_number year segment or created_at ──
+  try {
+    // First: extract year from PR number format PR-DEPT-YEAR-SEQ
+    const backfillResult = await pool.query(`
+      UPDATE purchaserequests
+      SET fiscal_year = CASE
+        WHEN pr_number ~ '^PR-[A-Z]+-([0-9]{4})-' THEN
+          CAST(SUBSTRING(pr_number FROM 'PR-[A-Z]+-([0-9]{4})-') AS INTEGER)
+        ELSE EXTRACT(YEAR FROM created_at)::INTEGER
+      END
+      WHERE fiscal_year IS NULL
+    `);
+    if (backfillResult.rowCount > 0) {
+      console.log(\`[MIGRATION] Backfilled fiscal_year for \${backfillResult.rowCount} purchase requests\`);
+    }
+    // Second: backfill pr_date from created_at where missing
+    const prDateResult = await pool.query(`
+      UPDATE purchaserequests SET pr_date = created_at::DATE WHERE pr_date IS NULL
+    `);
+    if (prDateResult.rowCount > 0) {
+      console.log(\`[MIGRATION] Backfilled pr_date for \${prDateResult.rowCount} purchase requests\`);
+    }
+  } catch (e) { console.error('[MIGRATION] PR fiscal_year/pr_date backfill error:', e.message); }
 
   // CRITICAL: Ensure unit and unit_price columns exist - explicit check and create
   try {
