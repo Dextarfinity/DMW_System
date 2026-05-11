@@ -6758,11 +6758,12 @@ function renderPRTable(pr) {
  <td>${unit}</td>
  <td>${unitCost}</td>
  <td>₱${parseFloat(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${p.status === "rejected" && p.reject_reason ? `<div style="margin-top:4px;padding:5px 7px;background:#fff5f5;border:1px solid #fed7d7;border-radius:5px;font-size:10px;"><div style="color:#c53030;font-weight:600;"><i class=\"fas fa-times-circle\"></i> Rejected${p.rejected_by_name ? " by " + escapeHtml(p.rejected_by_name) : ""}</div><div style="color:#742a2a;margin-top:2px;">${escapeHtml(p.reject_reason)}</div></div>` : ""}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
- ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button class="btn-icon success" data-action="approve-pr" title="Approve PR" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-pr" title="Reject PR" onclick="showRejectPRModal(${p.id})" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
+ ${p.status === "rejected" && (p.requested_by === (currentUser.id || currentUser.userId) || userHasRole("admin")) ? `<button class="btn-icon" data-action="resubmit-pr" title="Resubmit for Approval" onclick="resubmitPR(${p.id})" style="color:#dd6b20;"><i class="fas fa-redo"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditPRModal(${p.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printPR(${p.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PR', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -6845,7 +6846,7 @@ function renderRFQTable(rfq) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${r.status === "on_going" && hasPermission("canSendRFQ") ? `<button class="btn-icon success" data-action="approve-rfq" title="Complete RFQ" onclick="approveRFQRecord(${r.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${r.status === "on_going" && hasPermission("canSendRFQ") ? `<button class="btn-icon success" data-action="approve-rfq" title="Complete RFQ" onclick="approveRFQRecord(${r.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-rfq" title="Reject RFQ" onclick="showRejectModal('rfq', ${r.id}, 'rfqs', loadRFQ)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6907,7 +6908,7 @@ function renderAbstractTable(abstract) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${a.status === "on_going" && hasPermission("canApproveAbstract") ? `<button class="btn-icon success" data-action="approve-abstract" title="Approve Abstract" onclick="approveAbstractRecord(${a.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${a.status === "on_going" && hasPermission("canApproveAbstract") ? `<button class="btn-icon success" data-action="approve-abstract" title="Approve Abstract" onclick="approveAbstractRecord(${a.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-abstract" title="Reject Abstract" onclick="showRejectModal('abstract of quotation', ${a.id}, 'abstracts', loadAbstract)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6955,7 +6956,7 @@ function renderPostQualTable(postQual) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printTWGReport(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${p.status === "on_going" && hasPermission("canApprovePostQual") ? `<button class="btn-icon success" data-action="approve-postqual" title="Complete Post-Qualification" onclick="approvePostQualRecord(${p.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${p.status === "on_going" && hasPermission("canApprovePostQual") ? `<button class="btn-icon success" data-action="approve-postqual" title="Complete Post-Qualification" onclick="approvePostQualRecord(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-postqual" title="Reject Post-Qualification" onclick="showRejectModal('post-qualification', ${p.id}, 'post-qualifications', loadPostQual)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7004,7 +7005,7 @@ function renderBACResolutionTable(bacRes) {
  <button class="btn-icon" title="Print" onclick="printBACResolution(${b.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ""}
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${b.status === "on_going" && isCurrentUserAffixedSignatory(b, { userFields: ["hope_user_id"], employeeFields: ["hope_id"] }) ? `<button class="btn-icon success" data-action="approve-bacres" title="Approve / Complete" onclick="approveBACResolution(${b.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${b.status === "on_going" && isCurrentUserAffixedSignatory(b, { userFields: ["hope_user_id"], employeeFields: ["hope_id"] }) ? `<button class="btn-icon success" data-action="approve-bacres" title="Approve / Complete" onclick="approveBACResolution(${b.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-bacres" title="Reject BAC Resolution" onclick="showRejectModal('BAC Resolution', ${b.id}, 'bac-resolutions', loadBACResolution)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7053,7 +7054,7 @@ function renderNOATable(noa) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printNoticeOfAward(${n.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${n.status === "awaiting_noa" && hasPermission("canApproveNOA") ? `<button class="btn-icon success" data-action="approve-noa" title="Approve NOA" onclick="approveNOARecord(${n.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${n.status === "awaiting_noa" && hasPermission("canApproveNOA") ? `<button class="btn-icon success" data-action="approve-noa" title="Approve NOA" onclick="approveNOARecord(${n.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-noa" title="Reject NOA" onclick="showRejectModal('notice of award', ${n.id}, 'notices-of-award', loadNOA)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7102,7 +7103,7 @@ function renderPOTable(po) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printPurchaseOrder(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${p.status === "for_signing" && hasPermission("canApprovePO") ? `<button class="btn-icon success" data-action="approve-po" title="Approve / Sign PO" onclick="approvePORecord(${p.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${p.status === "for_signing" && hasPermission("canApprovePO") ? `<button class="btn-icon success" data-action="approve-po" title="Approve / Sign PO" onclick="approvePORecord(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-po" title="Reject PO" onclick="showRejectModal('purchase order', ${p.id}, 'purchase-orders', loadPO)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7164,7 +7165,7 @@ function renderIARTable(iar) {
  <button class="btn-icon" title="Edit" onclick="showEditIARModal(${i.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printIAR(${i.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('IAR', ${i.id})"><i class="fas fa-trash"></i></button>
- ${i.inspection_result !== "verified" && hasPermission("canApproveIAR") ? `<button class="btn-icon success" data-action="approve-iar" title="Accept & Verify IAR" onclick="approveIARRecord(${i.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${i.inspection_result !== "verified" && hasPermission("canApproveIAR") ? `<button class="btn-icon success" data-action="approve-iar" title="Accept & Verify IAR" onclick="approveIARRecord(${i.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-iar" title="Reject IAR" onclick="showRejectModal('IAR', ${i.id}, 'iars', loadIAR)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -9307,27 +9308,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
+      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: true,
+      canRejectAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: true,
+      canRejectPostQual: true,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: true,
+      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: true,
+      canRejectNOA: true,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: true,
+      canRejectPO: true,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: true,
+      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9367,27 +9376,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: true,
+      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9421,27 +9438,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
+      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9475,27 +9500,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9529,27 +9562,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9585,27 +9626,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: true,
+      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: true,
+      canRejectNOA: true,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: true,
+      canRejectPO: true,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: true,
+      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9639,27 +9688,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: true,
+      canRejectAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: true,
+      canRejectPostQual: true,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: true,
+      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9695,27 +9752,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
+      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9749,27 +9814,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9803,28 +9876,36 @@ document.addEventListener("DOMContentLoaded", () => {
       canViewAPP: true,
       canCreatePR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canEditPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9857,28 +9938,36 @@ document.addEventListener("DOMContentLoaded", () => {
       canViewAPP: false,
       canCreatePR: true,
       canApprovePR: false,
+      canRejectPR: false,
       canEditPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9912,27 +10001,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
+      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9966,27 +10063,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10020,27 +10125,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10074,27 +10187,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10128,27 +10249,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10182,27 +10311,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10236,27 +10373,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
+      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10290,27 +10435,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10344,27 +10497,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10398,27 +10559,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10452,27 +10621,35 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
+      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
+      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
+      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
+      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
+      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
+      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
+      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
+      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10954,34 +11131,42 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: ['[data-action="create-pr"]', ".btn-create-pr"],
       canEditPR: ['[data-action="edit-pr"]', ".btn-edit-pr"],
       canApprovePR: ['[data-action="approve-pr"]', ".btn-approve-pr"],
+      canRejectPR: ['[data-action="reject-pr"]', ".btn-reject-pr"],
       canViewPR: ['[data-action="view-pr"]'],
       // RFQ
       canCreateRFQ: ['[data-action="create-rfq"]', ".btn-create-rfq"],
       canSendRFQ: ['[data-action="send-rfq"]'],
+      canRejectRFQ: ['[data-action="reject-rfq"]'],
       // Abstract
       canCreateAbstract: [
         '[data-action="create-abstract"]',
         ".btn-create-abstract",
       ],
       canApproveAbstract: ['[data-action="approve-abstract"]'],
+      canRejectAbstract: ['[data-action="reject-abstract"]'],
       // Post-Qual
       canCreatePostQual: [
         '[data-action="create-postqual"]',
         ".btn-create-postqual",
       ],
       canApprovePostQual: ['[data-action="approve-postqual"]'],
+      canRejectPostQual: ['[data-action="reject-postqual"]'],
       // BAC Resolution
       canCreateBACRes: ['[data-action="create-bacres"]', ".btn-create-bacres"],
       canApproveBACRes: ['[data-action="approve-bacres"]'],
+      canRejectBACRes: ['[data-action="reject-bacres"]'],
       // NOA
       canCreateNOA: ['[data-action="create-noa"]', ".btn-create-noa"],
       canApproveNOA: ['[data-action="approve-noa"]'],
+      canRejectNOA: ['[data-action="reject-noa"]'],
       // PO
       canCreatePO: ['[data-action="create-po"]', ".btn-create-po"],
       canApprovePO: ['[data-action="approve-po"]'],
+      canRejectPO: ['[data-action="reject-po"]'],
       // IAR
       canCreateIAR: ['[data-action="create-iar"]', ".btn-create-iar"],
       canApproveIAR: ['[data-action="approve-iar"]'],
+      canRejectIAR: ['[data-action="reject-iar"]'],
       // COA
       canCreateCOA: ['[data-action="create-coa"]', ".btn-create-coa"],
       canSubmitCOA: ['[data-action="submit-coa"]'],
@@ -27317,7 +27502,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
-        ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button type="button" class="btn btn-primary" onclick="closeModal();showApprovePRModal(${id});"><i class="fas fa-check"></i> Approve</button>` : ""}
+        ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button type="button" class="btn btn-primary" onclick="closeModal();showApprovePRModal(${id});"><i class="fas fa-check"></i> Approve</button><button type="button" class="btn" onclick="closeModal();showRejectPRModal(${id});" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject</button>` : ""}
       </div>
     `;
     openModal("View Purchase Request", html, {
@@ -31256,48 +31441,49 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Approve PR Modal
   window.showApprovePRModal = async function (prIdOrNo) {
-    // Fetch actual PR data dynamically
     let pr = null;
     if (typeof prIdOrNo === "number") {
       pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
-      if (!pr) {
-        try {
-          pr = await apiRequest("/purchase-requests/" + prIdOrNo);
-        } catch (e) {}
-      }
+      if (!pr) { try { pr = await apiRequest("/purchase-requests/" + prIdOrNo); } catch (e) {} }
     } else {
       pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
     }
-    if (!pr) {
-      alert("PR not found");
-      return;
-    }
+    if (!pr) { alert("PR not found"); return; }
+
+    const isHope = userHasAnyRole(["hope", "admin"]);
+    const canUserApprove = isHope && pr.status === "pending_approval";
+    const approveLabel = userHasRole("admin") ? "Approve (Admin)" : "Approve as HOPE";
+
+    const approvedStatus = pr.status === "approved"
+      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${pr.approved_by_name ? " (" + pr.approved_by_name + ")" : ""}</span>`
+      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE Approval</span>`;
+
     const html = `
       <form id="approvePRForm" data-pr-id="${pr.id}">
-        <div class="info-banner" style="margin-bottom: 15px;">
-          <i class="fas fa-check-circle"></i>
-          Approve this Purchase Request as HoPE (Head of Procuring Entity).
-        </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
-          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+          <div class="detail-row"><label>PR No.:</label><span style="font-weight:bold;">${pr.pr_number || ""}</span></div>
+          <div class="detail-row"><label>Purpose / Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
+          <div class="detail-row"><label>Total Amount:</label><span style="font-weight:bold;color:#1a365d;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
           <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
+          <div class="detail-row"><label>Status:</label><span><span class="status-badge ${pr.status === "approved" ? "approved" : "pending"}">${pr.status}</span></span></div>
         </div>
-        <div class="form-group" style="margin-top: 15px;">
+        <div style="margin-top:16px;padding:14px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">${approvedStatus}</div>
+        </div>
+        ${canUserApprove ? `
+        <div class="form-group" style="margin-top:14px;">
           <label>Approval Remarks (Optional)</label>
-          <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record"></textarea>
-        </div>
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
+          <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+        </div>` : ""}
+        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button type="button" class="btn" onclick="closeModal();showRejectPRModal(${pr.id})" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject</button>
+          ${canUserApprove ? `<button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> ${approveLabel}</button>` : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PR with your current role.</p>`}
         </div>
       </form>
     `;
-    openModal("Approve Purchase Request", html, {
-      preventOutsideClose: true,
-    });
-    // Attach submit handler after modal is rendered
+    openModal("Approve Purchase Request", html, { preventOutsideClose: true });
     setTimeout(() => {
       const form = document.getElementById("approvePRForm");
       if (form) {
@@ -31319,6 +31505,146 @@ Failure to submit the above requirements within the prescribed period shall cons
         });
       }
     }, 0);
+  };
+
+  // Reject PR Modal (send back for revision)
+  window.showRejectPRModal = async function (prIdOrNo) {
+    let pr = null;
+    if (typeof prIdOrNo === "number") {
+      pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
+      if (!pr) { try { pr = await apiRequest("/purchase-requests/" + prIdOrNo); } catch (e) {} }
+    } else {
+      pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
+    }
+    if (!pr) { alert("PR not found"); return; }
+    const html = `
+      <div style="padding:5px 0;">
+        <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
+          <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;"><i class="fas fa-exclamation-triangle"></i> Reject Purchase Request</div>
+          <p style="color:#742a2a;font-size:12px;margin:0;">This will send the PR back to the requesting division for revision. The requester will be notified with your reason.</p>
+        </div>
+        <div class="view-details" style="margin-bottom:16px;">
+          <div class="detail-row"><label>PR No.:</label><span style="font-weight:bold;">${pr.pr_number || ""}</span></div>
+          <div class="detail-row"><label>Purpose:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
+          <div class="detail-row"><label>Amount:</label><span style="font-weight:bold;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
+        </div>
+        <div class="form-group">
+          <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;"><i class="fas fa-comment-alt"></i> Reason for Rejection <span style="color:#e53e3e;">*</span></label>
+          <textarea id="rejectPRReasonInput" rows="4" placeholder="Please provide a detailed reason for rejecting this PR (e.g., budget unavailable, wrong items, missing justification)..." style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="button" class="btn" onclick="rejectPR(${pr.id})" style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject PR</button>
+        </div>
+      </div>
+    `;
+    openModal("Reject Purchase Request — Needs Revision", html, { preventOutsideClose: true });
+    setTimeout(() => { const ta = document.getElementById("rejectPRReasonInput"); if (ta) ta.focus(); }, 200);
+  };
+
+  window.rejectPR = async function (prId) {
+    const reasonEl = document.getElementById("rejectPRReasonInput");
+    const reason = (reasonEl?.value || "").trim();
+    if (!reason) {
+      if (reasonEl) { reasonEl.style.border = "2px solid #e53e3e"; reasonEl.focus(); }
+      showToast("Please provide a reason for rejecting this PR.", "error");
+      return;
+    }
+    if (!confirm("Are you sure you want to reject this PR? The requester will be notified to revise and resubmit.")) return;
+    try {
+      const result = await apiRequest("/purchase-requests/" + prId + "/reject", "PUT", { reason });
+      showToast(result.message || "PR rejected and returned for revision.", "success");
+      closeModal();
+      if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
+      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
+    } catch (err) {
+      showToast(err.message || "Failed to reject PR.", "error");
+    }
+  };
+
+  window.resubmitPR = async function (prId) {
+    if (!confirm("Resubmit this PR for approval? The approver will be notified.")) return;
+    try {
+      const result = await apiRequest("/purchase-requests/" + prId + "/resubmit", "PUT");
+      showToast(result.message || "PR resubmitted for approval.", "success");
+      if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
+      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
+    } catch (err) {
+      showToast(err.message || "Failed to resubmit PR.", "error");
+    }
+  };
+
+  // =====================================================================
+  // UNIVERSAL REJECT MODAL — used by RFQ, AOQ, PostQual, BACRes, NOA, PO, IAR
+  // showRejectModal(label, id, apiResource, refreshFn)
+  //   label       — human-readable name e.g. "RFQ", "purchase order"
+  //   id          — record id
+  //   apiResource — API path segment e.g. "rfqs", "purchase-orders"
+  //   refreshFn   — function to call after success (or its string name)
+  // =====================================================================
+  window.showRejectModal = function (label, id, apiResource, refreshFn) {
+    const labelCaps = label.charAt(0).toUpperCase() + label.slice(1);
+    const html = `
+      <div style="padding:5px 0;">
+        <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
+          <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;">
+            <i class="fas fa-exclamation-triangle"></i> Reject ${labelCaps}
+          </div>
+          <p style="color:#742a2a;font-size:12px;margin:0;">
+            This will reject the ${label} and notify the responsible personnel.
+            They will need to revise and resubmit the document.
+          </p>
+        </div>
+        <div class="form-group">
+          <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;">
+            <i class="fas fa-comment-alt"></i> Reason for Rejection <span style="color:#e53e3e;">*</span>
+          </label>
+          <textarea id="universalRejectReasonInput" rows="4"
+            placeholder="Please provide a detailed reason for rejecting this ${label} (e.g., incorrect details, incomplete documents, policy non-compliance)..."
+            style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="button" class="btn"
+            onclick="confirmUniversalReject('${apiResource}', ${id}, '${typeof refreshFn === 'string' ? refreshFn : refreshFn?.name || ''}')"
+            style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;">
+            <i class="fas fa-times-circle"></i> Reject ${labelCaps}
+          </button>
+        </div>
+      </div>
+    `;
+    openModal(`Reject ${labelCaps} — Needs Revision`, html, { preventOutsideClose: true });
+    setTimeout(() => {
+      const ta = document.getElementById("universalRejectReasonInput");
+      if (ta) ta.focus();
+    }, 200);
+    // Store the refresh function reference for later use
+    window._universalRejectRefreshFn = typeof refreshFn === "function" ? refreshFn : null;
+  };
+
+  window.confirmUniversalReject = async function (apiResource, id, refreshFnName) {
+    const reasonEl = document.getElementById("universalRejectReasonInput");
+    const reason = (reasonEl?.value || "").trim();
+    if (!reason) {
+      if (reasonEl) { reasonEl.style.border = "2px solid #e53e3e"; reasonEl.focus(); }
+      showToast("Please provide a reason for rejecting this document.", "error");
+      return;
+    }
+    if (!confirm("Are you sure you want to reject this document? The responsible personnel will be notified to revise and resubmit.")) return;
+    try {
+      const result = await apiRequest(`/${apiResource}/${id}/reject`, "PUT", { reason });
+      showToast(result.message || "Document rejected and returned for revision.", "success");
+      closeModal();
+      // Try refresh function: stored reference first, then by name
+      const fn = window._universalRejectRefreshFn ||
+        (refreshFnName && typeof window[refreshFnName] === "function" ? window[refreshFnName] : null);
+      if (fn) fn();
+      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
+      window._universalRejectRefreshFn = null;
+    } catch (err) {
+      showToast(err.message || "Failed to reject document.", "error");
+    }
   };
 
   // Return PR Modal
@@ -53019,71 +53345,12 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Create PR from APP Modal — Redirects to PR page with pre-populated data
   // Approve PR Modal
-  window.showApprovePRModal = async function (prIdOrNo) {
-    // Fetch actual PR data dynamically
-    let pr = null;
-    if (typeof prIdOrNo === "number") {
-      pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
-      if (!pr) {
-        try {
-          pr = await apiRequest("/purchase-requests/" + prIdOrNo);
-        } catch (e) {}
-      }
-    } else {
-      pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
-    }
-    if (!pr) {
-      alert("PR not found");
-      return;
-    }
-    const html = `
- <form id="approvePRForm" data-pr-id="${pr.id}">
- <div class="info-banner" style="margin-bottom: 15px;">
- <i class="fas fa-check-circle"></i>
- Approve this Purchase Request as HoPE (Head of Procuring Entity).
- </div>
- <div class="view-details">
- <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
- <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
- <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
- <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
- </div>
- <div class="form-group" style="margin-top: 15px;">
- <label>Approval Remarks (Optional)</label>
- <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record"></textarea>
- </div>
- <div class="form-group" style="text-align: right; margin-top: 20px;">
- <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
- <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
- </div>
- </form>
- `;
-    openModal("Approve Purchase Request", html, {
-      preventOutsideClose: true,
-    });
-    // Attach submit handler after modal is rendered
-    setTimeout(() => {
-      const form = document.getElementById("approvePRForm");
-      if (form) {
-        form.addEventListener("submit", async function (e) {
-          e.preventDefault();
-          const prId = this.dataset.prId;
-          const submitBtn = this.querySelector('button[type="submit"]');
-          if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...'; }
-          try {
-            await apiRequest("/purchase-requests/" + prId + "/approve", "PUT");
-            closeModal();
-            showToast("Purchase Request approved successfully!", "success");
-            if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
-            else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
-          } catch (err) {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Approve PR'; }
-            showToast(err.message || "Failed to approve Purchase Request.", "error");
-          }
-        });
-      }
-    }, 0);
-  };
+  // showApprovePRModal and showRejectPRModal are defined earlier in this file;
+  // this duplicate context re-exports them so both page sections can use them.
+  if (!window._prModalsBound) {
+    window._prModalsBound = true;
+    // All PR modal logic lives in the first definition above.
+  }
 
   // Return PR Modal
   window.showReturnPRModal = async function (prIdOrNo) {

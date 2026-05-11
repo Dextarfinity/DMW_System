@@ -3389,12 +3389,14 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
               pri.item_name as first_item_name, pri.item_description as first_item_description,
               (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count,
-              hope_user.id as hope_user_id, hope_user.employee_id as hope_employee_id
+              hope_user.id as hope_user_id, hope_user.employee_id as hope_employee_id,
+              rj_user.username as rejected_by_name
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
        LEFT JOIN users hope_user ON (hope_user.role = 'hope' OR hope_user.secondary_role = 'hope')
+       LEFT JOIN users rj_user ON rj_user.id = pr.rejected_by
        WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}${fiscalYearCondition}
        ORDER BY pr.fiscal_year DESC, pr.created_at DESC`,
       params
@@ -3411,6 +3413,7 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
               d.name as department_name, d.code as department_code,
               u1.full_name as requested_by_name,
               u2.full_name as approved_by_name,
+              rj_user.username as rejected_by_name,
               -- "Requested by" signatory: WRSD uses their own chief, all others use FAD chief (ESPALDON)
               CASE WHEN d.code = 'WRSD'
                 THEN wrsd_chief.full_name
@@ -3426,6 +3429,7 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON pr.requested_by = u1.id
        LEFT JOIN users u2 ON pr.approved_by = u2.id
+       LEFT JOIN users rj_user ON rj_user.id = pr.rejected_by
        -- FAD chief (ESPALDON) for FAD/MWPSD/MWPTD
        LEFT JOIN departments fad_dept ON fad_dept.code = 'FAD'
        LEFT JOIN users fad_chief ON fad_chief.dept_id = fad_dept.id AND fad_chief.role LIKE 'chief_%'
@@ -3617,6 +3621,63 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT /api/purchase-requests/:id/reject — Reject a PR (send back for revision)
+app.put('/api/purchase-requests/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const isAdmin = userRoles.includes('admin');
+    const isHope = userRoles.includes('hope');
+    if (!isAdmin && !isHope) {
+      return res.status(403).json({ error: 'Only the designated HOPE signatory can reject purchase requests.' });
+    }
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A reason is required when rejecting a purchase request.' });
+    }
+    // Add rejected_by/reject_reason columns dynamically if not present (graceful)
+    await pool.query(`
+      ALTER TABLE purchaserequests
+        ADD COLUMN IF NOT EXISTS rejected_by integer REFERENCES users(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS rejected_at timestamp without time zone,
+        ADD COLUMN IF NOT EXISTS reject_reason text
+    `).catch(() => {});
+    const result = await pool.query(
+      `UPDATE purchaserequests
+       SET status='rejected', rejected_by=$1, rejected_at=CURRENT_TIMESTAMP,
+           reject_reason=$2, updated_at=CURRENT_TIMESTAMP
+       WHERE id=$3 RETURNING *`,
+      [req.user.id, reason.trim(), req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
+    const pr = result.rows[0];
+    if (pr.requested_by) {
+      createNotification(pr.requested_by, {
+        type: 'rejection',
+        icon: 'fas fa-times-circle',
+        title: `${pr.pr_number} Rejected`,
+        message: `Your purchase request was rejected: ${reason.trim()}`,
+        reference_type: 'purchase_request',
+        reference_id: pr.id,
+        reference_code: pr.pr_number
+      });
+    }
+    res.json({ message: 'Purchase Request rejected and returned for revision.', pr });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/purchase-requests/:id/resubmit — Resubmit a rejected PR for approval
+app.put('/api/purchase-requests/:id/resubmit', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE purchaserequests SET status='pending_approval', rejected_by=NULL, rejected_at=NULL,
+       reject_reason=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
+    res.json({ message: 'Purchase Request resubmitted for approval.', pr: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM purchaserequests WHERE id = $1', [req.params.id]);
@@ -3758,9 +3819,19 @@ app.put('/api/rfqs/:id/set-status', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ==============================================================================
-// ABSTRACT OF QUOTATION (AOQ)
-// ==============================================================================
+// PUT /api/rfqs/:id/reject
+app.put('/api/rfqs/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this RFQ.' });
+    const result = await pool.query(
+      `UPDATE rfqs SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'RFQ not found' });
+    res.json({ message: 'RFQ rejected and cancelled.', rfq: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.get('/api/abstracts', authenticateToken, async (req, res) => {
   try {
@@ -3895,6 +3966,20 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT /api/abstracts/:id/reject
+app.put('/api/abstracts/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Abstract.' });
+    const result = await pool.query(
+      `UPDATE abstracts SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Abstract not found' });
+    res.json({ message: 'Abstract of Quotation rejected.', abstract: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==============================================================================
 // POST-QUALIFICATION (TWG)
 // ==============================================================================
@@ -3988,6 +4073,20 @@ app.put('/api/post-qualifications/:id/set-status', authenticateToken, async (req
     const result = await pool.query('UPDATE post_qualifications SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Post-Qualification not found' });
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/post-qualifications/:id/reject
+app.put('/api/post-qualifications/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Post-Qualification.' });
+    const result = await pool.query(
+      `UPDATE post_qualifications SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Post-Qualification not found' });
+    res.json({ message: 'Post-Qualification rejected.', postqual: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4155,6 +4254,20 @@ app.put('/api/bac-resolutions/:id/set-status', authenticateToken, async (req, re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT /api/bac-resolutions/:id/reject
+app.put('/api/bac-resolutions/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this BAC Resolution.' });
+    const result = await pool.query(
+      `UPDATE bac_resolutions SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
+    res.json({ message: 'BAC Resolution rejected.', resolution: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ==============================================================================
 // NOTICE OF AWARD (NOA)
 // ==============================================================================
@@ -4268,6 +4381,20 @@ app.put('/api/notices-of-award/:id/set-status', authenticateToken, async (req, r
     const result = await pool.query('UPDATE notices_of_award SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/notices-of-award/:id/reject
+app.put('/api/notices-of-award/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this NOA.' });
+    const result = await pool.query(
+      `UPDATE notices_of_award SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
+    res.json({ message: 'Notice of Award rejected and cancelled.', noa: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4426,6 +4553,20 @@ app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM purchaseorders WHERE id = $1', [req.params.id]);
     res.json({ message: 'PO deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/purchase-orders/:id/reject
+app.put('/api/purchase-orders/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Purchase Order.' });
+    const result = await pool.query(
+      `UPDATE purchaseorders SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'PO not found' });
+    res.json({ message: 'Purchase Order rejected and cancelled.', po: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4779,6 +4920,20 @@ app.put('/api/iars/:id/set-status', authenticateToken, async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/iars/:id/reject
+app.put('/api/iars/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this IAR.' });
+    const result = await pool.query(
+      `UPDATE iars SET inspection_result='on_going', acceptance='to_be_checked', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
+    res.json({ message: 'IAR rejected and returned for revision.', iar: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
