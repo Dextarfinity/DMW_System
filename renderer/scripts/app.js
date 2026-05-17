@@ -689,30 +689,6 @@ function initAllStickyScrollbars() {
 
 // Wait for the DOM to load — populate ALL fiscal year spans & dynamic selects
 document.addEventListener("DOMContentLoaded", function () {
-  // ── Inject Bidder Picker CSS ──────────────────────────────────────────────
-  const bpStyle = document.createElement("style");
-  bpStyle.textContent = `
-    .bidder-picker-wrap { position: relative; }
-    .bidder-mode-toggle {
-      font-size: 10px !important;
-      padding: 1px 5px !important;
-      border: 1px solid #bbb !important;
-      border-radius: 3px !important;
-      background: #f8f9fa !important;
-      cursor: pointer !important;
-      color: #333 !important;
-      height: 20px !important;
-    }
-    .bidder-mode-toggle:focus { outline: none; border-color: #2b6cb0 !important; }
-    .bidder-manual-input, .bidder-select-input {
-      width: 100% !important;
-      font-size: 11px !important;
-    }
-    .bidder-select-input { cursor: pointer; }
-  `;
-  document.head.appendChild(bpStyle);
-  // ── End Bidder Picker CSS ─────────────────────────────────────────────────
-
   const currentYear = getCurrentFiscalYear();
   const activeFY = getActiveFiscalYear();
 
@@ -981,36 +957,6 @@ function userHasRole(r) {
 function userHasAnyRole(arr) {
   return (currentUser.roles || [currentUser.role]).some((r) => arr.includes(r));
 }
-
-/**
- * isCurrentUserAffixedSignatory — checks if the logged-in user is one of
- * the affixed signatories on a specific document record.
- *
- * @param {object} record        - The document row (PR, BAC Resolution, RIS, etc.)
- * @param {object} opts
- *   userFields    {string[]}  - Fields on the record that store a users.id
- *   employeeFields{string[]}  - Fields on the record that store an employees.id
- *
- * Admins always pass. For non-admins the current user's id must match one of
- * the userFields, OR their employee_id must match one of the employeeFields.
- */
-function isCurrentUserAffixedSignatory(record, { userFields = [], employeeFields = [] } = {}) {
-  if (!currentUser) return false;
-  const roles = currentUser.roles || [currentUser.role];
-  if (roles.includes('admin')) return true;
-
-  const uid = String(currentUser.id || '');
-  const empId = String(currentUser.employee_id || '');
-
-  for (const f of userFields) {
-    if (record[f] && String(record[f]) === uid) return true;
-  }
-  for (const f of employeeFields) {
-    if (record[f] && empId && String(record[f]) === empId) return true;
-  }
-  return false;
-}
-
 // Get the user's chief role (if any) from the roles array
 function getUserChiefRole() {
   const chiefRoles = ["chief_fad", "chief_wrsd", "chief_mwpsd", "chief_mwptd"];
@@ -6758,12 +6704,11 @@ function renderPRTable(pr) {
  <td>${unit}</td>
  <td>${unitCost}</td>
  <td>₱${parseFloat(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}${p.status === "rejected" && p.reject_reason ? `<div style="margin-top:4px;padding:5px 7px;background:#fff5f5;border:1px solid #fed7d7;border-radius:5px;font-size:10px;"><div style="color:#c53030;font-weight:600;"><i class=\"fas fa-times-circle\"></i> Rejected${p.rejected_by_name ? " by " + escapeHtml(p.rejected_by_name) : ""}</div><div style="color:#742a2a;margin-top:2px;">${escapeHtml(p.reject_reason)}</div></div>` : ""}</td>
+ <td>${statusBadge(statusLabel, statusClass)}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
- ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button class="btn-icon success" data-action="approve-pr" title="Approve PR" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-pr" title="Reject PR" onclick="showRejectPRModal(${p.id})" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
- ${p.status === "rejected" && (p.requested_by === (currentUser.id || currentUser.userId) || userHasRole("admin")) ? `<button class="btn-icon" data-action="resubmit-pr" title="Resubmit for Approval" onclick="resubmitPR(${p.id})" style="color:#dd6b20;"><i class="fas fa-redo"></i></button>` : ""}
+ ${p.status === "pending_approval" ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditPRModal(${p.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printPR(${p.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PR', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -6846,7 +6791,6 @@ function renderRFQTable(rfq) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${r.status === "on_going" && hasPermission("canSendRFQ") ? `<button class="btn-icon success" data-action="approve-rfq" title="Complete RFQ" onclick="approveRFQRecord(${r.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-rfq" title="Reject RFQ" onclick="showRejectModal('rfq', ${r.id}, 'rfqs', loadRFQ)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6908,7 +6852,6 @@ function renderAbstractTable(abstract) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${a.status === "on_going" && hasPermission("canApproveAbstract") ? `<button class="btn-icon success" data-action="approve-abstract" title="Approve Abstract" onclick="approveAbstractRecord(${a.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-abstract" title="Reject Abstract" onclick="showRejectModal('abstract of quotation', ${a.id}, 'abstracts', loadAbstract)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -6956,7 +6899,6 @@ function renderPostQualTable(postQual) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printTWGReport(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${p.status === "on_going" && hasPermission("canApprovePostQual") ? `<button class="btn-icon success" data-action="approve-postqual" title="Complete Post-Qualification" onclick="approvePostQualRecord(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-postqual" title="Reject Post-Qualification" onclick="showRejectModal('post-qualification', ${p.id}, 'post-qualifications', loadPostQual)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7005,7 +6947,6 @@ function renderBACResolutionTable(bacRes) {
  <button class="btn-icon" title="Print" onclick="printBACResolution(${b.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ""}
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${b.status === "on_going" && isCurrentUserAffixedSignatory(b, { userFields: ["hope_user_id"], employeeFields: ["hope_id"] }) ? `<button class="btn-icon success" data-action="approve-bacres" title="Approve / Complete" onclick="approveBACResolution(${b.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-bacres" title="Reject BAC Resolution" onclick="showRejectModal('BAC Resolution', ${b.id}, 'bac-resolutions', loadBACResolution)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7054,7 +6995,6 @@ function renderNOATable(noa) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printNoticeOfAward(${n.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${n.status === "awaiting_noa" && hasPermission("canApproveNOA") ? `<button class="btn-icon success" data-action="approve-noa" title="Approve NOA" onclick="approveNOARecord(${n.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-noa" title="Reject NOA" onclick="showRejectModal('notice of award', ${n.id}, 'notices-of-award', loadNOA)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7103,7 +7043,6 @@ function renderPOTable(po) {
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printPurchaseOrder(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
- ${p.status === "for_signing" && hasPermission("canApprovePO") ? `<button class="btn-icon success" data-action="approve-po" title="Approve / Sign PO" onclick="approvePORecord(${p.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-po" title="Reject PO" onclick="showRejectModal('purchase order', ${p.id}, 'purchase-orders', loadPO)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -7165,7 +7104,6 @@ function renderIARTable(iar) {
  <button class="btn-icon" title="Edit" onclick="showEditIARModal(${i.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printIAR(${i.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('IAR', ${i.id})"><i class="fas fa-trash"></i></button>
- ${i.inspection_result !== "verified" && hasPermission("canApproveIAR") ? `<button class="btn-icon success" data-action="approve-iar" title="Accept & Verify IAR" onclick="approveIARRecord(${i.id})"><i class="fas fa-check"></i></button><button class="btn-icon danger" data-action="reject-iar" title="Reject IAR" onclick="showRejectModal('IAR', ${i.id}, 'iars', loadIAR)" style="color:#e53e3e;"><i class="fas fa-times-circle"></i></button>` : ""}
  </div>
  </td>
  </tr>`;
@@ -8236,7 +8174,7 @@ function renderRISTable(ris) {
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewRISModal(${r.id})"><i class="fas fa-eye"></i></button>
  <button class="btn-icon" title="Print" onclick="printRIS(${r.id})"><i class="fas fa-print"></i></button>
- ${r.status === "draft" && isCurrentUserAffixedSignatory(r, { userFields: ["approved_by_supply_id"] }) ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ""}
+ ${r.status === "draft" ? `<button class="btn-icon success" title="Post" onclick="postRIS(${r.id})"><i class="fas fa-check-circle"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditRISModal(${r.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RIS', ${r.id})"><i class="fas fa-trash"></i></button>
  </div>
@@ -9308,35 +9246,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
-      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: true,
-      canRejectAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: true,
-      canRejectPostQual: true,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: true,
-      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: true,
-      canRejectNOA: true,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: true,
-      canRejectPO: true,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: true,
-      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9376,35 +9306,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: true,
-      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9438,35 +9360,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
-      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9500,35 +9414,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9562,35 +9468,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9626,35 +9524,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: true,
-      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: true,
-      canRejectNOA: true,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: true,
-      canRejectPO: true,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: true,
-      canRejectIAR: true,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9688,35 +9578,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: true,
-      canRejectAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: true,
-      canRejectPostQual: true,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: true,
-      canRejectBACRes: true,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9752,35 +9634,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
-      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -9814,35 +9688,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9876,36 +9742,28 @@ document.addEventListener("DOMContentLoaded", () => {
       canViewAPP: true,
       canCreatePR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canEditPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -9938,36 +9796,28 @@ document.addEventListener("DOMContentLoaded", () => {
       canViewAPP: false,
       canCreatePR: true,
       canApprovePR: false,
-      canRejectPR: false,
       canEditPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10001,35 +9851,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: true,
       canSendRFQ: true,
-      canRejectRFQ: true,
       canViewRFQ: true,
       canCreateAbstract: true,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: true,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: true,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: true,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: true,
       canSubmitCOA: true,
@@ -10063,35 +9905,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: true,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10125,35 +9959,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10187,35 +10013,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10249,35 +10067,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10311,35 +10121,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10373,35 +10175,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: true,
-      canRejectPR: true,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: true,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10435,35 +10229,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10497,35 +10283,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: false,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: false,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: false,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: false,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10559,35 +10337,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: true,
       canEditPR: true,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: true,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: true,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -10621,35 +10391,27 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: false,
       canEditPR: false,
       canApprovePR: false,
-      canRejectPR: false,
       canViewPR: true,
       canCreateRFQ: false,
       canSendRFQ: false,
-      canRejectRFQ: false,
       canViewRFQ: true,
       canCreateAbstract: false,
       canApproveAbstract: false,
-      canRejectAbstract: false,
       canViewAbstract: true,
       canCreatePostQual: false,
       canApprovePostQual: false,
-      canRejectPostQual: false,
       canViewPostQual: false,
       canCreateBACRes: false,
       canApproveBACRes: false,
-      canRejectBACRes: false,
       canViewBACRes: false,
       canCreateNOA: false,
       canApproveNOA: false,
-      canRejectNOA: false,
       canViewNOA: false,
       canCreatePO: false,
       canApprovePO: false,
-      canRejectPO: false,
       canViewPO: true,
       canCreateIAR: false,
       canApproveIAR: false,
-      canRejectIAR: false,
       canViewIAR: false,
       canCreateCOA: false,
       canSubmitCOA: false,
@@ -11131,42 +10893,34 @@ document.addEventListener("DOMContentLoaded", () => {
       canCreatePR: ['[data-action="create-pr"]', ".btn-create-pr"],
       canEditPR: ['[data-action="edit-pr"]', ".btn-edit-pr"],
       canApprovePR: ['[data-action="approve-pr"]', ".btn-approve-pr"],
-      canRejectPR: ['[data-action="reject-pr"]', ".btn-reject-pr"],
       canViewPR: ['[data-action="view-pr"]'],
       // RFQ
       canCreateRFQ: ['[data-action="create-rfq"]', ".btn-create-rfq"],
       canSendRFQ: ['[data-action="send-rfq"]'],
-      canRejectRFQ: ['[data-action="reject-rfq"]'],
       // Abstract
       canCreateAbstract: [
         '[data-action="create-abstract"]',
         ".btn-create-abstract",
       ],
       canApproveAbstract: ['[data-action="approve-abstract"]'],
-      canRejectAbstract: ['[data-action="reject-abstract"]'],
       // Post-Qual
       canCreatePostQual: [
         '[data-action="create-postqual"]',
         ".btn-create-postqual",
       ],
       canApprovePostQual: ['[data-action="approve-postqual"]'],
-      canRejectPostQual: ['[data-action="reject-postqual"]'],
       // BAC Resolution
       canCreateBACRes: ['[data-action="create-bacres"]', ".btn-create-bacres"],
       canApproveBACRes: ['[data-action="approve-bacres"]'],
-      canRejectBACRes: ['[data-action="reject-bacres"]'],
       // NOA
       canCreateNOA: ['[data-action="create-noa"]', ".btn-create-noa"],
       canApproveNOA: ['[data-action="approve-noa"]'],
-      canRejectNOA: ['[data-action="reject-noa"]'],
       // PO
       canCreatePO: ['[data-action="create-po"]', ".btn-create-po"],
       canApprovePO: ['[data-action="approve-po"]'],
-      canRejectPO: ['[data-action="reject-po"]'],
       // IAR
       canCreateIAR: ['[data-action="create-iar"]', ".btn-create-iar"],
       canApproveIAR: ['[data-action="approve-iar"]'],
-      canRejectIAR: ['[data-action="reject-iar"]'],
       // COA
       canCreateCOA: ['[data-action="create-coa"]', ".btn-create-coa"],
       canSubmitCOA: ['[data-action="submit-coa"]'],
@@ -13207,17 +12961,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const prCatOpts = buildCatalogCategoryOptions(allItems);
     const prItemOpts = buildCatalogItemOptions(allItems);
 
-    const appOptions = appItems
-      .map((item) => {
-        const desc = (
-          item.description ||
-          item.item_description ||
-          ""
-        ).substring(0, 60);
-        const dept = item.department_code || "";
-        return `<option value="${item.id}" data-desc="${desc}" data-dept="${dept}">${desc} (${dept} - FY${item.fiscal_year || String(getCurrentFiscalYear())})</option>`;
-      })
-      .join("");
+    // Store filtered APP items for the picker
+    window._prAvailableAppItems = appItems;
 
     const html = `
  <form id="prForm" onsubmit="saveNewPR(event)">
@@ -13226,18 +12971,22 @@ document.addEventListener("DOMContentLoaded", () => {
  <strong>PURCHASE REQUEST</strong> — Per Government PR Form
  </div>
 
- <!-- APP/PPMP Validation Section -->
+ <!-- APP/PPMP Validation Section — Multi-select using PPMP catalog style -->
  <div class="form-validation-section">
- <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
- <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
- </label>
- <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on. Items must exist in the approved APP before a PR can proceed.</p>
- <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this); onPRAppItemChange(this.value);">
- <option value="">-- Select APP Item --</option>
- ${appOptions}
- <option value="not-in-app" style="color:#e53e3e;font-weight:600;"> Item NOT in APP (Requires New PPMP)</option>
- </select>
- <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
+   <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
+     <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
+   </label>
+   <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Link one or more APP items this Purchase Request is based on. Click a row to add it.</p>
+   <div style="border:1px solid #cbd5e0;border-radius:6px;padding:10px;background:#fafafa;">
+     <div id="prLinkedAppTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-bottom:8px;">
+       <span style="color:#aaa;font-size:12px;align-self:center;" id="prLinkedAppPlaceholder">No APP items linked yet — click Add to select</span>
+     </div>
+     <button type="button" class="btn btn-sm btn-outline" onclick="openPRAppPicker()">
+       <i class="fas fa-plus"></i> Add APP Item
+     </button>
+   </div>
+   <input type="hidden" id="prLinkedAppIds" value="">
+   <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
  </div>
 
  <div class="form-row">
@@ -13354,20 +13103,12 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     window._docSelectedItems["pr"] = [];
 
     // Auto-populate from APP item if redirected from APP page
+    window._prLinkedAppIds  = [];
+    window._prLinkedAppMeta = {};
     if (window._prFromAPPItem) {
       const appItem = window._prFromAPPItem;
-      window._prFromAPPItem = null; // Clear so it doesn't re-trigger
-      setTimeout(() => {
-        const appSelect = document.getElementById("prAppItemSelect");
-        if (appSelect && appItem.id) {
-          appSelect.value = String(appItem.id);
-          if (appSelect.value === String(appItem.id)) {
-            validatePRAppItem(appSelect);
-            generatePRNumber(appSelect);
-            onPRAppItemChange(appItem.id);
-          }
-        }
-      }, 100);
+      window._prFromAPPItem = null;
+      setTimeout(() => prAddLinkedApp(appItem.id, appItem), 100);
     }
   };
 
@@ -13425,6 +13166,237 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
+  // ── PR Multi-APP Picker ────────────────────────────────────────────────────
+
+  /** Open the APP item picker — same overlay design as PPMP catalog modal */
+  window.openPRAppPicker = function () {
+    const appItems = [...(window._prAvailableAppItems || [])].sort((a, b) =>
+      (a.description || a.item_description || "").localeCompare(b.description || b.item_description || "")
+    );
+    const already = window._prLinkedAppIds || [];
+
+    const itemRows = appItems.map(item => {
+      const alreadyAdded = already.includes(item.id);
+      const desc  = escapeHtml((item.description || item.item_description || "").substring(0, 60));
+      const dept  = escapeHtml(item.department_code || "");
+      const fy    = item.fiscal_year || "";
+      const total = Number(item.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+      return (
+        '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? " already-added" : "") + '"' +
+        ' onclick="' + (alreadyAdded ? "" : "prSelectAppFromPicker(" + item.id + ", this)") + '"' +
+        ' style="cursor:' + (alreadyAdded ? "default" : "pointer") + ";" + (alreadyAdded ? "opacity:0.5;" : "") + '">' +
+        "<td>" + desc + "</td>" +
+        "<td>" + dept + "</td>" +
+        '<td style="text-align:center;">' + fy + "</td>" +
+        '<td style="text-align:right;">₱' + total + "</td>" +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : "") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+
+    // Remove any existing overlay
+    const existing = document.getElementById("prAppPickerOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "prAppPickerOverlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;";
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-clipboard-check"></i> Select APP / PPMP Items</h4>
+          <button onclick="document.getElementById('prAppPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="prAppPickerSearch" placeholder="Search by description, department, or fiscal year..."
+            oninput="filterPRAppPickerItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to link the APP item. Already-linked items are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Description</th>
+              <th>Division</th>
+              <th style="text-align:center;">FY</th>
+              <th style="text-align:right;">Amount</th>
+              <th style="width:60px;text-align:center;">Linked</th>
+            </tr></thead>
+            <tbody id="prAppPickerBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter rows in the APP picker */
+  window.filterPRAppPickerItems = function (text) {
+    const tbody = document.getElementById("prAppPickerBody");
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr");
+    const search = (text || "").toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? "" : "none";
+    });
+  };
+
+  /** Immediately link an APP item when its row is clicked */
+  window.prSelectAppFromPicker = async function (appId, row) {
+    if (row) {
+      row.style.opacity = "0.5";
+      row.style.cursor = "default";
+      row.setAttribute("onclick", "");
+      const statusCell = row.cells[row.cells.length - 1];
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+    const item = (window._prAvailableAppItems || []).find(i => i.id === appId);
+    if (item) await prAddLinkedApp(appId, item);
+  };
+
+  /** Add a single APP item to the PR linked list and merge its items */
+  window.prAddLinkedApp = async function (appId, appItem) {
+    if (!window._prLinkedAppIds)  window._prLinkedAppIds  = [];
+    if (!window._prLinkedAppMeta) window._prLinkedAppMeta = {};
+    if (window._prLinkedAppIds.includes(appId)) return;
+    window._prLinkedAppIds.push(appId);
+    window._prLinkedAppMeta[appId] = appItem;
+    prRenderLinkedAppTags();
+
+    // Generate PR number from the first linked APP item
+    if (window._prLinkedAppIds.length === 1) {
+      const dept = appItem.department_code || "";
+      if (dept) {
+        const year  = getActiveFiscalYear();
+        try {
+          const prs   = await apiRequest("/purchase-requests");
+          const pfx   = "PR-" + dept + "-" + year + "-";
+          let maxSeq  = 0;
+          prs.forEach(p => {
+            if (p.pr_number && p.pr_number.startsWith(pfx)) {
+              const seq = parseInt(p.pr_number.replace(pfx, "")) || 0;
+              if (seq > maxSeq) maxSeq = seq;
+            }
+          });
+          const prInput = document.getElementById("prNumber");
+          if (prInput && !prInput.value) prInput.value = pfx + String(maxSeq + 1).padStart(3, "0");
+        } catch(e) {}
+      }
+    }
+
+    // Fetch the plan and merge its items
+    try {
+      const plan = await apiRequest("/plans/" + appId);
+      if (!plan) return;
+      if (!window._docSelectedItems["pr"]) window._docSelectedItems["pr"] = [];
+      if (plan.items && plan.items.length > 0) {
+        plan.items.forEach(item => {
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const totalQty  = parseFloat(item.total_qty || 0) ||
+            (parseFloat(item.q1_qty || 0) + parseFloat(item.q2_qty || 0) +
+             parseFloat(item.q3_qty || 0) + parseFloat(item.q4_qty || 0));
+          const qty = totalQty || 1;
+          window._docSelectedItems["pr"].push({
+            item_id: item.id || 0,
+            item_name: item.item_name || item.item_description || "",
+            item_code: item.item_code || "",
+            item_unit: item.unit || "Lot",
+            item_category: item.category || plan.project_type || "",
+            item_description: item.item_description || "",
+            description: item.item_description || item.item_name || "",
+            unit_price: unitPrice,
+            quantity: qty,
+            total: qty * unitPrice,
+            _from_app: appId,
+          });
+        });
+      } else {
+        const unitPrice = parseFloat(plan.total_amount || 0);
+        const qty       = parseInt(plan.quantity_size || 1) || 1;
+        const perUnit   = qty > 0 ? unitPrice / qty : unitPrice;
+        const desc      = plan.description || plan.item_description || "";
+        window._docSelectedItems["pr"].push({
+          item_id: plan.item_id || 0,
+          item_name: (desc || "").split("\n")[0].trim() || "Approved Item",
+          item_code: "",
+          item_unit: "Lot",
+          item_category: plan.project_type || plan.category || "",
+          item_description: plan.item_description || desc || "",
+          description: plan.item_description || desc || "",
+          unit_price: perUnit,
+          quantity: qty,
+          total: unitPrice,
+          _from_app: appId,
+        });
+      }
+      renderDocItemsList("pr");
+      // Merge purpose
+      const purposeField = document.getElementById("prPurpose");
+      if (purposeField && !purposeField.value.trim() && plan.description) {
+        purposeField.value = plan.description;
+      }
+      // Merge specs
+      const specsField = document.getElementById("prItemSpecs");
+      if (specsField) {
+        const existing  = specsField.value.trim();
+        const specsLines = (plan.items || [])
+          .map(it => it.item_description || it.item_name || "")
+          .filter(s => s.trim());
+        const incoming = specsLines.length > 0 ? specsLines.join("\n") : (plan.item_description || "");
+        if (incoming) specsField.value = existing ? existing + "\n" + incoming : incoming;
+      }
+    } catch(e) { console.error("Error loading APP plan items for PR:", e); }
+
+    // Update hidden input
+    const hidden = document.getElementById("prLinkedAppIds");
+    if (hidden) hidden.value = (window._prLinkedAppIds || []).join(",");
+  };
+
+  /** Remove a linked APP item and its items from the PR */
+  window.prRemoveLinkedApp = function (appId) {
+    window._prLinkedAppIds  = (window._prLinkedAppIds || []).filter(id => id !== appId);
+    delete (window._prLinkedAppMeta || {})[appId];
+    if (window._docSelectedItems["pr"]) {
+      window._docSelectedItems["pr"] = window._docSelectedItems["pr"].filter(it => it._from_app !== appId);
+      renderDocItemsList("pr");
+    }
+    prRenderLinkedAppTags();
+    const hidden = document.getElementById("prLinkedAppIds");
+    if (hidden) hidden.value = (window._prLinkedAppIds || []).join(",");
+    // Clear PR number if no more items linked
+    if ((window._prLinkedAppIds || []).length === 0) {
+      const prInput = document.getElementById("prNumber");
+      if (prInput) prInput.value = "";
+    }
+  };
+
+  /** Render the APP item tags strip */
+  window.prRenderLinkedAppTags = function () {
+    const container   = document.getElementById("prLinkedAppTags");
+    const placeholder = document.getElementById("prLinkedAppPlaceholder");
+    if (!container) return;
+    const ids  = window._prLinkedAppIds  || [];
+    const meta = window._prLinkedAppMeta || {};
+    if (ids.length === 0) {
+      container.innerHTML = "";
+      if (placeholder) { placeholder.style.display = "inline"; container.appendChild(placeholder); }
+      return;
+    }
+    if (placeholder) placeholder.style.display = "none";
+    container.innerHTML = ids.map(id => {
+      const m    = meta[id] || {};
+      const desc = (m.description || m.item_description || String(id)).substring(0, 40);
+      return `<span style="display:inline-flex;align-items:center;gap:6px;background:#ebf8ff;border:1px solid #90cdf4;border-radius:14px;padding:3px 10px 3px 12px;font-size:12px;font-weight:600;color:#2b6cb0;">
+        <i class="fas fa-clipboard-check" style="font-size:10px;"></i>
+        ${escapeHtml(desc)}
+        <button type="button" onclick="prRemoveLinkedApp(${id})" style="background:none;border:none;cursor:pointer;color:#e53e3e;padding:0;line-height:1;font-size:14px;" title="Remove">&times;</button>
+      </span>`;
+    }).join("");
+  };
+
+  // Keep validatePRAppItem for backward compat (edit modal may still call it)
   window.validatePRAppItem = function (select) {
     const validation = document.getElementById("prAppValidation");
     if (!validation) return;
@@ -13715,11 +13687,16 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <input type="text" id="rfqTIN" placeholder="Auto-filled from supplier" readonly style="background:#f5f5f5;">
  </div>
  <div class="form-group">
- <label>Linked Purchase Request (Approved)</label>
- <select class="form-select" id="rfqLinkedPR" required onchange="onRFQLinkedPRChange(this.value)">
- <option value="">-- Select Approved PR --</option>
- ${prOptions}
- </select>
+ <label>Linked Purchase Requests <span style="color:red;">*</span> <small style="color:#888;">(one or many)</small></label>
+ <div style="border:1px solid #ddd;border-radius:6px;padding:10px;background:#fafafa;">
+   <div id="rfqLinkedPRTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-bottom:8px;">
+     <span style="color:#aaa;font-size:12px;align-self:center;" id="rfqLinkedPRPlaceholder">No PRs linked yet — click Add to select</span>
+   </div>
+   <button type="button" class="btn btn-sm btn-outline" onclick="openRFQPRPicker()">
+     <i class="fas fa-plus"></i> Add Purchase Request
+   </button>
+ </div>
+ <input type="hidden" id="rfqLinkedPRIds" value="">
  </div>
  <div class="form-row">
  <div class="form-group">
@@ -13825,12 +13802,203 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       } catch(e) { console.warn("Could not load employees for RFQ signatories", e); }
     })();
     window._docSelectedItems["rfq"] = [];
-    // If a PR was preselected, auto-fill items
+    window._rfqLinkedPRIds = [];   // tracks linked PR ids
+    window._rfqLinkedPRMeta = {};  // id → {pr_number, purpose}
+    // If a PR was preselected, auto-add it
     if (preselectedPrNumber) {
-      const sel = document.getElementById("rfqLinkedPR");
-      if (sel && sel.value) onRFQLinkedPRChange(sel.value);
+      const pr = (cachedPR || []).find(p =>
+        p.pr_number === preselectedPrNumber || String(p.id) === String(preselectedPrNumber)
+      );
+      if (pr) rfqAddLinkedPR(pr.id, pr.pr_number, pr.purpose || pr.first_item_name || "");
     }
   };
+
+  // ── RFQ Multi-PR Picker ──────────────────────────────────────────────────
+
+  /** Open the PR picker — same overlay style as PPMP item catalog modal */
+  window.openRFQPRPicker = function () {
+    const sortedPRs = [...(cachedPR || [])].sort((a, b) =>
+      (a.pr_number || "").localeCompare(b.pr_number || "")
+    );
+    const already = window._rfqLinkedPRIds || [];
+
+    const itemRows = sortedPRs.map(p => {
+      const alreadyAdded = already.includes(p.id);
+      const total = Number(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+      return (
+        '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? " already-added" : "") + '"' +
+        ' onclick="' + (alreadyAdded ? "" : "rfqSelectPRFromPicker(" + p.id + ", this)") + '"' +
+        ' style="cursor:' + (alreadyAdded ? "default" : "pointer") + ";" + (alreadyAdded ? "opacity:0.5;" : "") + '">' +
+        "<td>" + escapeHtml(p.pr_number || "") + "</td>" +
+        "<td>" + escapeHtml((p.purpose || p.first_item_name || "").substring(0, 60)) + "</td>" +
+        '<td style="text-align:right;">₱' + total + "</td>" +
+        '<td style="text-align:center;"><span class="status-badge ' + (p.status === "approved" ? "approved" : "draft") + '" style="font-size:10px;">' + escapeHtml(p.status || "") + "</span></td>" +
+        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : "") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+
+    // Remove any existing overlay
+    const existing = document.getElementById("rfqPRPickerOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "rfqPRPickerOverlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;";
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-file-alt"></i> Select Purchase Requests</h4>
+          <button onclick="document.getElementById('rfqPRPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="rfqPRPickerSearch" placeholder="Search by PR number, purpose, or amount..."
+            oninput="filterRFQPRPickerItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click on a row to link the PR. Already-linked PRs are grayed out.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>PR No.</th>
+              <th>Purpose</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th style="width:60px;">Linked</th>
+            </tr></thead>
+            <tbody id="rfqPRPickerBody">${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  /** Filter rows in the PR picker — same as filterPPMPCatalogModalItems */
+  window.filterRFQPRPickerItems = function (text) {
+    const tbody = document.getElementById("rfqPRPickerBody");
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr");
+    const search = (text || "").toLowerCase();
+    rows.forEach(r => {
+      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? "" : "none";
+    });
+  };
+
+  /** Immediately link a PR when its row is clicked — same UX as selectPPMPCatalogItem */
+  window.rfqSelectPRFromPicker = async function (prId, row) {
+    // Mark row as added immediately (visual feedback)
+    if (row) {
+      row.style.opacity = "0.5";
+      row.style.cursor = "default";
+      row.setAttribute("onclick", "");
+      const statusCell = row.cells[row.cells.length - 1];
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+    const pr = (cachedPR || []).find(p => p.id === prId);
+    if (pr) await rfqAddLinkedPR(pr.id, pr.pr_number, pr.purpose || pr.first_item_name || "");
+  };
+
+  /** Add a single PR to the RFQ linked list, merge its items */
+  window.rfqAddLinkedPR = async function (prId, prNumber, purpose) {
+    if (!window._rfqLinkedPRIds) window._rfqLinkedPRIds = [];
+    if (window._rfqLinkedPRIds.includes(prId)) return;
+    window._rfqLinkedPRIds.push(prId);
+    if (!window._rfqLinkedPRMeta) window._rfqLinkedPRMeta = {};
+    window._rfqLinkedPRMeta[prId] = { pr_number: prNumber, purpose };
+
+    // Render PR tags
+    rfqRenderLinkedPRTags();
+
+    // Merge items from this PR
+    try {
+      const pr = await apiRequest("/purchase-requests/" + prId);
+      if (pr && pr.items && pr.items.length > 0) {
+        if (!window._docSelectedItems["rfq"]) window._docSelectedItems["rfq"] = [];
+        pr.items.forEach(item => {
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const qty = parseFloat(item.quantity || 1);
+          window._docSelectedItems["rfq"].push({
+            item_id: item.item_id || item.id || 0,
+            item_name: item.item_name || item.item_description || "",
+            item_code: item.item_code || "",
+            item_unit: item.unit || "Lot",
+            item_category: item.category || "",
+            item_description: item.item_description || "",
+            description: item.item_description || item.item_name || "",
+            unit_price: unitPrice,
+            quantity: qty,
+            total: qty * unitPrice,
+            _from_pr: prId,   // track source PR
+          });
+        });
+        renderDocItemsList("rfq");
+      }
+      // Merge item specifications
+      if (pr && pr.item_specifications) {
+        const specsField = document.getElementById("rfqItemSpecs");
+        if (specsField) {
+          const existing = specsField.value.trim();
+          const incoming = pr.item_specifications.trim();
+          specsField.value = existing
+            ? existing + "\n" + incoming
+            : incoming;
+        }
+      }
+    } catch(e) { console.warn("Could not load PR items for RFQ:", e); }
+
+    // Update hidden input
+    const hiddenEl = document.getElementById("rfqLinkedPRIds");
+    if (hiddenEl) hiddenEl.value = (window._rfqLinkedPRIds || []).join(",");
+  };
+
+  /** Remove a PR from the linked list and its items from the items table */
+  window.rfqRemoveLinkedPR = function (prId) {
+    window._rfqLinkedPRIds = (window._rfqLinkedPRIds || []).filter(id => id !== prId);
+    delete (window._rfqLinkedPRMeta || {})[prId];
+    // Remove items that came from this PR
+    if (window._docSelectedItems["rfq"]) {
+      window._docSelectedItems["rfq"] = window._docSelectedItems["rfq"].filter(
+        it => it._from_pr !== prId
+      );
+      renderDocItemsList("rfq");
+    }
+    rfqRenderLinkedPRTags();
+    const hiddenEl = document.getElementById("rfqLinkedPRIds");
+    if (hiddenEl) hiddenEl.value = (window._rfqLinkedPRIds || []).join(",");
+  };
+
+  /** Render the PR tags strip */
+  window.rfqRenderLinkedPRTags = function () {
+    const container = document.getElementById("rfqLinkedPRTags");
+    const placeholder = document.getElementById("rfqLinkedPRPlaceholder");
+    if (!container) return;
+    const ids = window._rfqLinkedPRIds || [];
+    const meta = window._rfqLinkedPRMeta || {};
+    if (ids.length === 0) {
+      container.innerHTML = "";
+      if (placeholder) {
+        placeholder.style.display = "inline";
+        container.appendChild(placeholder);
+      }
+      return;
+    }
+    if (placeholder) placeholder.style.display = "none";
+    container.innerHTML = ids.map(id => {
+      const m = meta[id] || {};
+      return `<span style="display:inline-flex;align-items:center;gap:6px;background:#e3f2fd;border:1px solid #90caf9;border-radius:14px;padding:3px 10px 3px 12px;font-size:12px;font-weight:600;color:#1565c0;">
+        <i class="fas fa-file-alt" style="font-size:10px;"></i>
+        ${m.pr_number || id}
+        <button type="button" onclick="rfqRemoveLinkedPR(${id})" style="background:none;border:none;cursor:pointer;color:#e53e3e;padding:0;line-height:1;font-size:14px;" title="Remove">&times;</button>
+      </span>`;
+    }).join("");
+  };
+
+  // openSubModal removed — RFQ PR picker now uses same overlay pattern as PPMP catalog modal
+
+  // ── END RFQ Multi-PR Picker ───────────────────────────────────────────────
 
   // Auto-fill supplier address and TIN on RFQ supplier dropdown change
   window.rfqFillSupplierDetails = function () {
@@ -13885,44 +14053,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  // When user selects a PR in the RFQ form, auto-fill items from that PR
-  window.onRFQLinkedPRChange = async function (prId) {
-    if (!prId) return;
-    try {
-      const pr = await apiRequest("/purchase-requests/" + prId);
-      if (!pr) return;
-      // Populate items into the catalog-style list
-      window._docSelectedItems["rfq"] = [];
-      if (pr.items && pr.items.length > 0) {
-        pr.items.forEach((item) => {
-          const unitPrice = parseFloat(
-            item.unit_price || item.total_price || 0,
-          );
-          const qty = parseFloat(item.quantity || 0);
-          window._docSelectedItems["rfq"].push({
-            item_id: item.item_id || item.id || 0,
-            item_name: item.item_name || item.item_description || "",
-            item_code: item.item_code || "",
-            item_unit: item.unit || "Lot",
-            item_category: item.category || "",
-            item_description: item.item_description || "",
-            description: item.item_description || item.item_name || "",
-            unit_price: unitPrice,
-            quantity: qty || 1,
-            total: (qty || 1) * unitPrice,
-          });
-        });
-      }
-      renderDocItemsList("rfq");
-      // Auto-fill item specifications from PR
-      if (pr.item_specifications) {
-        const specsField = document.getElementById("rfqItemSpecs");
-        if (specsField) specsField.value = pr.item_specifications;
-      }
-    } catch (e) {
-      console.error("Error loading PR items for RFQ:", e);
-    }
-  };
+  // onRFQLinkedPRChange replaced by rfqAddLinkedPR / rfqPickerConfirm (multi-PR)
 
   window.addRFQItemRow = function () {
     const tbody = document.getElementById("rfqItemsBody");
@@ -13979,7 +14110,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: prId || null,
+        pr_ids: linkedPRIds,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -14037,8 +14169,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         cachedRFQ = await apiRequest("/rfq");
       } catch (e) {}
     }
-    // Pre-cache suppliers for bidder picker
-    await window.ensureSuppliersCached();
     // Load UOMs from database
     let uomList = [];
     try {
@@ -14133,13 +14263,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <strong>Supplier Names:</strong>
  </td>
  <td colspan="2" style="background: #e3f2fd;">
- ${window.buildBidderPickerHTML('absSupplier1Id', '', 'Enter Bidder 1 name', 'onAbsSupplierChange(1, this)')}
+ <input type="text" id="absSupplier1Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 1 name" oninput="onAbsSupplierChange(1, this)">
  </td>
  <td colspan="2" style="background: #d0e8ff;">
- ${window.buildBidderPickerHTML('absSupplier2Id', '', 'Enter Bidder 2 name', 'onAbsSupplierChange(2, this)')}
+ <input type="text" id="absSupplier2Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 2 name" oninput="onAbsSupplierChange(2, this)">
  </td>
  <td colspan="2" style="background: #bbdefb;">
- ${window.buildBidderPickerHTML('absSupplier3Id', '', 'Enter Bidder 3 name', 'onAbsSupplierChange(3, this)')}
+ <input type="text" id="absSupplier3Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder 3 name" oninput="onAbsSupplierChange(3, this)">
  </td>
  </tr>
  </tbody>
@@ -14357,87 +14487,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  // =====================================================
-  // BIDDER PICKER HELPER — shared across Abstract, BAC Resolution, Post-Qualification
-  // Renders a dual-mode input: manual text entry OR select from suppliers list.
-  // Usage: buildBidderPickerHTML(fieldId, existingValue, placeholder, onchangeJs)
-  // After injecting into DOM, call initBidderPicker(fieldId) to wire up toggle logic.
-  // =====================================================
-  window._globalSuppliersList = window._globalSuppliersList || [];
-
-  /** Ensure suppliers are cached globally (called before opening any affected modal) */
-  window.ensureSuppliersCached = async function () {
-    if (window._globalSuppliersList && window._globalSuppliersList.length > 0) return;
-    try {
-      const list = await apiRequest("/suppliers");
-      window._globalSuppliersList = Array.isArray(list) ? list : [];
-    } catch (e) {
-      window._globalSuppliersList = [];
-    }
-  };
-
-  /**
-   * Build the HTML for a bidder picker widget.
-   * @param {string} fieldId - The id of the hidden/text input that holds the final value
-   * @param {string} existingValue - Pre-filled value (for edit modals)
-   * @param {string} placeholder - Placeholder text
-   * @param {string} onchangeJs - Optional JS expression called when value changes (receives the input element)
-   */
-  window.buildBidderPickerHTML = function (fieldId, existingValue, placeholder, onchangeJs) {
-    const suppliers = window._globalSuppliersList || [];
-    const supplierOpts = suppliers
-      .map(s => `<option value="${escapeHtml(s.name || s.company_name || '')}">${escapeHtml(s.name || s.company_name || '')}</option>`)
-      .join('');
-    const escaped = escapeHtml(existingValue || '');
-    const onchangeAttr = onchangeJs
-      ? `oninput="${onchangeJs}" onchange="${onchangeJs}"`
-      : '';
-    return `<div class="bidder-picker-wrap" id="bpw_${fieldId}" style="display:flex;flex-direction:column;gap:3px;width:100%;">
-  <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-    <label style="font-size:10px;font-weight:600;color:#555;white-space:nowrap;margin:0;">Input mode:</label>
-    <select class="bidder-mode-toggle" onchange="window.onBidderModeToggle('${fieldId}',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid #bbb;border-radius:3px;background:#fff;cursor:pointer;">
-      <option value="manual">✏️ Type manually</option>
-      <option value="select"${suppliers.length === 0 ? ' disabled' : ''}>📋 Select from suppliers</option>
-    </select>
-  </div>
-  <input type="text" id="${fieldId}" class="form-select bidder-manual-input" style="width:100%;font-size:11px;" placeholder="${escapeHtml(placeholder || 'Enter Bidder name')}" value="${escaped}" ${onchangeAttr}>
-  <select id="${fieldId}_sel" class="form-select bidder-select-input" style="width:100%;font-size:11px;display:none;" onchange="window.onBidderSelectPick('${fieldId}',this)">
-    <option value="">-- Select Supplier --</option>
-    ${supplierOpts}
-  </select>
-</div>`;
-  };
-
-  /** Toggle between manual text input and supplier dropdown */
-  window.onBidderModeToggle = function (fieldId, mode) {
-    const manualEl = document.getElementById(fieldId);
-    const selectEl = document.getElementById(fieldId + '_sel');
-    if (!manualEl || !selectEl) return;
-    if (mode === 'select') {
-      manualEl.style.display = 'none';
-      selectEl.style.display = '';
-      // Pre-select if value already matches a supplier name
-      const currentVal = manualEl.value.trim().toLowerCase();
-      Array.from(selectEl.options).forEach(opt => {
-        if (opt.value.trim().toLowerCase() === currentVal) selectEl.value = opt.value;
-      });
-    } else {
-      selectEl.style.display = 'none';
-      manualEl.style.display = '';
-      manualEl.focus();
-    }
-  };
-
-  /** When a supplier is picked from the dropdown, populate the hidden text input */
-  window.onBidderSelectPick = function (fieldId, selectEl) {
-    const manualEl = document.getElementById(fieldId);
-    if (!manualEl) return;
-    manualEl.value = selectEl.value;
-    // Fire any registered oninput/onchange handler on the text input
-    manualEl.dispatchEvent(new Event('input', { bubbles: true }));
-    manualEl.dispatchEvent(new Event('change', { bubbles: true }));
-  };
-
   // Update supplier column header when a supplier dropdown changes
   window.onAbsSupplierChange = function (slotNum, inputEl) {
     const headerEl = document.getElementById(
@@ -14512,12 +14561,14 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       const td = document.createElement("td");
       td.colSpan = 2;
       td.style.background = bgHeader;
-      td.innerHTML = window.buildBidderPickerHTML(
-        'absSupplier' + n + 'Id',
-        '',
-        'Enter Bidder ' + n + ' name',
-        'onAbsSupplierChange(' + n + ', this)'
-      );
+      td.innerHTML =
+        '<input type="text" id="absSupplier' +
+        n +
+        'Id" class="form-select" style="width:100%;font-size:11px;" placeholder="Enter Bidder ' +
+        n +
+        ' name" oninput="onAbsSupplierChange(' +
+        n +
+        ', this)">';
       supplierNamesRow.appendChild(td);
     }
 
@@ -15053,7 +15104,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-group" style="text-align: right; margin-top: 0;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
-          ${userHasAnyRole(["hope","admin"]) ? '<button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>' : ""}
+          <button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>
         </div>
       </form>
     `;
@@ -16187,13 +16238,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
 
-    // Load suppliers from DB and update bidder picker cache
+    // Load suppliers from DB
     let suppliers = [];
     try {
       suppliers = await apiRequest("/suppliers");
     } catch (e) {}
-    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
-    else await window.ensureSuppliersCached();
     const supplierOptions = suppliers
       .map(
         (s) =>
@@ -16231,14 +16280,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (idx < 3) slot[idx] = q;
     });
 
-    // Build supplier text input with pre-filled value (uses bidder picker widget)
+    // Build supplier text input with pre-filled value
     function buildSupplierInput(slotNum, existingName) {
-      return window.buildBidderPickerHTML(
-        'editAbsSupplier' + slotNum + 'Id',
-        existingName || '',
-        'Enter Bidder ' + slotNum + ' name',
-        'onEditAbsSupplierChange(' + slotNum + ', this)'
-      );
+      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || "")}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
     }
 
     // Build header labels
@@ -16621,12 +16665,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (e) {
       console.error("Failed to load suppliers:", e);
     }
-    // Update global cache for bidder picker
-    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
-    else await window.ensureSuppliersCached();
 
     function buildBidderInput(fieldId, existingName) {
-      return window.buildBidderPickerHTML(fieldId, existingName || '', 'Enter Bidder name');
+      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || "")}">`;
     }
 
     const html = `
@@ -16646,7 +16687,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Subject / Bidder Name</label>${window.buildBidderPickerHTML('editPqBidder', p.bidder_name || '', 'Enter Bidder / Subject name')}</div>
+          <div class="form-group"><label>Subject / Bidder Name</label><input type="text" id="editPqBidder" value="${(p.bidder_name || "").replace(/"/g, "&quot;")}"></div>
           <div class="form-group">
             <label>Status</label>
             <select id="editPqStatus" class="form-select">
@@ -16769,19 +16810,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("Error: " + err.message);
     }
   };
-
-  // --- APPROVE BAC RESOLUTION ---
-  window.approveBACResolution = async function (id) {
-    if (!confirm('Mark this BAC Resolution as completed / approved?')) return;
-    try {
-      await apiRequest('/bac-resolutions/' + id + '/approve', 'PUT');
-      showToast('BAC Resolution approved and marked as completed.', 'success');
-      await loadBACResolution();
-    } catch (err) {
-      showToast(err.message || 'Failed to approve BAC Resolution.', 'error');
-    }
-  };
-
 
   // --- EDIT BAC RESOLUTION ---
   window.showEditBACResolutionModal = async function (id) {
@@ -17814,15 +17842,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
-  window.showNewItemModal = function () {
-    // Ensure UOMs are loaded
-    if (!cachedUOMs.length) {
-      apiRequest("/uoms")
-        .then((uoms) => {
-          cachedUOMs = uoms;
-        })
-        .catch(() => {});
-    }
+  window.showNewItemModal = async function () {
+    // Ensure PPMP categories and UOMs are fully loaded before rendering
+    await Promise.all([
+      ensurePPMPCategoriesLoaded(),
+      cachedUOMs.length ? Promise.resolve() : apiRequest("/uoms").then(u => { cachedUOMs = u; }).catch(() => {}),
+    ]);
     const html = `
       <form id="itemForm" onsubmit="saveNewItem(event)">
         <!-- Procurement Source selector (always visible) -->
@@ -17851,7 +17876,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="form-group">
               <label>Category</label>
               <select class="form-select" id="itemCategory" required>
-                ${buildCategoryOptions("")}
+                ${buildPPMPCategoryOptions("")}
               </select>
             </div>
           </div>
@@ -21074,6 +21099,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
+      const _linkedAppIdsRaw = document.getElementById("prLinkedAppIds")?.value || "";
+      const _linkedAppIds = _linkedAppIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
       const data = {
         pr_number: prNumber,
         pr_date: prDate || getTodayISO(),
@@ -21083,6 +21110,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
+        app_item_id: _linkedAppIds[0] || null,
+        app_item_ids: _linkedAppIds,
         requested_by_id: parseInt(document.getElementById("prRequestedById")?.value) || null,
         requested_by_name: document.getElementById("prRequestedByName")?.value || null,
         approved_by_id: parseInt(document.getElementById("prApprovedById")?.value) || null,
@@ -21120,7 +21149,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const prId = document.getElementById("rfqLinkedPR")?.value || "";
+    // Multi-PR: read from the hidden input that stores comma-separated IDs
+    const linkedPRIdsRaw = document.getElementById("rfqLinkedPRIds")?.value || "";
+    const linkedPRIds = linkedPRIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
+    const prId = linkedPRIds[0] || null; // keep first as legacy pr_id for backward compat
+    if (linkedPRIds.length === 0) { alert("Please link at least one Purchase Request to this RFQ."); return; }
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -21153,7 +21186,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: prId || null,
+        pr_ids: linkedPRIds,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -21636,16 +21670,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
-      const tds = row.querySelectorAll("td");
-      if (tds.length >= 3) {
-        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
-        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
-        const amountInput = tds[2]?.querySelector('input');
-        const remarksInput = tds[3]?.querySelector('input');
-        const name = nameInput?.value?.trim() || "";
-        const amount = parseFloat(amountInput?.value) || 0;
-        const remarks = remarksInput?.value?.trim() || "";
+      const inputs = row.querySelectorAll("input");
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -22058,16 +22087,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
-      const tds = row.querySelectorAll("td");
-      if (tds.length >= 3) {
-        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
-        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
-        const amountInput = tds[2]?.querySelector('input');
-        const remarksInput = tds[3]?.querySelector('input');
-        const name = nameInput?.value?.trim() || "";
-        const amount = parseFloat(amountInput?.value) || 0;
-        const remarks = remarksInput?.value?.trim() || "";
+      const inputs = row.querySelectorAll("input");
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -22801,9 +22825,24 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // ICS Modal
-  window.showNewICSModal = function () {
+  window.showNewICSModal = async function () {
+    // Pre-load property cards so we can embed item_id in each option
+    let propertyCards = [];
+    try { propertyCards = await apiRequest("/property-cards"); } catch(e) {}
+
+    const pcOptions = propertyCards.map(c =>
+      `<option value="${c.id}"
+         data-propno="${c.property_number || ""}"
+         data-itemid="${c.item_id || ""}"
+         data-desc="${(c.description || "").replace(/"/g, "&quot;")}"
+         data-cost="${c.acquisition_cost || 0}"
+         data-ppe="${c.ppe_no || ""}">${c.property_number} — ${c.description || ""}</option>`
+    ).join("");
+
     const html = `
       <form id="icsForm" onsubmit="saveNewICS(event)">
+        <input type="hidden" id="icsItemId">
+        <input type="hidden" id="icsPropNo">
         <div class="form-row">
           <div class="form-group">
             <label>ICS No.</label>
@@ -22816,9 +22855,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Property Card</label>
-            <select class="form-select" id="icsPropertyId" required>
+            <label>Property Card <span style="color:red;">*</span></label>
+            <select class="form-select" id="icsPropertyId" required onchange="icsOnPropertyChange(this)">
               <option value="">-- Select Property --</option>
+              ${pcOptions}
             </select>
           </div>
           <div class="form-group">
@@ -22826,9 +22866,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
           </div>
         </div>
+        <div class="info-banner" id="icsItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
+          <i class="fas fa-link" style="color:#2e7d32;"></i>
+          <span id="icsItemBannerText"></span>
+        </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Issued To (Employee)</label>
+            <label>Issued To (Employee) <span style="color:red;">*</span></label>
             <select class="form-select" id="icsIssuedTo" required>
               <option value="">-- Select Employee --</option>
             </select>
@@ -22865,24 +22909,63 @@ Failure to submit the above requirements within the prescribed period shall cons
       </form>
     `;
     openModal("Issue Inventory Custodian Slip (ICS)", html);
-    loadPropertyCardsDropdown("icsPropertyId");
     loadEmployeesDropdown("icsIssuedTo");
     loadEmployeesDropdown("icsReceivedBy");
   };
 
+  /** Auto-fill ICS fields when a property card is selected */
+  window.icsOnPropertyChange = function (sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    const itemId  = opt.dataset.itemid  || "";
+    const propNo  = opt.dataset.propno  || "";
+    const desc    = opt.dataset.desc    || "";
+    const cost    = opt.dataset.cost    || "0";
+    const ppe     = opt.dataset.ppe     || "";
+    // Populate hidden fields
+    const itemIdEl = document.getElementById("icsItemId");
+    const propNoEl = document.getElementById("icsPropNo");
+    if (itemIdEl) itemIdEl.value = itemId;
+    if (propNoEl) propNoEl.value = propNo;
+    // Auto-fill description if empty
+    const descEl = document.getElementById("icsDescription");
+    if (descEl && !descEl.value) descEl.value = desc;
+    // Auto-fill unit cost if 0
+    const costEl = document.getElementById("icsUnitCost");
+    if (costEl && (!costEl.value || costEl.value === "0")) costEl.value = cost;
+    // Show item linkage banner
+    const banner = document.getElementById("icsItemBanner");
+    const bannerText = document.getElementById("icsItemBannerText");
+    if (banner && bannerText) {
+      if (itemId) {
+        bannerText.textContent = `Linked to Item ID #${itemId} — issuance will post to Property Ledger Card (${propNo})`;
+        banner.style.display = "flex";
+      } else {
+        bannerText.textContent = `Property ${propNo} has no linked catalog item. Ledger entry will use property card data only.`;
+        banner.style.display = "flex";
+        banner.style.background = "#fff8e1";
+        banner.style.borderLeftColor = "#f9a825";
+      }
+    }
+  };
+
   window.saveNewICS = async function (e) {
     e.preventDefault();
+    const propertyCardId = parseInt(document.getElementById("icsPropertyId").value) || null;
+    const itemId = parseInt(document.getElementById("icsItemId")?.value) || null;
+    const propNo = document.getElementById("icsPropNo")?.value || null;
     const data = {
-      property_card_id: parseInt(
-        document.getElementById("icsPropertyId").value,
-      ),
+      property_card_id: propertyCardId,
+      item_id: itemId,
+      property_number: propNo,
       date_of_issue: document.getElementById("icsDateOfIssue").value,
       inventory_no: document.getElementById("icsInventoryNo").value,
       description: document.getElementById("icsDescription").value,
       quantity: parseInt(document.getElementById("icsQty").value) || 1,
       unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
       issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by:
+      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value),
+      received_by_employee_id:
         parseInt(document.getElementById("icsReceivedBy").value) || null,
       remarks: document.getElementById("icsRemarks").value,
     };
@@ -22892,6 +22975,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("ICS issued successfully!");
       closeModal();
       loadICS();
+      loadItems(); // refresh stock if item was updated
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -23345,9 +23429,40 @@ Failure to submit the above requirements within the prescribed period shall cons
   // ==================== NEW MODULE MODAL FUNCTIONS ====================
 
   // PAR Modals
-  window.showNewPARModal = function () {
+  window.showNewPARModal = async function () {
+    // Pre-load items for PPE/capital outlay linking
+    let allItems = [];
+    try { allItems = await apiRequest("/items"); } catch(e) {}
+    // PPE-relevant categories
+    const ppeItems = allItems.filter(i => {
+      const cat = (i.category || "").toUpperCase();
+      return cat.includes("EQUIPMENT") || cat.includes("FURNITURE") ||
+             cat.includes("CAPITAL") || cat.includes("PPE") ||
+             cat.includes("MACHINERY") || cat.includes("VEHICLE") ||
+             cat.includes("IT") || cat.includes("SEMI");
+    });
+    const itemOpts = [
+      '<option value="">-- Select Item (optional) --</option>',
+      ...ppeItems.map(i =>
+        `<option value="${i.id}"
+           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
+           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
+           data-price="${i.unit_price||0}"
+           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
+      ),
+      '<optgroup label="─── All Items ───"></optgroup>',
+      ...allItems.filter(i => !ppeItems.includes(i)).map(i =>
+        `<option value="${i.id}"
+           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
+           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
+           data-price="${i.unit_price||0}"
+           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
+      ),
+    ].join("");
+
     const html = `
       <form id="parForm" onsubmit="saveNewPAR(event)">
+        <input type="hidden" id="parItemId">
         <div class="form-row">
           <div class="form-group">
             <label>Date Issued</label>
@@ -23358,13 +23473,23 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="parFundCluster" placeholder="e.g., 01">
           </div>
         </div>
+        <div class="form-group">
+          <label>Link to Catalog Item <small style="color:#888;">(links PAR to inventory record)</small></label>
+          <select class="form-select" id="parItemSelect" onchange="parOnItemChange(this)">
+            ${itemOpts}
+          </select>
+        </div>
+        <div class="info-banner" id="parItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
+          <i class="fas fa-link" style="color:#2e7d32;"></i>
+          <span id="parItemBannerText"></span>
+        </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Property Number</label>
-            <input type="text" id="parPropertyNo" placeholder="Property number" required>
+            <label>Property Number (PPE No.) <span style="color:red;">*</span></label>
+            <input type="text" id="parPropertyNo" placeholder="Property / PPE number" required>
           </div>
           <div class="form-group">
-            <label>Description</label>
+            <label>Description <span style="color:red;">*</span></label>
             <input type="text" id="parDescription" placeholder="Item description" required>
           </div>
         </div>
@@ -23380,7 +23505,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Received By</label>
+            <label>Received By <span style="color:red;">*</span></label>
             <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
           </div>
           <div class="form-group">
@@ -23398,21 +23523,56 @@ Failure to submit the above requirements within the prescribed period shall cons
     loadEmployeesDropdown("parReceivedBy");
     loadEmployeesDropdown("parIssuedBy");
   };
+
+  /** Auto-fill PAR fields when a catalog item is selected */
+  window.parOnItemChange = function (sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) {
+      document.getElementById("parItemId").value = "";
+      const banner = document.getElementById("parItemBanner");
+      if (banner) banner.style.display = "none";
+      return;
+    }
+    document.getElementById("parItemId").value = opt.value;
+    const name  = opt.dataset.name  || "";
+    const desc  = opt.dataset.desc  || "";
+    const price = opt.dataset.price || "0";
+    const code  = opt.dataset.code  || "";
+    // Auto-fill description if empty
+    const descEl = document.getElementById("parDescription");
+    if (descEl && !descEl.value) descEl.value = desc || name;
+    // Auto-fill unit cost if 0
+    const costEl = document.getElementById("parUnitCost");
+    if (costEl && (!costEl.value || parseFloat(costEl.value) === 0)) costEl.value = price;
+    // Show banner
+    const banner = document.getElementById("parItemBanner");
+    const bannerText = document.getElementById("parItemBannerText");
+    if (banner && bannerText) {
+      bannerText.textContent = `Linked to Item #${code} — issuance will post to Property Ledger Card`;
+      banner.style.display = "flex";
+    }
+  };
+
   window.saveNewPAR = async function (e) {
     e.preventDefault();
+    const itemId = parseInt(document.getElementById("parItemId")?.value) || null;
+    const receivedById = parseInt(document.getElementById("parReceivedBy").value) || null;
+    const issuedById = parseInt(document.getElementById("parIssuedBy").value) || null;
+    const propNo = document.getElementById("parPropertyNo").value;
+    const qty = parseInt(document.getElementById("parQty").value);
+    const unitCost = parseFloat(document.getElementById("parUnitCost").value);
     const data = {
-      date_issued: document.getElementById("parDate").value,
+      item_id: itemId,
+      date_of_issue: document.getElementById("parDate").value,
       fund_cluster: document.getElementById("parFundCluster").value,
-      property_number: document.getElementById("parPropertyNo").value,
+      ppe_no: propNo,
       description: document.getElementById("parDescription").value,
-      quantity: parseInt(document.getElementById("parQty").value),
-      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
-      total_cost:
-        parseInt(document.getElementById("parQty").value) *
-        parseFloat(document.getElementById("parUnitCost").value),
-      received_by:
-        parseInt(document.getElementById("parReceivedBy").value) || null,
-      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
+      quantity: qty,
+      unit_cost: unitCost,
+      total_cost: qty * unitCost,
+      issued_to_employee_id: issuedById,
+      received_by_id: receivedById,
+      received_by_position: null,
     };
     try {
       if (!confirm("Are you sure you want to save this PAR?")) return;
@@ -23420,6 +23580,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("PAR saved!");
       closeModal();
       loadPAR();
+      loadItems(); // refresh stock if item was linked
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -24232,77 +24393,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
   };
 
-
-  // ============================================================
-  // APPROVAL FUNCTIONS — visible only to authorized roles
-  // ============================================================
-
-  window.approveRFQRecord = async function (id) {
-    if (!confirm("Mark this RFQ as completed?")) return;
-    try {
-      await apiRequest("/rfqs/" + id + "/set-status", "PUT", { status: "completed" });
-      showToast("RFQ marked as completed.", "success");
-      if (typeof loadRFQ === "function") loadRFQ();
-    } catch (err) {
-      showToast(err.message || "Failed to complete RFQ.", "error");
-    }
-  };
-
-  window.approveAbstractRecord = async function (id) {
-    if (!confirm("Mark this Abstract as completed/approved?")) return;
-    try {
-      await apiRequest("/abstracts/" + id + "/set-status", "PUT", { status: "completed" });
-      showToast("Abstract approved and marked as completed.", "success");
-      if (typeof loadAbstract === "function") loadAbstract();
-    } catch (err) {
-      showToast(err.message || "Failed to approve Abstract.", "error");
-    }
-  };
-
-  window.approvePostQualRecord = async function (id) {
-    if (!confirm("Mark this Post-Qualification as completed?")) return;
-    try {
-      await apiRequest("/post-qualifications/" + id + "/set-status", "PUT", { status: "completed" });
-      showToast("Post-Qualification marked as completed.", "success");
-      if (typeof loadPostQual === "function") loadPostQual();
-    } catch (err) {
-      showToast(err.message || "Failed to approve Post-Qualification.", "error");
-    }
-  };
-
-  window.approveNOARecord = async function (id) {
-    if (!confirm("Mark this Notice of Award as issued/approved?")) return;
-    try {
-      await apiRequest("/notices-of-award/" + id + "/set-status", "PUT", { status: "with_noa" });
-      showToast("Notice of Award approved.", "success");
-      if (typeof loadNOA === "function") loadNOA();
-    } catch (err) {
-      showToast(err.message || "Failed to approve NOA.", "error");
-    }
-  };
-
-  window.approvePORecord = async function (id) {
-    if (!confirm("Approve and sign this Purchase Order?")) return;
-    try {
-      await apiRequest("/purchase-orders/" + id + "/status", "PUT", { status: "signed" });
-      showToast("Purchase Order approved and signed.", "success");
-      if (typeof loadPO === "function") loadPO();
-    } catch (err) {
-      showToast(err.message || "Failed to approve Purchase Order.", "error");
-    }
-  };
-
-  window.approveIARRecord = async function (id) {
-    if (!confirm("Mark this IAR as verified and accepted?")) return;
-    try {
-      await apiRequest("/iars/" + id + "/accept", "PUT");
-      showToast("IAR verified and accepted.", "success");
-      if (typeof loadIAR === "function") loadIAR();
-    } catch (err) {
-      showToast(err.message || "Failed to accept IAR.", "error");
-    }
-  };
-
   // Trip Ticket Modals
   window.showNewTripTicketModal = function () {
     const html = `
@@ -25112,8 +25202,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // BAC Resolution Modal
   window.showNewBACResolutionModal = async function () {
-    // Pre-cache suppliers for bidder picker
-    await window.ensureSuppliersCached();
     // Load employees from DB for BAC member dropdowns
     let employees = [];
     try {
@@ -25198,19 +25286,19 @@ Failure to submit the above requirements within the prescribed period shall cons
           <tbody id="bacBiddersBody">
             <tr>
               <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
-              <td>${window.buildBidderPickerHTML('bacBidder1Name', '', 'Bidder Name')}</td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
             </tr>
             <tr>
               <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
-              <td>${window.buildBidderPickerHTML('bacBidder2Name', '', 'Bidder Name')}</td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
             </tr>
             <tr>
               <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
-              <td>${window.buildBidderPickerHTML('bacBidder3Name', '', 'Bidder Name')}</td>
+              <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
               <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
               <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
             </tr>
@@ -25367,10 +25455,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("bacBiddersBody");
     const nextNum = tbody.rows.length + 1;
     const row = document.createElement("tr");
-    const pickerId = 'bacDynBidder' + nextNum + '_' + Date.now();
     row.innerHTML = `
       <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
-      <td>${window.buildBidderPickerHTML(pickerId, '', 'Bidder Name')}</td>
+      <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
       <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
       <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
     `;
@@ -25406,10 +25493,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             const isRecommended =
               abs.recommended_supplier_name &&
               q.supplier_name === abs.recommended_supplier_name;
-            const autoPickerId = 'bacAutoBidder' + (idx + 1) + '_' + Date.now();
             row.innerHTML = `
               <td><input type="text" value="${idx + 1}" style="width: 35px; text-align: center;"></td>
-              <td>${window.buildBidderPickerHTML(autoPickerId, q.supplier_name || '', 'Bidder Name')}</td>
+              <td><input type="text" value="${escapeHtml(q.supplier_name || "")}" style="width: 100%;"></td>
               <td><input type="number" value="${bidAmount.toFixed(2)}" step="0.01" style="width: 120px;"></td>
               <td><input type="text" value="${isRecommended ? "LCRB / Responsive" : "Responsive"}" style="width: 100%;"></td>
             `;
@@ -25446,8 +25532,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = async function () {
-    // Pre-cache suppliers for bidder picker
-    await window.ensureSuppliersCached();
     // Load employees from DB for TWG member dropdowns
     let employees = [];
     try {
@@ -25537,9 +25621,9 @@ Failure to submit the above requirements within the prescribed period shall cons
               </tr>
               <tr>
                 <td></td>
-                <td style="background: #f5f9ff;">${window.buildBidderPickerHTML('twgBidder1', '', 'Enter Bidder 1 name')}</td>
-                <td style="background: #dce9fc;">${window.buildBidderPickerHTML('twgBidder2', '', 'Enter Bidder 2 name')}</td>
-                <td style="background: #cddff5;">${window.buildBidderPickerHTML('twgBidder3', '', 'Enter Bidder 3 name')}</td>
+                <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
+                <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
+                <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
               </tr>
               <tr>
                 <td>Latest Income Tax Return (ITR)</td>
@@ -25709,12 +25793,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             const labelCell = row.querySelector("td[colspan]");
             if (labelCell) labelCell.setAttribute("colspan", n + 1);
           } else if (idx === 1) {
-            // Bidder name input row — use bidder picker widget
-            td.innerHTML = window.buildBidderPickerHTML(
-              'twgBidder' + n,
-              '',
-              'Enter Bidder ' + n + ' name'
-            );
+            // Bidder name input row
+            td.innerHTML =
+              '<input type="text" id="twgBidder' +
+              n +
+              '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' +
+              n +
+              ' name">';
             row.appendChild(td);
           } else {
             // Document check rows
@@ -25842,7 +25927,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const poOpts = (cachedPO || [])
       .map(
         (p) =>
-          `<option value="${p.id}" data-po='${JSON.stringify({ id: p.id, po_number: p.po_number || "", supplier_name: p.supplier_name || "", purpose: p.purpose || "", place_of_delivery: p.place_of_delivery || p.delivery_address || "", delivery_date: p.delivery_date || null, expected_delivery_date: p.expected_delivery_date || null, total_amount: p.total_amount || 0 }).replace(/'/g, "&#39;")}'>${p.po_number || ""} — ${(p.supplier_name || "").substring(0, 30)} — ${(p.purpose || "").substring(0, 40)}</option>`,
+          `<option value="${p.id}" data-po='${JSON.stringify({ id: p.id, po_number: p.po_number || "", supplier_name: p.supplier_name || "", purpose: p.purpose || "", place_of_delivery: p.place_of_delivery || p.delivery_address || "", delivery_date: p.delivery_date || p.expected_delivery_date || "", total_amount: p.total_amount || 0 }).replace(/'/g, "&#39;")}'>${p.po_number || ""} — ${(p.supplier_name || "").substring(0, 30)} — ${(p.purpose || "").substring(0, 40)}</option>`,
       )
       .join("");
     const iarOpts = (cachedIAR || [])
@@ -25919,23 +26004,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       try {
         window._coaWizard.poData = JSON.parse(opt.dataset.po);
       } catch (e) {}
-    }
-    // Populate iarData from cached IARs so delivery date fallback works in letters
-    const linkedIarId = window._coaWizard.iarId;
-    if (linkedIarId && cachedIAR && cachedIAR.length > 0) {
-      const matchedIAR = cachedIAR.find(
-        (i) => String(i.id) === String(linkedIarId),
-      );
-      window._coaWizard.iarData = matchedIAR || null;
-    } else {
-      // Also try to match IAR by PO id even if no IAR was explicitly selected
-      const poId = window._coaWizard.poId;
-      if (poId && cachedIAR && cachedIAR.length > 0) {
-        const matchedIAR = cachedIAR.find(
-          (i) => String(i.po_id) === String(poId),
-        );
-        window._coaWizard.iarData = matchedIAR || null;
-      }
     }
     // Show document hub in modal
     coaRenderHub();
@@ -26041,17 +26109,12 @@ Failure to submit the above requirements within the prescribed period shall cons
   function coaBuildWizardLetter(step) {
     const w = window._coaWizard;
     const po = w.poData || {};
-    const iar = w.iarData || {};
     const today = new Date().toISOString().split("T")[0];
     const fmtDate = (d) => {
-      if (!d || d === "" || d === "null" || d === "undefined") return "";
-      const parsed = new Date(d.includes("T") ? d : d + "T00:00:00");
-      if (isNaN(parsed.getTime())) return "";
-      return parsed.toLocaleDateString("en-PH", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      if (!d || String(d).trim() === "") return "";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
     };
 
     const dateStr = fmtDate(w.dates["step" + step] || today);
@@ -26059,14 +26122,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const purpose = po.purpose || "";
     const location = po.place_of_delivery || po.delivery_address || "";
     const poNum = po.po_number || "";
-    // Resolve the delivery date: try PO actual → PO expected → IAR delivery → IAR inspection → today
-    const rawDelivDate =
-      po.delivery_date ||
-      po.expected_delivery_date ||
-      iar.delivery_date ||
-      iar.inspection_date ||
-      today;
-    const delivDate = fmtDate(rawDelivDate) || fmtDate(today);
+    const _rawDelivDate = po.delivery_date || po.expected_delivery_date || "";
+    const delivDate = _rawDelivDate ? fmtDate(_rawDelivDate) : "[delivery date not yet set — please update in Purchase Order]";
 
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
     <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
@@ -27502,7 +27559,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div class="form-group" style="text-align:right;margin-top:20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printPR(${id});"><i class="fas fa-print"></i> Print</button>
-        ${p.status === "pending_approval" && isCurrentUserAffixedSignatory(p, { userFields: ["hope_user_id"] }) ? `<button type="button" class="btn btn-primary" onclick="closeModal();showApprovePRModal(${id});"><i class="fas fa-check"></i> Approve</button><button type="button" class="btn" onclick="closeModal();showRejectPRModal(${id});" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject</button>` : ""}
       </div>
     `;
     openModal("View Purchase Request", html, {
@@ -28344,14 +28400,30 @@ Failure to submit the above requirements within the prescribed period shall cons
           : coa.documents_included || {};
     } catch (e) {}
 
-    const fmtDate = (d) =>
-      d
-        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-        : "N/A";
+    // Fetch live delivery date from linked PO when not stored in documents_included
+    const ni = docs.notice_inspection || {};
+    if (!ni.delivery_date && (coa.po_id || coa.id)) {
+      try {
+        const poId = coa.po_id;
+        if (poId) {
+          const livepo = await apiRequest("/purchase-orders/" + poId);
+          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
+            if (!docs.notice_inspection) docs.notice_inspection = {};
+            docs.notice_inspection.delivery_date =
+              livepo.delivery_date || livepo.expected_delivery_date;
+          }
+        }
+      } catch (e) {
+        console.warn("[COA View] Could not fetch PO delivery date:", e);
+      }
+    }
+
+    const fmtDate = (d) => {
+      if (!d || String(d).trim() === "") return "N/A";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "N/A";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+    };
 
     // Build read-only letter previews
     function viewLetterHeader() {
@@ -28379,7 +28451,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
 
     const tp = docs.transmittal_po || {};
-    const ni = docs.notice_inspection || {};
+    ni = docs.notice_inspection || {};
     const ti = docs.transmittal_iar || {};
 
     const card = (title, icon, body) => `
@@ -28401,7 +28473,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Step 2: Notice of Inspection",
       "fa-search",
       `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ni.date || coa.submission_date)}</div>${viewAddressee()}
-      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ""}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ""}</strong>, on <strong>${fmtDate(ni.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`,
+      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ""}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ""}</strong>, on <strong>${ni.delivery_date ? fmtDate(ni.delivery_date) : "N/A"}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`,
     );
 
     const letter3 = card(
@@ -28484,14 +28556,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? JSON.parse(coa.documents_included)
           : coa.documents_included || {};
     } catch (e) {}
-    const fmtDate = (d) =>
-      d
-        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-        : "";
+    const fmtDate = (d) => {
+      if (!d || String(d).trim() === "") return "";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+    };
 
     // No separate header needed — buildPrintHTML already provides the official DMW header with logos
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
@@ -28507,8 +28577,10 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
     } else if (stepNum === 2) {
       const d = docs.notice_inspection || {};
+      const _delivDate = d.delivery_date || coa.delivery_date || "";
+      const _delivDateStr = _delivDate ? fmtDate(_delivDate) : "[delivery date not set]";
       body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
-      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ""}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ""}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ""}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ""}</strong>, on <strong>${_delivDateStr}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
     } else if (stepNum === 3) {
       const d = docs.transmittal_iar || {};
       body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
@@ -28547,9 +28619,32 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Print all 3 COA documents in one print job
    */
-  window.coaPrintAllDocs = function (coaId) {
+  window.coaPrintAllDocs = async function (coaId) {
     const allCoa = window._cachedCOA || [];
-    const coa = allCoa.find((c) => c.id === coaId) || {};
+    let coa = allCoa.find((c) => c.id === coaId) || {};
+    // Ensure delivery_date is populated for Notice of Inspection (step 2)
+    {
+      let docs = {};
+      try {
+        docs = typeof coa.documents_included === "string"
+          ? JSON.parse(coa.documents_included)
+          : coa.documents_included || {};
+      } catch (e) {}
+      const ni = docs.notice_inspection || {};
+      if (!ni.delivery_date && coa.po_id) {
+        try {
+          const livepo = await apiRequest("/purchase-orders/" + coa.po_id);
+          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
+            if (!docs.notice_inspection) docs.notice_inspection = {};
+            docs.notice_inspection.delivery_date =
+              livepo.delivery_date || livepo.expected_delivery_date;
+            coa = { ...coa, documents_included: docs };
+          }
+        } catch (e) {
+          console.warn("[COA Print All] Could not fetch PO delivery date:", e);
+        }
+      }
+    }
     const title = "COA_Documents_" + (coa.submission_number || "");
     const stepTitles = [
       "Transmittal \u2013 Purchase Order",
@@ -31441,210 +31536,47 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Approve PR Modal
   window.showApprovePRModal = async function (prIdOrNo) {
+    // Fetch actual PR data dynamically
     let pr = null;
     if (typeof prIdOrNo === "number") {
       pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
-      if (!pr) { try { pr = await apiRequest("/purchase-requests/" + prIdOrNo); } catch (e) {} }
+      if (!pr) {
+        try {
+          pr = await apiRequest("/purchase-requests/" + prIdOrNo);
+        } catch (e) {}
+      }
     } else {
       pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
     }
-    if (!pr) { alert("PR not found"); return; }
-
-    const isHope = userHasAnyRole(["hope", "admin"]);
-    const canUserApprove = isHope && pr.status === "pending_approval";
-    const approveLabel = userHasRole("admin") ? "Approve (Admin)" : "Approve as HOPE";
-
-    const approvedStatus = pr.status === "approved"
-      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${pr.approved_by_name ? " (" + pr.approved_by_name + ")" : ""}</span>`
-      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE Approval</span>`;
-
+    if (!pr) {
+      alert("PR not found");
+      return;
+    }
     const html = `
-      <form id="approvePRForm" data-pr-id="${pr.id}">
+      <form id="approvePRForm">
+        <div class="info-banner" style="margin-bottom: 15px;">
+          <i class="fas fa-check-circle"></i>
+          Approve this Purchase Request as HoPE (Head of Procuring Entity).
+        </div>
         <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span style="font-weight:bold;">${pr.pr_number || ""}</span></div>
-          <div class="detail-row"><label>Purpose / Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
-          <div class="detail-row"><label>Total Amount:</label><span style="font-weight:bold;color:#1a365d;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
+          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
+          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
           <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
-          <div class="detail-row"><label>Status:</label><span><span class="status-badge ${pr.status === "approved" ? "approved" : "pending"}">${pr.status}</span></span></div>
         </div>
-        <div style="margin-top:16px;padding:14px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
-          <h4 style="margin:0 0 10px;color:#1a365d;font-size:13px;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">${approvedStatus}</div>
-        </div>
-        ${canUserApprove ? `
-        <div class="form-group" style="margin-top:14px;">
+        <div class="form-group" style="margin-top: 15px;">
           <label>Approval Remarks (Optional)</label>
-          <textarea id="approvePRRemarks" rows="2" placeholder="Any notes for record" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
-        </div>` : ""}
-        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
-          <button type="button" class="btn" onclick="closeModal();showRejectPRModal(${pr.id})" style="background:#c53030;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject</button>
-          ${canUserApprove ? `<button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> ${approveLabel}</button>` : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PR with your current role.</p>`}
+          <textarea rows="2" placeholder="Any notes for record"></textarea>
+        </div>
+        <div class="form-group" style="text-align: right; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
         </div>
       </form>
     `;
-    openModal("Approve Purchase Request", html, { preventOutsideClose: true });
-    setTimeout(() => {
-      const form = document.getElementById("approvePRForm");
-      if (form) {
-        form.addEventListener("submit", async function (e) {
-          e.preventDefault();
-          const prId = this.dataset.prId;
-          const submitBtn = this.querySelector('button[type="submit"]');
-          if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...'; }
-          try {
-            await apiRequest("/purchase-requests/" + prId + "/approve", "PUT");
-            closeModal();
-            showToast("Purchase Request approved successfully!", "success");
-            if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
-            else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
-          } catch (err) {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Approve PR'; }
-            showToast(err.message || "Failed to approve Purchase Request.", "error");
-          }
-        });
-      }
-    }, 0);
-  };
-
-  // Reject PR Modal (send back for revision)
-  window.showRejectPRModal = async function (prIdOrNo) {
-    let pr = null;
-    if (typeof prIdOrNo === "number") {
-      pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
-      if (!pr) { try { pr = await apiRequest("/purchase-requests/" + prIdOrNo); } catch (e) {} }
-    } else {
-      pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
-    }
-    if (!pr) { alert("PR not found"); return; }
-    const html = `
-      <div style="padding:5px 0;">
-        <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
-          <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;"><i class="fas fa-exclamation-triangle"></i> Reject Purchase Request</div>
-          <p style="color:#742a2a;font-size:12px;margin:0;">This will send the PR back to the requesting division for revision. The requester will be notified with your reason.</p>
-        </div>
-        <div class="view-details" style="margin-bottom:16px;">
-          <div class="detail-row"><label>PR No.:</label><span style="font-weight:bold;">${pr.pr_number || ""}</span></div>
-          <div class="detail-row"><label>Purpose:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
-          <div class="detail-row"><label>Amount:</label><span style="font-weight:bold;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
-          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
-        </div>
-        <div class="form-group">
-          <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;"><i class="fas fa-comment-alt"></i> Reason for Rejection <span style="color:#e53e3e;">*</span></label>
-          <textarea id="rejectPRReasonInput" rows="4" placeholder="Please provide a detailed reason for rejecting this PR (e.g., budget unavailable, wrong items, missing justification)..." style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
-        </div>
-        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="button" class="btn" onclick="rejectPR(${pr.id})" style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;"><i class="fas fa-times-circle"></i> Reject PR</button>
-        </div>
-      </div>
-    `;
-    openModal("Reject Purchase Request — Needs Revision", html, { preventOutsideClose: true });
-    setTimeout(() => { const ta = document.getElementById("rejectPRReasonInput"); if (ta) ta.focus(); }, 200);
-  };
-
-  window.rejectPR = async function (prId) {
-    const reasonEl = document.getElementById("rejectPRReasonInput");
-    const reason = (reasonEl?.value || "").trim();
-    if (!reason) {
-      if (reasonEl) { reasonEl.style.border = "2px solid #e53e3e"; reasonEl.focus(); }
-      showToast("Please provide a reason for rejecting this PR.", "error");
-      return;
-    }
-    if (!confirm("Are you sure you want to reject this PR? The requester will be notified to revise and resubmit.")) return;
-    try {
-      const result = await apiRequest("/purchase-requests/" + prId + "/reject", "PUT", { reason });
-      showToast(result.message || "PR rejected and returned for revision.", "success");
-      closeModal();
-      if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
-      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
-    } catch (err) {
-      showToast(err.message || "Failed to reject PR.", "error");
-    }
-  };
-
-  window.resubmitPR = async function (prId) {
-    if (!confirm("Resubmit this PR for approval? The approver will be notified.")) return;
-    try {
-      const result = await apiRequest("/purchase-requests/" + prId + "/resubmit", "PUT");
-      showToast(result.message || "PR resubmitted for approval.", "success");
-      if (typeof loadPurchaseRequests === "function") loadPurchaseRequests();
-      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
-    } catch (err) {
-      showToast(err.message || "Failed to resubmit PR.", "error");
-    }
-  };
-
-  // =====================================================================
-  // UNIVERSAL REJECT MODAL — used by RFQ, AOQ, PostQual, BACRes, NOA, PO, IAR
-  // showRejectModal(label, id, apiResource, refreshFn)
-  //   label       — human-readable name e.g. "RFQ", "purchase order"
-  //   id          — record id
-  //   apiResource — API path segment e.g. "rfqs", "purchase-orders"
-  //   refreshFn   — function to call after success (or its string name)
-  // =====================================================================
-  window.showRejectModal = function (label, id, apiResource, refreshFn) {
-    const labelCaps = label.charAt(0).toUpperCase() + label.slice(1);
-    const html = `
-      <div style="padding:5px 0;">
-        <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:15px;margin-bottom:16px;">
-          <div style="color:#c53030;font-weight:bold;font-size:14px;margin-bottom:8px;">
-            <i class="fas fa-exclamation-triangle"></i> Reject ${labelCaps}
-          </div>
-          <p style="color:#742a2a;font-size:12px;margin:0;">
-            This will reject the ${label} and notify the responsible personnel.
-            They will need to revise and resubmit the document.
-          </p>
-        </div>
-        <div class="form-group">
-          <label style="font-weight:600;color:#1a365d;margin-bottom:6px;display:block;">
-            <i class="fas fa-comment-alt"></i> Reason for Rejection <span style="color:#e53e3e;">*</span>
-          </label>
-          <textarea id="universalRejectReasonInput" rows="4"
-            placeholder="Please provide a detailed reason for rejecting this ${label} (e.g., incorrect details, incomplete documents, policy non-compliance)..."
-            style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
-        </div>
-        <div class="form-group" style="text-align:right;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="button" class="btn"
-            onclick="confirmUniversalReject('${apiResource}', ${id}, '${typeof refreshFn === 'string' ? refreshFn : refreshFn?.name || ''}')"
-            style="background:#c53030;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:600;cursor:pointer;">
-            <i class="fas fa-times-circle"></i> Reject ${labelCaps}
-          </button>
-        </div>
-      </div>
-    `;
-    openModal(`Reject ${labelCaps} — Needs Revision`, html, { preventOutsideClose: true });
-    setTimeout(() => {
-      const ta = document.getElementById("universalRejectReasonInput");
-      if (ta) ta.focus();
-    }, 200);
-    // Store the refresh function reference for later use
-    window._universalRejectRefreshFn = typeof refreshFn === "function" ? refreshFn : null;
-  };
-
-  window.confirmUniversalReject = async function (apiResource, id, refreshFnName) {
-    const reasonEl = document.getElementById("universalRejectReasonInput");
-    const reason = (reasonEl?.value || "").trim();
-    if (!reason) {
-      if (reasonEl) { reasonEl.style.border = "2px solid #e53e3e"; reasonEl.focus(); }
-      showToast("Please provide a reason for rejecting this document.", "error");
-      return;
-    }
-    if (!confirm("Are you sure you want to reject this document? The responsible personnel will be notified to revise and resubmit.")) return;
-    try {
-      const result = await apiRequest(`/${apiResource}/${id}/reject`, "PUT", { reason });
-      showToast(result.message || "Document rejected and returned for revision.", "success");
-      closeModal();
-      // Try refresh function: stored reference first, then by name
-      const fn = window._universalRejectRefreshFn ||
-        (refreshFnName && typeof window[refreshFnName] === "function" ? window[refreshFnName] : null);
-      if (fn) fn();
-      else if (typeof refreshCurrentPage === "function") refreshCurrentPage();
-      window._universalRejectRefreshFn = null;
-    } catch (err) {
-      showToast(err.message || "Failed to reject document.", "error");
-    }
+    openModal("Approve Purchase Request", html, {
+      preventOutsideClose: true,
+    });
   };
 
   // Return PR Modal
@@ -36916,7 +36848,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group" style="text-align: right; margin-top: 0;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
- ${userHasAnyRole(["hope","admin"]) ? '<button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>' : ""}
+ <button type="button" class="btn btn-primary" onclick="approvePO()"><i class="fas fa-file-contract"></i> Approve PO</button>
  </div>
  </form>
  `;
@@ -37998,13 +37930,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
     }
 
-    // Load suppliers from DB and update bidder picker cache
+    // Load suppliers from DB
     let suppliers = [];
     try {
       suppliers = await apiRequest("/suppliers");
     } catch (e) {}
-    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
-    else await window.ensureSuppliersCached();
     const supplierOptions = suppliers
       .map(
         (s) =>
@@ -38042,14 +37972,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (idx < 3) slot[idx] = q;
     });
 
-    // Build supplier text input with pre-filled value (uses bidder picker widget)
+    // Build supplier text input with pre-filled value
     function buildSupplierInput(slotNum, existingName) {
-      return window.buildBidderPickerHTML(
-        'editAbsSupplier' + slotNum + 'Id',
-        existingName || '',
-        'Enter Bidder ' + slotNum + ' name',
-        'onEditAbsSupplierChange(' + slotNum + ', this)'
-      );
+      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || "")}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
     }
 
     // Build header labels
@@ -38432,12 +38357,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (e) {
       console.error("Failed to load suppliers:", e);
     }
-    // Update global cache for bidder picker
-    if (suppliers.length > 0) window._globalSuppliersList = suppliers;
-    else await window.ensureSuppliersCached();
 
     function buildBidderInput(fieldId, existingName) {
-      return window.buildBidderPickerHTML(fieldId, existingName || '', 'Enter Bidder name');
+      return `<input type="text" id="${fieldId}" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder name" value="${escapeHtml(existingName || "")}">`;
     }
 
     const html = `
@@ -38457,7 +38379,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  </div>
  <div class="form-row">
- <div class="form-group"><label>Subject / Bidder Name</label>${window.buildBidderPickerHTML('editPqBidder', p.bidder_name || '', 'Enter Bidder / Subject name')}</div>
+ <div class="form-group"><label>Subject / Bidder Name</label><input type="text" id="editPqBidder" value="${(p.bidder_name || "").replace(/"/g, "&quot;")}"></div>
  <div class="form-group">
  <label>Status</label>
  <select id="editPqStatus" class="form-select">
@@ -39612,15 +39534,12 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
-  window.showNewItemModal = function () {
-    // Ensure UOMs are loaded
-    if (!cachedUOMs.length) {
-      apiRequest("/uoms")
-        .then((uoms) => {
-          cachedUOMs = uoms;
-        })
-        .catch(() => {});
-    }
+  window.showNewItemModal = async function () {
+    // Ensure PPMP categories and UOMs are fully loaded before rendering
+    await Promise.all([
+      ensurePPMPCategoriesLoaded(),
+      cachedUOMs.length ? Promise.resolve() : apiRequest("/uoms").then(u => { cachedUOMs = u; }).catch(() => {}),
+    ]);
     const html = `
  <form id="itemForm" onsubmit="saveNewItem(event)">
  <!-- Procurement Source selector (always visible) -->
@@ -39649,7 +39568,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group">
  <label>Category</label>
  <select class="form-select" id="itemCategory" required>
- ${buildCategoryOptions("")}
+ ${buildPPMPCategoryOptions("")}
  </select>
  </div>
  </div>
@@ -42821,6 +42740,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
+      const _linkedAppIdsRaw2 = document.getElementById("prLinkedAppIds")?.value || "";
+      const _linkedAppIds2 = _linkedAppIdsRaw2.split(",").map(s => parseInt(s.trim())).filter(Boolean);
       const data = {
         pr_number: prNumber,
         purpose: purpose,
@@ -42828,6 +42749,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
+        app_item_id: _linkedAppIds2[0] || null,
+        app_item_ids: _linkedAppIds2,
         items: items,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
@@ -42861,7 +42784,10 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const prId = document.getElementById("rfqLinkedPR")?.value || "";
+    const linkedPRIdsRaw = document.getElementById("rfqLinkedPRIds")?.value || "";
+    const linkedPRIds = linkedPRIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
+    const prId = linkedPRIds[0] || null;
+    if (linkedPRIds.length === 0) { alert("Please link at least one Purchase Request to this RFQ."); return; }
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -42894,7 +42820,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: prId || null,
+        pr_ids: linkedPRIds,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -43377,16 +43304,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
-      const tds = row.querySelectorAll("td");
-      if (tds.length >= 3) {
-        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
-        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
-        const amountInput = tds[2]?.querySelector('input');
-        const remarksInput = tds[3]?.querySelector('input');
-        const name = nameInput?.value?.trim() || "";
-        const amount = parseFloat(amountInput?.value) || 0;
-        const remarks = remarksInput?.value?.trim() || "";
+      const inputs = row.querySelectorAll("input");
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -43799,16 +43721,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     const bidderRows = document.querySelectorAll("#bacBiddersBody tr");
     const bidders = [];
     bidderRows.forEach((row) => {
-      // Row structure: td[0]=number, td[1]=bidder picker, td[2]=amount, td[3]=remarks
-      const tds = row.querySelectorAll("td");
-      if (tds.length >= 3) {
-        // Bidder name: read from the picker's text input (.bidder-manual-input) or fallback to any input in td[1]
-        const nameInput = tds[1]?.querySelector('.bidder-manual-input') || tds[1]?.querySelector('input[type="text"]');
-        const amountInput = tds[2]?.querySelector('input');
-        const remarksInput = tds[3]?.querySelector('input');
-        const name = nameInput?.value?.trim() || "";
-        const amount = parseFloat(amountInput?.value) || 0;
-        const remarks = remarksInput?.value?.trim() || "";
+      const inputs = row.querySelectorAll("input");
+      if (inputs.length >= 2) {
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -44542,9 +44459,23 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // ICS Modal
-  window.showNewICSModal = function () {
+  window.showNewICSModal = async function () {
+    let propertyCards = [];
+    try { propertyCards = await apiRequest("/property-cards"); } catch(e) {}
+
+    const pcOptions = propertyCards.map(c =>
+      `<option value="${c.id}"
+         data-propno="${c.property_number || ""}"
+         data-itemid="${c.item_id || ""}"
+         data-desc="${(c.description || "").replace(/"/g, "&quot;")}"
+         data-cost="${c.acquisition_cost || 0}"
+         data-ppe="${c.ppe_no || ""}">${c.property_number} — ${c.description || ""}</option>`
+    ).join("");
+
     const html = `
  <form id="icsForm" onsubmit="saveNewICS(event)">
+ <input type="hidden" id="icsItemId">
+ <input type="hidden" id="icsPropNo">
  <div class="form-row">
  <div class="form-group">
  <label>ICS No.</label>
@@ -44557,9 +44488,10 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Property Card</label>
- <select class="form-select" id="icsPropertyId" required>
+ <label>Property Card <span style="color:red;">*</span></label>
+ <select class="form-select" id="icsPropertyId" required onchange="icsOnPropertyChange(this)">
  <option value="">-- Select Property --</option>
+ ${pcOptions}
  </select>
  </div>
  <div class="form-group">
@@ -44567,9 +44499,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
  </div>
  </div>
+ <div class="info-banner" id="icsItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
+ <i class="fas fa-link" style="color:#2e7d32;"></i>
+ <span id="icsItemBannerText"></span>
+ </div>
  <div class="form-row">
  <div class="form-group">
- <label>Issued To (Employee)</label>
+ <label>Issued To (Employee) <span style="color:red;">*</span></label>
  <select class="form-select" id="icsIssuedTo" required>
  <option value="">-- Select Employee --</option>
  </select>
@@ -44606,24 +44542,27 @@ Failure to submit the above requirements within the prescribed period shall cons
  </form>
  `;
     openModal("Issue Inventory Custodian Slip (ICS)", html);
-    loadPropertyCardsDropdown("icsPropertyId");
     loadEmployeesDropdown("icsIssuedTo");
     loadEmployeesDropdown("icsReceivedBy");
   };
 
   window.saveNewICS = async function (e) {
     e.preventDefault();
+    const propertyCardId = parseInt(document.getElementById("icsPropertyId").value) || null;
+    const itemId = parseInt(document.getElementById("icsItemId")?.value) || null;
+    const propNo = document.getElementById("icsPropNo")?.value || null;
     const data = {
-      property_card_id: parseInt(
-        document.getElementById("icsPropertyId").value,
-      ),
+      property_card_id: propertyCardId,
+      item_id: itemId,
+      property_number: propNo,
       date_of_issue: document.getElementById("icsDateOfIssue").value,
       inventory_no: document.getElementById("icsInventoryNo").value,
       description: document.getElementById("icsDescription").value,
       quantity: parseInt(document.getElementById("icsQty").value) || 1,
       unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
       issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by:
+      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value),
+      received_by_employee_id:
         parseInt(document.getElementById("icsReceivedBy").value) || null,
       remarks: document.getElementById("icsRemarks").value,
     };
@@ -44633,6 +44572,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("ICS issued successfully!");
       closeModal();
       loadICS();
+      loadItems();
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -45064,9 +45004,38 @@ Failure to submit the above requirements within the prescribed period shall cons
   // ==================== NEW MODULE MODAL FUNCTIONS ====================
 
   // PAR Modals
-  window.showNewPARModal = function () {
+  window.showNewPARModal = async function () {
+    let allItems = [];
+    try { allItems = await apiRequest("/items"); } catch(e) {}
+    const ppeItems = allItems.filter(i => {
+      const cat = (i.category || "").toUpperCase();
+      return cat.includes("EQUIPMENT") || cat.includes("FURNITURE") ||
+             cat.includes("CAPITAL") || cat.includes("PPE") ||
+             cat.includes("MACHINERY") || cat.includes("VEHICLE") ||
+             cat.includes("IT") || cat.includes("SEMI");
+    });
+    const itemOpts = [
+      '<option value="">-- Select Item (optional) --</option>',
+      ...ppeItems.map(i =>
+        `<option value="${i.id}"
+           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
+           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
+           data-price="${i.unit_price||0}"
+           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
+      ),
+      '<optgroup label="─── All Items ───"></optgroup>',
+      ...allItems.filter(i => !ppeItems.includes(i)).map(i =>
+        `<option value="${i.id}"
+           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
+           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
+           data-price="${i.unit_price||0}"
+           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
+      ),
+    ].join("");
+
     const html = `
  <form id="parForm" onsubmit="saveNewPAR(event)">
+ <input type="hidden" id="parItemId">
  <div class="form-row">
  <div class="form-group">
  <label>Date Issued</label>
@@ -45077,13 +45046,23 @@ Failure to submit the above requirements within the prescribed period shall cons
  <input type="text" id="parFundCluster" placeholder="e.g., 01">
  </div>
  </div>
+ <div class="form-group">
+ <label>Link to Catalog Item <small style="color:#888;">(links PAR to inventory record)</small></label>
+ <select class="form-select" id="parItemSelect" onchange="parOnItemChange(this)">
+ ${itemOpts}
+ </select>
+ </div>
+ <div class="info-banner" id="parItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
+ <i class="fas fa-link" style="color:#2e7d32;"></i>
+ <span id="parItemBannerText"></span>
+ </div>
  <div class="form-row">
  <div class="form-group">
- <label>Property Number</label>
- <input type="text" id="parPropertyNo" placeholder="Property number" required>
+ <label>Property Number (PPE No.) <span style="color:red;">*</span></label>
+ <input type="text" id="parPropertyNo" placeholder="Property / PPE number" required>
  </div>
  <div class="form-group">
- <label>Description</label>
+ <label>Description <span style="color:red;">*</span></label>
  <input type="text" id="parDescription" placeholder="Item description" required>
  </div>
  </div>
@@ -45099,7 +45078,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Received By</label>
+ <label>Received By <span style="color:red;">*</span></label>
  <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
  </div>
  <div class="form-group">
@@ -45119,19 +45098,24 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
   window.saveNewPAR = async function (e) {
     e.preventDefault();
+    const itemId = parseInt(document.getElementById("parItemId")?.value) || null;
+    const receivedById = parseInt(document.getElementById("parReceivedBy").value) || null;
+    const issuedById = parseInt(document.getElementById("parIssuedBy").value) || null;
+    const propNo = document.getElementById("parPropertyNo").value;
+    const qty = parseInt(document.getElementById("parQty").value);
+    const unitCost = parseFloat(document.getElementById("parUnitCost").value);
     const data = {
-      date_issued: document.getElementById("parDate").value,
+      item_id: itemId,
+      date_of_issue: document.getElementById("parDate").value,
       fund_cluster: document.getElementById("parFundCluster").value,
-      property_number: document.getElementById("parPropertyNo").value,
+      ppe_no: propNo,
       description: document.getElementById("parDescription").value,
-      quantity: parseInt(document.getElementById("parQty").value),
-      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
-      total_cost:
-        parseInt(document.getElementById("parQty").value) *
-        parseFloat(document.getElementById("parUnitCost").value),
-      received_by:
-        parseInt(document.getElementById("parReceivedBy").value) || null,
-      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
+      quantity: qty,
+      unit_cost: unitCost,
+      total_cost: qty * unitCost,
+      issued_to_employee_id: issuedById,
+      received_by_id: receivedById,
+      received_by_position: null,
     };
     try {
       if (!confirm("Are you sure you want to save this PAR?")) return;
@@ -45139,6 +45123,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("PAR saved!");
       closeModal();
       loadPAR();
+      loadItems();
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -46760,8 +46745,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // BAC Resolution Modal
   window.showNewBACResolutionModal = async function () {
-    // Pre-cache suppliers for bidder picker
-    await window.ensureSuppliersCached();
     // Load employees from DB for BAC member dropdowns
     let employees = [];
     try {
@@ -46846,19 +46829,19 @@ Failure to submit the above requirements within the prescribed period shall cons
  <tbody id="bacBiddersBody">
  <tr>
  <td><input type="text" value="1" style="width: 35px; text-align: center;"></td>
- <td>${window.buildBidderPickerHTML('bacBidder1Name', '', 'Bidder Name')}</td>
+ <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="LCRB / Responsive" style="width: 100%;"></td>
  </tr>
  <tr>
  <td><input type="text" value="2" style="width: 35px; text-align: center;"></td>
- <td>${window.buildBidderPickerHTML('bacBidder2Name', '', 'Bidder Name')}</td>
+ <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  </tr>
  <tr>
  <td><input type="text" value="3" style="width: 35px; text-align: center;"></td>
- <td>${window.buildBidderPickerHTML('bacBidder3Name', '', 'Bidder Name')}</td>
+ <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  </tr>
@@ -47015,10 +46998,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     const tbody = document.getElementById("bacBiddersBody");
     const nextNum = tbody.rows.length + 1;
     const row = document.createElement("tr");
-    const pickerId = 'bacDynBidder' + nextNum + '_' + Date.now();
     row.innerHTML = `
  <td><input type="text" value="${nextNum}" style="width: 35px; text-align: center;"></td>
- <td>${window.buildBidderPickerHTML(pickerId, '', 'Bidder Name')}</td>
+ <td><input type="text" placeholder="Bidder Name" style="width: 100%;"></td>
  <td><input type="number" placeholder="0.00" step="0.01" style="width: 120px;"></td>
  <td><input type="text" placeholder="Remarks" style="width: 100%;"></td>
  `;
@@ -47093,8 +47075,6 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Post-Qualification / TWG Report Modal
   window.showNewPostQualModal = async function () {
-    // Pre-cache suppliers for bidder picker
-    await window.ensureSuppliersCached();
     // Load employees from DB for TWG member dropdowns
     let employees = [];
     try {
@@ -47184,9 +47164,9 @@ Failure to submit the above requirements within the prescribed period shall cons
  </tr>
  <tr>
  <td></td>
- <td style="background: #f5f9ff;">${window.buildBidderPickerHTML('twgBidder1', '', 'Enter Bidder 1 name')}</td>
- <td style="background: #dce9fc;">${window.buildBidderPickerHTML('twgBidder2', '', 'Enter Bidder 2 name')}</td>
- <td style="background: #cddff5;">${window.buildBidderPickerHTML('twgBidder3', '', 'Enter Bidder 3 name')}</td>
+ <td style="background: #f5f9ff;"><input type="text" id="twgBidder1" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 1 name"></td>
+ <td style="background: #dce9fc;"><input type="text" id="twgBidder2" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 2 name"></td>
+ <td style="background: #cddff5;"><input type="text" id="twgBidder3" class="form-select" style="font-size: 11px;" placeholder="Enter Bidder 3 name"></td>
  </tr>
  <tr>
  <td>Latest Income Tax Return (ITR)</td>
@@ -47356,12 +47336,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             const labelCell = row.querySelector("td[colspan]");
             if (labelCell) labelCell.setAttribute("colspan", n + 1);
           } else if (idx === 1) {
-            // Bidder name input row — use bidder picker widget
-            td.innerHTML = window.buildBidderPickerHTML(
-              'twgBidder' + n,
-              '',
-              'Enter Bidder ' + n + ' name'
-            );
+            // Bidder name input row
+            td.innerHTML =
+              '<input type="text" id="twgBidder' +
+              n +
+              '" class="form-select" style="font-size:11px;" placeholder="Enter Bidder ' +
+              n +
+              ' name">';
             row.appendChild(td);
           } else {
             // Document check rows
@@ -47489,7 +47470,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const poOpts = (cachedPO || [])
       .map(
         (p) =>
-          `<option value="${p.id}" data-po='${JSON.stringify({ id: p.id, po_number: p.po_number || "", supplier_name: p.supplier_name || "", purpose: p.purpose || "", place_of_delivery: p.place_of_delivery || p.delivery_address || "", delivery_date: p.delivery_date || null, expected_delivery_date: p.expected_delivery_date || null, total_amount: p.total_amount || 0 }).replace(/'/g, "&#39;")}'>${p.po_number || ""} — ${(p.supplier_name || "").substring(0, 30)} — ${(p.purpose || "").substring(0, 40)}</option>`,
+          `<option value="${p.id}" data-po='${JSON.stringify({ id: p.id, po_number: p.po_number || "", supplier_name: p.supplier_name || "", purpose: p.purpose || "", place_of_delivery: p.place_of_delivery || p.delivery_address || "", delivery_date: p.delivery_date || p.expected_delivery_date || "", total_amount: p.total_amount || 0 }).replace(/'/g, "&#39;")}'>${p.po_number || ""} — ${(p.supplier_name || "").substring(0, 30)} — ${(p.purpose || "").substring(0, 40)}</option>`,
       )
       .join("");
     const iarOpts = (cachedIAR || [])
@@ -47566,23 +47547,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       try {
         window._coaWizard.poData = JSON.parse(opt.dataset.po);
       } catch (e) {}
-    }
-    // Populate iarData from cached IARs so delivery date fallback works in letters
-    const linkedIarId = window._coaWizard.iarId;
-    if (linkedIarId && cachedIAR && cachedIAR.length > 0) {
-      const matchedIAR = cachedIAR.find(
-        (i) => String(i.id) === String(linkedIarId),
-      );
-      window._coaWizard.iarData = matchedIAR || null;
-    } else {
-      // Also try to match IAR by PO id even if no IAR was explicitly selected
-      const poId = window._coaWizard.poId;
-      if (poId && cachedIAR && cachedIAR.length > 0) {
-        const matchedIAR = cachedIAR.find(
-          (i) => String(i.po_id) === String(poId),
-        );
-        window._coaWizard.iarData = matchedIAR || null;
-      }
     }
     // Show document hub in modal
     coaRenderHub();
@@ -47688,17 +47652,12 @@ Failure to submit the above requirements within the prescribed period shall cons
   function coaBuildWizardLetter(step) {
     const w = window._coaWizard;
     const po = w.poData || {};
-    const iar = w.iarData || {};
     const today = new Date().toISOString().split("T")[0];
     const fmtDate = (d) => {
-      if (!d || d === "" || d === "null" || d === "undefined") return "";
-      const parsed = new Date(d.includes("T") ? d : d + "T00:00:00");
-      if (isNaN(parsed.getTime())) return "";
-      return parsed.toLocaleDateString("en-PH", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      if (!d || String(d).trim() === "") return "";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
     };
 
     const dateStr = fmtDate(w.dates["step" + step] || today);
@@ -47706,14 +47665,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     const purpose = po.purpose || "";
     const location = po.place_of_delivery || po.delivery_address || "";
     const poNum = po.po_number || "";
-    // Resolve the delivery date: try PO actual → PO expected → IAR delivery → IAR inspection → today
-    const rawDelivDate =
-      po.delivery_date ||
-      po.expected_delivery_date ||
-      iar.delivery_date ||
-      iar.inspection_date ||
-      today;
-    const delivDate = fmtDate(rawDelivDate) || fmtDate(today);
+    const _rawDelivDate = po.delivery_date || po.expected_delivery_date || "";
+    const delivDate = _rawDelivDate ? fmtDate(_rawDelivDate) : "[delivery date not yet set — please update in Purchase Order]";
 
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
  <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
@@ -50212,14 +50165,30 @@ Failure to submit the above requirements within the prescribed period shall cons
           : coa.documents_included || {};
     } catch (e) {}
 
-    const fmtDate = (d) =>
-      d
-        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-        : "N/A";
+    // Fetch live delivery date from linked PO when not stored in documents_included
+    const ni = docs.notice_inspection || {};
+    if (!ni.delivery_date && (coa.po_id || coa.id)) {
+      try {
+        const poId = coa.po_id;
+        if (poId) {
+          const livepo = await apiRequest("/purchase-orders/" + poId);
+          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
+            if (!docs.notice_inspection) docs.notice_inspection = {};
+            docs.notice_inspection.delivery_date =
+              livepo.delivery_date || livepo.expected_delivery_date;
+          }
+        }
+      } catch (e) {
+        console.warn("[COA View] Could not fetch PO delivery date:", e);
+      }
+    }
+
+    const fmtDate = (d) => {
+      if (!d || String(d).trim() === "") return "N/A";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "N/A";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+    };
 
     // Build read-only letter previews
     function viewLetterHeader() {
@@ -50247,7 +50216,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
 
     const tp = docs.transmittal_po || {};
-    const ni = docs.notice_inspection || {};
+    ni = docs.notice_inspection || {};
     const ti = docs.transmittal_iar || {};
 
     const card = (title, icon, body) => `
@@ -50348,14 +50317,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? JSON.parse(coa.documents_included)
           : coa.documents_included || {};
     } catch (e) {}
-    const fmtDate = (d) =>
-      d
-        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-        : "";
+    const fmtDate = (d) => {
+      if (!d || String(d).trim() === "") return "";
+      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+      if (isNaN(dt.getTime())) return "";
+      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+    };
 
     // No separate header needed — buildPrintHTML already provides the official DMW header with logos
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
@@ -50411,9 +50378,32 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Print all 3 COA documents in one print job
    */
-  window.coaPrintAllDocs = function (coaId) {
+  window.coaPrintAllDocs = async function (coaId) {
     const allCoa = window._cachedCOA || [];
-    const coa = allCoa.find((c) => c.id === coaId) || {};
+    let coa = allCoa.find((c) => c.id === coaId) || {};
+    // Ensure delivery_date is populated for Notice of Inspection (step 2)
+    {
+      let docs = {};
+      try {
+        docs = typeof coa.documents_included === "string"
+          ? JSON.parse(coa.documents_included)
+          : coa.documents_included || {};
+      } catch (e) {}
+      const ni = docs.notice_inspection || {};
+      if (!ni.delivery_date && coa.po_id) {
+        try {
+          const livepo = await apiRequest("/purchase-orders/" + coa.po_id);
+          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
+            if (!docs.notice_inspection) docs.notice_inspection = {};
+            docs.notice_inspection.delivery_date =
+              livepo.delivery_date || livepo.expected_delivery_date;
+            coa = { ...coa, documents_included: docs };
+          }
+        } catch (e) {
+          console.warn("[COA Print All] Could not fetch PO delivery date:", e);
+        }
+      }
+    }
     const title = "COA_Documents_" + (coa.submission_number || "");
     const stepTitles = [
       "Transmittal \u2013 Purchase Order",
@@ -53345,12 +53335,49 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   // Create PR from APP Modal — Redirects to PR page with pre-populated data
   // Approve PR Modal
-  // showApprovePRModal and showRejectPRModal are defined earlier in this file;
-  // this duplicate context re-exports them so both page sections can use them.
-  if (!window._prModalsBound) {
-    window._prModalsBound = true;
-    // All PR modal logic lives in the first definition above.
-  }
+  window.showApprovePRModal = async function (prIdOrNo) {
+    // Fetch actual PR data dynamically
+    let pr = null;
+    if (typeof prIdOrNo === "number") {
+      pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
+      if (!pr) {
+        try {
+          pr = await apiRequest("/purchase-requests/" + prIdOrNo);
+        } catch (e) {}
+      }
+    } else {
+      pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
+    }
+    if (!pr) {
+      alert("PR not found");
+      return;
+    }
+    const html = `
+ <form id="approvePRForm">
+ <div class="info-banner" style="margin-bottom: 15px;">
+ <i class="fas fa-check-circle"></i>
+ Approve this Purchase Request as HoPE (Head of Procuring Entity).
+ </div>
+ <div class="view-details">
+ <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
+ <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
+ <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+ <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
+ </div>
+ <div class="form-group" style="margin-top: 15px;">
+ <label>Approval Remarks (Optional)</label>
+ <textarea rows="2" placeholder="Any notes for record"></textarea>
+ </div>
+ <div class="form-group" style="text-align: right; margin-top: 20px;">
+ <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+ <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
+ </div>
+ </form>
+ `;
+    openModal("Approve Purchase Request", html, {
+      preventOutsideClose: true,
+    });
+  };
 
   // Return PR Modal
   window.showReturnPRModal = async function (prIdOrNo) {
@@ -58638,7 +58665,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         dept_id: data.user.dept_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
-        employee_id: data.user.employee_id || null,
       };
 
       // Persist session to sessionStorage (survives page refresh, clears on app close)
@@ -58877,7 +58903,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         dept_id: data.user.dept_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
-        employee_id: data.user.employee_id || null,
       };
 
       // Wait a moment then proceed to app

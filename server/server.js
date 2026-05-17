@@ -649,7 +649,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined, employee_id: user.employee_id || null }
+      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -3388,15 +3388,11 @@ app.get('/api/purchase-requests', authenticateToken, async (req, res) => {
               d.name as department_name, d.code as department_code, u.username as requested_by_name,
               pri.quantity as item_quantity, pri.unit as item_unit, pri.unit_price as item_unit_price,
               pri.item_name as first_item_name, pri.item_description as first_item_description,
-              (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count,
-              hope_user.id as hope_user_id, hope_user.employee_id as hope_employee_id,
-              rj_user.username as rejected_by_name
+              (SELECT COUNT(*) FROM pr_items WHERE pr_id = pr.id) as item_count
        FROM purchaserequests pr
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON pr.requested_by = u.id
        LEFT JOIN LATERAL (SELECT * FROM pr_items WHERE pr_id = pr.id ORDER BY id LIMIT 1) pri ON true
-       LEFT JOIN users hope_user ON (hope_user.role = 'hope' OR hope_user.secondary_role = 'hope')
-       LEFT JOIN users rj_user ON rj_user.id = pr.rejected_by
        WHERE (pr.status != 'draft' OR pr.requested_by = $1 OR $2 = true)${divisionCondition}${fiscalYearCondition}
        ORDER BY pr.fiscal_year DESC, pr.created_at DESC`,
       params
@@ -3413,7 +3409,6 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
               d.name as department_name, d.code as department_code,
               u1.full_name as requested_by_name,
               u2.full_name as approved_by_name,
-              rj_user.username as rejected_by_name,
               -- "Requested by" signatory: WRSD uses their own chief, all others use FAD chief (ESPALDON)
               CASE WHEN d.code = 'WRSD'
                 THEN wrsd_chief.full_name
@@ -3429,7 +3424,6 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u1 ON pr.requested_by = u1.id
        LEFT JOIN users u2 ON pr.approved_by = u2.id
-       LEFT JOIN users rj_user ON rj_user.id = pr.rejected_by
        -- FAD chief (ESPALDON) for FAD/MWPSD/MWPTD
        LEFT JOIN departments fad_dept ON fad_dept.code = 'FAD'
        LEFT JOIN users fad_chief ON fad_chief.dept_id = fad_dept.id AND fad_chief.role LIKE 'chief_%'
@@ -3441,7 +3435,7 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
        LEFT JOIN employees wrsd_emp ON wrsd_chief.employee_id = wrsd_emp.id
        LEFT JOIN designations wrsd_desig ON wrsd_emp.designation_id = wrsd_desig.id
        -- HOPE (Approved by)
-       LEFT JOIN users hope_user ON (hope_user.role = 'hope' OR hope_user.secondary_role = 'hope')
+       LEFT JOIN users hope_user ON hope_user.role = 'hope'
        LEFT JOIN employees hope_emp ON hope_user.employee_id = hope_emp.id
        LEFT JOIN designations hope_desig ON hope_emp.designation_id = hope_desig.id
        WHERE pr.id = $1`,
@@ -3458,7 +3452,9 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { pr_number, purpose, total_amount, dept_id, status, item_specifications, items,
-            fiscal_year: reqFiscalYear, pr_date: reqPrDate } = req.body;
+            fiscal_year: reqFiscalYear, pr_date: reqPrDate,
+            app_item_id, app_item_ids,
+            requested_by_id, requested_by_name, approved_by_id, approved_by_name } = req.body;
     const deptId = dept_id || req.user.dept_id;
 
     // Resolve fiscal year: use what the client sent, or derive from pr_date, or use server active FY
@@ -3487,6 +3483,21 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
       [finalPrNumber, resolvedPrDate, fy, purpose, total_amount || 0, deptId, status || 'pending_approval', req.user.id, item_specifications || null]
     );
     const pr = prResult.rows[0];
+
+    // Insert all linked APP item IDs into bridge table
+    const allAppIds = Array.isArray(app_item_ids) && app_item_ids.length > 0
+      ? app_item_ids : (app_item_id ? [app_item_id] : []);
+    for (const aid of allAppIds) {
+      if (!aid) continue;
+      try {
+        await client.query(
+          `INSERT INTO app_item_pr_links (plan_item_id, pr_id, linked_by)
+           VALUES ($1, $2, $3) ON CONFLICT (plan_item_id, pr_id) DO NOTHING`,
+          [aid, pr.id, req.user.id]
+        );
+      } catch(e) { console.warn('[PR] app_item_pr_links insert skipped:', e.message); }
+    }
+
     if (items && items.length > 0) {
       for (const item of items) {
         await client.query(
@@ -3575,28 +3586,6 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
 
 app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res) => {
   try {
-    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
-    const isAdmin = userRoles.includes('admin');
-    const isHope = userRoles.includes('hope');
-
-    if (!isAdmin && !isHope) {
-      return res.status(403).json({ error: 'Only the designated HOPE signatory can approve purchase requests.' });
-    }
-
-    // For non-admins, verify this user is the affixed HOPE signatory on this specific PR
-    if (!isAdmin) {
-      const prCheck = await pool.query(
-        `SELECT hope_user.id as hope_user_id
-         FROM purchaserequests pr
-         LEFT JOIN users hope_user ON hope_user.role = 'hope' OR hope_user.secondary_role = 'hope'
-         WHERE pr.id = $1 AND hope_user.id = $2 LIMIT 1`,
-        [req.params.id, req.user.id]
-      );
-      if (prCheck.rows.length === 0) {
-        return res.status(403).json({ error: 'Only the designated HOPE signatory can approve purchase requests.' });
-      }
-    }
-
     const result = await pool.query(
       `UPDATE purchaserequests SET status='approved', approved_by=$1, approved_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
        WHERE id=$2 RETURNING *`,
@@ -3618,63 +3607,6 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
     }
     
     res.json(pr);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/purchase-requests/:id/reject — Reject a PR (send back for revision)
-app.put('/api/purchase-requests/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
-    const isAdmin = userRoles.includes('admin');
-    const isHope = userRoles.includes('hope');
-    if (!isAdmin && !isHope) {
-      return res.status(403).json({ error: 'Only the designated HOPE signatory can reject purchase requests.' });
-    }
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({ error: 'A reason is required when rejecting a purchase request.' });
-    }
-    // Add rejected_by/reject_reason columns dynamically if not present (graceful)
-    await pool.query(`
-      ALTER TABLE purchaserequests
-        ADD COLUMN IF NOT EXISTS rejected_by integer REFERENCES users(id) ON DELETE SET NULL,
-        ADD COLUMN IF NOT EXISTS rejected_at timestamp without time zone,
-        ADD COLUMN IF NOT EXISTS reject_reason text
-    `).catch(() => {});
-    const result = await pool.query(
-      `UPDATE purchaserequests
-       SET status='rejected', rejected_by=$1, rejected_at=CURRENT_TIMESTAMP,
-           reject_reason=$2, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$3 RETURNING *`,
-      [req.user.id, reason.trim(), req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
-    const pr = result.rows[0];
-    if (pr.requested_by) {
-      createNotification(pr.requested_by, {
-        type: 'rejection',
-        icon: 'fas fa-times-circle',
-        title: `${pr.pr_number} Rejected`,
-        message: `Your purchase request was rejected: ${reason.trim()}`,
-        reference_type: 'purchase_request',
-        reference_id: pr.id,
-        reference_code: pr.pr_number
-      });
-    }
-    res.json({ message: 'Purchase Request rejected and returned for revision.', pr });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/purchase-requests/:id/resubmit — Resubmit a rejected PR for approval
-app.put('/api/purchase-requests/:id/resubmit', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE purchaserequests SET status='pending_approval', rejected_by=NULL, rejected_at=NULL,
-       reject_reason=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
-    res.json({ message: 'Purchase Request resubmitted for approval.', pr: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3718,7 +3650,14 @@ app.get('/api/rfqs', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `SELECT r.*, pr.pr_number, u.username as created_by_name,
               pri.quantity as pr_item_quantity, pri.unit as pr_item_unit, pri.item_name as pr_item_name,
-              pr.dept_id as pr_dept_id, d.code as department_code
+              pr.dept_id as pr_dept_id, d.code as department_code,
+              COALESCE(
+                (SELECT string_agg(lpr.pr_number, ', ' ORDER BY lpr.pr_number)
+                 FROM pr_rfq_links prl
+                 JOIN purchaserequests lpr ON lpr.id = prl.pr_id
+                 WHERE prl.rfq_id = r.id),
+                pr.pr_number
+              ) as linked_pr_numbers
        FROM rfqs r LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
        LEFT JOIN departments d ON pr.dept_id = d.id
        LEFT JOIN users u ON r.created_by = u.id
@@ -3742,7 +3681,14 @@ app.get('/api/rfqs/:id', authenticateToken, async (req, res) => {
       `SELECT rs.*, s.name as supplier_name FROM rfq_suppliers rs LEFT JOIN suppliers s ON rs.supplier_id = s.id WHERE rs.rfq_id = $1`,
       [req.params.id]
     );
-    res.json({ ...rfq.rows[0], items: items.rows, suppliers: suppliers.rows });
+    // Fetch all linked PRs from the bridge table
+    const linkedPRs = await pool.query(
+      `SELECT prl.pr_id, pr.pr_number, pr.purpose, pr.total_amount
+       FROM pr_rfq_links prl
+       JOIN purchaserequests pr ON pr.id = prl.pr_id
+       WHERE prl.rfq_id = $1 ORDER BY pr.pr_number`, [req.params.id]
+    );
+    res.json({ ...rfq.rows[0], items: items.rows, suppliers: suppliers.rows, linked_prs: linkedPRs.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3750,13 +3696,37 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, item_specifications, items, suppliers, manual_supplier_name, manual_supplier_address, manual_supplier_tin } = req.body;
+    const {
+      rfq_number, pr_id, pr_ids,
+      date_prepared, submission_deadline, abc_amount, philgeps_required,
+      status, item_specifications, items, suppliers,
+      manual_supplier_name, manual_supplier_address, manual_supplier_tin
+    } = req.body;
+
+    // Resolve the primary pr_id: use explicit pr_id or first entry of pr_ids array
+    const resolvedPrId = pr_id || (Array.isArray(pr_ids) && pr_ids.length > 0 ? pr_ids[0] : null);
+
     const rfqResult = await client.query(
       `INSERT INTO rfqs (rfq_number, pr_id, date_prepared, submission_deadline, abc_amount, philgeps_required, status, created_by, item_specifications, manual_supplier_name, manual_supplier_address, manual_supplier_tin)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [rfq_number, pr_id, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null]
+      [rfq_number, resolvedPrId, date_prepared, submission_deadline, abc_amount||0, philgeps_required||false, status||'on_going', req.user.id, item_specifications || null, manual_supplier_name||null, manual_supplier_address||null, manual_supplier_tin||null]
     );
     const rfq = rfqResult.rows[0];
+
+    // Insert all PR links into the bridge table (pr_rfq_links)
+    const allPrIds = Array.isArray(pr_ids) && pr_ids.length > 0
+      ? pr_ids
+      : (resolvedPrId ? [resolvedPrId] : []);
+    for (const pid of allPrIds) {
+      if (!pid) continue;
+      await client.query(
+        `INSERT INTO pr_rfq_links (pr_id, rfq_id, linked_by)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (pr_id, rfq_id) DO NOTHING`,
+        [pid, rfq.id, req.user.id]
+      );
+    }
+
     if (items) for (const it of items) {
       await client.query(
         `INSERT INTO rfq_items (rfq_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
@@ -3771,8 +3741,18 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
       );
     }
     await client.query('COMMIT');
-    res.status(201).json(rfq);
-  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
+
+    // Return with linked PR numbers for convenience
+    const linkedPRs = await pool.query(
+      `SELECT pr.pr_number FROM pr_rfq_links prl
+       JOIN purchaserequests pr ON pr.id = prl.pr_id
+       WHERE prl.rfq_id = $1`, [rfq.id]
+    );
+    res.status(201).json({ ...rfq, linked_pr_numbers: linkedPRs.rows.map(r => r.pr_number) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  }
   finally { client.release(); }
 });
 
@@ -3819,19 +3799,9 @@ app.put('/api/rfqs/:id/set-status', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PUT /api/rfqs/:id/reject
-app.put('/api/rfqs/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this RFQ.' });
-    const result = await pool.query(
-      `UPDATE rfqs SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'RFQ not found' });
-    res.json({ message: 'RFQ rejected and cancelled.', rfq: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// ==============================================================================
+// ABSTRACT OF QUOTATION (AOQ)
+// ==============================================================================
 
 app.get('/api/abstracts', authenticateToken, async (req, res) => {
   try {
@@ -3966,20 +3936,6 @@ app.put('/api/abstracts/:id/set-status', authenticateToken, async (req, res) => 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PUT /api/abstracts/:id/reject
-app.put('/api/abstracts/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Abstract.' });
-    const result = await pool.query(
-      `UPDATE abstracts SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Abstract not found' });
-    res.json({ message: 'Abstract of Quotation rejected.', abstract: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // ==============================================================================
 // POST-QUALIFICATION (TWG)
 // ==============================================================================
@@ -4076,20 +4032,6 @@ app.put('/api/post-qualifications/:id/set-status', authenticateToken, async (req
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PUT /api/post-qualifications/:id/reject
-app.put('/api/post-qualifications/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Post-Qualification.' });
-    const result = await pool.query(
-      `UPDATE post_qualifications SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Post-Qualification not found' });
-    res.json({ message: 'Post-Qualification rejected.', postqual: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM post_qualifications WHERE id=$1 RETURNING *', [req.params.id]);
@@ -4124,13 +4066,7 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
        em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
        eh.full_name as hope_name,
-       pr.dept_id as pr_dept_id, dept.code as department_code,
-       hope_user.id as hope_user_id, hope_user.employee_id as hope_user_employee_id,
-       chair_user.id as bac_chairperson_user_id,
-       vchair_user.id as bac_vice_chairperson_user_id,
-       mem1_user.id as bac_member1_user_id,
-       mem2_user.id as bac_member2_user_id,
-       mem3_user.id as bac_member3_user_id
+       pr.dept_id as pr_dept_id, dept.code as department_code
        FROM bac_resolutions br LEFT JOIN abstracts a ON br.abstract_id = a.id
        LEFT JOIN rfqs r ON a.rfq_id = r.id
        LEFT JOIN purchaserequests pr ON r.pr_id = pr.id
@@ -4142,12 +4078,6 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
        LEFT JOIN employees em2 ON br.bac_member2_id = em2.id
        LEFT JOIN employees em3 ON br.bac_member3_id = em3.id
        LEFT JOIN employees eh ON br.hope_id = eh.id
-       LEFT JOIN users hope_user ON hope_user.employee_id = br.hope_id
-       LEFT JOIN users chair_user ON chair_user.employee_id = br.bac_chairperson_id
-       LEFT JOIN users vchair_user ON vchair_user.employee_id = br.bac_vice_chairperson_id
-       LEFT JOIN users mem1_user ON mem1_user.employee_id = br.bac_member1_id
-       LEFT JOIN users mem2_user ON mem2_user.employee_id = br.bac_member2_id
-       LEFT JOIN users mem3_user ON mem3_user.employee_id = br.bac_member3_id
        WHERE (br.status != 'draft' OR br.created_by = $1 OR $2 = true)${divisionCondition}
        ORDER BY br.created_at DESC`,
       params
@@ -4212,24 +4142,6 @@ app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
 
 app.put('/api/bac-resolutions/:id/approve', authenticateToken, async (req, res) => {
   try {
-    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
-    const isAdmin = userRoles.includes('admin');
-
-    if (!isAdmin) {
-      // Only the user whose employee_id matches bac_resolutions.hope_id may approve
-      const brCheck = await pool.query(
-        `SELECT br.hope_id, u.employee_id FROM bac_resolutions br
-         LEFT JOIN users u ON u.id = $1
-         WHERE br.id = $2`,
-        [req.user.id, req.params.id]
-      );
-      if (brCheck.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
-      const { hope_id, employee_id } = brCheck.rows[0];
-      if (!hope_id || String(employee_id) !== String(hope_id)) {
-        return res.status(403).json({ error: 'Only the affixed HOPE signatory can approve this BAC Resolution.' });
-      }
-    }
-
     const result = await pool.query(
       `UPDATE bac_resolutions SET status='completed', approved_by=$1, approved_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
       [req.user.id, req.params.id]
@@ -4251,20 +4163,6 @@ app.put('/api/bac-resolutions/:id/set-status', authenticateToken, async (req, re
     const result = await pool.query('UPDATE bac_resolutions SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/bac-resolutions/:id/reject
-app.put('/api/bac-resolutions/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this BAC Resolution.' });
-    const result = await pool.query(
-      `UPDATE bac_resolutions SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'BAC Resolution not found' });
-    res.json({ message: 'BAC Resolution rejected.', resolution: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4381,20 +4279,6 @@ app.put('/api/notices-of-award/:id/set-status', authenticateToken, async (req, r
     const result = await pool.query('UPDATE notices_of_award SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *', [status, req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/notices-of-award/:id/reject
-app.put('/api/notices-of-award/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this NOA.' });
-    const result = await pool.query(
-      `UPDATE notices_of_award SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'NOA not found' });
-    res.json({ message: 'Notice of Award rejected and cancelled.', noa: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4553,20 +4437,6 @@ app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM purchaseorders WHERE id = $1', [req.params.id]);
     res.json({ message: 'PO deleted' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/purchase-orders/:id/reject
-app.put('/api/purchase-orders/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this Purchase Order.' });
-    const result = await pool.query(
-      `UPDATE purchaseorders SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'PO not found' });
-    res.json({ message: 'Purchase Order rejected and cancelled.', po: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4920,20 +4790,6 @@ app.put('/api/iars/:id/set-status', authenticateToken, async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// PUT /api/iars/:id/reject
-app.put('/api/iars/:id/reject', authenticateToken, async (req, res) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) return res.status(400).json({ error: 'A reason is required to reject this IAR.' });
-    const result = await pool.query(
-      `UPDATE iars SET inspection_result='on_going', acceptance='to_be_checked', updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'IAR not found' });
-    res.json({ message: 'IAR rejected and returned for revision.', iar: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5554,14 +5410,6 @@ app.put('/api/ris/:id/post', authenticateToken, async (req, res) => {
     const risResult = await client.query('SELECT * FROM requisition_issue_slips WHERE id = $1', [risId]);
     if (risResult.rows.length === 0) throw new Error('RIS not found');
     const ris = risResult.rows[0];
-
-    // Signatory enforcement: only the supply officer set as approved_by_supply_id (or admin) may post
-    const _risUserRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
-    if (!_risUserRoles.includes("admin") && ris.approved_by_supply_id && String(ris.approved_by_supply_id) !== String(req.user.id)) {
-      await client.query("ROLLBACK");
-      client.release();
-      return res.status(403).json({ error: "Only the affixed supply officer signatory can post this RIS." });
-    }
 
     const risItemsResult = await client.query(
       `SELECT ri.*, i.code, i.name as item_name, i.unit, i.unit_price FROM ris_items ri LEFT JOIN items i ON ri.item_id = i.id WHERE ri.ris_id = $1`,
