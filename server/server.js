@@ -3484,18 +3484,25 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
     );
     const pr = prResult.rows[0];
 
-    // Insert all linked APP item IDs into bridge table
+    // Insert all linked APP item IDs into bridge table (using savepoint so failures don't abort tx)
     const allAppIds = Array.isArray(app_item_ids) && app_item_ids.length > 0
       ? app_item_ids : (app_item_id ? [app_item_id] : []);
-    for (const aid of allAppIds) {
+    for (let i = 0; i < allAppIds.length; i++) {
+      const aid = allAppIds[i];
       if (!aid) continue;
+      const sp = `sp_app_link_${i}`;
+      await client.query(`SAVEPOINT ${sp}`);
       try {
         await client.query(
           `INSERT INTO app_item_pr_links (plan_item_id, pr_id, linked_by)
            VALUES ($1, $2, $3) ON CONFLICT (plan_item_id, pr_id) DO NOTHING`,
           [aid, pr.id, req.user.id]
         );
-      } catch(e) { console.warn('[PR] app_item_pr_links insert skipped:', e.message); }
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+      } catch(e) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        console.warn('[PR] app_item_pr_links insert skipped (table may not exist yet):', e.message);
+      }
     }
 
     if (items && items.length > 0) {
@@ -3713,18 +3720,27 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
     );
     const rfq = rfqResult.rows[0];
 
-    // Insert all PR links into the bridge table (pr_rfq_links)
+    // Insert all PR links into the bridge table (pr_rfq_links) using savepoints
     const allPrIds = Array.isArray(pr_ids) && pr_ids.length > 0
       ? pr_ids
       : (resolvedPrId ? [resolvedPrId] : []);
-    for (const pid of allPrIds) {
+    for (let i = 0; i < allPrIds.length; i++) {
+      const pid = allPrIds[i];
       if (!pid) continue;
-      await client.query(
-        `INSERT INTO pr_rfq_links (pr_id, rfq_id, linked_by)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (pr_id, rfq_id) DO NOTHING`,
-        [pid, rfq.id, req.user.id]
-      );
+      const sp = `sp_rfq_link_${i}`;
+      await client.query(`SAVEPOINT ${sp}`);
+      try {
+        await client.query(
+          `INSERT INTO pr_rfq_links (pr_id, rfq_id, linked_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (pr_id, rfq_id) DO NOTHING`,
+          [pid, rfq.id, req.user.id]
+        );
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+      } catch(e) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        console.warn('[RFQ] pr_rfq_links insert skipped (table may not exist yet):', e.message);
+      }
     }
 
     if (items) for (const it of items) {
@@ -6994,6 +7010,20 @@ async function runMigrations() {
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS fiscal_year INTEGER`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS pr_date DATE`,
     `CREATE INDEX IF NOT EXISTS idx_pr_fiscal_year ON purchaserequests(fiscal_year)`,
+    // PR signatory columns
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS requested_by_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS requested_by_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_name TEXT`,
+    // RFQ signatory columns
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS bac_sec_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS bac_sec_name TEXT`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS bac_chair_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS bac_chair_name TEXT`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_name TEXT`,
+    // NOA default status
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'awaiting_noa'`,
     `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
@@ -7009,11 +7039,119 @@ async function runMigrations() {
     `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS unit_price DECIMAL(12,2) DEFAULT 0`,
     // Ensure plan_type column exists on procurementplans (INDICATIVE / FINAL)
     `ALTER TABLE procurementplans ADD COLUMN IF NOT EXISTS plan_type VARCHAR(20) DEFAULT 'INDICATIVE'`,
+    // ── Bridge tables: one-to-many procurement chain ─────────────────────────
+    // APP items → Purchase Request (many APP items per PR)
+    `CREATE TABLE IF NOT EXISTS app_item_pr_links (
+      id           SERIAL PRIMARY KEY,
+      plan_item_id INTEGER NOT NULL,
+      pr_id        INTEGER NOT NULL REFERENCES purchaserequests(id) ON DELETE CASCADE,
+      linked_by    INTEGER,
+      linked_at    TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT uq_app_item_pr UNIQUE (plan_item_id, pr_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_aipl_plan_item ON app_item_pr_links(plan_item_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_aipl_pr        ON app_item_pr_links(pr_id)`,
+    // Purchase Request → RFQ (many PRs per RFQ)
+    `CREATE TABLE IF NOT EXISTS pr_rfq_links (
+      id        SERIAL PRIMARY KEY,
+      pr_id     INTEGER NOT NULL REFERENCES purchaserequests(id) ON DELETE CASCADE,
+      rfq_id    INTEGER NOT NULL REFERENCES rfqs(id) ON DELETE CASCADE,
+      linked_by INTEGER,
+      linked_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT uq_pr_rfq UNIQUE (pr_id, rfq_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_prrl_pr  ON pr_rfq_links(pr_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_prrl_rfq ON pr_rfq_links(rfq_id)`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }
   }
   console.log('[MIGRATION] Supplier/bidder name columns ensured.');
+
+  // ── Seed missing PPMP categories from the items catalog screenshot ─────────
+  try {
+    // Ensure unique constraint on name exists before ON CONFLICT (name)
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'uq_ppmp_sections_name'
+        ) THEN
+          ALTER TABLE ppmp_sections ADD CONSTRAINT uq_ppmp_sections_name UNIQUE (name);
+        END IF;
+      END $$
+    `);
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'uq_ppmp_categories_name'
+        ) THEN
+          ALTER TABLE ppmp_categories ADD CONSTRAINT uq_ppmp_categories_name UNIQUE (name);
+        END IF;
+      END $$
+    `);
+
+    // Ensure sections exist
+    await pool.query(`
+      INSERT INTO ppmp_sections (name, description, display_order, is_active)
+      VALUES ('MOOE', 'Maintenance and Other Operating Expenses', 1, true)
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO ppmp_sections (name, description, display_order, is_active)
+      VALUES ('Capital Outlay', 'Capital Outlay', 2, true)
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO ppmp_sections (name, description, display_order, is_active)
+      VALUES ('Semi-Expendable', 'Semi-Expendable Equipment', 3, true)
+      ON CONFLICT (name) DO NOTHING
+    `);
+
+    // Get section IDs
+    const mooeRes   = await pool.query(`SELECT id FROM ppmp_sections WHERE name = 'MOOE' LIMIT 1`);
+    const coRes     = await pool.query(`SELECT id FROM ppmp_sections WHERE name = 'Capital Outlay' LIMIT 1`);
+    const semiRes   = await pool.query(`SELECT id FROM ppmp_sections WHERE name = 'Semi-Expendable' LIMIT 1`);
+    const mooeId    = mooeRes.rows[0]?.id   || 1;
+    const coId      = coRes.rows[0]?.id     || 2;
+    const semiId    = semiRes.rows[0]?.id   || 3;
+
+    const categoriesToSeed = [
+      // name,                                          section_id, display_order
+      ['ICT OFFICE SUPPLIES EXPENSES',                 mooeId,   1],
+      ['OFFICE SUPPLIES EXPENSES',                     mooeId,   2],
+      ['SEMI-ICT EQUIPMENT',                           semiId,   3],
+      ['PRINTING, PUBLICATION AND BINDING EXPENSES',   mooeId,   4],
+      ['SEMI-OFFICE EQUIPMENT',                        semiId,   5],
+      ['SEMI-FURNITURE & FIXTURES',                    semiId,   6],
+      ['OTHER SUPPLIES AND MATERIALS',                 mooeId,   7],
+      ['OTHER MOOE',                                   mooeId,   8],
+      ['REPRESENTATION EXPENSES',                      mooeId,   9],
+    ];
+
+    for (const [name, sectionId, order] of categoriesToSeed) {
+      await pool.query(`
+        INSERT INTO ppmp_categories (name, section_id, display_order, is_active)
+        VALUES ($1, $2, $3, true)
+        ON CONFLICT (name) DO UPDATE SET
+          section_id    = EXCLUDED.section_id,
+          display_order = EXCLUDED.display_order,
+          is_active     = true
+      `, [name, sectionId, order]);
+    }
+    console.log('[MIGRATION] PPMP categories seeded/updated:', categoriesToSeed.map(c => c[0]).join(', '));
+  } catch (e) { console.error('[MIGRATION] PPMP category seed error:', e.message); }
+
+  // Back-fill pr_rfq_links from existing rfqs.pr_id (safe to run multiple times)
+  try {
+    await pool.query(`
+      INSERT INTO pr_rfq_links (pr_id, rfq_id)
+      SELECT pr_id, id FROM rfqs WHERE pr_id IS NOT NULL
+      ON CONFLICT (pr_id, rfq_id) DO NOTHING
+    `);
+    console.log('[MIGRATION] pr_rfq_links back-fill complete');
+  } catch (e) { console.error('[MIGRATION] pr_rfq_links back-fill error:', e.message); }
 
   // ── Backfill fiscal_year on purchaserequests from pr_number year segment or created_at ──
   try {
@@ -7138,6 +7276,8 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_app_entries_fiscal_year ON app_entries(fiscal_year)`);
     console.log('[MIGRATION] app_entries table ensured');
   } catch (e) { console.error('[MIGRATION] app_entries table error:', e.message); }
+
+  // Bridge tables are now in the migrations array above — back-fill pr_rfq_links below
 }
 
 runMigrations().catch(err => console.error('[MIGRATION ERROR]', err.message));

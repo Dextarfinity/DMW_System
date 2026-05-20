@@ -12961,8 +12961,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const prCatOpts = buildCatalogCategoryOptions(allItems);
     const prItemOpts = buildCatalogItemOptions(allItems);
 
-    // Store filtered APP items for the picker
-    window._prAvailableAppItems = appItems;
+    const appOptions = appItems
+      .map((item) => {
+        const desc = (
+          item.description ||
+          item.item_description ||
+          ""
+        ).substring(0, 60);
+        const dept = item.department_code || "";
+        return `<option value="${item.id}" data-desc="${desc}" data-dept="${dept}">${desc} (${dept} - FY${item.fiscal_year || String(getCurrentFiscalYear())})</option>`;
+      })
+      .join("");
 
     const html = `
  <form id="prForm" onsubmit="saveNewPR(event)">
@@ -12971,22 +12980,18 @@ document.addEventListener("DOMContentLoaded", () => {
  <strong>PURCHASE REQUEST</strong> — Per Government PR Form
  </div>
 
- <!-- APP/PPMP Validation Section — Multi-select using PPMP catalog style -->
+ <!-- APP/PPMP Validation Section -->
  <div class="form-validation-section">
-   <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
-     <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
-   </label>
-   <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Link one or more APP items this Purchase Request is based on. Click a row to add it.</p>
-   <div style="border:1px solid #cbd5e0;border-radius:6px;padding:10px;background:#fafafa;">
-     <div id="prLinkedAppTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-bottom:8px;">
-       <span style="color:#aaa;font-size:12px;align-self:center;" id="prLinkedAppPlaceholder">No APP items linked yet — click Add to select</span>
-     </div>
-     <button type="button" class="btn btn-sm btn-outline" onclick="openPRAppPicker()">
-       <i class="fas fa-plus"></i> Add APP Item
-     </button>
-   </div>
-   <input type="hidden" id="prLinkedAppIds" value="">
-   <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
+ <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
+ <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
+ </label>
+ <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on. Items must exist in the approved APP before a PR can proceed.</p>
+ <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this); onPRAppItemChange(this.value);">
+ <option value="">-- Select APP Item --</option>
+ ${appOptions}
+ <option value="not-in-app" style="color:#e53e3e;font-weight:600;"> Item NOT in APP (Requires New PPMP)</option>
+ </select>
+ <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
  </div>
 
  <div class="form-row">
@@ -13049,28 +13054,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  </div>
  </div>
-
- <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
- <div class="form-boxed-section">
-   <div class="form-row">
-     <div class="form-group">
-       <label style="font-size:12px;">Requested By <small style="color:#666;">(Division Chief)</small></label>
-       <select id="prRequestedById" class="form-select" onchange="prFillSignatoryName('prRequestedById','prRequestedByName','prRequestedByDesig')">
-         <option value="">-- Select Employee --</option>
-       </select>
-       <input type="text" id="prRequestedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-       <input type="text" id="prRequestedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-     </div>
-     <div class="form-group">
-       <label style="font-size:12px;">Approved By <small style="color:#666;">(HoPE)</small></label>
-       <select id="prApprovedById" class="form-select" onchange="prFillSignatoryName('prApprovedById','prApprovedByName','prApprovedByDesig')">
-         <option value="">-- Select Employee --</option>
-       </select>
-       <input type="text" id="prApprovedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-       <input type="text" id="prApprovedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-     </div>
-   </div>
- </div>
  <div class="form-group" style="text-align: right; margin-top: 20px;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save as Draft</button>
@@ -13081,34 +13064,23 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Purchase Request (PR)", html, {
       preventOutsideClose: true,
     });
-    // Load employees into signatory dropdowns
-    (async () => {
-      try {
-        const emps = await apiRequest("/employees");
-        window._prEmpCache = emps;
-        ["prRequestedById", "prApprovedById"].forEach(selId => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            sel.appendChild(opt);
-          });
-        });
-      } catch(e) { console.warn("Could not load employees for PR signatories", e); }
-    })();
     window._docSelectedItems["pr"] = [];
 
     // Auto-populate from APP item if redirected from APP page
-    window._prLinkedAppIds  = [];
-    window._prLinkedAppMeta = {};
     if (window._prFromAPPItem) {
       const appItem = window._prFromAPPItem;
-      window._prFromAPPItem = null;
-      setTimeout(() => prAddLinkedApp(appItem.id, appItem), 100);
+      window._prFromAPPItem = null; // Clear so it doesn't re-trigger
+      setTimeout(() => {
+        const appSelect = document.getElementById("prAppItemSelect");
+        if (appSelect && appItem.id) {
+          appSelect.value = String(appItem.id);
+          if (appSelect.value === String(appItem.id)) {
+            validatePRAppItem(appSelect);
+            generatePRNumber(appSelect);
+            onPRAppItemChange(appItem.id);
+          }
+        }
+      }, 100);
     }
   };
 
@@ -13166,237 +13138,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  // ── PR Multi-APP Picker ────────────────────────────────────────────────────
-
-  /** Open the APP item picker — same overlay design as PPMP catalog modal */
-  window.openPRAppPicker = function () {
-    const appItems = [...(window._prAvailableAppItems || [])].sort((a, b) =>
-      (a.description || a.item_description || "").localeCompare(b.description || b.item_description || "")
-    );
-    const already = window._prLinkedAppIds || [];
-
-    const itemRows = appItems.map(item => {
-      const alreadyAdded = already.includes(item.id);
-      const desc  = escapeHtml((item.description || item.item_description || "").substring(0, 60));
-      const dept  = escapeHtml(item.department_code || "");
-      const fy    = item.fiscal_year || "";
-      const total = Number(item.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
-      return (
-        '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? " already-added" : "") + '"' +
-        ' onclick="' + (alreadyAdded ? "" : "prSelectAppFromPicker(" + item.id + ", this)") + '"' +
-        ' style="cursor:' + (alreadyAdded ? "default" : "pointer") + ";" + (alreadyAdded ? "opacity:0.5;" : "") + '">' +
-        "<td>" + desc + "</td>" +
-        "<td>" + dept + "</td>" +
-        '<td style="text-align:center;">' + fy + "</td>" +
-        '<td style="text-align:right;">₱' + total + "</td>" +
-        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : "") + "</td>" +
-        "</tr>"
-      );
-    }).join("");
-
-    // Remove any existing overlay
-    const existing = document.getElementById("prAppPickerOverlay");
-    if (existing) existing.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "prAppPickerOverlay";
-    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;";
-    overlay.innerHTML = `
-      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
-          <h4 style="margin:0;"><i class="fas fa-clipboard-check"></i> Select APP / PPMP Items</h4>
-          <button onclick="document.getElementById('prAppPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
-        </div>
-        <div style="padding:8px 16px;">
-          <input type="text" id="prAppPickerSearch" placeholder="Search by description, department, or fiscal year..."
-            oninput="filterPRAppPickerItems(this.value)"
-            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
-        </div>
-        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
-          Click on a row to link the APP item. Already-linked items are grayed out.
-        </div>
-        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
-          <table class="data-table full-width" style="font-size:12px;">
-            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
-              <th>Description</th>
-              <th>Division</th>
-              <th style="text-align:center;">FY</th>
-              <th style="text-align:right;">Amount</th>
-              <th style="width:60px;text-align:center;">Linked</th>
-            </tr></thead>
-            <tbody id="prAppPickerBody">${itemRows}</tbody>
-          </table>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-  };
-
-  /** Filter rows in the APP picker */
-  window.filterPRAppPickerItems = function (text) {
-    const tbody = document.getElementById("prAppPickerBody");
-    if (!tbody) return;
-    const rows = tbody.querySelectorAll("tr");
-    const search = (text || "").toLowerCase();
-    rows.forEach(r => {
-      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? "" : "none";
-    });
-  };
-
-  /** Immediately link an APP item when its row is clicked */
-  window.prSelectAppFromPicker = async function (appId, row) {
-    if (row) {
-      row.style.opacity = "0.5";
-      row.style.cursor = "default";
-      row.setAttribute("onclick", "");
-      const statusCell = row.cells[row.cells.length - 1];
-      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
-    }
-    const item = (window._prAvailableAppItems || []).find(i => i.id === appId);
-    if (item) await prAddLinkedApp(appId, item);
-  };
-
-  /** Add a single APP item to the PR linked list and merge its items */
-  window.prAddLinkedApp = async function (appId, appItem) {
-    if (!window._prLinkedAppIds)  window._prLinkedAppIds  = [];
-    if (!window._prLinkedAppMeta) window._prLinkedAppMeta = {};
-    if (window._prLinkedAppIds.includes(appId)) return;
-    window._prLinkedAppIds.push(appId);
-    window._prLinkedAppMeta[appId] = appItem;
-    prRenderLinkedAppTags();
-
-    // Generate PR number from the first linked APP item
-    if (window._prLinkedAppIds.length === 1) {
-      const dept = appItem.department_code || "";
-      if (dept) {
-        const year  = getActiveFiscalYear();
-        try {
-          const prs   = await apiRequest("/purchase-requests");
-          const pfx   = "PR-" + dept + "-" + year + "-";
-          let maxSeq  = 0;
-          prs.forEach(p => {
-            if (p.pr_number && p.pr_number.startsWith(pfx)) {
-              const seq = parseInt(p.pr_number.replace(pfx, "")) || 0;
-              if (seq > maxSeq) maxSeq = seq;
-            }
-          });
-          const prInput = document.getElementById("prNumber");
-          if (prInput && !prInput.value) prInput.value = pfx + String(maxSeq + 1).padStart(3, "0");
-        } catch(e) {}
-      }
-    }
-
-    // Fetch the plan and merge its items
-    try {
-      const plan = await apiRequest("/plans/" + appId);
-      if (!plan) return;
-      if (!window._docSelectedItems["pr"]) window._docSelectedItems["pr"] = [];
-      if (plan.items && plan.items.length > 0) {
-        plan.items.forEach(item => {
-          const unitPrice = parseFloat(item.unit_price || 0);
-          const totalQty  = parseFloat(item.total_qty || 0) ||
-            (parseFloat(item.q1_qty || 0) + parseFloat(item.q2_qty || 0) +
-             parseFloat(item.q3_qty || 0) + parseFloat(item.q4_qty || 0));
-          const qty = totalQty || 1;
-          window._docSelectedItems["pr"].push({
-            item_id: item.id || 0,
-            item_name: item.item_name || item.item_description || "",
-            item_code: item.item_code || "",
-            item_unit: item.unit || "Lot",
-            item_category: item.category || plan.project_type || "",
-            item_description: item.item_description || "",
-            description: item.item_description || item.item_name || "",
-            unit_price: unitPrice,
-            quantity: qty,
-            total: qty * unitPrice,
-            _from_app: appId,
-          });
-        });
-      } else {
-        const unitPrice = parseFloat(plan.total_amount || 0);
-        const qty       = parseInt(plan.quantity_size || 1) || 1;
-        const perUnit   = qty > 0 ? unitPrice / qty : unitPrice;
-        const desc      = plan.description || plan.item_description || "";
-        window._docSelectedItems["pr"].push({
-          item_id: plan.item_id || 0,
-          item_name: (desc || "").split("\n")[0].trim() || "Approved Item",
-          item_code: "",
-          item_unit: "Lot",
-          item_category: plan.project_type || plan.category || "",
-          item_description: plan.item_description || desc || "",
-          description: plan.item_description || desc || "",
-          unit_price: perUnit,
-          quantity: qty,
-          total: unitPrice,
-          _from_app: appId,
-        });
-      }
-      renderDocItemsList("pr");
-      // Merge purpose
-      const purposeField = document.getElementById("prPurpose");
-      if (purposeField && !purposeField.value.trim() && plan.description) {
-        purposeField.value = plan.description;
-      }
-      // Merge specs
-      const specsField = document.getElementById("prItemSpecs");
-      if (specsField) {
-        const existing  = specsField.value.trim();
-        const specsLines = (plan.items || [])
-          .map(it => it.item_description || it.item_name || "")
-          .filter(s => s.trim());
-        const incoming = specsLines.length > 0 ? specsLines.join("\n") : (plan.item_description || "");
-        if (incoming) specsField.value = existing ? existing + "\n" + incoming : incoming;
-      }
-    } catch(e) { console.error("Error loading APP plan items for PR:", e); }
-
-    // Update hidden input
-    const hidden = document.getElementById("prLinkedAppIds");
-    if (hidden) hidden.value = (window._prLinkedAppIds || []).join(",");
-  };
-
-  /** Remove a linked APP item and its items from the PR */
-  window.prRemoveLinkedApp = function (appId) {
-    window._prLinkedAppIds  = (window._prLinkedAppIds || []).filter(id => id !== appId);
-    delete (window._prLinkedAppMeta || {})[appId];
-    if (window._docSelectedItems["pr"]) {
-      window._docSelectedItems["pr"] = window._docSelectedItems["pr"].filter(it => it._from_app !== appId);
-      renderDocItemsList("pr");
-    }
-    prRenderLinkedAppTags();
-    const hidden = document.getElementById("prLinkedAppIds");
-    if (hidden) hidden.value = (window._prLinkedAppIds || []).join(",");
-    // Clear PR number if no more items linked
-    if ((window._prLinkedAppIds || []).length === 0) {
-      const prInput = document.getElementById("prNumber");
-      if (prInput) prInput.value = "";
-    }
-  };
-
-  /** Render the APP item tags strip */
-  window.prRenderLinkedAppTags = function () {
-    const container   = document.getElementById("prLinkedAppTags");
-    const placeholder = document.getElementById("prLinkedAppPlaceholder");
-    if (!container) return;
-    const ids  = window._prLinkedAppIds  || [];
-    const meta = window._prLinkedAppMeta || {};
-    if (ids.length === 0) {
-      container.innerHTML = "";
-      if (placeholder) { placeholder.style.display = "inline"; container.appendChild(placeholder); }
-      return;
-    }
-    if (placeholder) placeholder.style.display = "none";
-    container.innerHTML = ids.map(id => {
-      const m    = meta[id] || {};
-      const desc = (m.description || m.item_description || String(id)).substring(0, 40);
-      return `<span style="display:inline-flex;align-items:center;gap:6px;background:#ebf8ff;border:1px solid #90cdf4;border-radius:14px;padding:3px 10px 3px 12px;font-size:12px;font-weight:600;color:#2b6cb0;">
-        <i class="fas fa-clipboard-check" style="font-size:10px;"></i>
-        ${escapeHtml(desc)}
-        <button type="button" onclick="prRemoveLinkedApp(${id})" style="background:none;border:none;cursor:pointer;color:#e53e3e;padding:0;line-height:1;font-size:14px;" title="Remove">&times;</button>
-      </span>`;
-    }).join("");
-  };
-
-  // Keep validatePRAppItem for backward compat (edit modal may still call it)
   window.validatePRAppItem = function (select) {
     const validation = document.getElementById("prAppValidation");
     if (!validation) return;
@@ -13687,16 +13428,11 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <input type="text" id="rfqTIN" placeholder="Auto-filled from supplier" readonly style="background:#f5f5f5;">
  </div>
  <div class="form-group">
- <label>Linked Purchase Requests <span style="color:red;">*</span> <small style="color:#888;">(one or many)</small></label>
- <div style="border:1px solid #ddd;border-radius:6px;padding:10px;background:#fafafa;">
-   <div id="rfqLinkedPRTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-bottom:8px;">
-     <span style="color:#aaa;font-size:12px;align-self:center;" id="rfqLinkedPRPlaceholder">No PRs linked yet — click Add to select</span>
-   </div>
-   <button type="button" class="btn btn-sm btn-outline" onclick="openRFQPRPicker()">
-     <i class="fas fa-plus"></i> Add Purchase Request
-   </button>
- </div>
- <input type="hidden" id="rfqLinkedPRIds" value="">
+ <label>Linked Purchase Request (Approved)</label>
+ <select class="form-select" id="rfqLinkedPR" required onchange="onRFQLinkedPRChange(this.value)">
+ <option value="">-- Select Approved PR --</option>
+ ${prOptions}
+ </select>
  </div>
  <div class="form-row">
  <div class="form-group">
@@ -13740,38 +13476,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  </div>
  </div>
-
- <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
- <div class="form-boxed-section">
-   <div class="form-row">
-     <div class="form-group">
-       <label style="font-size:12px;">BAC Secretariat</label>
-       <select id="rfqBacSecId" class="form-select" onchange="rfqFillSignatoryName('rfqBacSecId','rfqBacSecName','rfqBacSecDesig')">
-         <option value="">-- Select Employee --</option>
-       </select>
-       <input type="text" id="rfqBacSecName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-       <input type="text" id="rfqBacSecDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-     </div>
-     <div class="form-group">
-       <label style="font-size:12px;">BAC Chairperson</label>
-       <select id="rfqBacChairId" class="form-select" onchange="rfqFillSignatoryName('rfqBacChairId','rfqBacChairName','rfqBacChairDesig')">
-         <option value="">-- Select Employee --</option>
-       </select>
-       <input type="text" id="rfqBacChairName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-       <input type="text" id="rfqBacChairDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-     </div>
-   </div>
-   <div class="form-row">
-     <div class="form-group">
-       <label style="font-size:12px;">Noted By / Approving Authority</label>
-       <select id="rfqNotedById" class="form-select" onchange="rfqFillSignatoryName('rfqNotedById','rfqNotedByName','rfqNotedByDesig')">
-         <option value="">-- Select Employee --</option>
-       </select>
-       <input type="text" id="rfqNotedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-       <input type="text" id="rfqNotedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-     </div>
-   </div>
- </div>
  <div class="form-group" style="text-align: right; margin-top: 0;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Draft</button>
@@ -13782,223 +13486,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Request for Quotation (RFQ)", html, {
       preventOutsideClose: true,
     });
-    // Load employees into RFQ signatory dropdowns
-    (async () => {
-      try {
-        const emps = await apiRequest("/employees");
-        window._rfqEmpCache = emps;
-        ["rfqBacSecId", "rfqBacChairId", "rfqNotedById"].forEach(selId => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            sel.appendChild(opt);
-          });
-        });
-      } catch(e) { console.warn("Could not load employees for RFQ signatories", e); }
-    })();
     window._docSelectedItems["rfq"] = [];
-    window._rfqLinkedPRIds = [];   // tracks linked PR ids
-    window._rfqLinkedPRMeta = {};  // id → {pr_number, purpose}
-    // If a PR was preselected, auto-add it
+    // If a PR was preselected, auto-fill items
     if (preselectedPrNumber) {
-      const pr = (cachedPR || []).find(p =>
-        p.pr_number === preselectedPrNumber || String(p.id) === String(preselectedPrNumber)
-      );
-      if (pr) rfqAddLinkedPR(pr.id, pr.pr_number, pr.purpose || pr.first_item_name || "");
+      const sel = document.getElementById("rfqLinkedPR");
+      if (sel && sel.value) onRFQLinkedPRChange(sel.value);
     }
   };
-
-  // ── RFQ Multi-PR Picker ──────────────────────────────────────────────────
-
-  /** Open the PR picker — same overlay style as PPMP item catalog modal */
-  window.openRFQPRPicker = function () {
-    const sortedPRs = [...(cachedPR || [])].sort((a, b) =>
-      (a.pr_number || "").localeCompare(b.pr_number || "")
-    );
-    const already = window._rfqLinkedPRIds || [];
-
-    const itemRows = sortedPRs.map(p => {
-      const alreadyAdded = already.includes(p.id);
-      const total = Number(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
-      return (
-        '<tr class="ppmp-catalog-select-row' + (alreadyAdded ? " already-added" : "") + '"' +
-        ' onclick="' + (alreadyAdded ? "" : "rfqSelectPRFromPicker(" + p.id + ", this)") + '"' +
-        ' style="cursor:' + (alreadyAdded ? "default" : "pointer") + ";" + (alreadyAdded ? "opacity:0.5;" : "") + '">' +
-        "<td>" + escapeHtml(p.pr_number || "") + "</td>" +
-        "<td>" + escapeHtml((p.purpose || p.first_item_name || "").substring(0, 60)) + "</td>" +
-        '<td style="text-align:right;">₱' + total + "</td>" +
-        '<td style="text-align:center;"><span class="status-badge ' + (p.status === "approved" ? "approved" : "draft") + '" style="font-size:10px;">' + escapeHtml(p.status || "") + "</span></td>" +
-        '<td style="text-align:center;">' + (alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : "") + "</td>" +
-        "</tr>"
-      );
-    }).join("");
-
-    // Remove any existing overlay
-    const existing = document.getElementById("rfqPRPickerOverlay");
-    if (existing) existing.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "rfqPRPickerOverlay";
-    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;";
-    overlay.innerHTML = `
-      <div style="background:#fff;border-radius:8px;width:780px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
-          <h4 style="margin:0;"><i class="fas fa-file-alt"></i> Select Purchase Requests</h4>
-          <button onclick="document.getElementById('rfqPRPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
-        </div>
-        <div style="padding:8px 16px;">
-          <input type="text" id="rfqPRPickerSearch" placeholder="Search by PR number, purpose, or amount..."
-            oninput="filterRFQPRPickerItems(this.value)"
-            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
-        </div>
-        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
-          Click on a row to link the PR. Already-linked PRs are grayed out.
-        </div>
-        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
-          <table class="data-table full-width" style="font-size:12px;">
-            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
-              <th>PR No.</th>
-              <th>Purpose</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th style="width:60px;">Linked</th>
-            </tr></thead>
-            <tbody id="rfqPRPickerBody">${itemRows}</tbody>
-          </table>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-  };
-
-  /** Filter rows in the PR picker — same as filterPPMPCatalogModalItems */
-  window.filterRFQPRPickerItems = function (text) {
-    const tbody = document.getElementById("rfqPRPickerBody");
-    if (!tbody) return;
-    const rows = tbody.querySelectorAll("tr");
-    const search = (text || "").toLowerCase();
-    rows.forEach(r => {
-      r.style.display = !search || r.textContent.toLowerCase().includes(search) ? "" : "none";
-    });
-  };
-
-  /** Immediately link a PR when its row is clicked — same UX as selectPPMPCatalogItem */
-  window.rfqSelectPRFromPicker = async function (prId, row) {
-    // Mark row as added immediately (visual feedback)
-    if (row) {
-      row.style.opacity = "0.5";
-      row.style.cursor = "default";
-      row.setAttribute("onclick", "");
-      const statusCell = row.cells[row.cells.length - 1];
-      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
-    }
-    const pr = (cachedPR || []).find(p => p.id === prId);
-    if (pr) await rfqAddLinkedPR(pr.id, pr.pr_number, pr.purpose || pr.first_item_name || "");
-  };
-
-  /** Add a single PR to the RFQ linked list, merge its items */
-  window.rfqAddLinkedPR = async function (prId, prNumber, purpose) {
-    if (!window._rfqLinkedPRIds) window._rfqLinkedPRIds = [];
-    if (window._rfqLinkedPRIds.includes(prId)) return;
-    window._rfqLinkedPRIds.push(prId);
-    if (!window._rfqLinkedPRMeta) window._rfqLinkedPRMeta = {};
-    window._rfqLinkedPRMeta[prId] = { pr_number: prNumber, purpose };
-
-    // Render PR tags
-    rfqRenderLinkedPRTags();
-
-    // Merge items from this PR
-    try {
-      const pr = await apiRequest("/purchase-requests/" + prId);
-      if (pr && pr.items && pr.items.length > 0) {
-        if (!window._docSelectedItems["rfq"]) window._docSelectedItems["rfq"] = [];
-        pr.items.forEach(item => {
-          const unitPrice = parseFloat(item.unit_price || 0);
-          const qty = parseFloat(item.quantity || 1);
-          window._docSelectedItems["rfq"].push({
-            item_id: item.item_id || item.id || 0,
-            item_name: item.item_name || item.item_description || "",
-            item_code: item.item_code || "",
-            item_unit: item.unit || "Lot",
-            item_category: item.category || "",
-            item_description: item.item_description || "",
-            description: item.item_description || item.item_name || "",
-            unit_price: unitPrice,
-            quantity: qty,
-            total: qty * unitPrice,
-            _from_pr: prId,   // track source PR
-          });
-        });
-        renderDocItemsList("rfq");
-      }
-      // Merge item specifications
-      if (pr && pr.item_specifications) {
-        const specsField = document.getElementById("rfqItemSpecs");
-        if (specsField) {
-          const existing = specsField.value.trim();
-          const incoming = pr.item_specifications.trim();
-          specsField.value = existing
-            ? existing + "\n" + incoming
-            : incoming;
-        }
-      }
-    } catch(e) { console.warn("Could not load PR items for RFQ:", e); }
-
-    // Update hidden input
-    const hiddenEl = document.getElementById("rfqLinkedPRIds");
-    if (hiddenEl) hiddenEl.value = (window._rfqLinkedPRIds || []).join(",");
-  };
-
-  /** Remove a PR from the linked list and its items from the items table */
-  window.rfqRemoveLinkedPR = function (prId) {
-    window._rfqLinkedPRIds = (window._rfqLinkedPRIds || []).filter(id => id !== prId);
-    delete (window._rfqLinkedPRMeta || {})[prId];
-    // Remove items that came from this PR
-    if (window._docSelectedItems["rfq"]) {
-      window._docSelectedItems["rfq"] = window._docSelectedItems["rfq"].filter(
-        it => it._from_pr !== prId
-      );
-      renderDocItemsList("rfq");
-    }
-    rfqRenderLinkedPRTags();
-    const hiddenEl = document.getElementById("rfqLinkedPRIds");
-    if (hiddenEl) hiddenEl.value = (window._rfqLinkedPRIds || []).join(",");
-  };
-
-  /** Render the PR tags strip */
-  window.rfqRenderLinkedPRTags = function () {
-    const container = document.getElementById("rfqLinkedPRTags");
-    const placeholder = document.getElementById("rfqLinkedPRPlaceholder");
-    if (!container) return;
-    const ids = window._rfqLinkedPRIds || [];
-    const meta = window._rfqLinkedPRMeta || {};
-    if (ids.length === 0) {
-      container.innerHTML = "";
-      if (placeholder) {
-        placeholder.style.display = "inline";
-        container.appendChild(placeholder);
-      }
-      return;
-    }
-    if (placeholder) placeholder.style.display = "none";
-    container.innerHTML = ids.map(id => {
-      const m = meta[id] || {};
-      return `<span style="display:inline-flex;align-items:center;gap:6px;background:#e3f2fd;border:1px solid #90caf9;border-radius:14px;padding:3px 10px 3px 12px;font-size:12px;font-weight:600;color:#1565c0;">
-        <i class="fas fa-file-alt" style="font-size:10px;"></i>
-        ${m.pr_number || id}
-        <button type="button" onclick="rfqRemoveLinkedPR(${id})" style="background:none;border:none;cursor:pointer;color:#e53e3e;padding:0;line-height:1;font-size:14px;" title="Remove">&times;</button>
-      </span>`;
-    }).join("");
-  };
-
-  // openSubModal removed — RFQ PR picker now uses same overlay pattern as PPMP catalog modal
-
-  // ── END RFQ Multi-PR Picker ───────────────────────────────────────────────
 
   // Auto-fill supplier address and TIN on RFQ supplier dropdown change
   window.rfqFillSupplierDetails = function () {
@@ -14053,7 +13547,44 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  // onRFQLinkedPRChange replaced by rfqAddLinkedPR / rfqPickerConfirm (multi-PR)
+  // When user selects a PR in the RFQ form, auto-fill items from that PR
+  window.onRFQLinkedPRChange = async function (prId) {
+    if (!prId) return;
+    try {
+      const pr = await apiRequest("/purchase-requests/" + prId);
+      if (!pr) return;
+      // Populate items into the catalog-style list
+      window._docSelectedItems["rfq"] = [];
+      if (pr.items && pr.items.length > 0) {
+        pr.items.forEach((item) => {
+          const unitPrice = parseFloat(
+            item.unit_price || item.total_price || 0,
+          );
+          const qty = parseFloat(item.quantity || 0);
+          window._docSelectedItems["rfq"].push({
+            item_id: item.item_id || item.id || 0,
+            item_name: item.item_name || item.item_description || "",
+            item_code: item.item_code || "",
+            item_unit: item.unit || "Lot",
+            item_category: item.category || "",
+            item_description: item.item_description || "",
+            description: item.item_description || item.item_name || "",
+            unit_price: unitPrice,
+            quantity: qty || 1,
+            total: (qty || 1) * unitPrice,
+          });
+        });
+      }
+      renderDocItemsList("rfq");
+      // Auto-fill item specifications from PR
+      if (pr.item_specifications) {
+        const specsField = document.getElementById("rfqItemSpecs");
+        if (specsField) specsField.value = pr.item_specifications;
+      }
+    } catch (e) {
+      console.error("Error loading PR items for RFQ:", e);
+    }
+  };
 
   window.addRFQItemRow = function () {
     const tbody = document.getElementById("rfqItemsBody");
@@ -14110,20 +13641,13 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId || null,
-        pr_ids: linkedPRIds,
+        pr_id: prId ? parseInt(prId) : null,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
         status: "on_going",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
-        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
-        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
-        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
-        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
-        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
-        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -15650,27 +15174,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           <textarea rows="4" id="editPrItemSpecs" placeholder="Enter specifications, one per line...">${(pr.item_specifications || "").replace(/</g, "&lt;")}</textarea>
         </div>
         ${getEditAttachmentSectionHTML("purchase_request", id, "editPrAttachment")}
-        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
-        <div class="form-boxed-section">
-          <div class="form-row">
-            <div class="form-group">
-              <label style="font-size:12px;">Requested By <small style="color:#666;">(Division Chief)</small></label>
-              <select id="editPrRequestedById" class="form-select" onchange="prFillSignatoryName('editPrRequestedById','editPrRequestedByName','editPrRequestedByDesig')">
-                <option value="">-- Select Employee --</option>
-              </select>
-              <input type="text" id="editPrRequestedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-              <input type="text" id="editPrRequestedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-            </div>
-            <div class="form-group">
-              <label style="font-size:12px;">Approved By <small style="color:#666;">(HoPE)</small></label>
-              <select id="editPrApprovedById" class="form-select" onchange="prFillSignatoryName('editPrApprovedById','editPrApprovedByName','editPrApprovedByDesig')">
-                <option value="">-- Select Employee --</option>
-              </select>
-              <input type="text" id="editPrApprovedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-              <input type="text" id="editPrApprovedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-            </div>
-          </div>
-        </div>
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
@@ -15679,31 +15182,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit Purchase Request", html, {
       preventOutsideClose: true,
     });
-    // Load employees into edit PR signatory dropdowns
-    (async () => {
-      try {
-        const emps = window._prEmpCache || await apiRequest("/employees");
-        window._prEmpCache = emps;
-        [
-          {selId: "editPrRequestedById", preselect: pr.requested_by_id || null},
-          {selId: "editPrApprovedById",  preselect: pr.approved_by_id  || null}
-        ].forEach(({selId, preselect}) => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            if (preselect && emp.id == preselect) opt.selected = true;
-            sel.appendChild(opt);
-          });
-          // trigger fill if preselected
-          if (preselect) sel.dispatchEvent(new Event('change'));
-        });
-      } catch(e) { console.warn("Could not load employees for edit PR signatories", e); }
-    })();
   };
 
   // Dynamic helpers for Edit PR (same pattern as New PR)
@@ -15820,10 +15298,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
       item_specifications:
         document.getElementById("editPrItemSpecs")?.value.trim() || null,
-      requested_by_id: parseInt(document.getElementById("editPrRequestedById")?.value) || null,
-      requested_by_name: document.getElementById("editPrRequestedByName")?.value || null,
-      approved_by_id: parseInt(document.getElementById("editPrApprovedById")?.value) || null,
-      approved_by_name: document.getElementById("editPrApprovedByName")?.value || null,
       items: items,
     };
     try {
@@ -16041,37 +15515,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
 
         ${getEditAttachmentSectionHTML("rfq", id, "editRfqAttachment")}
-        <div class="form-section-header section-signatories"><i class="fas fa-signature"></i> Signatories</div>
-        <div class="form-boxed-section">
-          <div class="form-row">
-            <div class="form-group">
-              <label style="font-size:12px;">BAC Secretariat</label>
-              <select id="editRfqBacSecId" class="form-select" onchange="rfqFillSignatoryName('editRfqBacSecId','editRfqBacSecName','editRfqBacSecDesig')">
-                <option value="">-- Select Employee --</option>
-              </select>
-              <input type="text" id="editRfqBacSecName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-              <input type="text" id="editRfqBacSecDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-            </div>
-            <div class="form-group">
-              <label style="font-size:12px;">BAC Chairperson</label>
-              <select id="editRfqBacChairId" class="form-select" onchange="rfqFillSignatoryName('editRfqBacChairId','editRfqBacChairName','editRfqBacChairDesig')">
-                <option value="">-- Select Employee --</option>
-              </select>
-              <input type="text" id="editRfqBacChairName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-              <input type="text" id="editRfqBacChairDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label style="font-size:12px;">Noted By / Approving Authority</label>
-              <select id="editRfqNotedById" class="form-select" onchange="rfqFillSignatoryName('editRfqNotedById','editRfqNotedByName','editRfqNotedByDesig')">
-                <option value="">-- Select Employee --</option>
-              </select>
-              <input type="text" id="editRfqNotedByName" placeholder="Name will auto-fill" readonly style="background:#f5f5f5;margin-top:4px;font-weight:600;">
-              <input type="text" id="editRfqNotedByDesig" placeholder="Designation" readonly style="background:#f5f5f5;margin-top:4px;font-size:12px;">
-            </div>
-          </div>
-        </div>
         <div class="form-group" style="text-align:right;margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
@@ -16080,31 +15523,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit RFQ", html, {
       preventOutsideClose: true,
     });
-    // Load employees into edit RFQ signatory dropdowns
-    (async () => {
-      try {
-        const emps = window._rfqEmpCache || await apiRequest("/employees");
-        window._rfqEmpCache = emps;
-        [
-          {selId: "editRfqBacSecId",   preselect: r.bac_sec_id   || null},
-          {selId: "editRfqBacChairId", preselect: r.bac_chair_id || null},
-          {selId: "editRfqNotedById",  preselect: r.noted_by_id  || null}
-        ].forEach(({selId, preselect}) => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            if (preselect && emp.id == preselect) opt.selected = true;
-            sel.appendChild(opt);
-          });
-          if (preselect) sel.dispatchEvent(new Event('change'));
-        });
-      } catch(e) { console.warn("Could not load employees for edit RFQ signatories", e); }
-    })();
 
     // Attach live preview for specs textarea
     const specsTA = document.getElementById("editRfqItemSpecs");
@@ -16206,12 +15624,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Send item_specifications directly to server
     const specsText = document.getElementById("editRfqItemSpecs")?.value || "";
     data.item_specifications = specsText.trim() || null;
-    data.bac_sec_id = parseInt(document.getElementById("editRfqBacSecId")?.value) || null;
-    data.bac_sec_name = document.getElementById("editRfqBacSecName")?.value || null;
-    data.bac_chair_id = parseInt(document.getElementById("editRfqBacChairId")?.value) || null;
-    data.bac_chair_name = document.getElementById("editRfqBacChairName")?.value || null;
-    data.noted_by_id = parseInt(document.getElementById("editRfqNotedById")?.value) || null;
-    data.noted_by_name = document.getElementById("editRfqNotedByName")?.value || null;
 
     try {
       await apiRequest("/rfqs/" + id, "PUT", data);
@@ -17842,12 +17254,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
-  window.showNewItemModal = async function () {
-    // Ensure PPMP categories and UOMs are fully loaded before rendering
-    await Promise.all([
-      ensurePPMPCategoriesLoaded(),
-      cachedUOMs.length ? Promise.resolve() : apiRequest("/uoms").then(u => { cachedUOMs = u; }).catch(() => {}),
-    ]);
+  window.showNewItemModal = function () {
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      apiRequest("/uoms")
+        .then((uoms) => {
+          cachedUOMs = uoms;
+        })
+        .catch(() => {});
+    }
     const html = `
       <form id="itemForm" onsubmit="saveNewItem(event)">
         <!-- Procurement Source selector (always visible) -->
@@ -17876,7 +17291,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="form-group">
               <label>Category</label>
               <select class="form-select" id="itemCategory" required>
-                ${buildPPMPCategoryOptions("")}
+                ${buildCategoryOptions("")}
               </select>
             </div>
           </div>
@@ -21099,8 +20514,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
-      const _linkedAppIdsRaw = document.getElementById("prLinkedAppIds")?.value || "";
-      const _linkedAppIds = _linkedAppIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
       const data = {
         pr_number: prNumber,
         pr_date: prDate || getTodayISO(),
@@ -21110,12 +20523,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
-        app_item_id: _linkedAppIds[0] || null,
-        app_item_ids: _linkedAppIds,
-        requested_by_id: parseInt(document.getElementById("prRequestedById")?.value) || null,
-        requested_by_name: document.getElementById("prRequestedByName")?.value || null,
-        approved_by_id: parseInt(document.getElementById("prApprovedById")?.value) || null,
-        approved_by_name: document.getElementById("prApprovedByName")?.value || null,
         items: items,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
@@ -21149,11 +20556,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    // Multi-PR: read from the hidden input that stores comma-separated IDs
-    const linkedPRIdsRaw = document.getElementById("rfqLinkedPRIds")?.value || "";
-    const linkedPRIds = linkedPRIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
-    const prId = linkedPRIds[0] || null; // keep first as legacy pr_id for backward compat
-    if (linkedPRIds.length === 0) { alert("Please link at least one Purchase Request to this RFQ."); return; }
+    const prId = document.getElementById("rfqLinkedPR")?.value || "";
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -21186,20 +20589,13 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId || null,
-        pr_ids: linkedPRIds,
+        pr_id: prId ? parseInt(prId) : null,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
         status: "draft",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
-        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
-        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
-        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
-        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
-        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
-        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -21446,7 +20842,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "awaiting_noa",
+        status: "draft",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -22026,7 +21422,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "awaiting_noa",
+        status: "issued",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -22038,7 +21434,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         ]);
       }
-      alert("Notice of Award saved successfully!");
+      alert("Notice of Award issued successfully!");
       closeModal();
       if (typeof loadNOA === "function") loadNOA();
       else if (typeof loadPageData === "function") loadPageData("noa");
@@ -22825,24 +22221,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // ICS Modal
-  window.showNewICSModal = async function () {
-    // Pre-load property cards so we can embed item_id in each option
-    let propertyCards = [];
-    try { propertyCards = await apiRequest("/property-cards"); } catch(e) {}
-
-    const pcOptions = propertyCards.map(c =>
-      `<option value="${c.id}"
-         data-propno="${c.property_number || ""}"
-         data-itemid="${c.item_id || ""}"
-         data-desc="${(c.description || "").replace(/"/g, "&quot;")}"
-         data-cost="${c.acquisition_cost || 0}"
-         data-ppe="${c.ppe_no || ""}">${c.property_number} — ${c.description || ""}</option>`
-    ).join("");
-
+  window.showNewICSModal = function () {
     const html = `
       <form id="icsForm" onsubmit="saveNewICS(event)">
-        <input type="hidden" id="icsItemId">
-        <input type="hidden" id="icsPropNo">
         <div class="form-row">
           <div class="form-group">
             <label>ICS No.</label>
@@ -22855,10 +22236,9 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Property Card <span style="color:red;">*</span></label>
-            <select class="form-select" id="icsPropertyId" required onchange="icsOnPropertyChange(this)">
+            <label>Property Card</label>
+            <select class="form-select" id="icsPropertyId" required>
               <option value="">-- Select Property --</option>
-              ${pcOptions}
             </select>
           </div>
           <div class="form-group">
@@ -22866,13 +22246,9 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
           </div>
         </div>
-        <div class="info-banner" id="icsItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
-          <i class="fas fa-link" style="color:#2e7d32;"></i>
-          <span id="icsItemBannerText"></span>
-        </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Issued To (Employee) <span style="color:red;">*</span></label>
+            <label>Issued To (Employee)</label>
             <select class="form-select" id="icsIssuedTo" required>
               <option value="">-- Select Employee --</option>
             </select>
@@ -22909,63 +22285,24 @@ Failure to submit the above requirements within the prescribed period shall cons
       </form>
     `;
     openModal("Issue Inventory Custodian Slip (ICS)", html);
+    loadPropertyCardsDropdown("icsPropertyId");
     loadEmployeesDropdown("icsIssuedTo");
     loadEmployeesDropdown("icsReceivedBy");
   };
 
-  /** Auto-fill ICS fields when a property card is selected */
-  window.icsOnPropertyChange = function (sel) {
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.value) return;
-    const itemId  = opt.dataset.itemid  || "";
-    const propNo  = opt.dataset.propno  || "";
-    const desc    = opt.dataset.desc    || "";
-    const cost    = opt.dataset.cost    || "0";
-    const ppe     = opt.dataset.ppe     || "";
-    // Populate hidden fields
-    const itemIdEl = document.getElementById("icsItemId");
-    const propNoEl = document.getElementById("icsPropNo");
-    if (itemIdEl) itemIdEl.value = itemId;
-    if (propNoEl) propNoEl.value = propNo;
-    // Auto-fill description if empty
-    const descEl = document.getElementById("icsDescription");
-    if (descEl && !descEl.value) descEl.value = desc;
-    // Auto-fill unit cost if 0
-    const costEl = document.getElementById("icsUnitCost");
-    if (costEl && (!costEl.value || costEl.value === "0")) costEl.value = cost;
-    // Show item linkage banner
-    const banner = document.getElementById("icsItemBanner");
-    const bannerText = document.getElementById("icsItemBannerText");
-    if (banner && bannerText) {
-      if (itemId) {
-        bannerText.textContent = `Linked to Item ID #${itemId} — issuance will post to Property Ledger Card (${propNo})`;
-        banner.style.display = "flex";
-      } else {
-        bannerText.textContent = `Property ${propNo} has no linked catalog item. Ledger entry will use property card data only.`;
-        banner.style.display = "flex";
-        banner.style.background = "#fff8e1";
-        banner.style.borderLeftColor = "#f9a825";
-      }
-    }
-  };
-
   window.saveNewICS = async function (e) {
     e.preventDefault();
-    const propertyCardId = parseInt(document.getElementById("icsPropertyId").value) || null;
-    const itemId = parseInt(document.getElementById("icsItemId")?.value) || null;
-    const propNo = document.getElementById("icsPropNo")?.value || null;
     const data = {
-      property_card_id: propertyCardId,
-      item_id: itemId,
-      property_number: propNo,
+      property_card_id: parseInt(
+        document.getElementById("icsPropertyId").value,
+      ),
       date_of_issue: document.getElementById("icsDateOfIssue").value,
       inventory_no: document.getElementById("icsInventoryNo").value,
       description: document.getElementById("icsDescription").value,
       quantity: parseInt(document.getElementById("icsQty").value) || 1,
       unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
       issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by_employee_id:
+      received_by:
         parseInt(document.getElementById("icsReceivedBy").value) || null,
       remarks: document.getElementById("icsRemarks").value,
     };
@@ -22975,7 +22312,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("ICS issued successfully!");
       closeModal();
       loadICS();
-      loadItems(); // refresh stock if item was updated
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -23077,28 +22413,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     } catch (err) {
       console.error("Error loading items dropdown:", err);
     }
-  };
-
-  // PR signatory auto-fill helper
-  window.prFillSignatoryName = function(selectId, nameId, desigId) {
-    const sel = document.getElementById(selectId);
-    const nameField = document.getElementById(nameId);
-    const desigField = document.getElementById(desigId);
-    if (!sel) return;
-    const opt = sel.options[sel.selectedIndex];
-    if (nameField) nameField.value = opt?.dataset?.name || "";
-    if (desigField) desigField.value = opt?.dataset?.desig || "";
-  };
-
-  // RFQ signatory auto-fill helper
-  window.rfqFillSignatoryName = function(selectId, nameId, desigId) {
-    const sel = document.getElementById(selectId);
-    const nameField = document.getElementById(nameId);
-    const desigField = document.getElementById(desigId);
-    if (!sel) return;
-    const opt = sel.options[sel.selectedIndex];
-    if (nameField) nameField.value = opt?.dataset?.name || "";
-    if (desigField) desigField.value = opt?.dataset?.desig || "";
   };
 
   window.loadEmployeesDropdown = async function (selectId, selectedId) {
@@ -23429,40 +22743,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   // ==================== NEW MODULE MODAL FUNCTIONS ====================
 
   // PAR Modals
-  window.showNewPARModal = async function () {
-    // Pre-load items for PPE/capital outlay linking
-    let allItems = [];
-    try { allItems = await apiRequest("/items"); } catch(e) {}
-    // PPE-relevant categories
-    const ppeItems = allItems.filter(i => {
-      const cat = (i.category || "").toUpperCase();
-      return cat.includes("EQUIPMENT") || cat.includes("FURNITURE") ||
-             cat.includes("CAPITAL") || cat.includes("PPE") ||
-             cat.includes("MACHINERY") || cat.includes("VEHICLE") ||
-             cat.includes("IT") || cat.includes("SEMI");
-    });
-    const itemOpts = [
-      '<option value="">-- Select Item (optional) --</option>',
-      ...ppeItems.map(i =>
-        `<option value="${i.id}"
-           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
-           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
-           data-price="${i.unit_price||0}"
-           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
-      ),
-      '<optgroup label="─── All Items ───"></optgroup>',
-      ...allItems.filter(i => !ppeItems.includes(i)).map(i =>
-        `<option value="${i.id}"
-           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
-           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
-           data-price="${i.unit_price||0}"
-           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
-      ),
-    ].join("");
-
+  window.showNewPARModal = function () {
     const html = `
       <form id="parForm" onsubmit="saveNewPAR(event)">
-        <input type="hidden" id="parItemId">
         <div class="form-row">
           <div class="form-group">
             <label>Date Issued</label>
@@ -23473,23 +22756,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="parFundCluster" placeholder="e.g., 01">
           </div>
         </div>
-        <div class="form-group">
-          <label>Link to Catalog Item <small style="color:#888;">(links PAR to inventory record)</small></label>
-          <select class="form-select" id="parItemSelect" onchange="parOnItemChange(this)">
-            ${itemOpts}
-          </select>
-        </div>
-        <div class="info-banner" id="parItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
-          <i class="fas fa-link" style="color:#2e7d32;"></i>
-          <span id="parItemBannerText"></span>
-        </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Property Number (PPE No.) <span style="color:red;">*</span></label>
-            <input type="text" id="parPropertyNo" placeholder="Property / PPE number" required>
+            <label>Property Number</label>
+            <input type="text" id="parPropertyNo" placeholder="Property number" required>
           </div>
           <div class="form-group">
-            <label>Description <span style="color:red;">*</span></label>
+            <label>Description</label>
             <input type="text" id="parDescription" placeholder="Item description" required>
           </div>
         </div>
@@ -23505,7 +22778,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Received By <span style="color:red;">*</span></label>
+            <label>Received By</label>
             <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
           </div>
           <div class="form-group">
@@ -23523,56 +22796,21 @@ Failure to submit the above requirements within the prescribed period shall cons
     loadEmployeesDropdown("parReceivedBy");
     loadEmployeesDropdown("parIssuedBy");
   };
-
-  /** Auto-fill PAR fields when a catalog item is selected */
-  window.parOnItemChange = function (sel) {
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.value) {
-      document.getElementById("parItemId").value = "";
-      const banner = document.getElementById("parItemBanner");
-      if (banner) banner.style.display = "none";
-      return;
-    }
-    document.getElementById("parItemId").value = opt.value;
-    const name  = opt.dataset.name  || "";
-    const desc  = opt.dataset.desc  || "";
-    const price = opt.dataset.price || "0";
-    const code  = opt.dataset.code  || "";
-    // Auto-fill description if empty
-    const descEl = document.getElementById("parDescription");
-    if (descEl && !descEl.value) descEl.value = desc || name;
-    // Auto-fill unit cost if 0
-    const costEl = document.getElementById("parUnitCost");
-    if (costEl && (!costEl.value || parseFloat(costEl.value) === 0)) costEl.value = price;
-    // Show banner
-    const banner = document.getElementById("parItemBanner");
-    const bannerText = document.getElementById("parItemBannerText");
-    if (banner && bannerText) {
-      bannerText.textContent = `Linked to Item #${code} — issuance will post to Property Ledger Card`;
-      banner.style.display = "flex";
-    }
-  };
-
   window.saveNewPAR = async function (e) {
     e.preventDefault();
-    const itemId = parseInt(document.getElementById("parItemId")?.value) || null;
-    const receivedById = parseInt(document.getElementById("parReceivedBy").value) || null;
-    const issuedById = parseInt(document.getElementById("parIssuedBy").value) || null;
-    const propNo = document.getElementById("parPropertyNo").value;
-    const qty = parseInt(document.getElementById("parQty").value);
-    const unitCost = parseFloat(document.getElementById("parUnitCost").value);
     const data = {
-      item_id: itemId,
-      date_of_issue: document.getElementById("parDate").value,
+      date_issued: document.getElementById("parDate").value,
       fund_cluster: document.getElementById("parFundCluster").value,
-      ppe_no: propNo,
+      property_number: document.getElementById("parPropertyNo").value,
       description: document.getElementById("parDescription").value,
-      quantity: qty,
-      unit_cost: unitCost,
-      total_cost: qty * unitCost,
-      issued_to_employee_id: issuedById,
-      received_by_id: receivedById,
-      received_by_position: null,
+      quantity: parseInt(document.getElementById("parQty").value),
+      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
+      total_cost:
+        parseInt(document.getElementById("parQty").value) *
+        parseFloat(document.getElementById("parUnitCost").value),
+      received_by:
+        parseInt(document.getElementById("parReceivedBy").value) || null,
+      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
     };
     try {
       if (!confirm("Are you sure you want to save this PAR?")) return;
@@ -23580,7 +22818,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("PAR saved!");
       closeModal();
       loadPAR();
-      loadItems(); // refresh stock if item was linked
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -26110,20 +25347,23 @@ Failure to submit the above requirements within the prescribed period shall cons
     const w = window._coaWizard;
     const po = w.poData || {};
     const today = new Date().toISOString().split("T")[0];
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "";
 
     const dateStr = fmtDate(w.dates["step" + step] || today);
     const supplier = po.supplier_name || "";
     const purpose = po.purpose || "";
     const location = po.place_of_delivery || po.delivery_address || "";
     const poNum = po.po_number || "";
-    const _rawDelivDate = po.delivery_date || po.expected_delivery_date || "";
-    const delivDate = _rawDelivDate ? fmtDate(_rawDelivDate) : "[delivery date not yet set — please update in Purchase Order]";
+    const delivDate = fmtDate(
+      po.delivery_date || po.expected_delivery_date || "",
+    );
 
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
     <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
@@ -28400,30 +27640,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           : coa.documents_included || {};
     } catch (e) {}
 
-    // Fetch live delivery date from linked PO when not stored in documents_included
-    const ni = docs.notice_inspection || {};
-    if (!ni.delivery_date && (coa.po_id || coa.id)) {
-      try {
-        const poId = coa.po_id;
-        if (poId) {
-          const livepo = await apiRequest("/purchase-orders/" + poId);
-          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
-            if (!docs.notice_inspection) docs.notice_inspection = {};
-            docs.notice_inspection.delivery_date =
-              livepo.delivery_date || livepo.expected_delivery_date;
-          }
-        }
-      } catch (e) {
-        console.warn("[COA View] Could not fetch PO delivery date:", e);
-      }
-    }
-
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "N/A";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "N/A";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "N/A";
 
     // Build read-only letter previews
     function viewLetterHeader() {
@@ -28451,7 +27675,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
 
     const tp = docs.transmittal_po || {};
-    ni = docs.notice_inspection || {};
+    const ni = docs.notice_inspection || {};
     const ti = docs.transmittal_iar || {};
 
     const card = (title, icon, body) => `
@@ -28473,7 +27697,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       "Step 2: Notice of Inspection",
       "fa-search",
       `${viewLetterHeader()}<div style="text-align:right;margin-bottom:8px;">${fmtDate(ni.date || coa.submission_date)}</div>${viewAddressee()}
-      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ""}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ""}</strong>, on <strong>${ni.delivery_date ? fmtDate(ni.delivery_date) : "N/A"}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`,
+      <div style="text-align:justify;">In connection with the delivery of the procured items under <strong>${ni.purpose || ""}</strong> / PO No.: <strong>${ni.po_number || coa.po_number || ""}</strong>, on <strong>${fmtDate(ni.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${viewSignatory()}`,
     );
 
     const letter3 = card(
@@ -28556,12 +27780,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? JSON.parse(coa.documents_included)
           : coa.documents_included || {};
     } catch (e) {}
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "";
 
     // No separate header needed — buildPrintHTML already provides the official DMW header with logos
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
@@ -28577,10 +27803,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       <div style="font-size:12px;">Hope you find the attached documents in order.</div>${sig}`;
     } else if (stepNum === 2) {
       const d = docs.notice_inspection || {};
-      const _delivDate = d.delivery_date || coa.delivery_date || "";
-      const _delivDateStr = _delivDate ? fmtDate(_delivDate) : "[delivery date not set]";
       body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
-      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ""}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ""}</strong>, on <strong>${_delivDateStr}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
+      <div style="font-size:12px;line-height:1.6;text-align:justify;margin-bottom:14px;">In connection with the delivery of the procured items under <strong>${d.purpose || ""}</strong> / PO No.: <strong>${d.po_number || coa.po_number || ""}</strong>, on <strong>${fmtDate(d.delivery_date)}</strong>, may we respectfully invite your good office or your duly authorized representative to witness the inspection and acceptance of the said procurement.</div>${sig}`;
     } else if (stepNum === 3) {
       const d = docs.transmittal_iar || {};
       body = `<div style="margin-bottom:14px;font-size:12px;font-weight:bold;">${fmtDate(d.date || coa.submission_date)}</div>${addr}
@@ -28619,32 +27843,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Print all 3 COA documents in one print job
    */
-  window.coaPrintAllDocs = async function (coaId) {
+  window.coaPrintAllDocs = function (coaId) {
     const allCoa = window._cachedCOA || [];
-    let coa = allCoa.find((c) => c.id === coaId) || {};
-    // Ensure delivery_date is populated for Notice of Inspection (step 2)
-    {
-      let docs = {};
-      try {
-        docs = typeof coa.documents_included === "string"
-          ? JSON.parse(coa.documents_included)
-          : coa.documents_included || {};
-      } catch (e) {}
-      const ni = docs.notice_inspection || {};
-      if (!ni.delivery_date && coa.po_id) {
-        try {
-          const livepo = await apiRequest("/purchase-orders/" + coa.po_id);
-          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
-            if (!docs.notice_inspection) docs.notice_inspection = {};
-            docs.notice_inspection.delivery_date =
-              livepo.delivery_date || livepo.expected_delivery_date;
-            coa = { ...coa, documents_included: docs };
-          }
-        } catch (e) {
-          console.warn("[COA Print All] Could not fetch PO delivery date:", e);
-        }
-      }
-    }
+    const coa = allCoa.find((c) => c.id === coaId) || {};
     const title = "COA_Documents_" + (coa.submission_number || "");
     const stepTitles = [
       "Transmittal \u2013 Purchase Order",
@@ -32763,26 +31964,34 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch "Requested by" and "Approved by" signatories
-      // Use saved signatory IDs from the PR record first; fall back to role/name lookup
-      let chiefName = pr.requested_by_name || pr.chief_name || "",
+      // Server already returns chief_name/chief_designation based on division rules:
+      //   WRSD → WRSD chief (MAKINANO), all others → FAD chief (ESPALDON)
+      let chiefName = pr.chief_name || "",
         chiefDesignation = pr.chief_designation || "";
-      let hopeName = pr.approved_by_name || pr.hope_name || "",
+      let hopeName = pr.hope_name || "",
         hopeDesignation = pr.hope_designation || "Regional Director";
-      // Fallback: if signatory not saved, resolve from employee records
+      // Fallback: if server didn't return names, fetch from employees
       if (!chiefName) {
         try {
           const allEmployees = await apiRequest("/employees");
-          if (pr.requested_by_id) {
-            const reqEmp = allEmployees.find((e) => e.id === parseInt(pr.requested_by_id));
-            if (reqEmp) { chiefName = reqEmp.full_name || ""; chiefDesignation = reqEmp.designation_name || ""; }
+          const deptCode = (pr.department_code || "").toUpperCase();
+          if (deptCode === "WRSD") {
+            const wrsdEmp = allEmployees.find(
+              (e) =>
+                e.full_name && e.full_name.toUpperCase().includes("MAKINANO"),
+            );
+            if (wrsdEmp) {
+              chiefName = wrsdEmp.full_name || "";
+              chiefDesignation = wrsdEmp.designation_name || "";
+            }
           } else {
-            const deptCode = (pr.department_code || "").toUpperCase();
-            if (deptCode === "WRSD") {
-              const wrsdEmp = allEmployees.find((e) => e.full_name && e.full_name.toUpperCase().includes("MAKINANO"));
-              if (wrsdEmp) { chiefName = wrsdEmp.full_name || ""; chiefDesignation = wrsdEmp.designation_name || ""; }
-            } else {
-              const fadEmp = allEmployees.find((e) => e.full_name && e.full_name.toUpperCase().includes("ESPALDON"));
-              if (fadEmp) { chiefName = fadEmp.full_name || ""; chiefDesignation = fadEmp.designation_name || ""; }
+            const fadEmp = allEmployees.find(
+              (e) =>
+                e.full_name && e.full_name.toUpperCase().includes("ESPALDON"),
+            );
+            if (fadEmp) {
+              chiefName = fadEmp.full_name || "";
+              chiefDesignation = fadEmp.designation_name || "";
             }
           }
         } catch (e) {
@@ -32791,15 +32000,9 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
       if (!hopeName) {
         try {
-          if (pr.approved_by_id) {
-            const allEmployees = window._prEmpCache || await apiRequest("/employees");
-            const apprEmp = allEmployees.find((e) => e.id === parseInt(pr.approved_by_id));
-            if (apprEmp) { hopeName = apprEmp.full_name || ""; hopeDesignation = apprEmp.designation_name || "Regional Director"; }
-          } else {
-            const allUsers = await apiRequest("/users");
-            const hopeUser = allUsers.find((u) => u.role === "hope");
-            if (hopeUser) hopeName = hopeUser.full_name || "";
-          }
+          const allUsers = await apiRequest("/users");
+          const hopeUser = allUsers.find((u) => u.role === "hope");
+          if (hopeUser) hopeName = hopeUser.full_name || "";
         } catch (e) {}
       }
 
@@ -34161,22 +33364,22 @@ Failure to submit the above requirements within the prescribed period shall cons
             b.remarks && typeof b.remarks === "string" ? b.remarks : "";
           biddersTableRows +=
             "<tr>" +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;font-size:9pt;' +
             st +
             '">' +
             (idx + 1) +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;' +
             st +
             '" contenteditable="true">' +
             (b.name || "") +
             "</div></td>" +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;font-size:9pt;' +
             st +
             '">' +
             fmtAmt +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;' +
             st +
             '" contenteditable="true">' +
             remarksDisplay +
@@ -34187,12 +33390,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         for (let i = 1; i <= 3; i++) {
           biddersTableRows +=
             "<tr>" +
-            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;">' +
+            '<td style="text-align:center;padding:4px 3px;border:1px solid #000;font-size:9pt;">' +
             i +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
-            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;"></td>' +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
+            '<td style="text-align:right;padding:4px 3px;border:1px solid #000;font-size:9pt;"></td>' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:4px 3px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
             "</tr>";
         }
       }
@@ -35156,7 +34359,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
-      // Use saved signatory IDs from the RFQ record; fall back to role-based lookup
       let bacSecName = "GIOVANNI S. PAREDES",
         bacSecDesignation = "";
       let bacChairName = "",
@@ -35169,37 +34371,44 @@ Failure to submit the above requirements within the prescribed period shall cons
           apiRequest("/users"),
           apiRequest("/employees"),
         ]);
-        // BAC Secretariat — use saved bac_sec_id first
-        if (rfq.bac_sec_id) {
-          const savedSec = allEmployees.find((e) => e.id === parseInt(rfq.bac_sec_id));
-          if (savedSec) { bacSecName = savedSec.full_name || bacSecName; bacSecDesignation = savedSec.designation_name || ""; }
-        } else {
-          const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
-          if (bacSecUser) {
-            bacSecName = bacSecUser.full_name || bacSecName;
-            const bacSecEmp = allEmployees.find((e) => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
-            if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
-          }
+        // BAC Secretariat
+        const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
+        if (bacSecUser) {
+          bacSecName = bacSecUser.full_name || bacSecName;
+          const bacSecEmp = allEmployees.find(
+            (e) =>
+              e.full_name &&
+              bacSecUser.full_name &&
+              e.full_name.trim().toLowerCase() ===
+                bacSecUser.full_name.trim().toLowerCase(),
+          );
+          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
         }
-        // BAC Chairperson — use saved bac_chair_id first
-        if (rfq.bac_chair_id) {
-          const savedChair = allEmployees.find((e) => e.id === parseInt(rfq.bac_chair_id));
-          if (savedChair) { bacChairName = savedChair.full_name || ""; bacChairDesignation = savedChair.designation_name || ""; }
-        } else {
-          const bacChairUser = allUsers.find((u) => u.role === "bac_chair" || u.secondary_role === "bac_chair");
-          if (bacChairUser) {
-            bacChairName = bacChairUser.full_name || "";
-            const bacChairEmp = allEmployees.find((e) => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
-            if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || "";
-          }
+        // BAC Chairperson (primary or secondary role)
+        const bacChairUser = allUsers.find(
+          (u) => u.role === "bac_chair" || u.secondary_role === "bac_chair",
+        );
+        if (bacChairUser) {
+          bacChairName = bacChairUser.full_name || "";
+          const bacChairEmp = allEmployees.find(
+            (e) =>
+              e.full_name &&
+              bacChairUser.full_name &&
+              e.full_name.trim().toLowerCase() ===
+                bacChairUser.full_name.trim().toLowerCase(),
+          );
+          if (bacChairEmp)
+            bacChairDesignation = bacChairEmp.designation_name || "";
         }
-        // Noted By / Mark — use saved noted_by_id first
-        if (rfq.noted_by_id) {
-          const savedNoted = allEmployees.find((e) => e.id === parseInt(rfq.noted_by_id));
-          if (savedNoted) { markName = savedNoted.full_name || markName; markDesignation = savedNoted.designation_name || ""; }
-        } else {
-          const markEmp = allEmployees.find((e) => e.full_name && e.full_name.trim().toLowerCase().includes("marasigan"));
-          if (markEmp) { markName = markEmp.full_name || markName; markDesignation = markEmp.designation_name || ""; }
+        // Mark E. Marasigan
+        const markEmp = allEmployees.find(
+          (e) =>
+            e.full_name &&
+            e.full_name.trim().toLowerCase().includes("marasigan"),
+        );
+        if (markEmp) {
+          markName = markEmp.full_name || markName;
+          markDesignation = markEmp.designation_name || "";
         }
       } catch (e) {
         console.warn("Could not fetch BAC/employee data:", e);
@@ -37402,31 +36611,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit Purchase Request", html, {
       preventOutsideClose: true,
     });
-    // Load employees into edit PR signatory dropdowns
-    (async () => {
-      try {
-        const emps = window._prEmpCache || await apiRequest("/employees");
-        window._prEmpCache = emps;
-        [
-          {selId: "editPrRequestedById", preselect: pr.requested_by_id || null},
-          {selId: "editPrApprovedById",  preselect: pr.approved_by_id  || null}
-        ].forEach(({selId, preselect}) => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            if (preselect && emp.id == preselect) opt.selected = true;
-            sel.appendChild(opt);
-          });
-          // trigger fill if preselected
-          if (preselect) sel.dispatchEvent(new Event('change'));
-        });
-      } catch(e) { console.warn("Could not load employees for edit PR signatories", e); }
-    })();
   };
 
   // Dynamic helpers for Edit PR (same pattern as New PR)
@@ -37543,10 +36727,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
       item_specifications:
         document.getElementById("editPrItemSpecs")?.value.trim() || null,
-      requested_by_id: parseInt(document.getElementById("editPrRequestedById")?.value) || null,
-      requested_by_name: document.getElementById("editPrRequestedByName")?.value || null,
-      approved_by_id: parseInt(document.getElementById("editPrApprovedById")?.value) || null,
-      approved_by_name: document.getElementById("editPrApprovedByName")?.value || null,
       items: items,
     };
     try {
@@ -37772,31 +36952,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     openModal("Edit RFQ", html, {
       preventOutsideClose: true,
     });
-    // Load employees into edit RFQ signatory dropdowns
-    (async () => {
-      try {
-        const emps = window._rfqEmpCache || await apiRequest("/employees");
-        window._rfqEmpCache = emps;
-        [
-          {selId: "editRfqBacSecId",   preselect: r.bac_sec_id   || null},
-          {selId: "editRfqBacChairId", preselect: r.bac_chair_id || null},
-          {selId: "editRfqNotedById",  preselect: r.noted_by_id  || null}
-        ].forEach(({selId, preselect}) => {
-          const sel = document.getElementById(selId);
-          if (!sel) return;
-          emps.forEach(emp => {
-            const opt = document.createElement("option");
-            opt.value = emp.id;
-            opt.textContent = emp.full_name + (emp.designation_name ? " (" + emp.designation_name + ")" : "");
-            opt.dataset.name = emp.full_name || "";
-            opt.dataset.desig = emp.designation_name || "";
-            if (preselect && emp.id == preselect) opt.selected = true;
-            sel.appendChild(opt);
-          });
-          if (preselect) sel.dispatchEvent(new Event('change'));
-        });
-      } catch(e) { console.warn("Could not load employees for edit RFQ signatories", e); }
-    })();
 
     // Attach live preview for specs textarea
     const specsTA = document.getElementById("editRfqItemSpecs");
@@ -37898,12 +37053,6 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Send item_specifications directly to server
     const specsText = document.getElementById("editRfqItemSpecs")?.value || "";
     data.item_specifications = specsText.trim() || null;
-    data.bac_sec_id = parseInt(document.getElementById("editRfqBacSecId")?.value) || null;
-    data.bac_sec_name = document.getElementById("editRfqBacSecName")?.value || null;
-    data.bac_chair_id = parseInt(document.getElementById("editRfqBacChairId")?.value) || null;
-    data.bac_chair_name = document.getElementById("editRfqBacChairName")?.value || null;
-    data.noted_by_id = parseInt(document.getElementById("editRfqNotedById")?.value) || null;
-    data.noted_by_name = document.getElementById("editRfqNotedByName")?.value || null;
 
     try {
       await apiRequest("/rfqs/" + id, "PUT", data);
@@ -39534,12 +38683,15 @@ Failure to submit the above requirements within the prescribed period shall cons
     tbody.appendChild(row);
   };
 
-  window.showNewItemModal = async function () {
-    // Ensure PPMP categories and UOMs are fully loaded before rendering
-    await Promise.all([
-      ensurePPMPCategoriesLoaded(),
-      cachedUOMs.length ? Promise.resolve() : apiRequest("/uoms").then(u => { cachedUOMs = u; }).catch(() => {}),
-    ]);
+  window.showNewItemModal = function () {
+    // Ensure UOMs are loaded
+    if (!cachedUOMs.length) {
+      apiRequest("/uoms")
+        .then((uoms) => {
+          cachedUOMs = uoms;
+        })
+        .catch(() => {});
+    }
     const html = `
  <form id="itemForm" onsubmit="saveNewItem(event)">
  <!-- Procurement Source selector (always visible) -->
@@ -39568,7 +38720,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group">
  <label>Category</label>
  <select class="form-select" id="itemCategory" required>
- ${buildPPMPCategoryOptions("")}
+ ${buildCategoryOptions("")}
  </select>
  </div>
  </div>
@@ -42740,8 +41892,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
-      const _linkedAppIdsRaw2 = document.getElementById("prLinkedAppIds")?.value || "";
-      const _linkedAppIds2 = _linkedAppIdsRaw2.split(",").map(s => parseInt(s.trim())).filter(Boolean);
       const data = {
         pr_number: prNumber,
         purpose: purpose,
@@ -42749,8 +41899,6 @@ Failure to submit the above requirements within the prescribed period shall cons
         status: "draft",
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
-        app_item_id: _linkedAppIds2[0] || null,
-        app_item_ids: _linkedAppIds2,
         items: items,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
@@ -42784,10 +41932,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const linkedPRIdsRaw = document.getElementById("rfqLinkedPRIds")?.value || "";
-    const linkedPRIds = linkedPRIdsRaw.split(",").map(s => parseInt(s.trim())).filter(Boolean);
-    const prId = linkedPRIds[0] || null;
-    if (linkedPRIds.length === 0) { alert("Please link at least one Purchase Request to this RFQ."); return; }
+    const prId = document.getElementById("rfqLinkedPR")?.value || "";
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -42820,20 +41965,13 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId || null,
-        pr_ids: linkedPRIds,
+        pr_id: prId ? parseInt(prId) : null,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
         status: "draft",
         item_specifications:
           document.getElementById("rfqItemSpecs")?.value.trim() || null,
-        bac_sec_id: parseInt(document.getElementById("rfqBacSecId")?.value) || null,
-        bac_sec_name: document.getElementById("rfqBacSecName")?.value || null,
-        bac_chair_id: parseInt(document.getElementById("rfqBacChairId")?.value) || null,
-        bac_chair_name: document.getElementById("rfqBacChairName")?.value || null,
-        noted_by_id: parseInt(document.getElementById("rfqNotedById")?.value) || null,
-        noted_by_name: document.getElementById("rfqNotedByName")?.value || null,
         items: items,
         suppliers:
           !isManualSupplier && supplierId
@@ -43080,7 +42218,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "awaiting_noa",
+        status: "draft",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -43660,7 +42798,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         address: supplierAddress,
         contract_amount: contractAmount,
         date_issued: noaDate || null,
-        status: "awaiting_noa",
+        status: "issued",
       };
       const result = await apiRequest("/notices-of-award", "POST", data);
       const noaId = result.id || result.noa_id;
@@ -43672,7 +42810,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           },
         ]);
       }
-      alert("Notice of Award saved successfully!");
+      alert("Notice of Award issued successfully!");
       closeModal();
       if (typeof loadNOA === "function") loadNOA();
       else if (typeof loadPageData === "function") loadPageData("noa");
@@ -44459,23 +43597,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // ICS Modal
-  window.showNewICSModal = async function () {
-    let propertyCards = [];
-    try { propertyCards = await apiRequest("/property-cards"); } catch(e) {}
-
-    const pcOptions = propertyCards.map(c =>
-      `<option value="${c.id}"
-         data-propno="${c.property_number || ""}"
-         data-itemid="${c.item_id || ""}"
-         data-desc="${(c.description || "").replace(/"/g, "&quot;")}"
-         data-cost="${c.acquisition_cost || 0}"
-         data-ppe="${c.ppe_no || ""}">${c.property_number} — ${c.description || ""}</option>`
-    ).join("");
-
+  window.showNewICSModal = function () {
     const html = `
  <form id="icsForm" onsubmit="saveNewICS(event)">
- <input type="hidden" id="icsItemId">
- <input type="hidden" id="icsPropNo">
  <div class="form-row">
  <div class="form-group">
  <label>ICS No.</label>
@@ -44488,10 +43612,9 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Property Card <span style="color:red;">*</span></label>
- <select class="form-select" id="icsPropertyId" required onchange="icsOnPropertyChange(this)">
+ <label>Property Card</label>
+ <select class="form-select" id="icsPropertyId" required>
  <option value="">-- Select Property --</option>
- ${pcOptions}
  </select>
  </div>
  <div class="form-group">
@@ -44499,13 +43622,9 @@ Failure to submit the above requirements within the prescribed period shall cons
  <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
  </div>
  </div>
- <div class="info-banner" id="icsItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
- <i class="fas fa-link" style="color:#2e7d32;"></i>
- <span id="icsItemBannerText"></span>
- </div>
  <div class="form-row">
  <div class="form-group">
- <label>Issued To (Employee) <span style="color:red;">*</span></label>
+ <label>Issued To (Employee)</label>
  <select class="form-select" id="icsIssuedTo" required>
  <option value="">-- Select Employee --</option>
  </select>
@@ -44542,27 +43661,24 @@ Failure to submit the above requirements within the prescribed period shall cons
  </form>
  `;
     openModal("Issue Inventory Custodian Slip (ICS)", html);
+    loadPropertyCardsDropdown("icsPropertyId");
     loadEmployeesDropdown("icsIssuedTo");
     loadEmployeesDropdown("icsReceivedBy");
   };
 
   window.saveNewICS = async function (e) {
     e.preventDefault();
-    const propertyCardId = parseInt(document.getElementById("icsPropertyId").value) || null;
-    const itemId = parseInt(document.getElementById("icsItemId")?.value) || null;
-    const propNo = document.getElementById("icsPropNo")?.value || null;
     const data = {
-      property_card_id: propertyCardId,
-      item_id: itemId,
-      property_number: propNo,
+      property_card_id: parseInt(
+        document.getElementById("icsPropertyId").value,
+      ),
       date_of_issue: document.getElementById("icsDateOfIssue").value,
       inventory_no: document.getElementById("icsInventoryNo").value,
       description: document.getElementById("icsDescription").value,
       quantity: parseInt(document.getElementById("icsQty").value) || 1,
       unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
       issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by_employee_id:
+      received_by:
         parseInt(document.getElementById("icsReceivedBy").value) || null,
       remarks: document.getElementById("icsRemarks").value,
     };
@@ -44572,7 +43688,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("ICS issued successfully!");
       closeModal();
       loadICS();
-      loadItems();
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -45004,38 +44119,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   // ==================== NEW MODULE MODAL FUNCTIONS ====================
 
   // PAR Modals
-  window.showNewPARModal = async function () {
-    let allItems = [];
-    try { allItems = await apiRequest("/items"); } catch(e) {}
-    const ppeItems = allItems.filter(i => {
-      const cat = (i.category || "").toUpperCase();
-      return cat.includes("EQUIPMENT") || cat.includes("FURNITURE") ||
-             cat.includes("CAPITAL") || cat.includes("PPE") ||
-             cat.includes("MACHINERY") || cat.includes("VEHICLE") ||
-             cat.includes("IT") || cat.includes("SEMI");
-    });
-    const itemOpts = [
-      '<option value="">-- Select Item (optional) --</option>',
-      ...ppeItems.map(i =>
-        `<option value="${i.id}"
-           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
-           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
-           data-price="${i.unit_price||0}"
-           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
-      ),
-      '<optgroup label="─── All Items ───"></optgroup>',
-      ...allItems.filter(i => !ppeItems.includes(i)).map(i =>
-        `<option value="${i.id}"
-           data-name="${(i.name||"").replace(/"/g,"&quot;")}"
-           data-desc="${(i.description||"").replace(/"/g,"&quot;")}"
-           data-price="${i.unit_price||0}"
-           data-code="${i.code||""}">${i.code} — ${i.name}</option>`
-      ),
-    ].join("");
-
+  window.showNewPARModal = function () {
     const html = `
  <form id="parForm" onsubmit="saveNewPAR(event)">
- <input type="hidden" id="parItemId">
  <div class="form-row">
  <div class="form-group">
  <label>Date Issued</label>
@@ -45046,23 +44132,13 @@ Failure to submit the above requirements within the prescribed period shall cons
  <input type="text" id="parFundCluster" placeholder="e.g., 01">
  </div>
  </div>
- <div class="form-group">
- <label>Link to Catalog Item <small style="color:#888;">(links PAR to inventory record)</small></label>
- <select class="form-select" id="parItemSelect" onchange="parOnItemChange(this)">
- ${itemOpts}
- </select>
- </div>
- <div class="info-banner" id="parItemBanner" style="display:none;margin:4px 0 10px;padding:8px 12px;background:#e8f5e9;border-left:3px solid #2e7d32;font-size:12px;">
- <i class="fas fa-link" style="color:#2e7d32;"></i>
- <span id="parItemBannerText"></span>
- </div>
  <div class="form-row">
  <div class="form-group">
- <label>Property Number (PPE No.) <span style="color:red;">*</span></label>
- <input type="text" id="parPropertyNo" placeholder="Property / PPE number" required>
+ <label>Property Number</label>
+ <input type="text" id="parPropertyNo" placeholder="Property number" required>
  </div>
  <div class="form-group">
- <label>Description <span style="color:red;">*</span></label>
+ <label>Description</label>
  <input type="text" id="parDescription" placeholder="Item description" required>
  </div>
  </div>
@@ -45078,7 +44154,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Received By <span style="color:red;">*</span></label>
+ <label>Received By</label>
  <select class="form-select" id="parReceivedBy"><option value="">-- Select Employee --</option></select>
  </div>
  <div class="form-group">
@@ -45098,24 +44174,19 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
   window.saveNewPAR = async function (e) {
     e.preventDefault();
-    const itemId = parseInt(document.getElementById("parItemId")?.value) || null;
-    const receivedById = parseInt(document.getElementById("parReceivedBy").value) || null;
-    const issuedById = parseInt(document.getElementById("parIssuedBy").value) || null;
-    const propNo = document.getElementById("parPropertyNo").value;
-    const qty = parseInt(document.getElementById("parQty").value);
-    const unitCost = parseFloat(document.getElementById("parUnitCost").value);
     const data = {
-      item_id: itemId,
-      date_of_issue: document.getElementById("parDate").value,
+      date_issued: document.getElementById("parDate").value,
       fund_cluster: document.getElementById("parFundCluster").value,
-      ppe_no: propNo,
+      property_number: document.getElementById("parPropertyNo").value,
       description: document.getElementById("parDescription").value,
-      quantity: qty,
-      unit_cost: unitCost,
-      total_cost: qty * unitCost,
-      issued_to_employee_id: issuedById,
-      received_by_id: receivedById,
-      received_by_position: null,
+      quantity: parseInt(document.getElementById("parQty").value),
+      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
+      total_cost:
+        parseInt(document.getElementById("parQty").value) *
+        parseFloat(document.getElementById("parUnitCost").value),
+      received_by:
+        parseInt(document.getElementById("parReceivedBy").value) || null,
+      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
     };
     try {
       if (!confirm("Are you sure you want to save this PAR?")) return;
@@ -45123,7 +44194,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       alert("PAR saved!");
       closeModal();
       loadPAR();
-      loadItems();
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -47653,20 +46723,23 @@ Failure to submit the above requirements within the prescribed period shall cons
     const w = window._coaWizard;
     const po = w.poData || {};
     const today = new Date().toISOString().split("T")[0];
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "";
 
     const dateStr = fmtDate(w.dates["step" + step] || today);
     const supplier = po.supplier_name || "";
     const purpose = po.purpose || "";
     const location = po.place_of_delivery || po.delivery_address || "";
     const poNum = po.po_number || "";
-    const _rawDelivDate = po.delivery_date || po.expected_delivery_date || "";
-    const delivDate = _rawDelivDate ? fmtDate(_rawDelivDate) : "[delivery date not yet set — please update in Purchase Order]";
+    const delivDate = fmtDate(
+      po.delivery_date || po.expected_delivery_date || "",
+    );
 
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
  <div style="font-size:12px;margin-bottom:6px;">Dear Auditor,</div><div style="font-size:12px;margin-bottom:14px;">Greetings!</div>`;
@@ -50165,30 +49238,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           : coa.documents_included || {};
     } catch (e) {}
 
-    // Fetch live delivery date from linked PO when not stored in documents_included
-    const ni = docs.notice_inspection || {};
-    if (!ni.delivery_date && (coa.po_id || coa.id)) {
-      try {
-        const poId = coa.po_id;
-        if (poId) {
-          const livepo = await apiRequest("/purchase-orders/" + poId);
-          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
-            if (!docs.notice_inspection) docs.notice_inspection = {};
-            docs.notice_inspection.delivery_date =
-              livepo.delivery_date || livepo.expected_delivery_date;
-          }
-        }
-      } catch (e) {
-        console.warn("[COA View] Could not fetch PO delivery date:", e);
-      }
-    }
-
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "N/A";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "N/A";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "N/A";
 
     // Build read-only letter previews
     function viewLetterHeader() {
@@ -50216,7 +49273,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     }
 
     const tp = docs.transmittal_po || {};
-    ni = docs.notice_inspection || {};
+    const ni = docs.notice_inspection || {};
     const ti = docs.transmittal_iar || {};
 
     const card = (title, icon, body) => `
@@ -50317,12 +49374,14 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? JSON.parse(coa.documents_included)
           : coa.documents_included || {};
     } catch (e) {}
-    const fmtDate = (d) => {
-      if (!d || String(d).trim() === "") return "";
-      const dt = new Date(String(d).includes("T") ? d : d + "T00:00:00");
-      if (isNaN(dt.getTime())) return "";
-      return dt.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-    };
+    const fmtDate = (d) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "";
 
     // No separate header needed — buildPrintHTML already provides the official DMW header with logos
     const addr = `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;"><strong>MS. NAOMI M. TENECIO</strong><br>State Auditor IV<br>Audit Team Leader<br>Commission on Audit<br>Regional Office No. XIII<br>Butuan City</div>
@@ -50378,32 +49437,9 @@ Failure to submit the above requirements within the prescribed period shall cons
   /**
    * Print all 3 COA documents in one print job
    */
-  window.coaPrintAllDocs = async function (coaId) {
+  window.coaPrintAllDocs = function (coaId) {
     const allCoa = window._cachedCOA || [];
-    let coa = allCoa.find((c) => c.id === coaId) || {};
-    // Ensure delivery_date is populated for Notice of Inspection (step 2)
-    {
-      let docs = {};
-      try {
-        docs = typeof coa.documents_included === "string"
-          ? JSON.parse(coa.documents_included)
-          : coa.documents_included || {};
-      } catch (e) {}
-      const ni = docs.notice_inspection || {};
-      if (!ni.delivery_date && coa.po_id) {
-        try {
-          const livepo = await apiRequest("/purchase-orders/" + coa.po_id);
-          if (livepo && (livepo.delivery_date || livepo.expected_delivery_date)) {
-            if (!docs.notice_inspection) docs.notice_inspection = {};
-            docs.notice_inspection.delivery_date =
-              livepo.delivery_date || livepo.expected_delivery_date;
-            coa = { ...coa, documents_included: docs };
-          }
-        } catch (e) {
-          console.warn("[COA Print All] Could not fetch PO delivery date:", e);
-        }
-      }
-    }
+    const coa = allCoa.find((c) => c.id === coaId) || {};
     const title = "COA_Documents_" + (coa.submission_number || "");
     const stepTitles = [
       "Transmittal \u2013 Purchase Order",
@@ -55900,22 +54936,22 @@ Failure to submit the above requirements within the prescribed period shall cons
             b.remarks && typeof b.remarks === "string" ? b.remarks : "";
           biddersTableRows +=
             "<tr>" +
-            '<td style="text-align:center;padding:8px;border:1px solid #000;' +
+            '<td style="text-align:center;padding:8px;border:1px solid #000;font-size:9pt;' +
             st +
             '">' +
             (idx + 1) +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:8px;width:100%;box-sizing:border-box;' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:8px;width:100%;box-sizing:border-box;' +
             st +
             '" contenteditable="true">' +
             (b.name || "") +
             "</div></td>" +
-            '<td style="text-align:right;padding:8px;border:1px solid #000;' +
+            '<td style="text-align:right;padding:8px;border:1px solid #000;font-size:9pt;' +
             st +
             '">' +
             fmtAmt +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:8px;width:100%;box-sizing:border-box;' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:8px;width:100%;box-sizing:border-box;' +
             st +
             '" contenteditable="true">' +
             remarksDisplay +
@@ -55926,12 +54962,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         for (let i = 1; i <= 3; i++) {
           biddersTableRows +=
             "<tr>" +
-            '<td style="text-align:center;padding:8px;border:1px solid #000;">' +
+            '<td style="text-align:center;padding:8px;border:1px solid #000;font-size:9pt;">' +
             i +
             "</td>" +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:8px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
-            '<td style="text-align:right;padding:8px;border:1px solid #000;"></td>' +
-            '<td style="padding:0;border:1px solid #000;"><div style="padding:8px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:8px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
+            '<td style="text-align:right;padding:8px;border:1px solid #000;font-size:9pt;"></td>' +
+            '<td style="padding:0;border:1px solid #000;font-size:9pt;"><div style="padding:8px;width:100%;box-sizing:border-box;" contenteditable="true"></div></td>' +
             "</tr>";
         }
       }
@@ -56895,7 +55931,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
 
       // Fetch BAC Secretariat, BAC Chair, Mark Marasigan names + designations
-      // Use saved signatory IDs from the RFQ record; fall back to role-based lookup
       let bacSecName = "GIOVANNI S. PAREDES",
         bacSecDesignation = "";
       let bacChairName = "",
@@ -56908,37 +55943,44 @@ Failure to submit the above requirements within the prescribed period shall cons
           apiRequest("/users"),
           apiRequest("/employees"),
         ]);
-        // BAC Secretariat — use saved bac_sec_id first
-        if (rfq.bac_sec_id) {
-          const savedSec = allEmployees.find((e) => e.id === parseInt(rfq.bac_sec_id));
-          if (savedSec) { bacSecName = savedSec.full_name || bacSecName; bacSecDesignation = savedSec.designation_name || ""; }
-        } else {
-          const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
-          if (bacSecUser) {
-            bacSecName = bacSecUser.full_name || bacSecName;
-            const bacSecEmp = allEmployees.find((e) => e.full_name && bacSecUser.full_name && e.full_name.trim().toLowerCase() === bacSecUser.full_name.trim().toLowerCase());
-            if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
-          }
+        // BAC Secretariat
+        const bacSecUser = allUsers.find((u) => u.role === "bac_secretariat");
+        if (bacSecUser) {
+          bacSecName = bacSecUser.full_name || bacSecName;
+          const bacSecEmp = allEmployees.find(
+            (e) =>
+              e.full_name &&
+              bacSecUser.full_name &&
+              e.full_name.trim().toLowerCase() ===
+                bacSecUser.full_name.trim().toLowerCase(),
+          );
+          if (bacSecEmp) bacSecDesignation = bacSecEmp.designation_name || "";
         }
-        // BAC Chairperson — use saved bac_chair_id first
-        if (rfq.bac_chair_id) {
-          const savedChair = allEmployees.find((e) => e.id === parseInt(rfq.bac_chair_id));
-          if (savedChair) { bacChairName = savedChair.full_name || ""; bacChairDesignation = savedChair.designation_name || ""; }
-        } else {
-          const bacChairUser = allUsers.find((u) => u.role === "bac_chair" || u.secondary_role === "bac_chair");
-          if (bacChairUser) {
-            bacChairName = bacChairUser.full_name || "";
-            const bacChairEmp = allEmployees.find((e) => e.full_name && bacChairUser.full_name && e.full_name.trim().toLowerCase() === bacChairUser.full_name.trim().toLowerCase());
-            if (bacChairEmp) bacChairDesignation = bacChairEmp.designation_name || "";
-          }
+        // BAC Chairperson (primary or secondary role)
+        const bacChairUser = allUsers.find(
+          (u) => u.role === "bac_chair" || u.secondary_role === "bac_chair",
+        );
+        if (bacChairUser) {
+          bacChairName = bacChairUser.full_name || "";
+          const bacChairEmp = allEmployees.find(
+            (e) =>
+              e.full_name &&
+              bacChairUser.full_name &&
+              e.full_name.trim().toLowerCase() ===
+                bacChairUser.full_name.trim().toLowerCase(),
+          );
+          if (bacChairEmp)
+            bacChairDesignation = bacChairEmp.designation_name || "";
         }
-        // Noted By / Mark — use saved noted_by_id first
-        if (rfq.noted_by_id) {
-          const savedNoted = allEmployees.find((e) => e.id === parseInt(rfq.noted_by_id));
-          if (savedNoted) { markName = savedNoted.full_name || markName; markDesignation = savedNoted.designation_name || ""; }
-        } else {
-          const markEmp = allEmployees.find((e) => e.full_name && e.full_name.trim().toLowerCase().includes("marasigan"));
-          if (markEmp) { markName = markEmp.full_name || markName; markDesignation = markEmp.designation_name || ""; }
+        // Mark E. Marasigan
+        const markEmp = allEmployees.find(
+          (e) =>
+            e.full_name &&
+            e.full_name.trim().toLowerCase().includes("marasigan"),
+        );
+        if (markEmp) {
+          markName = markEmp.full_name || markName;
+          markDesignation = markEmp.designation_name || "";
         }
       } catch (e) {
         console.warn("Could not fetch BAC/employee data:", e);
