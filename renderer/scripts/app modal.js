@@ -11838,10 +11838,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (modalOverlay) {
       modalOverlay.classList.add("show");
     }
-    // Apply custom select styling to all dropdowns inside the modal
-    if (typeof window.cselRescan === 'function' && modalBody) {
-      window.cselRescan(modalBody);
-    }
   }
 
   // Alias for report functions that use showModal
@@ -21261,9 +21257,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -21678,9 +21674,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -25517,7 +25513,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       </div>`;
 
     if (modalTitle) modalTitle.textContent = "COA Submission Wizard";
-    if (modalBody) { modalBody.innerHTML = html; if (typeof window.cselRescan === 'function') window.cselRescan(modalBody); }
+    if (modalBody) modalBody.innerHTML = html;
   }
 
   /**
@@ -33217,29 +33213,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -33525,12 +33505,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (quotations.length > 0) {
         quotations.forEach((q, idx) => {
           const fb = bidders[idx] || {};
-          const rawRemarks = fb.remarks && typeof fb.remarks === "string" ? fb.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            fb.remarks && typeof fb.remarks === "string" && fb.remarks.trim()
+              ? fb.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: q.supplier_name || fb.name || fb.supplier_name || "",
@@ -33544,12 +33523,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         bidders.forEach((b, idx) => {
           const nm = b.name || b.supplier_name || b.bidder_name || "";
           const isNumeric = /^\d+$/.test(String(nm).trim());
-          const rawRemarks = b.remarks && typeof b.remarks === "string" ? b.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            b.remarks && typeof b.remarks === "string" && b.remarks.trim()
+              ? b.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: isNumeric ? "" : nm,
@@ -33641,7 +33619,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:3px 2px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -33666,9 +33644,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' +
           procurementDescription +
           "</td>" +
@@ -42657,9 +42633,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -43074,9 +43050,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -46913,7 +46889,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>`;
 
     if (modalTitle) modalTitle.textContent = "COA Submission Wizard";
-    if (modalBody) { modalBody.innerHTML = html; if (typeof window.cselRescan === 'function') window.cselRescan(modalBody); }
+    if (modalBody) modalBody.innerHTML = html;
   }
 
   /**
@@ -54813,29 +54789,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -55117,12 +55077,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (quotations.length > 0) {
         quotations.forEach((q, idx) => {
           const fb = bidders[idx] || {};
-          const rawRemarks = fb.remarks && typeof fb.remarks === "string" ? fb.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            fb.remarks && typeof fb.remarks === "string" && fb.remarks.trim()
+              ? fb.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: q.supplier_name || fb.name || fb.supplier_name || "",
@@ -55136,12 +55095,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         bidders.forEach((b, idx) => {
           const nm = b.name || b.supplier_name || b.bidder_name || "";
           const isNumeric = /^\d+$/.test(String(nm).trim());
-          const rawRemarks = b.remarks && typeof b.remarks === "string" ? b.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            b.remarks && typeof b.remarks === "string" && b.remarks.trim()
+              ? b.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: isNumeric ? "" : nm,
@@ -55233,7 +55191,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -55258,9 +55216,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          "</td>" +
+          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
           procurementDescription +
           "</td>" +
@@ -59817,394 +59773,3 @@ Failure to submit the above requirements within the prescribed period shall cons
   // Initialize the application
   init();
 });
-
-// =============================================================================
-// MODAL-SCOPED CUSTOM SELECT ENGINE
-// Replaces every <select class="form-select"> inside modal dialogs with a
-// styled custom dropdown matching the supplier combobox design.
-// Static page selects (filters, page-level forms) are NOT touched.
-// =============================================================================
-(function () {
-  'use strict';
-
-  const MARKER = 'data-csel-init';
-
-  // ── Inject CSS once ──────────────────────────────────────────────────────────
-  function injectCSS() {
-    if (document.getElementById('_cselStyle')) return;
-    const s = document.createElement('style');
-    s.id = '_cselStyle';
-    s.textContent = `
-      .csel-wrap {
-        position: relative;
-        display: inline-flex;
-        align-items: stretch;
-        width: 100%;
-        box-sizing: border-box;
-        font-size: inherit;
-      }
-      .csel-trigger {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        padding: 6px 10px;
-        background: #fff;
-        border: 1px solid #cbd5e0;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: inherit;
-        font-family: inherit;
-        color: #2d3748;
-        min-height: 34px;
-        box-sizing: border-box;
-        text-align: left;
-        transition: border-color .15s, box-shadow .15s;
-        white-space: nowrap;
-        overflow: hidden;
-        width: 100%;
-      }
-      .csel-trigger:hover { border-color: #a0aec0; }
-      .csel-trigger:focus,
-      .csel-wrap.open .csel-trigger {
-        outline: none;
-        border-color: #1a73e8;
-        box-shadow: 0 0 0 3px rgba(26,115,232,.15);
-      }
-      .csel-trigger[disabled] {
-        background: #f7fafc;
-        color: #a0aec0;
-        cursor: not-allowed;
-        pointer-events: none;
-      }
-      .csel-trigger-label {
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .csel-trigger-label.csel-placeholder { color: #a0aec0; }
-      .csel-chevron {
-        flex-shrink: 0;
-        width: 14px;
-        height: 14px;
-        fill: none;
-        stroke: #718096;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        transition: transform .2s;
-        overflow: visible;
-      }
-      .csel-wrap.open .csel-chevron { transform: rotate(180deg); stroke: #1a73e8; }
-
-      /* Fixed panel escapes modal overflow clipping */
-      .csel-panel {
-        display: none;
-        position: fixed;
-        z-index: 99999;
-        background: #fff;
-        border: 1px solid #cbd5e0;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,.14), 0 2px 6px rgba(0,0,0,.08);
-        overflow: hidden;
-        min-width: 160px;
-      }
-      .csel-wrap.open .csel-panel { display: block; }
-
-      .csel-search-wrap {
-        padding: 8px;
-        border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
-      }
-      .csel-search {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 6px 10px;
-        border: 1px solid #cbd5e0;
-        border-radius: 5px;
-        font-size: 12px;
-        outline: none;
-        transition: border-color .15s;
-        background: #fff;
-      }
-      .csel-search:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.12); }
-
-      .csel-list {
-        max-height: 210px;
-        overflow-y: auto;
-        padding: 4px 0;
-      }
-      .csel-opt {
-        padding: 8px 14px;
-        font-size: 13px;
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #2d3748;
-        transition: background .1s;
-      }
-      .csel-opt:hover              { background: #edf2ff; }
-      .csel-opt.csel-selected      { background: #e8f0fe; color: #1a73e8; font-weight: 600; }
-      .csel-opt.csel-opt-disabled  { color: #a0aec0; cursor: default; background: none !important; }
-      .csel-opt.csel-group-label   {
-        font-size: 10px; font-weight: 700; letter-spacing: .06em;
-        text-transform: uppercase; color: #718096;
-        padding: 10px 14px 4px; cursor: default; background: none !important;
-      }
-      .csel-opt.csel-empty { color: #a0aec0; cursor: default; font-style: italic; }
-      .csel-opt.csel-no-match { color: #a0aec0; cursor: default; font-style: italic; }
-
-      /* Small font selects (inside table cells) */
-      .csel-wrap.csel-sm .csel-trigger { min-height: 26px; padding: 3px 8px; font-size: 11px; border-radius: 4px; }
-      .csel-wrap.csel-sm .csel-opt     { font-size: 11px; padding: 5px 12px; }
-    `;
-    document.head.appendChild(s);
-  }
-
-  function collectOptions(sel) {
-    const items = [];
-    for (const child of sel.children) {
-      if (child.tagName === 'OPTGROUP') {
-        items.push({ type: 'group', label: child.label });
-        for (const opt of child.children)
-          items.push({ type: 'option', value: opt.value, label: opt.textContent.trim(), disabled: opt.disabled });
-      } else if (child.tagName === 'OPTION') {
-        items.push({ type: 'option', value: child.value, label: child.textContent.trim(), disabled: child.disabled });
-      }
-    }
-    return items;
-  }
-
-  function needsSearch(items) {
-    return items.filter(i => i.type === 'option').length >= 7;
-  }
-
-  function renderList(listEl, items, filterText, currentValue, onSelect) {
-    const q = (filterText || '').toLowerCase();
-    listEl.innerHTML = '';
-    let count = 0;
-    for (const item of items) {
-      if (item.type === 'group') {
-        if (q) continue;
-        const d = document.createElement('div');
-        d.className = 'csel-opt csel-group-label';
-        d.textContent = item.label;
-        listEl.appendChild(d); continue;
-      }
-      if (q && !item.label.toLowerCase().includes(q)) continue;
-      const d = document.createElement('div');
-      d.className = 'csel-opt' +
-        (item.disabled ? ' csel-opt-disabled' : '') +
-        (item.value === currentValue ? ' csel-selected' : '');
-      d.textContent = item.label || '\u00a0';
-      d.title = item.label;
-      if (!item.disabled) d.addEventListener('mousedown', e => { e.preventDefault(); onSelect(item.value, item.label); });
-      listEl.appendChild(d);
-      count++;
-    }
-    if (count === 0 && q) {
-      const d = document.createElement('div');
-      d.className = 'csel-opt csel-no-match';
-      d.textContent = 'No matches for "' + filterText + '"';
-      listEl.appendChild(d);
-    }
-    if (items.filter(i => i.type === 'option').length === 0) {
-      const d = document.createElement('div');
-      d.className = 'csel-opt csel-empty';
-      d.textContent = 'No options';
-      listEl.appendChild(d);
-    }
-  }
-
-  function positionPanel(wrap, panel) {
-    const rect   = wrap.getBoundingClientRect();
-    const vh     = window.innerHeight;
-    const vw     = window.innerWidth;
-    const panelH = Math.min(280, vh * 0.45);
-    const panelW = Math.max(rect.width, 180);
-    const below  = vh - rect.bottom;
-    const above  = rect.top;
-    let top, openUp = false;
-    if (below >= panelH || below >= above) { top = rect.bottom + 2; }
-    else { openUp = true; top = rect.top - panelH - 2; }
-    let left = rect.left;
-    if (left + panelW > vw - 8) left = vw - panelW - 8;
-    if (left < 8) left = 8;
-    panel.style.top       = top + 'px';
-    panel.style.left      = left + 'px';
-    panel.style.width     = panelW + 'px';
-    panel.style.maxHeight = panelH + 'px';
-    panel.style.borderRadius = openUp ? '8px 8px 2px 2px' : '2px 2px 8px 8px';
-  }
-
-  let _activeWrap = null;
-
-  function closeAll() {
-    document.querySelectorAll('.csel-wrap.open').forEach(w => w.classList.remove('open'));
-    _activeWrap = null;
-  }
-
-  document.addEventListener('click', e => {
-    if (_activeWrap && !_activeWrap.contains(e.target)) closeAll();
-  });
-
-  window.addEventListener('scroll', () => {
-    if (_activeWrap) {
-      const panel = _activeWrap.querySelector('.csel-panel');
-      if (panel) positionPanel(_activeWrap, panel);
-    }
-  }, true);
-
-  function initSelect(sel) {
-    if (sel.hasAttribute(MARKER))  return;
-    if (sel.multiple)              return;
-    if (sel.closest('.csel-wrap')) return;
-    if (!sel.classList.contains('form-select')) return;
-
-    sel.setAttribute(MARKER, '1');
-
-    // Hide native select, keep it in DOM for value/onchange/form compatibility
-    sel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;';
-
-    const isSmall = sel.style.fontSize && parseFloat(sel.style.fontSize) <= 12;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'csel-wrap' + (isSmall ? ' csel-sm' : '');
-
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'csel-trigger';
-    if (sel.disabled) trigger.disabled = true;
-
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'csel-trigger-label';
-
-    const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    chevron.setAttribute('viewBox', '0 0 16 16');
-    chevron.classList.add('csel-chevron');
-    chevron.innerHTML = '<polyline points="4 6 8 10 12 6"/>';
-
-    trigger.appendChild(labelSpan);
-    trigger.appendChild(chevron);
-
-    const panel = document.createElement('div');
-    panel.className = 'csel-panel';
-    panel.addEventListener('click', e => e.stopPropagation());
-
-    const searchWrap = document.createElement('div');
-    searchWrap.className = 'csel-search-wrap';
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.className = 'csel-search';
-    searchInput.placeholder = 'Search\u2026';
-    searchInput.autocomplete = 'off';
-    searchWrap.appendChild(searchInput);
-
-    const listEl = document.createElement('div');
-    listEl.className = 'csel-list';
-
-    panel.appendChild(searchWrap);
-    panel.appendChild(listEl);
-    wrap.appendChild(trigger);
-    wrap.appendChild(panel);
-
-    sel.parentNode.insertBefore(wrap, sel);
-    wrap.appendChild(sel);
-
-    let filterText = '';
-
-    function sync() {
-      const items = collectOptions(sel);
-      searchWrap.style.display = needsSearch(items) ? '' : 'none';
-      const selected = items.find(i => i.type === 'option' && i.value === sel.value);
-      if (selected && selected.label) {
-        labelSpan.textContent = selected.label;
-        labelSpan.classList.toggle('csel-placeholder', sel.value === '' || !sel.value);
-      } else {
-        const ph = items.find(i => i.type === 'option' && i.value === '');
-        labelSpan.textContent = ph ? ph.label : (sel.options[0]?.text || '\u2014');
-        labelSpan.classList.add('csel-placeholder');
-      }
-      renderList(listEl, items, filterText, sel.value, onSelect);
-    }
-
-    function onSelect(value) {
-      sel.value = value;
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-      filterText = '';
-      searchInput.value = '';
-      sync();
-      closeAll();
-    }
-
-    function open() {
-      closeAll();
-      _activeWrap = wrap;
-      sync();
-      positionPanel(wrap, panel);
-      wrap.classList.add('open');
-      if (needsSearch(collectOptions(sel))) { searchInput.focus(); searchInput.select(); }
-    }
-
-    trigger.addEventListener('click', e => {
-      e.stopPropagation();
-      wrap.classList.contains('open') ? closeAll() : open();
-    });
-    trigger.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      if (e.key === 'Escape') closeAll();
-    });
-    searchInput.addEventListener('input', () => {
-      filterText = searchInput.value;
-      renderList(listEl, collectOptions(sel), filterText, sel.value, onSelect);
-    });
-    searchInput.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeAll(); trigger.focus(); }
-    });
-
-    // Reflect external programmatic value changes back to the trigger label
-    new MutationObserver(sync).observe(sel, { childList: true, attributes: true, attributeFilter: ['value', 'disabled'] });
-    sel.addEventListener('change', sync);
-
-    const origDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-    if (origDesc) {
-      Object.defineProperty(sel, 'value', {
-        get: () => origDesc.get.call(sel),
-        set: v => { origDesc.set.call(sel, v); sync(); },
-        configurable: true,
-      });
-    }
-
-    sync();
-  }
-
-  // ── Public: scan a given root element (called by openModal) ─────────────────
-  window.cselRescan = function (root) {
-    (root || document.getElementById('modalBody') || document)
-      .querySelectorAll('select.form-select:not([' + MARKER + '])')
-      .forEach(initSelect);
-  };
-
-  injectCSS();
-
-  // Watch only #modalBody for dynamic additions (e.g. "Add Bidder" buttons)
-  document.addEventListener('DOMContentLoaded', () => {
-    const modalBody = document.getElementById('modalBody');
-    if (!modalBody) return;
-    new MutationObserver(mutations => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (node.nodeType !== 1) continue;
-          if (node.matches && node.matches('select.form-select')) initSelect(node);
-          node.querySelectorAll && node.querySelectorAll(
-            'select.form-select:not([' + MARKER + '])'
-          ).forEach(initSelect);
-        }
-      }
-    }).observe(modalBody, { childList: true, subtree: true });
-  });
-
-})();

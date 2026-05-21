@@ -4105,7 +4105,8 @@ app.get('/api/bac-resolutions', authenticateToken, async (req, res) => {
 app.get('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT br.*, a.abstract_number, s.name as supplier_name,
+      `SELECT br.*, a.abstract_number, a.rfq_id,
+       s.name as supplier_name,
        ec.full_name as chairperson_name, ev.full_name as vice_chairperson_name,
        em1.full_name as member1_name, em2.full_name as member2_name, em3.full_name as member3_name,
        eh.full_name as hope_name

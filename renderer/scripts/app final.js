@@ -33217,29 +33217,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -33641,7 +33625,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:3px 2px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -33666,9 +33650,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' +
           procurementDescription +
           "</td>" +
@@ -54813,29 +54795,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -55233,7 +55199,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -55258,9 +55224,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          "</td>" +
+          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
           procurementDescription +
           "</td>" +

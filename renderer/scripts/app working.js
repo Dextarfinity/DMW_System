@@ -21261,9 +21261,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -21678,9 +21678,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -33217,29 +33217,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -33525,12 +33509,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (quotations.length > 0) {
         quotations.forEach((q, idx) => {
           const fb = bidders[idx] || {};
-          const rawRemarks = fb.remarks && typeof fb.remarks === "string" ? fb.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            fb.remarks && typeof fb.remarks === "string" && fb.remarks.trim()
+              ? fb.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: q.supplier_name || fb.name || fb.supplier_name || "",
@@ -33544,12 +33527,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         bidders.forEach((b, idx) => {
           const nm = b.name || b.supplier_name || b.bidder_name || "";
           const isNumeric = /^\d+$/.test(String(nm).trim());
-          const rawRemarks = b.remarks && typeof b.remarks === "string" ? b.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            b.remarks && typeof b.remarks === "string" && b.remarks.trim()
+              ? b.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: isNumeric ? "" : nm,
@@ -33641,7 +33623,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:3px 2px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -33666,9 +33648,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          '</td>' +
+          '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' +
           procurementDescription +
           "</td>" +
@@ -42657,9 +42637,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -43074,9 +43054,9 @@ Failure to submit the above requirements within the prescribed period shall cons
     bidderRows.forEach((row) => {
       const inputs = row.querySelectorAll("input");
       if (inputs.length >= 2) {
-        const name = inputs[1]?.value?.trim() || "";
-        const amount = parseFloat(inputs[2]?.value) || 0;
-        const remarks = inputs[3]?.value?.trim() || "";
+        const name = inputs[0]?.value?.trim() || "";
+        const amount = parseFloat(inputs[1]?.value) || 0;
+        const remarks = inputs[2]?.value?.trim() || "";
         if (name)
           bidders.push({
             name,
@@ -54813,29 +54793,13 @@ Failure to submit the above requirements within the prescribed period shall cons
 
       // Fetch RFQ items for detail table
       let rfqItems = [];
-      let prItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
-          }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
-      const resolveUnit = (item, idx) => {
-        const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
-      };
 
       // Helper: format currency
       const fmtCurrency = (v) => {
@@ -55117,12 +55081,11 @@ Failure to submit the above requirements within the prescribed period shall cons
       if (quotations.length > 0) {
         quotations.forEach((q, idx) => {
           const fb = bidders[idx] || {};
-          const rawRemarks = fb.remarks && typeof fb.remarks === "string" ? fb.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            fb.remarks && typeof fb.remarks === "string" && fb.remarks.trim()
+              ? fb.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: q.supplier_name || fb.name || fb.supplier_name || "",
@@ -55136,12 +55099,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         bidders.forEach((b, idx) => {
           const nm = b.name || b.supplier_name || b.bidder_name || "";
           const isNumeric = /^\d+$/.test(String(nm).trim());
-          const rawRemarks = b.remarks && typeof b.remarks === "string" ? b.remarks.trim() : "";
           const remarksVal =
-            rawRemarks && !/^\d+(\.\d+)?$/.test(rawRemarks)
-              ? rawRemarks
+            b.remarks && typeof b.remarks === "string" && b.remarks.trim()
+              ? b.remarks.trim()
               : idx === 0
-                ? "LCRB"
+                ? "Complying/responsive/lowest calculated"
                 : "Complying/responsive";
           mergedBidders.push({
             name: isNumeric ? "" : nm,
@@ -55233,7 +55195,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             qty +
             "</td>" +
             '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-            resolveUnit(item, rfqItems.indexOf(item)) +
+            (item.unit || "") +
             "</td>" +
             '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
@@ -55258,9 +55220,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           fmtCurrency(abcAmount) +
           "</td>" +
           '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
-          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
-          "</td>" +
+          '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">Lot</td>' +
           '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
           procurementDescription +
           "</td>" +
