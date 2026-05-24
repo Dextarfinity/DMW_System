@@ -6713,6 +6713,37 @@ function renderPRTable(pr) {
             minimumFractionDigits: 2,
           })
         : "-";
+      // ── Multi-stage approval chips (mirrors PPMP) ──
+      let prApprovalInfo = "";
+      if (p.status === "pending_approval") {
+        const prIsWRSD = (p.department_code || "").toUpperCase() === "WRSD";
+        const prChiefLabel = prIsWRSD ? "Chief WRSD" : "Chief FAD";
+        const prBudgetDone = p.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget Consultant: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const prHopeDone = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const prChiefDone = p.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by ${prChiefLabel}: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> ${prChiefLabel}</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting ${prChiefLabel}"><i class="fas fa-clock"></i> ${prChiefLabel}</span>`;
+        prApprovalInfo = `<div class="approval-status-row">${prBudgetDone}${prHopeDone}${prChiefDone}</div>`;
+      }
+
+      // ── Approve button visibility — uses the same userHasRole/userHasAnyRole helpers as PPMP ──
+      const prIsWRSD2 = (p.department_code || "").toUpperCase() === "WRSD";
+      const prUserNameUpper = (window.currentUser?.full_name || "").toUpperCase();
+      const prIsMakinano = prUserNameUpper.includes("MAKINANO");
+      const prChiefCanApprove = prIsMakinano ||
+        (prIsWRSD2 ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
+      const prCanApprove = p.status === "pending_approval" &&
+        (prChiefCanApprove || userHasAnyRole(["hope", "budget_consultant", "admin"]));
+      const prAlreadyApproved =
+        (prChiefCanApprove && !!p.approved_by_chief) ||
+        (userHasRole("hope") && !!p.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!p.approved_by_budget);
+      const prShowApproveBtn = prCanApprove && !prAlreadyApproved;
+
       return `<tr>
  <td>${p.pr_number || ""}</td>
  <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ""}</td>
@@ -6723,11 +6754,11 @@ function renderPRTable(pr) {
  <td>${unit}</td>
  <td>${unitCost}</td>
  <td>₱${parseFloat(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${prApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" data-action="view-pr" title="View" onclick="showViewPRModal(${p.id})"><i class="fas fa-eye"></i></button>
- ${p.status === "pending_approval" ? `<button class="btn-icon" data-action="approve-pr" title="Approve" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
+ ${prShowApproveBtn ? `<button class="btn-icon success" data-action="approve-pr" title="Approve PR" onclick="showApprovePRModal(${p.id})"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Edit" onclick="showEditPRModal(${p.id})"><i class="fas fa-edit"></i></button>
  <button class="btn-icon" title="Print" onclick="printPR(${p.id})"><i class="fas fa-print"></i></button>
  <button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PR', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -6794,6 +6825,29 @@ function renderRFQTable(rfq) {
         }
       }
 
+
+      // ── Multi-stage approval chips ──
+      let rfqApprovalInfo = "";
+      if (r.status === "on_going") {
+        const rfqBudgetDone = r.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${r.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const rfqHopeDone = r.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${r.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const rfqChiefDone = r.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${r.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
+        rfqApprovalInfo = `<div class="approval-status-row">${rfqBudgetDone}${rfqHopeDone}${rfqChiefDone}</div>`;
+      }
+      const rfqAlreadyApproved =
+        (userHasRole("hope") && !!r.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!r.approved_by_budget) ||
+        (userHasRole("bac_chair") && !!r.approved_by_chief);
+      const rfqShowBtn = r.status === "on_going" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !rfqAlreadyApproved;
+
       return `<tr>
  <td>${r.rfq_number || ""}</td>
  <td>${r.date_prepared ? new Date(r.date_prepared).toLocaleDateString() : ""}</td>
@@ -6803,11 +6857,12 @@ function renderRFQTable(rfq) {
  <td>${itemSpecHtml || "-"}</td>
  <td>₱${parseFloat(r.abc_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td>${r.submission_deadline ? new Date(r.submission_deadline).toLocaleDateString() : ""}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${rfqApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewRFQModal(${r.id})"><i class="fas fa-eye"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditRFQModal(${r.id})"><i class="fas fa-edit"></i></button>` : ""}
+ ${rfqShowBtn ? `<button class="btn-icon success" title="Approve RFQ" onclick="showApproveDocModal('rfq',${r.id},'${r.rfq_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printRFQ(${r.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('RFQ', ${r.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -6855,6 +6910,29 @@ function renderAbstractTable(abstract) {
             "</ul>";
         }
       }
+
+      // ── Multi-stage approval chips ──
+      let absApprovalInfo = "";
+      if (a.status === "on_going") {
+        const absBudgetDone = a.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${a.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const absHopeDone = a.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${a.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const absChiefDone = a.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${a.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
+        absApprovalInfo = `<div class="approval-status-row">${absBudgetDone}${absHopeDone}${absChiefDone}</div>`;
+      }
+      const absAlreadyApproved =
+        (userHasRole("hope") && !!a.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!a.approved_by_budget) ||
+        (userHasRole("bac_chair") && !!a.approved_by_chief);
+      const absShowBtn = a.status === "on_going" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !absAlreadyApproved;
+
       return `<tr>
  <td>${a.abstract_number || ""}</td>
  <td>${a.date_prepared ? new Date(a.date_prepared).toLocaleDateString() : ""}</td>
@@ -6864,11 +6942,12 @@ function renderAbstractTable(abstract) {
  <td>${a.num_bidders || 0}</td>
  <td>${a.recommended_supplier_name || ""}</td>
  <td>₱${parseFloat(a.recommended_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${absApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewAbstractModal(${a.id})"><i class="fas fa-eye"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditAbstractModal(${a.id})"><i class="fas fa-edit"></i></button>` : ""}
+ ${absShowBtn ? `<button class="btn-icon success" title="Approve Abstract" onclick="showApproveDocModal('abstract',${a.id},'${a.abstract_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printAbstract(${a.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('Abstract', ${a.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -6903,6 +6982,29 @@ function renderPostQualTable(postQual) {
           : p.status === "on_going"
             ? "on_going"
             : "cancelled";
+
+      // ── Multi-stage approval chips ──
+      let pqApprovalInfo = "";
+      if (p.status === "on_going") {
+        const pqBudgetDone = p.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const pqHopeDone = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const pqChiefDone = p.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
+        pqApprovalInfo = `<div class="approval-status-row">${pqBudgetDone}${pqHopeDone}${pqChiefDone}</div>`;
+      }
+      const pqAlreadyApproved =
+        (userHasRole("hope") && !!p.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!p.approved_by_budget) ||
+        (userHasRole("bac_chair") && !!p.approved_by_chief);
+      const pqShowBtn = p.status === "on_going" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !pqAlreadyApproved;
+
       return `<tr>
  <td>${p.postqual_number || ""}</td>
  <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ""}</td>
@@ -6911,11 +7013,12 @@ function renderPostQualTable(postQual) {
  <td>${p.bidders_evaluated_count || 0}</td>
  <td><span class="status-badge ${p.documents_verified ? "completed" : "on_going"}">${p.documents_verified ? "All Passed" : "Pending"}</span></td>
  <td><span class="status-badge ${p.financial_validation ? "completed" : "on_going"}">${p.financial_validation ? "Completed" : "Pending"}</span></td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${pqApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewPostQualModal(${p.id})"><i class="fas fa-eye"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPostQualModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
+ ${pqShowBtn ? `<button class="btn-icon success" title="Approve Post-Qualification" onclick="showApproveDocModal('post_qualification',${p.id},'${p.postqual_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printTWGReport(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PostQual', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -6950,6 +7053,29 @@ function renderBACResolutionTable(bacRes) {
           : b.status === "on_going"
             ? "on_going"
             : "cancelled";
+
+      // ── Multi-stage approval chips ──
+      let bacApprovalInfo = "";
+      if (b.status === "on_going") {
+        const bacBudgetDone = b.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${b.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const bacHopeDone = b.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${b.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const bacChiefDone = b.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${b.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
+        bacApprovalInfo = `<div class="approval-status-row">${bacBudgetDone}${bacHopeDone}${bacChiefDone}</div>`;
+      }
+      const bacAlreadyApproved =
+        (userHasRole("hope") && !!b.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!b.approved_by_budget) ||
+        (userHasRole("bac_chair") && !!b.approved_by_chief);
+      const bacShowBtn = b.status === "on_going" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !bacAlreadyApproved;
+
       return `<tr>
  <td>${b.resolution_number || ""}</td>
  <td>${b.abstract_number || "-"}</td>
@@ -6959,11 +7085,12 @@ function renderBACResolutionTable(bacRes) {
  <td>${b.supplier_name || b.recommended_awardee_name || ""}</td>
  <td>₱${parseFloat(b.bid_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td>₱${parseFloat(b.abc_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${bacApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewBACResolutionModal(${b.id})"><i class="fas fa-eye"></i></button>
  <button class="btn-icon" title="Print" onclick="printBACResolution(${b.id})"><i class="fas fa-print"></i></button>
+ ${bacShowBtn ? `<button class="btn-icon success" title="Approve BAC Resolution" onclick="showApproveDocModal('bac_resolution',${b.id},'${b.resolution_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditBACResolutionModal(${b.id})"><i class="fas fa-edit"></i></button>` : ""}
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('BACResolution', ${b.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -31449,6 +31576,110 @@ Failure to submit the above requirements within the prescribed period shall cons
     }, 300);
   };
 
+  // ══════════════════════════════════════════════════════════════════
+  // SHARED MULTI-STAGE APPROVAL MODAL — RFQ / Abstract / BAC Resolution
+  // docType: 'rfq' | 'abstract' | 'bac_resolution'
+  // When all 3 stages approved → status becomes 'completed'
+  // ══════════════════════════════════════════════════════════════════
+  window.showApproveDocModal = async function (docType, docId, docLabel) {
+    const endpointMap = {
+      rfq:              "/rfqs/" + docId,
+      abstract:         "/abstracts/" + docId,
+      bac_resolution:   "/bac-resolutions/" + docId,
+      post_qualification: "/post-qualifications/" + docId,
+    };
+    const titleMap = {
+      rfq:              "Approve RFQ",
+      abstract:         "Approve Abstract",
+      bac_resolution:   "Approve BAC Resolution",
+      post_qualification: "Approve Post-Qualification",
+    };
+    let doc = null;
+    try { doc = await apiRequest(endpointMap[docType]); } catch (e) {}
+    if (!doc) { showNotification("Record not found.", "error"); return; }
+
+    const chiefApproved  = !!doc.approved_by_chief;
+    const hopeApproved   = !!doc.approved_by_hope;
+    const budgetApproved = !!doc.approved_by_budget;
+
+    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
+    const isMakinano = userNameUpper.includes("MAKINANO");
+    const bacChairCanApprove = isMakinano || userHasAnyRole(["bac_chair", "admin", "system_admin"]);
+
+    let canUserApprove = false, approveLabel = "";
+    if (userHasRole("budget_consultant") && !budgetApproved) { canUserApprove = true; approveLabel = "Approve as Budget Consultant"; }
+    if (userHasRole("hope") && !hopeApproved)               { canUserApprove = true; approveLabel = "Approve as HOPE"; }
+    if (bacChairCanApprove && !chiefApproved)                { canUserApprove = true; approveLabel = "Approve as BAC Chair"; }
+    if (userHasAnyRole(["admin", "system_admin"]))           { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
+
+    const budgetStatus = budgetApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Budget Consultant${doc.budget_approver_name ? " (" + doc.budget_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
+    const hopeStatus = hopeApproved
+      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> HOPE${doc.hope_approver_name ? " (" + doc.hope_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
+    const chiefStatus = chiefApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> BAC Chair${doc.chief_approver_name ? " (" + doc.chief_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting BAC Chair</span>`;
+
+    const allApproved = budgetApproved && hopeApproved && chiefApproved;
+    const html = `
+      <div class="view-details">
+        <div class="detail-row"><label>Document No.:</label><span><strong>${docLabel}</strong></span></div>
+        ${doc.purpose ? `<div class="detail-row"><label>Purpose:</label><span>${doc.purpose}</span></div>` : ""}
+        ${doc.abc_amount ? `<div class="detail-row"><label>ABC:</label><span style="font-weight:bold;color:#1a365d;">₱${parseFloat(doc.abc_amount||0).toLocaleString("en-PH",{minimumFractionDigits:2})}</span></div>` : ""}
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge on_going">${doc.status}</span></span></div>
+      </div>
+      <div style="margin-top:18px;padding:15px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+        <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">${budgetStatus}${hopeStatus}${chiefStatus}</div>
+        ${allApproved
+          ? `<p style="margin-top:12px;color:#2e7d32;font-weight:bold;"><i class="fas fa-check-double"></i> All stages approved — document will be marked <strong>COMPLETED</strong></p>`
+          : `<p style="margin-top:10px;color:#636e78;font-size:12px;">All 3 stages must be approved to mark this document as completed.</p>`}
+      </div>
+      <div style="text-align:right;margin-top:18px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        ${canUserApprove
+          ? `<button type="button" class="btn btn-primary" onclick="approveDoc('${docType}',${docId})"><i class="fas fa-check"></i> ${approveLabel}</button>`
+          : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this document with your current role.</p>`}
+      </div>
+    `;
+    openModal(titleMap[docType] || "Approve Document", html);
+  };
+
+  // Execute doc approval — server sets the matching stage column;
+  // when all 3 stages done, server sets status = 'completed'
+  window.approveDoc = async function (docType, docId) {
+    const isAdmin = userHasAnyRole(["admin", "system_admin"]);
+    const confirmMsg = isAdmin
+      ? "Approve all stages (Budget, HOPE, BAC Chair) and mark this document as COMPLETED?"
+      : "Confirm approval of this document for your stage?";
+    if (!confirm(confirmMsg)) return;
+    const endpointMap = {
+      rfq:               "/rfqs/" + docId + "/approve",
+      abstract:          "/abstracts/" + docId + "/approve",
+      bac_resolution:    "/bac-resolutions/" + docId + "/approve",
+      post_qualification: "/post-qualifications/" + docId + "/approve",
+    };
+    const reloadFnMap = {
+      rfq:               () => { if (typeof loadRFQ === "function") loadRFQ(); },
+      abstract:          () => { if (typeof loadAbstract === "function") loadAbstract(); },
+      bac_resolution:    () => { if (typeof loadBACResolution === "function") loadBACResolution();
+                                   else if (typeof loadBAC === "function") loadBAC(); },
+      post_qualification: () => { if (typeof loadPostQual === "function") loadPostQual();
+                                    else if (typeof loadPostQualification === "function") loadPostQualification(); },
+    };
+    try {
+      const body = isAdmin ? { approve_all: true } : {};
+      const result = await apiRequest(endpointMap[docType], "PUT", body);
+      showNotification(result.message || "Approved successfully.", "success");
+      closeModal();
+      if (reloadFnMap[docType]) reloadFnMap[docType]();
+    } catch (err) {
+      showNotification("Approval failed: " + err.message, "error");
+    }
+  };
+
   // Approve PR Modal
   window.showApprovePRModal = async function (prIdOrNo) {
     // Fetch actual PR data dynamically
@@ -31463,35 +31694,87 @@ Failure to submit the above requirements within the prescribed period shall cons
     } else {
       pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
     }
-    if (!pr) {
-      alert("PR not found");
-      return;
-    }
+    if (!pr) { alert("PR not found"); return; }
+
+    const isWRSD = (pr.department_code || "").toUpperCase() === "WRSD";
+    const chiefLabel = isWRSD ? "Chief WRSD" : "Chief FAD";
+
+    // What has already been approved?
+    const chiefApproved  = !!pr.approved_by_chief;
+    const hopeApproved   = !!pr.approved_by_hope;
+    const budgetApproved = !!pr.approved_by_budget;
+
+    // What can this user approve? — uses app-wide userHasRole/userHasAnyRole helpers
+    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
+    const isMakinano = userNameUpper.includes("MAKINANO");
+    const chiefCanApprove = isMakinano ||
+      (isWRSD ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
+
+    let canUserApprove = false;
+    let approveLabel = "";
+    if (chiefCanApprove && !chiefApproved)                         { canUserApprove = true; approveLabel = "Approve as " + chiefLabel; }
+    if (userHasRole("hope") && !hopeApproved)                      { canUserApprove = true; approveLabel = "Approve as HOPE"; }
+    if (userHasRole("budget_consultant") && !budgetApproved)       { canUserApprove = true; approveLabel = "Approve as Budget Consultant"; }
+    if (userHasAnyRole(["admin", "system_admin"]))                 { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
+
+    // Build status badges
+    const chiefStatus  = chiefApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by ${chiefLabel}${pr.chief_approver_name ? " (" + pr.chief_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting ${chiefLabel}</span>`;
+    const hopeStatus   = hopeApproved
+      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${pr.hope_approver_name ? " (" + pr.hope_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
+    const budgetStatus = budgetApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Budget Consultant${pr.budget_approver_name ? " (" + pr.budget_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
+
+    const allApproved = chiefApproved && hopeApproved && budgetApproved;
+
     const html = `
-      <form id="approvePRForm">
-        <div class="info-banner" style="margin-bottom: 15px;">
-          <i class="fas fa-check-circle"></i>
-          Approve this Purchase Request as HoPE (Head of Procuring Entity).
+      <div class="view-details">
+        <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
+        <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
+        <div class="detail-row"><label>Amount:</label><span style="font-weight:bold;color:#1a365d;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+        <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
+        <div class="detail-row"><label>Status:</label><span><span class="status-badge pending">${pr.status}</span></span></div>
+      </div>
+      <div style="margin-top:20px;padding:15px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+        <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
+        <div style="display:flex;gap:15px;flex-wrap:wrap;">
+          ${budgetStatus}
+          ${hopeStatus}
+          ${chiefStatus}
         </div>
-        <div class="view-details">
-          <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
-          <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
-          <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
-          <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
-        </div>
-        <div class="form-group" style="margin-top: 15px;">
-          <label>Approval Remarks (Optional)</label>
-          <textarea rows="2" placeholder="Any notes for record"></textarea>
-        </div>
-        <div class="form-group" style="text-align: right; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
-        </div>
-      </form>
+        ${allApproved ? '<p style="margin-top:12px;color:#2196f3;font-weight:bold;"><i class="fas fa-check-double"></i> Fully approved — PR is approved</p>' : ""}
+      </div>
+      <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        ${canUserApprove
+          ? `<button type="button" class="btn btn-primary" onclick="approvePR(${pr.id})"><i class="fas fa-check"></i> ${approveLabel}</button>`
+          : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PR with your current role.</p>`}
+      </div>
     `;
-    openModal("Approve Purchase Request", html, {
-      preventOutsideClose: true,
-    });
+    openModal("Approve Purchase Request", html);
+  };
+
+  // Execute PR multi-stage approval (mirrors approvePPMP)
+  // Sends approve_all:true for admin so the server sets all three stages at once
+  window.approvePR = async function (prId) {
+    const isAdmin = userHasAnyRole(["admin", "system_admin"]);
+    const confirmMsg = isAdmin
+      ? "Approve this Purchase Request on behalf of all stages (Budget, HOPE, and Chief)?"
+      : "Are you sure you want to approve this Purchase Request?";
+    if (!confirm(confirmMsg)) return;
+    try {
+      const body = isAdmin ? { approve_all: true } : {};
+      const result = await apiRequest("/purchase-requests/" + prId + "/approve", "PUT", body);
+      alert(result.message || "PR approved successfully.");
+      closeModal();
+      if (typeof loadPR === "function") loadPR();
+      else if (typeof loadPageData === "function") loadPageData("pr");
+    } catch (err) {
+      alert("Approval failed: " + err.message);
+    }
   };
 
   // Return PR Modal
@@ -53250,49 +53533,64 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Create PR from APP Modal — Redirects to PR page with pre-populated data
-  // Approve PR Modal
+  // Approve PR Modal (multi-stage: Budget → HOPE → Chief FAD/WRSD)
   window.showApprovePRModal = async function (prIdOrNo) {
-    // Fetch actual PR data dynamically
     let pr = null;
     if (typeof prIdOrNo === "number") {
       pr = (cachedPR || []).find((p) => p.id === prIdOrNo);
-      if (!pr) {
-        try {
-          pr = await apiRequest("/purchase-requests/" + prIdOrNo);
-        } catch (e) {}
-      }
+      if (!pr) { try { pr = await apiRequest("/purchase-requests/" + prIdOrNo); } catch (e) {} }
     } else {
       pr = (cachedPR || []).find((p) => p.pr_number === prIdOrNo);
     }
-    if (!pr) {
-      alert("PR not found");
-      return;
-    }
+    if (!pr) { alert("PR not found"); return; }
+
+    const isWRSD = (pr.department_code || "").toUpperCase() === "WRSD";
+    const chiefLabel = isWRSD ? "Chief WRSD" : "Chief FAD";
+    const chiefApproved  = !!pr.approved_by_chief;
+    const hopeApproved   = !!pr.approved_by_hope;
+    const budgetApproved = !!pr.approved_by_budget;
+    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
+    const isMakinano = userNameUpper.includes("MAKINANO");
+    const chiefCanApprove = isMakinano ||
+      (isWRSD ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
+    let canUserApprove = false, approveLabel = "";
+    if (chiefCanApprove && !chiefApproved)                           { canUserApprove = true; approveLabel = "Approve as " + chiefLabel; }
+    if (userHasRole("hope") && !hopeApproved)                       { canUserApprove = true; approveLabel = "Approve as HOPE"; }
+    if (userHasRole("budget_consultant") && !budgetApproved)        { canUserApprove = true; approveLabel = "Approve as Budget Consultant"; }
+    if (userHasAnyRole(["admin", "system_admin"]))                  { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
+
+    const chiefStatus  = chiefApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by ${chiefLabel}${pr.chief_approver_name ? " (" + pr.chief_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting ${chiefLabel}</span>`;
+    const hopeStatus   = hopeApproved
+      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${pr.hope_approver_name ? " (" + pr.hope_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
+    const budgetStatus = budgetApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Budget Consultant${pr.budget_approver_name ? " (" + pr.budget_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
+
+    const allApproved = chiefApproved && hopeApproved && budgetApproved;
     const html = `
- <form id="approvePRForm">
- <div class="info-banner" style="margin-bottom: 15px;">
- <i class="fas fa-check-circle"></i>
- Approve this Purchase Request as HoPE (Head of Procuring Entity).
- </div>
  <div class="view-details">
  <div class="detail-row"><label>PR No.:</label><span>${pr.pr_number || ""}</span></div>
  <div class="detail-row"><label>Project:</label><span>${pr.purpose || pr.first_item_name || "N/A"}</span></div>
- <div class="detail-row"><label>Amount:</label><span>₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+ <div class="detail-row"><label>Amount:</label><span style="font-weight:bold;color:#1a365d;">₱${parseFloat(pr.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
  <div class="detail-row"><label>Requested By:</label><span>${pr.requested_by_name || ""} (${pr.department_name || pr.department_code || ""})</span></div>
+ <div class="detail-row"><label>Status:</label><span><span class="status-badge pending">${pr.status}</span></span></div>
  </div>
- <div class="form-group" style="margin-top: 15px;">
- <label>Approval Remarks (Optional)</label>
- <textarea rows="2" placeholder="Any notes for record"></textarea>
+ <div style="margin-top:20px;padding:15px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
+ <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
+ <div style="display:flex;gap:15px;flex-wrap:wrap;">${budgetStatus}${hopeStatus}${chiefStatus}</div>
+ ${allApproved ? '<p style="margin-top:12px;color:#2196f3;font-weight:bold;"><i class="fas fa-check-double"></i> Fully approved — PR is approved</p>' : ""}
  </div>
- <div class="form-group" style="text-align: right; margin-top: 20px;">
- <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
- <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Approve PR</button>
+ <div class="form-group" style="text-align:right;margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+ <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+ ${canUserApprove
+   ? `<button type="button" class="btn btn-primary" onclick="approvePR(${pr.id})"><i class="fas fa-check"></i> ${approveLabel}</button>`
+   : `<p style="color:#636e78;font-size:13px;margin:auto 0;">You cannot approve this PR with your current role.</p>`}
  </div>
- </form>
  `;
-    openModal("Approve Purchase Request", html, {
-      preventOutsideClose: true,
-    });
+    openModal("Approve Purchase Request", html);
   };
 
   // Return PR Modal

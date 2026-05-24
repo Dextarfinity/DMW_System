@@ -3610,29 +3610,117 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
+// ==============================================================================
+// SHARED MULTI-STAGE APPROVAL HELPER (Budget → HOPE → BAC Chair)
+// All 3 stages done → status = 'completed'
+// ==============================================================================
+function makeDocApproveHandler(tableName) {
+  return async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid ID' });
+
+      const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+      const userId   = req.user.id;
+      const userName = req.user.full_name || req.user.username || 'Unknown';
+      const now      = new Date();
+      const isAdmin    = userRoles.some(r => ['admin','system_admin'].includes(r));
+      const approveAll = isAdmin && req.body && req.body.approve_all === true;
+
+      const { rows } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
+      if (!rows.length) return res.status(404).json({ error: 'Record not found' });
+      const doc = rows[0];
+
+      let fields = [], values = [], p = 1;
+      const push = (col, val) => { fields.push(`${col} = $${p++}`); values.push(val); };
+
+      if (approveAll) {
+        push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
+        push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
+        push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+        push('status', 'completed');
+      } else if (userRoles.includes('budget_consultant') && !doc.approved_by_budget) {
+        push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
+      } else if (userRoles.includes('hope') && !doc.approved_by_hope) {
+        push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
+      } else if (userRoles.some(r => ['bac_chair','bac_sec','chief_fad','chief_wrsd'].includes(r)) && !doc.approved_by_chief) {
+        push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+      } else {
+        return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
+      }
+
+      fields.push('updated_at = NOW()');
+      values.push(id);
+      await pool.query(`UPDATE ${tableName} SET ${fields.join(', ')} WHERE id = $${p}`, values);
+
+      const { rows: updated } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
+      const u = updated[0];
+      if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== 'completed') {
+        await pool.query(`UPDATE ${tableName} SET status = 'completed', updated_at = NOW() WHERE id = $1`, [id]);
+        u.status = 'completed';
+      }
+      res.json({
+        message: u.status === 'completed' ? 'All stages approved — document marked as completed.' : 'Stage approved successfully.',
+        status: u.status, completed: u.status === 'completed',
+      });
+    } catch (err) {
+      console.error(`[APPROVE ${tableName}]`, err.message);
+      res.status(500).json({ error: err.message });
+    }
+  };
+}
+
 app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `UPDATE purchaserequests SET status='approved', approved_by=$1, approved_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
-       WHERE id=$2 RETURNING *`,
-      [req.user.id, req.params.id]
-    );
-    const pr = result.rows[0];
-    
-    // Notify the requester that their PR was approved
-    if (pr && pr.requested_by) {
-      createNotification(pr.requested_by, {
-        type: 'approval',
-        icon: 'fas fa-check-circle',
-        title: `${pr.pr_number} Approved`,
-        message: 'Your purchase request has been approved',
-        reference_type: 'purchase_request',
-        reference_id: pr.id,
-        reference_code: pr.pr_number
-      });
+    const id = parseInt(req.params.id);
+    const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
+    const userId = req.user.id;
+    const userName = req.user.full_name || req.user.username || 'Unknown';
+    const now = new Date();
+    const isAdmin    = userRoles.some(r => ['admin','system_admin'].includes(r));
+    const approveAll = isAdmin && req.body && req.body.approve_all === true;
+
+    const { rows } = await pool.query('SELECT * FROM purchaserequests WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'PR not found' });
+    const pr = rows[0];
+
+    let fields = [], values = [], p = 1;
+    const push = (col, val) => { fields.push(`${col} = $${p++}`); values.push(val); };
+
+    if (approveAll) {
+      push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
+      push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
+      push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+      push('status', 'approved');
+    } else if (userRoles.includes('budget_consultant') && !pr.approved_by_budget) {
+      push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
+    } else if (userRoles.includes('hope') && !pr.approved_by_hope) {
+      push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
+    } else if (userRoles.some(r => ['chief_fad','chief_wrsd','bac_chair'].includes(r)) && !pr.approved_by_chief) {
+      push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+    } else {
+      return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
     }
-    
-    res.json(pr);
+
+    fields.push('updated_at = NOW()');
+    values.push(id);
+    await pool.query(`UPDATE purchaserequests SET ${fields.join(', ')} WHERE id = $${p}`, values);
+
+    const { rows: updated } = await pool.query('SELECT * FROM purchaserequests WHERE id = $1', [id]);
+    const u = updated[0];
+    if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== 'approved') {
+      await pool.query(`UPDATE purchaserequests SET status = 'approved', approved_at = NOW(), updated_at = NOW() WHERE id = $1`, [id]);
+      u.status = 'approved';
+      if (u.requested_by) {
+        createNotification(u.requested_by, {
+          type: 'approval', icon: 'fas fa-check-circle',
+          title: `${u.pr_number} Approved`,
+          message: 'Your purchase request has been approved',
+          reference_type: 'purchase_request', reference_id: u.id, reference_code: u.pr_number
+        });
+      }
+    }
+    res.json({ message: u.status === 'approved' ? 'PR fully approved!' : 'Stage approved successfully.', status: u.status });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3839,6 +3927,8 @@ app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
+app.put('/api/rfqs/:id/approve', authenticateToken, makeDocApproveHandler('rfqs'));
+
 app.delete('/api/rfqs/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM rfqs WHERE id = $1', [req.params.id]);
@@ -3976,6 +4066,8 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
+app.put('/api/abstracts/:id/approve', authenticateToken, makeDocApproveHandler('abstracts'));
+
 app.delete('/api/abstracts/:id', authenticateToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM abstracts WHERE id = $1', [req.params.id]);
@@ -4088,6 +4180,8 @@ app.put('/api/post-qualifications/:id/set-status', authenticateToken, async (req
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/post-qualifications/:id/approve', authenticateToken, makeDocApproveHandler('post_qualifications'));
+
 app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM post_qualifications WHERE id=$1 RETURNING *', [req.params.id]);
@@ -4197,15 +4291,7 @@ app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/bac-resolutions/:id/approve', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE bac_resolutions SET status='completed', approved_by=$1, approved_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
-      [req.user.id, req.params.id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+app.put('/api/bac-resolutions/:id/approve', authenticateToken, makeDocApproveHandler('bac_resolutions'));
 
 app.delete('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
@@ -7069,6 +7155,66 @@ async function runMigrations() {
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder1_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder2_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder3_name TEXT`,
     // IAR new fields for requisitioning office, property custodian, inspector name
