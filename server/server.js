@@ -3442,7 +3442,26 @@ app.get('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
       [req.params.id]
     );
     if (pr.rows.length === 0) return res.status(404).json({ error: 'PR not found' });
-    const items = await pool.query('SELECT * FROM pr_items WHERE pr_id = $1 ORDER BY id', [req.params.id]);
+    const items = await pool.query(
+      `SELECT pi.*,
+              COALESCE(NULLIF(pi.unit,''), NULLIF(i.unit,'')) AS resolved_unit,
+              i.unit       AS catalog_unit,
+              i.code       AS catalog_code,
+              i.id         AS catalog_item_id,
+              i.name       AS catalog_item_name,
+              i.unit_price AS catalog_unit_price
+       FROM pr_items pi
+       LEFT JOIN items i
+         ON (pi.item_id IS NOT NULL AND i.id = pi.item_id)
+         OR (pi.item_id IS NULL AND pi.item_code IS NOT NULL AND pi.item_code <> ''
+             AND pi.item_code NOT LIKE 'PR-ITEM-%' AND i.code = pi.item_code)
+         OR (pi.item_id IS NULL
+             AND (pi.item_code IS NULL OR pi.item_code = '' OR pi.item_code LIKE 'PR-ITEM-%')
+             AND pi.item_name IS NOT NULL AND i.name ILIKE pi.item_name)
+       WHERE pi.pr_id = $1
+       ORDER BY pi.id`,
+      [req.params.id]
+    );
     res.json({ ...pr.rows[0], items: items.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3508,9 +3527,9 @@ app.post('/api/purchase-requests', authenticateToken, async (req, res) => {
     if (items && items.length > 0) {
       for (const item of items) {
         await client.query(
-          `INSERT INTO pr_items (pr_id, item_code, item_name, item_description, unit, category, quantity, unit_price, remarks)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-          [pr.id, item.item_code, item.item_name, item.item_description, item.unit, item.category, item.quantity||1, item.unit_price||0, item.remarks]
+          `INSERT INTO pr_items (pr_id, item_id, item_code, item_name, item_description, unit, category, quantity, unit_price, remarks)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [pr.id, item.item_id||null, item.item_code, item.item_name, item.item_description, item.unit, item.category, item.quantity||1, item.unit_price||0, item.remarks]
         );
       }
     }
@@ -3565,9 +3584,9 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM pr_items WHERE pr_id = $1', [req.params.id]);
       for (const item of items) {
         await client.query(
-          `INSERT INTO pr_items (pr_id, item_code, item_name, item_description, unit, category, quantity, unit_price, remarks)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-          [req.params.id, item.item_code, item.item_name, item.item_description, item.unit, item.category, item.quantity||1, item.unit_price||0, item.remarks]
+          `INSERT INTO pr_items (pr_id, item_id, item_code, item_name, item_description, unit, category, quantity, unit_price, remarks)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [req.params.id, item.item_id||null, item.item_code, item.item_name, item.item_description, item.unit, item.category, item.quantity||1, item.unit_price||0, item.remarks]
         );
       }
     }
@@ -3683,7 +3702,28 @@ app.get('/api/rfqs/:id', authenticateToken, async (req, res) => {
       `SELECT r.*, pr.pr_number FROM rfqs r LEFT JOIN purchaserequests pr ON r.pr_id = pr.id WHERE r.id = $1`, [req.params.id]
     );
     if (rfq.rows.length === 0) return res.status(404).json({ error: 'RFQ not found' });
-    const items = await pool.query('SELECT * FROM rfq_items WHERE rfq_id = $1 ORDER BY id', [req.params.id]);
+    const items = await pool.query(
+      `SELECT ri.*,
+              COALESCE(NULLIF(ri.unit,''), NULLIF(i.unit,'')) AS resolved_unit,
+              i.unit       AS catalog_unit,
+              i.code       AS catalog_code,
+              i.id         AS catalog_item_id,
+              i.name       AS catalog_item_name,
+              i.unit_price AS catalog_unit_price
+       FROM rfq_items ri
+       LEFT JOIN items i
+         ON (ri.item_id IS NOT NULL AND i.id = ri.item_id)
+         OR (ri.item_id IS NULL AND ri.item_code IS NOT NULL AND ri.item_code <> ''
+             AND ri.item_code NOT LIKE 'PR-ITEM-%' AND ri.item_code NOT LIKE 'RFQ-ITEM-%'
+             AND i.code = ri.item_code)
+         OR (ri.item_id IS NULL
+             AND (ri.item_code IS NULL OR ri.item_code = ''
+                  OR ri.item_code LIKE 'PR-ITEM-%' OR ri.item_code LIKE 'RFQ-ITEM-%')
+             AND ri.item_name IS NOT NULL AND ri.item_name <> '' AND i.name ILIKE ri.item_name)
+       WHERE ri.rfq_id = $1
+       ORDER BY ri.id`,
+      [req.params.id]
+    );
     const suppliers = await pool.query(
       `SELECT rs.*, s.name as supplier_name FROM rfq_suppliers rs LEFT JOIN suppliers s ON rs.supplier_id = s.id WHERE rs.rfq_id = $1`,
       [req.params.id]
@@ -3745,9 +3785,9 @@ app.post('/api/rfqs', authenticateToken, async (req, res) => {
 
     if (items) for (const it of items) {
       await client.query(
-        `INSERT INTO rfq_items (rfq_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [rfq.id, it.item_code, it.item_name, it.item_description, it.unit, it.category, it.quantity||1, it.abc_unit_cost||0]
+        `INSERT INTO rfq_items (rfq_id, item_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [rfq.id, it.item_id||null, it.item_code, it.item_name, it.item_description, it.unit, it.category, it.quantity||1, it.abc_unit_cost||0]
       );
     }
     if (suppliers) for (const s of suppliers) {
@@ -3787,9 +3827,9 @@ app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM rfq_items WHERE rfq_id = $1', [req.params.id]);
       for (const it of items) {
         await client.query(
-          `INSERT INTO rfq_items (rfq_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [req.params.id, it.item_code||'', it.item_name||'', it.item_description||null, it.unit||'', it.category||null, it.quantity||1, it.abc_unit_cost||0]
+          `INSERT INTO rfq_items (rfq_id, item_id, item_code, item_name, item_description, unit, category, quantity, abc_unit_cost)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [req.params.id, it.item_id||null, it.item_code||'', it.item_name||'', it.item_description||null, it.unit||'', it.category||null, it.quantity||1, it.abc_unit_cost||0]
         );
       }
     }
@@ -7063,6 +7103,12 @@ async function runMigrations() {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_prrl_pr  ON pr_rfq_links(pr_id)`,
     `CREATE INDEX IF NOT EXISTS idx_prrl_rfq ON pr_rfq_links(rfq_id)`,
+    // Add item_id FK to pr_items so we can reliably JOIN items catalog for unit
+    `ALTER TABLE pr_items ADD COLUMN IF NOT EXISTS item_id INTEGER REFERENCES items(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_pr_items_item ON pr_items(item_id)`,
+    // Add item_id FK to rfq_items too for the same reason
+    `ALTER TABLE rfq_items ADD COLUMN IF NOT EXISTS item_id INTEGER REFERENCES items(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_rfq_items_item ON rfq_items(item_id)`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); console.log('[MIGRATION] OK:', sql.substring(0, 80)); } catch (e) { console.error('[MIGRATION] FAILED:', sql.substring(0, 80), '|', e.message); }

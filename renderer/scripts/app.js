@@ -1317,6 +1317,25 @@ async function apiRequest(endpoint, method = "GET", data = null) {
 }
 
 // Data loading functions
+// ── Multi-PR helper ─────────────────────────────────────────────────────────
+async function fetchAllLinkedPRItems(rfq) {
+  let prItems = [];
+  const linkedPRIds = (rfq?.linked_prs || []).map(p => p.pr_id).filter(Boolean);
+  if (rfq?.pr_id && !linkedPRIds.includes(rfq.pr_id)) linkedPRIds.push(rfq.pr_id);
+  if (linkedPRIds.length === 0) return prItems;
+  const prs = await Promise.all(
+    linkedPRIds.map(pid => apiRequest("/purchase-requests/" + pid).catch(() => null))
+  );
+  prs.forEach(pr => { if (pr && pr.items) prItems = prItems.concat(pr.items); });
+  return prItems;
+}
+async function fetchFirstLinkedPR(rfq) {
+  const firstPrId = (rfq?.linked_prs?.[0]?.pr_id) || rfq?.pr_id;
+  if (!firstPrId) return null;
+  try { return await apiRequest("/purchase-requests/" + firstPrId); } catch(e) { return null; }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 async function loadDashboardStats() {
   try {
     // FRESH FETCH FROM DATABASE - Cache busting parameter ensures no caching
@@ -12960,6 +12979,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+    // Cache APP items for the picker modal
+    window._prAppItemsCache = appItems;
+    window._prSelectedAppItemIds = [];
+
     // Load items catalog for picker
     const allItems = await ensureItemsCatalogLoaded();
     const prCatOpts = buildCatalogCategoryOptions(allItems);
@@ -12989,12 +13012,20 @@ document.addEventListener("DOMContentLoaded", () => {
  <label style="font-weight:700;color:#1a365d;display:block;margin-bottom:6px;">
  <i class="fas fa-clipboard-check" style="margin-right:4px;"></i> APP / PPMP Reference <span style="color:#e53e3e;">*</span>
  </label>
- <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select the APP item this Purchase Request is based on. Items must exist in the approved APP before a PR can proceed.</p>
- <select id="prAppItemSelect" class="form-select" style="width:100%;padding:8px;font-size:13px;border:1px solid #cbd5e0;border-radius:4px;" onchange="validatePRAppItem(this); generatePRNumber(this); onPRAppItemChange(this.value);">
- <option value="">-- Select APP Item --</option>
- ${appOptions}
- <option value="not-in-app" style="color:#e53e3e;font-weight:600;"> Item NOT in APP (Requires New PPMP)</option>
- </select>
+ <p style="font-size:11px;color:#4a5568;margin-bottom:8px;">Select one or more APP items this Purchase Request is based on. Items must exist in the approved APP before a PR can proceed.</p>
+ <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+   <button type="button" class="btn btn-sm btn-primary" onclick="showPRAppItemPickerModal()" ${appItems.length === 0 ? 'disabled title="No APP items found for your division."' : ''}>
+     <i class="fas fa-clipboard-list"></i> Browse &amp; Select APP Items
+   </button>
+   <span id="prAppItemPickerCount" style="font-size:12px;color:#718096;">None selected</span>
+ </div>
+ <div id="prAppItemSelectedChips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;padding:4px 0;"></div>
+ <div style="margin-top:6px;display:flex;gap:8px;align-items:center;">
+   <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#e53e3e;cursor:pointer;">
+     <input type="checkbox" id="prNotInApp" onchange="onPRNotInAppChange(this)">
+     <span style="font-weight:600;">Item NOT in APP (Requires New PPMP)</span>
+   </label>
+ </div>
  <div id="prAppValidation" style="display:none;margin-top:10px;"></div>
  </div>
 
@@ -13073,17 +13104,16 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     // Auto-populate from APP item if redirected from APP page
     if (window._prFromAPPItem) {
       const appItem = window._prFromAPPItem;
-      window._prFromAPPItem = null; // Clear so it doesn't re-trigger
+      window._prFromAPPItem = null;
       setTimeout(() => {
-        const appSelect = document.getElementById("prAppItemSelect");
-        if (appSelect && appItem.id) {
-          appSelect.value = String(appItem.id);
-          if (appSelect.value === String(appItem.id)) {
-            validatePRAppItem(appSelect);
-            generatePRNumber(appSelect);
-            onPRAppItemChange(appItem.id);
-          }
+        const desc = (appItem.description || appItem.item_description || '').substring(0, 60);
+        const dept = appItem.department_code || '';
+        const fy = appItem.fiscal_year || String(getCurrentFiscalYear ? getCurrentFiscalYear() : new Date().getFullYear());
+        if (!(window._prSelectedAppItemIds || []).some(it => it.id === appItem.id)) {
+          window._prSelectedAppItemIds = window._prSelectedAppItemIds || [];
+          window._prSelectedAppItemIds.push({ id: appItem.id, desc, dept, fiscal_year: fy });
         }
+        onPRAppItemMultiChange();
       }, 100);
     }
   };
@@ -13111,52 +13141,406 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
 
   // Validate PR against APP items
   // Generate dynamic PR number: PR-{DEPT}-{YEAR}-{SEQ}
+  // Generate PR number from first checked APP item's dept
   window.generatePRNumber = async function (select) {
-    const prInput = document.getElementById("prNumber");
-    if (!prInput) return;
-    const val = select.value;
-    if (!val || val === "not-in-app") {
-      prInput.value = "";
-      return;
-    }
-    const opt = select.selectedOptions[0];
-    const dept = opt?.getAttribute("data-dept") || "";
-    if (!dept) {
-      prInput.value = generateDocNumber("PR");
-      return;
-    }
-    const year = getActiveFiscalYear();
-    try {
-      const prs = await apiRequest("/purchase-requests");
-      const prefix = "PR-" + dept + "-" + year + "-";
-      let maxSeq = 0;
-      prs.forEach((p) => {
-        if (p.pr_number && p.pr_number.startsWith(prefix)) {
-          const seq = parseInt(p.pr_number.replace(prefix, "")) || 0;
-          if (seq > maxSeq) maxSeq = seq;
-        }
-      });
-      prInput.value = prefix + String(maxSeq + 1).padStart(3, "0");
-    } catch (e) {
-      prInput.value = "PR-" + dept + "-" + year + "-001";
+    // legacy single-select shim — no-op; number is generated in onPRAppItemMultiChange
+  };
+
+
+  // ── APP Item Picker Modal (catalog-style) ────────────────────────────────
+  window._prSelectedAppItemIds = []; // [{id, desc, dept, fiscal_year}]
+
+  function _renderPRAppChips() {
+    const chips = document.getElementById('prAppItemSelectedChips');
+    const counter = document.getElementById('prAppItemPickerCount');
+    if (!chips) return;
+    const items = window._prSelectedAppItemIds || [];
+    chips.innerHTML = items.map(it => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:#ebf8ff;border:1px solid #90cdf4;border-radius:20px;padding:3px 10px 3px 12px;font-size:12px;color:#2b6cb0;">
+        <i class="fas fa-clipboard-check" style="font-size:10px;"></i>
+        ${escapeHtml((it.desc || '').substring(0, 50))} <em style="color:#4a90d9;font-size:10px;">(${it.dept} FY${it.fiscal_year})</em>
+        <button type="button" onclick="removePRAppItem(${it.id})" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:13px;line-height:1;padding:0 2px;" title="Remove">&times;</button>
+      </span>`).join('');
+    if (counter) counter.textContent = items.length === 0 ? 'None selected' : items.length + ' item(s) selected';
+  }
+
+  window.removePRAppItem = function(itemId) {
+    window._prSelectedAppItemIds = (window._prSelectedAppItemIds || []).filter(it => it.id !== itemId);
+    _renderPRAppChips();
+    onPRAppItemMultiChange();
+    // Refresh modal row if open
+    const row = document.querySelector(`#prAppPickerBody tr[data-id="${itemId}"]`);
+    if (row) {
+      row.classList.remove('already-added');
+      row.style.opacity = '';
+      row.style.cursor = 'pointer';
+      const statusCell = row.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '';
+      row.onclick = () => selectPRAppItem(itemId, row);
     }
   };
 
-  window.validatePRAppItem = function (select) {
-    const validation = document.getElementById("prAppValidation");
-    if (!validation) return;
-    const val = select.value;
-    if (val === "not-in-app") {
-      validation.style.display = "block";
+  window.selectPRAppItem = function(itemId, rowEl) {
+    const allItems = window._prAppItemsCache || [];
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) return;
+    if ((window._prSelectedAppItemIds || []).some(it => it.id === itemId)) return;
+    const desc = (item.description || item.item_description || '').substring(0, 60);
+    const dept = item.department_code || '';
+    const fy = item.fiscal_year || String(getCurrentFiscalYear ? getCurrentFiscalYear() : new Date().getFullYear());
+    window._prSelectedAppItemIds = window._prSelectedAppItemIds || [];
+    window._prSelectedAppItemIds.push({ id: item.id, desc, dept, fiscal_year: fy,
+      data_desc: desc, data_dept: dept });
+    // Mark row
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.onclick = null;
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+    _renderPRAppChips();
+    onPRAppItemMultiChange();
+    showToast('APP item added: ' + desc.substring(0,40), 'success');
+  };
+
+  window.showPRAppItemPickerModal = function() {
+    const allItems = window._prAppItemsCache || [];
+    const selected = window._prSelectedAppItemIds || [];
+
+    const rows = allItems.map(item => {
+      const alreadyAdded = selected.some(s => s.id === item.id);
+      const desc = (item.description || item.item_description || '').substring(0, 80);
+      const dept = item.department_code || '';
+      const fy = item.fiscal_year || '';
+      const budget = parseFloat(item.total_price || item.total_amount || 0);
+      return `<tr data-id="${item.id}" class="ppmp-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+        onclick="${alreadyAdded ? '' : 'selectPRAppItem(' + item.id + ', this)'}"
+        style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td>${escapeHtml(dept)}</td>
+        <td>FY${escapeHtml(fy)}</td>
+        <td>${escapeHtml(desc)}</td>
+        <td style="text-align:right;">&#8369;${budget.toLocaleString('en-PH',{minimumFractionDigits:2})}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const existing = document.getElementById('prAppPickerOverlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'prAppPickerOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:800px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-clipboard-list"></i> Select APP / PPMP Items</h4>
+          <button onclick="document.getElementById('prAppPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="prAppPickerSearch" placeholder="Search by description, department, fiscal year..."
+            oninput="filterPRAppPickerItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click a row to link it to this PR. Already-added items are grayed out. Close this panel when done.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>Dept</th><th>FY</th><th>Description / Item</th><th style="text-align:right;">Budget</th><th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="prAppPickerBody">${rows}</tbody>
+          </table>
+          ${allItems.length === 0 ? '<p style="color:#888;text-align:center;margin-top:24px;">No APP items found for your division.</p>' : ''}
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+          <span id="prAppPickerDoneCount" style="font-size:12px;color:#4a5568;"></span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('prAppPickerOverlay').remove()">
+            <i class="fas fa-check"></i> Done Selecting
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  };
+
+  window.filterPRAppPickerItems = function(text) {
+    const tbody = document.getElementById('prAppPickerBody');
+    if (!tbody) return;
+    const s = (text || '').toLowerCase();
+    tbody.querySelectorAll('tr').forEach(r => {
+      r.style.display = !s || r.textContent.toLowerCase().includes(s) ? '' : 'none';
+    });
+  };
+
+  // ── RFQ → PR Picker Modal (catalog-style) ────────────────────────────────
+  window._rfqSelectedPRIds = []; // [{id, pr_number, purpose, total_amount}]
+
+  function _renderRFQPRChips() {
+    const chips = document.getElementById('rfqLinkedPRSelectedChips');
+    const counter = document.getElementById('rfqLinkedPRPickerCount');
+    if (!chips) return;
+    const items = window._rfqSelectedPRIds || [];
+    chips.innerHTML = items.map(it => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:#f0fff4;border:1px solid #9ae6b4;border-radius:20px;padding:3px 10px 3px 12px;font-size:12px;color:#276749;">
+        <i class="fas fa-file-invoice" style="font-size:10px;"></i>
+        <strong>${escapeHtml(it.pr_number || '')}</strong>
+        <span style="color:#4a5568;font-size:11px;">— ${escapeHtml((it.purpose || '').substring(0, 40))}</span>
+        <em style="color:#38a169;font-size:10px;">&#8369;${Number(it.total_amount||0).toLocaleString('en-PH',{minimumFractionDigits:2})}</em>
+        <button type="button" onclick="removeRFQLinkedPR(${it.id})" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:13px;line-height:1;padding:0 2px;" title="Remove">&times;</button>
+      </span>`).join('');
+    if (counter) counter.textContent = items.length === 0 ? 'None selected' : items.length + ' PR(s) selected';
+  }
+
+  window.removeRFQLinkedPR = function(prId) {
+    window._rfqSelectedPRIds = (window._rfqSelectedPRIds || []).filter(it => it.id !== prId);
+    _renderRFQPRChips();
+    onRFQLinkedPRMultiChange();
+    const row = document.querySelector(`#rfqPRPickerBody tr[data-id="${prId}"]`);
+    if (row) {
+      row.classList.remove('already-added');
+      row.style.opacity = '';
+      row.style.cursor = 'pointer';
+      const statusCell = row.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '';
+      row.onclick = () => selectRFQLinkedPR(prId, row);
+    }
+  };
+
+  window.selectRFQLinkedPR = function(prId, rowEl) {
+    const allPRs = window._rfqAvailablePRsCache || [];
+    const pr = allPRs.find(p => p.id === prId);
+    if (!pr) return;
+    if ((window._rfqSelectedPRIds || []).some(it => it.id === prId)) return;
+    window._rfqSelectedPRIds = window._rfqSelectedPRIds || [];
+    window._rfqSelectedPRIds.push({ id: pr.id, pr_number: pr.pr_number || '',
+      purpose: pr.purpose || pr.first_item_name || '', total_amount: pr.total_amount || 0 });
+    if (rowEl) {
+      rowEl.classList.add('already-added');
+      rowEl.style.opacity = '0.5';
+      rowEl.style.cursor = 'default';
+      rowEl.onclick = null;
+      const statusCell = rowEl.querySelector('td:last-child');
+      if (statusCell) statusCell.innerHTML = '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>';
+    }
+    _renderRFQPRChips();
+    onRFQLinkedPRMultiChange();
+    showToast('PR linked: ' + (pr.pr_number || ''), 'success');
+  };
+
+  window.showRFQLinkedPRPickerModal = function() {
+    const allPRs = window._rfqAvailablePRsCache || [];
+    const selected = window._rfqSelectedPRIds || [];
+
+    const rows = allPRs.map(pr => {
+      const alreadyAdded = selected.some(s => s.id === pr.id);
+      const purpose = (pr.purpose || pr.first_item_name || '').substring(0, 70);
+      const total = Number(pr.total_amount || 0);
+      const date = pr.pr_date ? pr.pr_date.substring(0, 10) : '';
+      return `<tr data-id="${pr.id}" class="ppmp-catalog-select-row${alreadyAdded ? ' already-added' : ''}"
+        onclick="${alreadyAdded ? '' : 'selectRFQLinkedPR(' + pr.id + ', this)'}"
+        style="cursor:${alreadyAdded ? 'default' : 'pointer'};${alreadyAdded ? 'opacity:0.5;' : ''}">
+        <td><strong>${escapeHtml(pr.pr_number || '')}</strong></td>
+        <td>${escapeHtml(date)}</td>
+        <td>${escapeHtml(purpose)}</td>
+        <td style="text-align:right;">&#8369;${total.toLocaleString('en-PH',{minimumFractionDigits:2})}</td>
+        <td style="text-align:center;">${alreadyAdded ? '<span style="color:#38a169;font-size:11px;"><i class="fas fa-check"></i> Added</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const existing = document.getElementById('rfqPRPickerOverlay');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'rfqPRPickerOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:8px;width:820px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+          <h4 style="margin:0;"><i class="fas fa-file-invoice"></i> Link Purchase Requests to RFQ</h4>
+          <button onclick="document.getElementById('rfqPRPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:8px 16px;">
+          <input type="text" id="rfqPRPickerSearch" placeholder="Search by PR number, purpose, amount..."
+            oninput="filterRFQPRPickerItems(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div style="padding:0 16px 4px;font-size:11px;color:#718096;">
+          Click a row to link it to this RFQ. Items from all linked PRs will be merged. Close when done.
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+          <table class="data-table full-width" style="font-size:12px;">
+            <thead><tr style="background:#f7fafc;position:sticky;top:0;z-index:1;">
+              <th>PR No.</th><th>Date</th><th>Purpose / Description</th><th style="text-align:right;">Total Amount</th><th style="width:60px;">Status</th>
+            </tr></thead>
+            <tbody id="rfqPRPickerBody">${rows}</tbody>
+          </table>
+          ${allPRs.length === 0 ? '<p style="color:#888;text-align:center;margin-top:24px;">No approved PRs found.</p>' : ''}
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+          <span id="rfqPRPickerDoneCount" style="font-size:12px;color:#4a5568;"></span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('rfqPRPickerOverlay').remove()">
+            <i class="fas fa-check"></i> Done Selecting
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  };
+
+  window.filterRFQPRPickerItems = function(text) {
+    const tbody = document.getElementById('rfqPRPickerBody');
+    if (!tbody) return;
+    const s = (text || '').toLowerCase();
+    tbody.querySelectorAll('tr').forEach(r => {
+      r.style.display = !s || r.textContent.toLowerCase().includes(s) ? '' : 'none';
+    });
+  };
+
+  // Called when any APP item checkbox changes
+  window.onPRAppItemMultiChange = async function () {
+    const checks = (window._prSelectedAppItemIds || []).map(it => ({ value: it.id, getAttribute: (k) => k === 'data-dept' ? it.dept : it.desc }));
+    const validation = document.getElementById('prAppValidation');
+    const prInput    = document.getElementById('prNumber');
+
+    _renderPRAppChips();
+
+    if (checks.length === 0) {
+      if (validation) validation.style.display = 'none';
+      if (prInput)    prInput.value = '';
+      window._docSelectedItems['pr'] = [];
+      renderDocItemsList('pr');
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+      return;
+    }
+
+    // Show valid banner
+    if (validation) {
+      validation.style.display = 'block';
       validation.innerHTML = `
+ <div style="background:#e3f2fd;border:1px solid #2196f3;border-radius:6px;padding:10px;display:flex;align-items:center;gap:8px;">
+ <i class="fas fa-check-circle" style="color:#2196f3;font-size:18px;"></i>
+ <span style="color:#1a365d;font-weight:600;font-size:13px;">${checks.length} APP item(s) selected — PR can proceed to RFQ after approval.</span>
+ </div>`;
+    }
+    document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+
+    // Auto-generate PR number from first item's dept
+    const firstOpt = checks[0];
+    const dept = firstOpt.getAttribute('data-dept') || '';
+    if (dept && prInput) {
+      const year = getActiveFiscalYear();
+      try {
+        const prs = await apiRequest('/purchase-requests');
+        const prefix = 'PR-' + dept + '-' + year + '-';
+        let maxSeq = 0;
+        prs.forEach(p => {
+          if (p.pr_number && p.pr_number.startsWith(prefix)) {
+            const seq = parseInt(p.pr_number.replace(prefix, '')) || 0;
+            if (seq > maxSeq) maxSeq = seq;
+          }
+        });
+        prInput.value = prefix + String(maxSeq + 1).padStart(3, '0');
+      } catch (e) {
+        prInput.value = 'PR-' + dept + '-' + year + '-001';
+      }
+    } else if (prInput && !prInput.value) {
+      prInput.value = generateDocNumber('PR');
+    }
+
+    // Load and merge items from all checked plan items
+    window._docSelectedItems['pr'] = [];
+    const allDescLines = [];
+    let firstPurpose = '';
+
+    for (const cb of checks) {
+      const planId = cb.value;
+      try {
+        const plan = await apiRequest('/plans/' + planId);
+        if (!plan) continue;
+
+        if (!firstPurpose && plan.description) firstPurpose = plan.description;
+
+        if (plan.items && plan.items.length > 0) {
+          const seenItemNames = new Set();
+          plan.items.forEach(item => {
+            const nameKey = (item.item_name || item.item_description || '').trim().toLowerCase();
+            if (nameKey && seenItemNames.has(nameKey)) return;
+            if (nameKey) seenItemNames.add(nameKey);
+            const unitPrice = parseFloat(item.unit_price || 0);
+            const totalQty = parseFloat(item.total_qty || 0) ||
+              (parseFloat(item.q1_qty || 0) + parseFloat(item.q2_qty || 0) +
+               parseFloat(item.q3_qty || 0) + parseFloat(item.q4_qty || 0));
+            const qty = totalQty || 1;
+            window._docSelectedItems['pr'].push({
+              item_id: item.id || 0,
+              item_name: item.item_name || item.item_description || '',
+              item_code: item.item_code || '',
+              item_unit: item.catalog_unit || item.resolved_unit || item.item_unit || item.unit || '',
+              item_category: item.category || plan.project_type || '',
+              item_description: item.item_description || '',
+              description: item.item_description || item.item_name || '',
+              unit_price: unitPrice,
+              quantity: qty,
+              total: qty * unitPrice,
+            });
+            const d = item.item_description || item.item_name || '';
+            if (d.trim()) allDescLines.push(d);
+          });
+        } else {
+          const unitPrice = parseFloat(plan.total_amount || 0);
+          const qty = parseInt(plan.quantity_size || 1) || 1;
+          const perUnit = qty > 0 ? unitPrice / qty : unitPrice;
+          const desc = plan.description || plan.item_description || '';
+          window._docSelectedItems['pr'].push({
+            item_id: plan.item_id || 0,
+            item_name: (desc || '').split('\n')[0].trim() || 'Approved Item',
+            item_code: plan.item_code || '',
+            item_unit: plan.catalog_unit || plan.resolved_unit || plan.item_unit || plan.unit || '',
+            item_category: plan.project_type || plan.category || '',
+            item_description: plan.item_description || desc || '',
+            description: plan.item_description || desc || '',
+            unit_price: perUnit,
+            quantity: qty,
+            total: unitPrice,
+          });
+          if ((plan.item_description || desc).trim()) allDescLines.push(plan.item_description || desc);
+        }
+      } catch (e) {
+        console.error('Error loading plan item ' + planId, e);
+      }
+    }
+
+    renderDocItemsList('pr');
+
+    const purposeField = document.getElementById('prPurpose');
+    if (purposeField && !purposeField.value.trim() && firstPurpose) {
+      purposeField.value = firstPurpose;
+    }
+    const specsField = document.getElementById('prItemSpecs');
+    if (specsField && allDescLines.length > 0) {
+      specsField.value = allDescLines.join('\n');
+    }
+  };
+
+  // "Not in APP" checkbox handler
+  window.onPRNotInAppChange = function (cb) {
+    const validation = document.getElementById('prAppValidation');
+    const pickerBtn = document.querySelector('button[onclick="showPRAppItemPickerModal()"]');
+    if (cb.checked) {
+      // Clear selected APP items and disable the picker button
+      window._prSelectedAppItemIds = [];
+      _renderPRAppChips();
+      if (pickerBtn) { pickerBtn.disabled = true; pickerBtn.style.opacity = '0.5'; }
+      if (validation) {
+        validation.style.display = 'block';
+        validation.innerHTML = `
  <div style="background:#fff5f5;border:2px solid #e53e3e;border-radius:8px;padding:14px;">
  <div style="display:flex;align-items:flex-start;gap:10px;">
  <i class="fas fa-exclamation-triangle" style="color:#e53e3e;font-size:22px;margin-top:2px;"></i>
  <div>
  <div style="font-weight:700;color:#c53030;font-size:14px;margin-bottom:4px;">Item Not Found in APP</div>
  <p style="font-size:12px;color:#4a5568;margin-bottom:10px;">
- This item does not exist in the current Annual Procurement Plan (APP). As Division Head, 
- you must first <strong>endorse a new PPMP entry</strong> for this item. Once the PPMP is approved 
+ This item does not exist in the current Annual Procurement Plan (APP). As Division Head,
+ you must first <strong>endorse a new PPMP entry</strong> for this item. Once the PPMP is approved
  and included in the APP, you can create a Purchase Request.
  </p>
  <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -13170,60 +13554,64 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  </div>
  </div>`;
-      // Disable submit buttons
-      document.querySelectorAll("#prForm .btn-primary").forEach((b) => {
-        b.disabled = true;
-        b.style.opacity = "0.5";
-      });
-    } else if (val) {
-      validation.style.display = "block";
-      validation.innerHTML = `
- <div style="background:#e3f2fd;border:1px solid #2196f3;border-radius:6px;padding:10px;display:flex;align-items:center;gap:8px;">
- <i class="fas fa-check-circle" style="color:#2196f3;font-size:18px;"></i>
- <span style="color:#1a365d;font-weight:600;font-size:13px;">Item found in APP — PR can proceed to RFQ after approval.</span>
- </div>`;
-      // Re-enable submit buttons
-      document.querySelectorAll("#prForm .btn-primary").forEach((b) => {
-        b.disabled = false;
-        b.style.opacity = "1";
-      });
+      }
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
     } else {
-      validation.style.display = "none";
-      document.querySelectorAll("#prForm .btn-primary").forEach((b) => {
-        b.disabled = false;
-        b.style.opacity = "1";
-      });
+      if (pickerBtn) { pickerBtn.disabled = false; pickerBtn.style.opacity = ''; }
+      if (validation) validation.style.display = 'none';
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+    }
+  };
+
+  // legacy single-select shim kept for edit modal compatibility
+  window.validatePRAppItem = function (select) {
+    const validation = document.getElementById('prAppValidation');
+    if (!validation) return;
+    const val = select.value;
+    if (val === 'not-in-app') {
+      validation.style.display = 'block';
+      validation.innerHTML = `<div style="background:#fff5f5;border:2px solid #e53e3e;border-radius:8px;padding:14px;"><div style="display:flex;align-items:flex-start;gap:10px;"><i class="fas fa-exclamation-triangle" style="color:#e53e3e;font-size:22px;margin-top:2px;"></i><div><div style="font-weight:700;color:#c53030;font-size:14px;margin-bottom:4px;">Item Not Found in APP</div><p style="font-size:12px;color:#4a5568;margin-bottom:10px;">This item does not exist in the current Annual Procurement Plan (APP). You must first endorse a new PPMP entry.</p><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn btn-sm" style="background:#c53030;color:#fff;" onclick="closeModal(); navigateTo('ppmp');"><i class="fas fa-file-alt"></i> Go to PPMP & Create Entry</button><button type="button" class="btn btn-sm btn-outline" onclick="closeModal(); navigateTo('app');"><i class="fas fa-clipboard-list"></i> View APP</button></div></div></div></div>`;
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+    } else if (val) {
+      validation.style.display = 'block';
+      validation.innerHTML = `<div style="background:#e3f2fd;border:1px solid #2196f3;border-radius:6px;padding:10px;display:flex;align-items:center;gap:8px;"><i class="fas fa-check-circle" style="color:#2196f3;font-size:18px;"></i><span style="color:#1a365d;font-weight:600;font-size:13px;">Item found in APP — PR can proceed to RFQ after approval.</span></div>`;
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+    } else {
+      validation.style.display = 'none';
+      document.querySelectorAll('#prForm .btn-primary').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
     }
   };
 
   window.onPRAppItemChange = async function (planId) {
-    if (!planId || planId === "not-in-app") {
-      window._docSelectedItems["pr"] = [];
-      renderDocItemsList("pr");
+    // legacy shim — delegates to multi-select handler when called from edit modal context
+    if (!planId || planId === 'not-in-app') {
+      window._docSelectedItems['pr'] = [];
+      renderDocItemsList('pr');
       return;
     }
     try {
-      const plan = await apiRequest("/plans/" + planId);
+      const plan = await apiRequest('/plans/' + planId);
       if (!plan) return;
-      window._docSelectedItems["pr"] = [];
+      window._docSelectedItems['pr'] = [];
       if (plan.items && plan.items.length > 0) {
-        plan.items.forEach((item) => {
+        const seenItemNames = new Set();
+        plan.items.forEach(item => {
+          const nameKey = (item.item_name || item.item_description || '').trim().toLowerCase();
+          if (nameKey && seenItemNames.has(nameKey)) return;
+          if (nameKey) seenItemNames.add(nameKey);
           const unitPrice = parseFloat(item.unit_price || 0);
-          const totalQty =
-            parseFloat(item.total_qty || 0) ||
-            parseFloat(item.q1_qty || 0) +
-              parseFloat(item.q2_qty || 0) +
-              parseFloat(item.q3_qty || 0) +
-              parseFloat(item.q4_qty || 0);
+          const totalQty = parseFloat(item.total_qty || 0) ||
+            (parseFloat(item.q1_qty || 0) + parseFloat(item.q2_qty || 0) +
+             parseFloat(item.q3_qty || 0) + parseFloat(item.q4_qty || 0));
           const qty = totalQty || 1;
-          window._docSelectedItems["pr"].push({
+          window._docSelectedItems['pr'].push({
             item_id: item.id || 0,
-            item_name: item.item_name || item.item_description || "",
-            item_code: item.item_code || "",
-            item_unit: item.unit || "Lot",
-            item_category: item.category || plan.project_type || "",
-            item_description: item.item_description || "",
-            description: item.item_description || item.item_name || "",
+            item_name: item.item_name || item.item_description || '',
+            item_code: item.item_code || '',
+            item_unit: item.catalog_unit || item.resolved_unit || item.item_unit || item.unit || '',
+            item_category: item.category || plan.project_type || '',
+            item_description: item.item_description || '',
+            description: item.item_description || item.item_name || '',
             unit_price: unitPrice,
             quantity: qty,
             total: qty * unitPrice,
@@ -13233,38 +13621,31 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
         const unitPrice = parseFloat(plan.total_amount || 0);
         const qty = parseInt(plan.quantity_size || 1) || 1;
         const perUnit = qty > 0 ? unitPrice / qty : unitPrice;
-        const desc = plan.description || plan.item_description || "";
-        window._docSelectedItems["pr"].push({
+        const desc = plan.description || plan.item_description || '';
+        window._docSelectedItems['pr'].push({
           item_id: plan.item_id || 0,
-          item_name: (desc || "").split("\n")[0].trim() || "Approved Item",
-          item_code: "",
-          item_unit: "Lot",
-          item_category: plan.project_type || plan.category || "",
-          item_description: plan.item_description || desc || "",
-          description: plan.item_description || desc || "",
+          item_name: (desc || '').split('\n')[0].trim() || 'Approved Item',
+          item_code: plan.item_code || '',
+          item_unit: plan.catalog_unit || plan.resolved_unit || plan.item_unit || plan.unit || '',
+          item_category: plan.project_type || plan.category || '',
+          item_description: plan.item_description || desc || '',
+          description: plan.item_description || desc || '',
           unit_price: perUnit,
           quantity: qty,
           total: unitPrice,
         });
       }
-      renderDocItemsList("pr");
-      const purposeField = document.getElementById("prPurpose");
-      if (purposeField && !purposeField.value.trim() && plan.description) {
-        purposeField.value = plan.description;
-      }
-      const specsField = document.getElementById("prItemSpecs");
+      renderDocItemsList('pr');
+      const purposeField = document.getElementById('prPurpose');
+      if (purposeField && !purposeField.value.trim() && plan.description) purposeField.value = plan.description;
+      const specsField = document.getElementById('prItemSpecs');
       if (specsField && !specsField.value.trim()) {
-        const specsLines = (plan.items || [])
-          .map((it) => it.item_description || it.item_name || "")
-          .filter((s) => s.trim());
-        if (specsLines.length > 0) {
-          specsField.value = specsLines.join("\n");
-        } else if (plan.item_description) {
-          specsField.value = plan.item_description;
-        }
+        const specsLines = (plan.items || []).map(it => it.item_description || it.item_name || '').filter(s => s.trim());
+        if (specsLines.length > 0) specsField.value = specsLines.join('\n');
+        else if (plan.item_description) specsField.value = plan.item_description;
       }
     } catch (e) {
-      console.error("Error loading PPMP items for PR:", e);
+      console.error('Error loading PPMP items for PR:', e);
     }
   };
 
@@ -13306,7 +13687,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -13324,6 +13705,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     (async () => {
       try {
         const prDateVal = document.getElementById("prDate")?.value || "";
+        const checkedAppIds = (window._prSelectedAppItemIds || []).map(it => it.id);
         const data = {
           pr_number: prNumber,
           pr_date: prDateVal || getTodayISO(),
@@ -13334,6 +13716,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
           item_specifications:
             document.getElementById("prItemSpecs")?.value.trim() || null,
           items: items,
+          app_item_ids: checkedAppIds.length > 0 ? checkedAppIds : undefined,
         };
         const result = await apiRequest("/purchase-requests", "POST", data);
         const prId = result.id || result.pr_id;
@@ -13387,6 +13770,18 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     const sortedPRs = [...(cachedPR || [])].sort((a, b) =>
       (a.pr_number || "").localeCompare(b.pr_number || ""),
     );
+    // Cache PRs for the picker modal; reset selection
+    window._rfqAvailablePRsCache = sortedPRs;
+    window._rfqSelectedPRIds = [];
+    // Pre-select if a PR number was passed
+    if (preselectedPrNumber) {
+      const pre = sortedPRs.find(p => p.pr_number === preselectedPrNumber || String(p.id) === String(preselectedPrNumber));
+      if (pre) {
+        window._rfqSelectedPRIds.push({ id: pre.id, pr_number: pre.pr_number || '',
+          purpose: pre.purpose || pre.first_item_name || '', total_amount: pre.total_amount || 0 });
+      }
+    }
+
     const prOptions = sortedPRs
       .map((p) => {
         const sel =
@@ -13432,11 +13827,15 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <input type="text" id="rfqTIN" placeholder="Auto-filled from supplier" readonly style="background:#f5f5f5;">
  </div>
  <div class="form-group">
- <label>Linked Purchase Request (Approved)</label>
- <select class="form-select" id="rfqLinkedPR" required onchange="onRFQLinkedPRChange(this.value)">
- <option value="">-- Select Approved PR --</option>
- ${prOptions}
- </select>
+ <label>Linked Purchase Requests (Approved) <span style="color:#e53e3e;">*</span></label>
+ <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+   <button type="button" class="btn btn-sm btn-primary" onclick="showRFQLinkedPRPickerModal()" ${sortedPRs.length === 0 ? 'disabled title="No approved PRs found."' : ''}>
+     <i class="fas fa-file-invoice"></i> Browse &amp; Link Purchase Requests
+   </button>
+   <span id="rfqLinkedPRPickerCount" style="font-size:12px;color:#718096;">None selected</span>
+ </div>
+ <div id="rfqLinkedPRSelectedChips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px;padding:4px 0;"></div>
+ <small style="color:#888;margin-top:4px;display:block;">Items from all selected PRs will be merged into this RFQ.</small>
  </div>
  <div class="form-row">
  <div class="form-group">
@@ -13491,10 +13890,12 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       preventOutsideClose: true,
     });
     window._docSelectedItems["rfq"] = [];
-    // If a PR was preselected, auto-fill items
+    // If a PR was preselected, render its chip and auto-fill items
     if (preselectedPrNumber) {
-      const sel = document.getElementById("rfqLinkedPR");
-      if (sel && sel.value) onRFQLinkedPRChange(sel.value);
+      setTimeout(() => {
+        _renderRFQPRChips();
+        onRFQLinkedPRMultiChange();
+      }, 100);
     }
   };
 
@@ -13551,7 +13952,73 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     }
   };
 
-  // When user selects a PR in the RFQ form, auto-fill items from that PR
+  // Multi-PR handler: merge items from all selected PRs into the RFQ
+  window.onRFQLinkedPRMultiChange = async function () {
+    const checks = (window._rfqSelectedPRIds || []).map(it => ({ value: it.id }));
+    _renderRFQPRChips();
+
+    // Preserve items that were manually selected from the catalog
+    // (they have _fromCatalog:true flag). PR-sourced items are always refreshed.
+    const catalogPicked = (window._docSelectedItems['rfq'] || []).filter(it => it._fromCatalog);
+    const allSpecs = [];
+    const prItems = [];
+
+    for (const cb of checks) {
+      const prId = cb.value;
+      try {
+        const pr = await apiRequest('/purchase-requests/' + prId);
+        if (!pr) continue;
+        if (pr.items && pr.items.length > 0) {
+          pr.items.forEach(item => {
+            const unitPrice = parseFloat(item.catalog_unit_price || item.unit_price || item.total_price || 0);
+            const qty = parseFloat(item.quantity || 0);
+            const resolvedUnit = item.catalog_unit || item.resolved_unit || item.unit || item.item_unit || '';
+            prItems.push({
+              item_id: item.catalog_item_id || item.item_id || 0,
+              item_name: item.catalog_item_name || item.item_name || item.item_description || '',
+              item_code: item.catalog_code || item.item_code || '',
+              item_unit: resolvedUnit,
+              item_category: item.category || '',
+              item_description: item.item_description || '',
+              description: item.item_description || item.item_name || '',
+              unit_price: unitPrice,
+              quantity: qty || 1,
+              total: (qty || 1) * unitPrice,
+              _fromPR: true,
+            });
+          });
+        }
+        if (pr.item_specifications) allSpecs.push(pr.item_specifications);
+      } catch (e) {
+        console.error('Error loading PR items for RFQ:', e);
+      }
+    }
+
+    // Merge: catalog picks first, then PR items (skip exact duplicates only)
+    // Dedup by name+description — NOT just item_name — so items sharing the same
+    // name but different descriptions (e.g. Black ink vs Cyan ink) are both kept
+    const merged = [...catalogPicked];
+    prItems.forEach(pi => {
+      const piDesc = (pi.description || pi.item_description || '').trim().toLowerCase();
+      const piName = (pi.item_name || '').trim().toLowerCase();
+      const dup = merged.some(m => {
+        const mDesc = (m.description || m.item_description || '').trim().toLowerCase();
+        const mName = (m.item_name || '').trim().toLowerCase();
+        if (m.item_id && pi.item_id && String(m.item_id) === String(pi.item_id)) {
+          return piDesc ? mDesc === piDesc : mName === piName;
+        }
+        return mName === piName && mDesc === piDesc;
+      });
+      if (!dup) merged.push(pi);
+    });
+
+    window._docSelectedItems['rfq'] = merged;
+    renderDocItemsList('rfq');
+    const specsField = document.getElementById('rfqItemSpecs');
+    if (specsField && allSpecs.length > 0) specsField.value = allSpecs.join('\n');
+  };
+
+  // Legacy single-PR shim (used by edit modal and showCreateRFQFromPRModal)
   window.onRFQLinkedPRChange = async function (prId) {
     if (!prId) return;
     try {
@@ -13561,15 +14028,14 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       window._docSelectedItems["rfq"] = [];
       if (pr.items && pr.items.length > 0) {
         pr.items.forEach((item) => {
-          const unitPrice = parseFloat(
-            item.unit_price || item.total_price || 0,
-          );
+          const unitPrice = parseFloat(item.catalog_unit_price || item.unit_price || item.total_price || 0);
           const qty = parseFloat(item.quantity || 0);
+          const resolvedUnit = item.catalog_unit || item.resolved_unit || item.unit || item.item_unit || '';
           window._docSelectedItems["rfq"].push({
-            item_id: item.item_id || item.id || 0,
-            item_name: item.item_name || item.item_description || "",
-            item_code: item.item_code || "",
-            item_unit: item.unit || "Lot",
+            item_id: item.catalog_item_id || item.item_id || 0,
+            item_name: item.catalog_item_name || item.item_name || item.item_description || "",
+            item_code: item.catalog_code || item.item_code || "",
+            item_unit: resolvedUnit,
             item_category: item.category || "",
             item_description: item.item_description || "",
             description: item.item_description || item.item_name || "",
@@ -13617,7 +14083,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     if (!confirm("Are you sure you want to send this RFQ?")) return;
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const prId = document.getElementById("rfqLinkedPR")?.value || "";
+    const checkedPrIds = (window._rfqSelectedPRIds || []).map(it => it.id);
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -13630,13 +14096,14 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       document.getElementById("rfqTIN")?.value?.trim() || "";
     const selectedItems = window._docSelectedItems["rfq"] || [];
     const items = selectedItems.map((si, idx) => ({
-      item_id: si.item_id,
-      item_code: si.item_code || "RFQ-ITEM-" + (idx + 1),
+      item_id: si.item_id || null,
+      item_code: si.item_code && !si.item_code.startsWith('RFQ-ITEM-') && !si.item_code.startsWith('PR-ITEM-')
+        ? si.item_code : (si.item_code || "RFQ-ITEM-" + (idx + 1)),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
-      abc_unit_cost: si.unit_price,
+      abc_unit_cost: si.catalog_unit_price || si.unit_price,
     }));
     const abcAmount = selectedItems.reduce(
       (sum, si) => sum + (si.total || 0),
@@ -13645,7 +14112,8 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: checkedPrIds.length > 0 ? checkedPrIds[0] : null,
+        pr_ids: checkedPrIds.length > 0 ? checkedPrIds : undefined,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -13935,15 +14403,18 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       const rfq = await apiRequest("/rfqs/" + rfqId);
       if (!rfq) return;
 
-      // Fill purpose from linked PR
-      if (rfq.pr_id) {
-        try {
-          const pr = await apiRequest("/purchase-requests/" + rfq.pr_id);
-          if (pr && pr.purpose) {
-            const purposeField = document.getElementById("abstractPurpose");
-            if (purposeField) purposeField.value = pr.purpose;
-          }
-        } catch (e) {}
+      // Fill purpose from linked PR (use first linked PR, prefer bridge table linked_prs)
+      {
+        const firstPrId = (rfq?.linked_prs?.[0]?.pr_id) || rfq?.pr_id;
+        if (firstPrId) {
+          try {
+            const pr = await apiRequest("/purchase-requests/" + firstPrId);
+            if (pr && pr.purpose) {
+              const purposeField = document.getElementById("abstractPurpose");
+              if (purposeField) purposeField.value = pr.purpose;
+            }
+          } catch (e) {}
+        }
       }
 
       // Fill item specifications
@@ -13957,7 +14428,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
       if (tbody && rfq.items && rfq.items.length > 0) {
         tbody.innerHTML = "";
         rfq.items.forEach((item) => {
-          const curUnit = item.unit || "Lot";
+          const curUnit = item.unit && item.unit.toLowerCase() !== "lot" ? item.unit : (item.item_unit && item.item_unit.toLowerCase() !== "lot" ? item.item_unit : (item.unit || ""));
           // Show unit as read-only text from the source item (PPMP/RFQ)
           const unitCell =
             '<span style="font-size:11px;font-weight:500;">' +
@@ -14401,7 +14872,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     const allItems = window._ppmpItemsCache || [];
     const item = allItems.find((i) => i.id === itemId);
     if (!item) return;
-    const curUnit = item.unit || "Lot";
+    const curUnit = item.unit && item.unit.toLowerCase() !== "lot" ? item.unit : (item.item_unit && item.item_unit.toLowerCase() !== "lot" ? item.item_unit : (item.unit || ""));
     // Show unit from the item as read-only (fetched from PPMP/catalog)
     const unitCell =
       '<span style="font-size:11px;font-weight:500;">' +
@@ -14898,13 +15369,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Auto-fill purpose, procurement mode, and items by tracing: NOA -> RFQ -> PR -> pr_items
     try {
       let prData = null;
-      // First try direct path: NOA.rfq_id -> RFQ.pr_id -> PR (with items)
+      // First try direct path: NOA.rfq_id -> RFQ linked_prs -> first PR (with items)
       if (noa.rfq_id) {
         try {
           const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
-          if (rfq && rfq.pr_id) {
-            prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
-          }
+          if (rfq) prData = await fetchFirstLinkedPR(rfq);
         } catch (e) {
           console.warn("[PO] Direct RFQ path failed:", e);
         }
@@ -14935,9 +15404,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               }
               if (abstract.rfq_id) {
                 const rfq = await apiRequest("/rfqs/" + abstract.rfq_id);
-                if (rfq && rfq.pr_id) {
-                  prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
-                }
+                if (rfq) prData = await fetchFirstLinkedPR(rfq);
               }
             }
           }
@@ -15236,7 +15703,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             item_name: item.item_name || item.item_description || "",
             description: item.item_description || item.item_name || "",
             item_description: item.item_description || "",
-            item_unit: item.unit || "Lot",
+            item_unit: (item.unit && item.unit.toLowerCase() !== "lot" ? item.unit : "") || item.item_unit || "",
             item_category: item.category || "general",
             quantity: item.quantity || 0,
             unit_price: item.unit_price || 0,
@@ -15252,19 +15719,16 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     // ----- NON-DRAFT: existing table-based edit modal -----
     const unitOptions = [
-      "Lot",
-      "Pax",
-      "Pcs",
-      "Unit",
-      "Sq.ft",
-      "Gal",
-      "Ltrs",
-      "Box",
-      "Ream",
-      "Set",
+      "Lot", "Pax", "Pcs", "pc", "Unit", "Bottle", "BOT", "Can", "Sack",
+      "Sq.ft", "Gal", "Ltrs", "Box", "Ream", "Set", "Pair", "Roll",
+      "Sheet", "Pack", "Bag", "Tube", "Jar", "Drum", "Meter", "Piece",
     ];
     const buildUnitSelect = (selected) => {
-      return `<select class="form-select" style="width:75px;">${unitOptions.map((u) => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("")}</select>`;
+      const opts = [...unitOptions];
+      if (selected && !opts.some(u => u.toLowerCase() === selected.toLowerCase())) {
+        opts.push(selected);
+      }
+      return `<select class="form-select" style="width:75px;">${opts.map((u) => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("")}</select>`;
     };
 
     const buildItemRow = (item, idx) => {
@@ -15284,7 +15748,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         ? items.map((item, idx) => buildItemRow(item, idx)).join("")
         : buildItemRow(
             {
-              unit: "Lot",
+              unit: "",
               item_description: "",
               quantity: 0,
               unit_price: 0,
@@ -15519,7 +15983,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -15579,7 +16043,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -16871,6 +17335,57 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
     })();
     setupPOAmountWordsListener();
+
+    // Auto-fill delivery_date and item_specifications from linked PR if missing on PO
+    (async () => {
+      try {
+        let prData = null;
+
+        // Path 1: PO has a direct pr_id
+        if (p.pr_id) {
+          try {
+            prData = await apiRequest("/purchase-requests/" + p.pr_id);
+          } catch (e) {
+            console.warn("[PO Edit] Could not fetch linked PR:", e);
+          }
+        }
+
+        // Path 2: PO has noa_id → fetch NOA → trace to RFQ → first linked PR
+        if (!prData && p.noa_id) {
+          try {
+            const noa = await apiRequest("/noa/" + p.noa_id);
+            if (noa && noa.rfq_id) {
+              const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
+              if (rfq) prData = await fetchFirstLinkedPR(rfq);
+            }
+          } catch (e) {
+            console.warn("[PO Edit] Could not trace NOA→RFQ→PR:", e);
+          }
+        }
+
+        if (!prData) return;
+
+        // Back-fill item_specifications if PO doesn't have one yet
+        const specsField = document.getElementById("editPoItemSpecs");
+        if (specsField && !specsField.value.trim() && prData.item_specifications) {
+          specsField.value = prData.item_specifications;
+        }
+
+        // Back-fill delivery_date from:
+        //   1. PO's own expected_delivery_date (hidden field, already stored)
+        //   2. PR items' descriptions don't carry dates — leave blank for manual entry
+        const deliveryField = document.getElementById("editPoDeliveryDate");
+        if (deliveryField && !deliveryField.value) {
+          // Try expected_delivery_date stored on the PO itself
+          const expectedDelivery = document.getElementById("editPoExpectedDelivery")?.value;
+          if (expectedDelivery) {
+            deliveryField.value = expectedDelivery;
+          }
+        }
+      } catch (err) {
+        console.warn("[PO Edit] Auto-fill from PR failed:", err);
+      }
+    })();
   };
   window.saveEditPO = async function (e, id) {
     e.preventDefault();
@@ -17348,8 +17863,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           );
           if (noa && noa.rfq_id) {
             const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
-            if (rfq && rfq.pr_id) {
-              prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
+            if (rfq) {
+              prData = await fetchFirstLinkedPR(rfq);
             }
           } else if (noa && noa.bac_resolution_id) {
             const bacRes = await apiRequest(
@@ -17361,8 +17876,8 @@ Failure to submit the above requirements within the prescribed period shall cons
               );
               if (abstract && abstract.rfq_id) {
                 const rfq = await apiRequest("/rfqs/" + abstract.rfq_id);
-                if (rfq && rfq.pr_id) {
-                  prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
+                if (rfq) {
+                  prData = await fetchFirstLinkedPR(rfq);
                 }
               }
             }
@@ -18465,7 +18980,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           escapeHtml(it.item_category) +
           "</td>" +
           '<td style="text-align:center;">' +
-          escapeHtml(it.item_unit) +
+          escapeHtml(it.catalog_unit || it.resolved_unit || it.item_unit || '') +
           "</td>" +
           '<td style="text-align:center;font-size:11px;">' +
           escapeHtml(it.qty_size || "-") +
@@ -20362,6 +20877,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       unit_price: unitPrice,
       quantity: 1,
       total: unitPrice,
+      _fromCatalog: true,  // preserve this item when PR selection changes
     });
     renderDocItemsList(prefix);
     // Mark the row as added
@@ -20444,6 +20960,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       unit_price: unitPrice,
       quantity: 1,
       total: unitPrice,
+      _fromCatalog: true,  // preserve this item when PR selection changes
     });
     renderDocItemsList(prefix);
     itemSelect.value = "";
@@ -20542,7 +21059,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           descDisplay +
           "</td>" +
           '<td style="text-align:center;">' +
-          escapeHtml(it.item_unit) +
+          escapeHtml(it.catalog_unit || it.resolved_unit || it.item_unit || '') +
           "</td>" +
           priceCols +
           '<td><input type="number" value="' +
@@ -20690,7 +21207,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -20707,6 +21224,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
+      const checkedAppIds = (window._prSelectedAppItemIds || []).map(it => it.id);
       const data = {
         pr_number: prNumber,
         pr_date: prDate || getTodayISO(),
@@ -20717,6 +21235,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
         items: items,
+        app_item_ids: checkedAppIds.length > 0 ? checkedAppIds : undefined,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
       const prId = result.id || result.pr_id;
@@ -20749,7 +21268,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const prId = document.getElementById("rfqLinkedPR")?.value || "";
+    const checkedPrIds = (window._rfqSelectedPRIds || []).map(it => it.id);
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -20764,13 +21283,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Read items from catalog selection
     const selectedItems = window._docSelectedItems["rfq"] || [];
     const items = selectedItems.map((si, idx) => ({
-      item_id: si.item_id,
-      item_code: si.item_code || "RFQ-ITEM-" + (idx + 1),
+      item_id: si.item_id || null,
+      item_code: si.item_code && !si.item_code.startsWith('RFQ-ITEM-') && !si.item_code.startsWith('PR-ITEM-')
+        ? si.item_code : (si.item_code || "RFQ-ITEM-" + (idx + 1)),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
-      abc_unit_cost: si.unit_price,
+      abc_unit_cost: si.catalog_unit_price || si.unit_price,
     }));
     const abcAmount = selectedItems.reduce(
       (sum, si) => sum + (si.total || 0),
@@ -20782,7 +21302,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: checkedPrIds.length > 0 ? checkedPrIds[0] : null,
+        pr_ids: checkedPrIds.length > 0 ? checkedPrIds : undefined,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -32283,6 +32804,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? parseFloat(pr.total_amount)
           : grandTotal;
 
+      // Add NOTHING FOLLOWS row right after items
+      itemsHTML += `
+            <tr>
+              <td class="pr-cell-center" colspan="6" style="text-align:center; padding:12px 0; font-weight:bold; font-style:italic; font-size:11pt; color:red;">***NOTHING FOLLOWS***</td>
+            </tr>`;
+
       // Add empty rows to fill space (minimum ~15 visible rows for form look)
       const minRows = 15;
       const currentRows =
@@ -32292,7 +32819,8 @@ Failure to submit the above requirements within the prescribed period shall cons
             i.item_description &&
             i.item_description.trim().toLowerCase() !==
               (i.item_name || "").trim().toLowerCase(),
-        ).length;
+        ).length +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = currentRows; i < minRows; i++) {
         itemsHTML += `
             <tr>
@@ -33132,7 +33660,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <div class="closing">Very truly yours,</div>
 
             <div class="sig-name">${rdName}</div>
-            <div class="sig-title">OIC \u2013 Regional Director</div>
+            <div class="sig-title">Regional Director</div>
             <div class="sig-title">Head of the Procuring Entity</div>
           </div>
 
@@ -33218,27 +33746,79 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Fetch RFQ items for detail table
       let rfqItems = [];
       let prItems = [];
+      let catalogItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
+              // Fetch PR items from ALL linked PRs (bridge table) for unit fallback
+          // linked_prs is the array from pr_rfq_links returned by GET /rfqs/:id
+          const linkedPRIds = (rfq?.linked_prs || []).map(p => p.pr_id).filter(Boolean);
+          // Also include the legacy single pr_id if not already in bridge list
+          if (rfq?.pr_id && !linkedPRIds.includes(rfq.pr_id)) linkedPRIds.push(rfq.pr_id);
+          if (linkedPRIds.length > 0) {
+            const prFetches = linkedPRIds.map(pid =>
+              apiRequest("/purchase-requests/" + pid).catch(() => null)
+            );
+            const prs = await Promise.all(prFetches);
+            prs.forEach(pr => { if (pr && pr.items) prItems = prItems.concat(pr.items); });
           }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
+      // Pre-fetch items catalog for final unit fallback (keyed by item_code and name)
+      try {
+        const catalog = await apiRequest("/items");
+        if (Array.isArray(catalog)) catalogItems = catalog;
+      } catch (e) {}
+      // Resolve unit: rfq_item.unit → pr_item.unit → items catalog by item_code/name → ""
+      // "Lot"/"lot" is treated as a non-authoritative placeholder — catalog lookup overrides it.
+      const isLotPlaceholder = (u) => !u || u.toLowerCase() === "lot";
       const resolveUnit = (item, idx) => {
+        const code = item?.item_code || item?.catalog_code || "";
+        const name = item?.item_name || "";
+
+        // Priority 1: catalog_unit from server-side JOIN (most authoritative — already resolved)
+        if (item?.catalog_unit && !isLotPlaceholder(item.catalog_unit)) return item.catalog_unit;
+        // Priority 2: resolved_unit from server-side COALESCE (rfq unit || catalog unit)
+        if (item?.resolved_unit && !isLotPlaceholder(item.resolved_unit)) return item.resolved_unit;
+
+        // Priority 3: client-side catalog lookup by item_code then item_name
+        if (code || name) {
+          const catItem = catalogItems.find(c =>
+            (code && (c.code === code || c.stock_no === code)) ||
+            (name && c.name?.toLowerCase() === name.toLowerCase())
+          );
+          if (catItem?.unit && !isLotPlaceholder(catItem.unit)) return catItem.unit;
+        }
+
+        // Priority 4: rfq_item stored unit (skip "Lot" placeholder)
         const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
+        if (u && !isLotPlaceholder(u)) return u;
+
+        // Priority 5: pr_item unit from any linked PR — search all fetched prItems
+        // Match by item_code first (most reliable), then by item_name
+        const prItem = (code
+          ? prItems.find(p => (p.item_code === code) || (p.item_name?.toLowerCase() === name.toLowerCase()))
+          : prItems.find(p => p.item_name?.toLowerCase() === name.toLowerCase())
+        ) || prItems[idx];
+
+        if (prItem) {
+          const prCode = prItem?.item_code || "";
+          // Try catalog lookup via PR's item_code if different from rfq item_code
+          if (prCode && prCode !== code) {
+            const catByPR = catalogItems.find(c =>
+              c.code === prCode || c.stock_no === prCode ||
+              (name && c.name?.toLowerCase() === name.toLowerCase())
+            );
+            if (catByPR?.unit && !isLotPlaceholder(catByPR.unit)) return catByPR.unit;
+          }
+          const prUnit = prItem?.unit || prItem?.item_unit || "";
+          if (prUnit && !isLotPlaceholder(prUnit)) return prUnit;
+        }
+
+        // Last resort: return whatever we have (even "Lot") or empty string
+        return u || "";
       };
 
       // Helper: format currency
@@ -33629,6 +34209,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             mergedBidders.length > 0
               ? parseFloat(mergedBidders[0].amount || bidAmount)
               : bidAmount;
+          // contractUnitCost = bid total for this item ÷ qty
+          // contractTotalCost = bid total for this item (proportional share of total bid)
+          const itemShare = rfqItems.length > 1
+            ? (abcTotalCost / (rfqItems.reduce((s, i) => s + parseFloat(i.abc_unit_cost || i.unit_price || 0) * parseFloat(i.quantity || 0), 0) || abcAmount)) * bidAmount
+            : bidAmount;
+          const resolvedContractUnit = qty > 0 ? itemShare / qty : abcUnitCost;
+          const resolvedContractTotal = itemShare;
           detailTableRows +=
             "<tr>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' +
@@ -33643,16 +34230,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
             resolveUnit(item, rfqItems.indexOf(item)) +
             "</td>" +
-            '<td style="padding:3px 2px;font-size:10pt;outline:none;" contenteditable="false">' +
+            '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
               item.item_description ||
               procurementDescription) +
             "</td>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' +
-            fmtCurrency(contractUnitCost) +
+            fmtCurrency(resolvedContractUnit) +
             "</td>" +
             '<td style="border:1px solid #000;padding:3px 2px;text-align:right;font-size:10pt;">' +
-            fmtCurrency(contractTotalCost) +
+            fmtCurrency(resolvedContractTotal) +
             "</td>" +
             "</tr>";
         });
@@ -33667,7 +34254,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           "</td>" +
           '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">1</td>' +
           '<td style="border:1px solid #000;padding:3px 2px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
+          (() => { const pu = prItems[0]?.unit || prItems[0]?.item_unit || ""; const pcode = prItems[0]?.item_code || ""; const pname = prItems[0]?.item_name || ""; const cat = catalogItems.find(c => (pcode && c.code === pcode) || (pname && c.name?.toLowerCase() === pname.toLowerCase())); return (cat?.unit && cat.unit.toLowerCase() !== "lot") ? cat.unit : (pu && pu.toLowerCase() !== "lot" ? pu : (pu || "")); })() +
           '</td>' +
           '<td style="border:1px solid #000;padding:3px 2px;font-size:10pt;" contenteditable="true">' +
           procurementDescription +
@@ -33936,10 +34523,33 @@ Failure to submit the above requirements within the prescribed period shall cons
         </style>
       `;
 
-      const html = buildPrintHTML(
-        "BAC Resolution - " + (bacRes.resolution_number || ""),
-        customStyles + fullContent,
-      );
+      // Build the BAC Resolution HTML directly — bypassing buildPrintHTML's
+      // thead/tfoot table wrapper which causes a blank page 1 in Chromium print.
+      // Instead: header + content + footer all flow as normal body content.
+      const bacFooter = `<p style="text-align:center;font-size:8px;color:#888;margin-top:10px;">Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>`;
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>BAC Resolution - ${bacRes.resolution_number || ''}</title>
+  <style>
+    ${getPrintHeaderCSS()}
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: white !important; }
+    body { font-family: Arial, sans-serif; padding: 0; font-size: 10px; line-height: 1.4; color: #222; }
+    @page { size: A4 portrait; margin: 15mm 20mm; }
+    [contenteditable="true"] { background: #fffde7; padding: 1px 4px; border-radius: 2px; min-width: 50px; display: inline-block; }
+    [contenteditable="true"]:hover { background: #fff9c4; }
+    [contenteditable="true"]:focus { background: #fff59d; outline: 2px solid #ffc107; }
+    @media print { [contenteditable="true"] { background: transparent !important; } }
+  </style>
+</head>
+<body>
+  ${getPrintHeaderHTML()}
+  ${fullContent}
+  ${bacFooter}
+</body>
+</html>`;
       openPrintPreview(html, {
         title: toFilename("BAC_Resolution_" + (bacRes.resolution_number || "")),
         pageSize: "A4",
@@ -34166,7 +34776,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       } else if (po.item_specifications && items.length === 0) {
         items.push({
           quantity: 1,
-          unit: "Lot",
+          unit: "",
           item_name: po.item_specifications.split("\n")[0] || "",
           item_description: po.item_specifications,
           unit_price: po.total_amount || 0,
@@ -34627,14 +35237,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         console.warn("Could not fetch BAC/employee data:", e);
       }
 
-      // Fetch Purpose from linked PR
-      if (rfq.pr_id) {
-        try {
-          const pr = await apiRequest("/purchase-requests/" + rfq.pr_id);
-          if (pr && pr.purpose) prPurpose = pr.purpose;
-        } catch (e) {
-          console.warn("Could not fetch PR purpose:", e);
-        }
+      // Fetch Purpose from first linked PR
+      {
+        const firstPR = await fetchFirstLinkedPR(rfq).catch(() => null);
+        if (firstPR && firstPR.purpose) prPurpose = firstPR.purpose;
       }
 
       const fmtDate = (d) => {
@@ -34726,6 +35332,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
       }
 
+      // Add NOTHING FOLLOWS row right after items
+      itemsHTML += `
+            <tr>
+              <td class="rfq-cell-center" colspan="6" style="text-align:center; padding:12px 0; font-weight:bold; font-style:italic; font-size:11pt; color:red;">***NOTHING FOLLOWS***</td>
+            </tr>`;
+
       // Fill empty rows for form look
       const minRows = 12;
       const currentRows =
@@ -34737,7 +35349,8 @@ Failure to submit the above requirements within the prescribed period shall cons
               c +
               i.item_description.split(/\\n|\n/).filter((l) => l.trim()).length,
             0,
-          );
+          ) +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = currentRows; i < minRows; i++) {
         itemsHTML += `
             <tr>
@@ -35203,13 +35816,17 @@ Failure to submit the above requirements within the prescribed period shall cons
         });
       }
 
+      // Add NOTHING FOLLOWS row right after items/specs
+      itemsHTML += `<tr><td class="abs-td" colspan="10" style="text-align:center; padding:8px 0; font-weight:bold; font-style:italic; font-size:10pt; color:red;">***NOTHING FOLLOWS***</td></tr>`;
+
       // Empty filler rows
       const totalContentRows =
         abstractItems.length +
         (abs.item_specifications
           ? abs.item_specifications.split(/\n/).filter((l) => l.trim()).length +
             1
-          : 0);
+          : 0) +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = totalContentRows; i < 6; i++) {
         itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
       }
@@ -36347,13 +36964,11 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Auto-fill purpose, procurement mode, and items by tracing: NOA -> RFQ -> PR -> pr_items
     try {
       let prData = null;
-      // First try direct path: NOA.rfq_id -> RFQ.pr_id -> PR (with items)
+      // First try direct path: NOA.rfq_id -> RFQ linked_prs -> first PR (with items)
       if (noa.rfq_id) {
         try {
           const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
-          if (rfq && rfq.pr_id) {
-            prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
-          }
+          if (rfq) prData = await fetchFirstLinkedPR(rfq);
         } catch (e) {
           console.warn("[PO] Direct RFQ path failed:", e);
         }
@@ -36384,9 +36999,7 @@ Failure to submit the above requirements within the prescribed period shall cons
               }
               if (abstract.rfq_id) {
                 const rfq = await apiRequest("/rfqs/" + abstract.rfq_id);
-                if (rfq && rfq.pr_id) {
-                  prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
-                }
+                if (rfq) prData = await fetchFirstLinkedPR(rfq);
               }
             }
           }
@@ -36685,7 +37298,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             item_name: item.item_name || item.item_description || "",
             description: item.item_description || item.item_name || "",
             item_description: item.item_description || "",
-            item_unit: item.unit || "Lot",
+            item_unit: (item.unit && item.unit.toLowerCase() !== "lot" ? item.unit : "") || item.item_unit || "",
             item_category: item.category || "general",
             quantity: item.quantity || 0,
             unit_price: item.unit_price || 0,
@@ -36701,19 +37314,16 @@ Failure to submit the above requirements within the prescribed period shall cons
 
     // ----- NON-DRAFT: existing table-based edit modal -----
     const unitOptions = [
-      "Lot",
-      "Pax",
-      "Pcs",
-      "Unit",
-      "Sq.ft",
-      "Gal",
-      "Ltrs",
-      "Box",
-      "Ream",
-      "Set",
+      "Lot", "Pax", "Pcs", "pc", "Unit", "Bottle", "BOT", "Can", "Sack",
+      "Sq.ft", "Gal", "Ltrs", "Box", "Ream", "Set", "Pair", "Roll",
+      "Sheet", "Pack", "Bag", "Tube", "Jar", "Drum", "Meter", "Piece",
     ];
     const buildUnitSelect = (selected) => {
-      return `<select class="form-select" style="width:75px;">${unitOptions.map((u) => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("")}</select>`;
+      const opts = [...unitOptions];
+      if (selected && !opts.some(u => u.toLowerCase() === selected.toLowerCase())) {
+        opts.push(selected);
+      }
+      return `<select class="form-select" style="width:75px;">${opts.map((u) => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("")}</select>`;
     };
 
     const buildItemRow = (item, idx) => {
@@ -36733,7 +37343,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         ? items.map((item, idx) => buildItemRow(item, idx)).join("")
         : buildItemRow(
             {
-              unit: "Lot",
+              unit: "",
               item_description: "",
               quantity: 0,
               unit_price: 0,
@@ -36968,7 +37578,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -37028,7 +37638,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -38320,6 +38930,57 @@ Failure to submit the above requirements within the prescribed period shall cons
       }
     })();
     setupPOAmountWordsListener();
+
+    // Auto-fill delivery_date and item_specifications from linked PR if missing on PO
+    (async () => {
+      try {
+        let prData = null;
+
+        // Path 1: PO has a direct pr_id
+        if (p.pr_id) {
+          try {
+            prData = await apiRequest("/purchase-requests/" + p.pr_id);
+          } catch (e) {
+            console.warn("[PO Edit] Could not fetch linked PR:", e);
+          }
+        }
+
+        // Path 2: PO has noa_id → fetch NOA → trace to RFQ → first linked PR
+        if (!prData && p.noa_id) {
+          try {
+            const noa = await apiRequest("/noa/" + p.noa_id);
+            if (noa && noa.rfq_id) {
+              const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
+              if (rfq) prData = await fetchFirstLinkedPR(rfq);
+            }
+          } catch (e) {
+            console.warn("[PO Edit] Could not trace NOA→RFQ→PR:", e);
+          }
+        }
+
+        if (!prData) return;
+
+        // Back-fill item_specifications if PO doesn't have one yet
+        const specsField = document.getElementById("editPoItemSpecs");
+        if (specsField && !specsField.value.trim() && prData.item_specifications) {
+          specsField.value = prData.item_specifications;
+        }
+
+        // Back-fill delivery_date from:
+        //   1. PO's own expected_delivery_date (hidden field, already stored)
+        //   2. PR items' descriptions don't carry dates — leave blank for manual entry
+        const deliveryField = document.getElementById("editPoDeliveryDate");
+        if (deliveryField && !deliveryField.value) {
+          // Try expected_delivery_date stored on the PO itself
+          const expectedDelivery = document.getElementById("editPoExpectedDelivery")?.value;
+          if (expectedDelivery) {
+            deliveryField.value = expectedDelivery;
+          }
+        }
+      } catch (err) {
+        console.warn("[PO Edit] Auto-fill from PR failed:", err);
+      }
+    })();
   };
   window.saveEditPO = async function (e, id) {
     e.preventDefault();
@@ -38797,8 +39458,8 @@ Failure to submit the above requirements within the prescribed period shall cons
           );
           if (noa && noa.rfq_id) {
             const rfq = await apiRequest("/rfqs/" + noa.rfq_id);
-            if (rfq && rfq.pr_id) {
-              prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
+            if (rfq) {
+              prData = await fetchFirstLinkedPR(rfq);
             }
           } else if (noa && noa.bac_resolution_id) {
             const bacRes = await apiRequest(
@@ -38810,8 +39471,8 @@ Failure to submit the above requirements within the prescribed period shall cons
               );
               if (abstract && abstract.rfq_id) {
                 const rfq = await apiRequest("/rfqs/" + abstract.rfq_id);
-                if (rfq && rfq.pr_id) {
-                  prData = await apiRequest("/purchase-requests/" + rfq.pr_id);
+                if (rfq) {
+                  prData = await fetchFirstLinkedPR(rfq);
                 }
               }
             }
@@ -39860,7 +40521,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           escapeHtml(it.item_category) +
           "</td>" +
           '<td style="text-align:center;">' +
-          escapeHtml(it.item_unit) +
+          escapeHtml(it.catalog_unit || it.resolved_unit || it.item_unit || '') +
           "</td>" +
           '<td style="text-align:center;font-size:11px;">' +
           escapeHtml(it.qty_size || "-") +
@@ -41760,6 +42421,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       unit_price: unitPrice,
       quantity: 1,
       total: unitPrice,
+      _fromCatalog: true,  // preserve this item when PR selection changes
     });
     renderDocItemsList(prefix);
     // Mark the row as added
@@ -41842,6 +42504,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       unit_price: unitPrice,
       quantity: 1,
       total: unitPrice,
+      _fromCatalog: true,  // preserve this item when PR selection changes
     });
     renderDocItemsList(prefix);
     itemSelect.value = "";
@@ -41940,7 +42603,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           descDisplay +
           "</td>" +
           '<td style="text-align:center;">' +
-          escapeHtml(it.item_unit) +
+          escapeHtml(it.catalog_unit || it.resolved_unit || it.item_unit || '') +
           "</td>" +
           priceCols +
           '<td><input type="number" value="' +
@@ -42088,7 +42751,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       item_code: si.item_code || "PR-ITEM-" + (idx + 1),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
       unit_price: si.unit_price,
       category: si.item_category || "general",
@@ -42105,6 +42768,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       return;
 
     try {
+      const checkedAppIds = (window._prSelectedAppItemIds || []).map(it => it.id);
       const data = {
         pr_number: prNumber,
         purpose: purpose,
@@ -42113,6 +42777,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         item_specifications:
           document.getElementById("prItemSpecs")?.value.trim() || null,
         items: items,
+        app_item_ids: checkedAppIds.length > 0 ? checkedAppIds : undefined,
       };
       const result = await apiRequest("/purchase-requests", "POST", data);
       const prId = result.id || result.pr_id;
@@ -42145,7 +42810,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     e.preventDefault();
     const rfqNumber = document.getElementById("rfqNumber")?.value || "";
     const rfqDate = document.getElementById("rfqDate")?.value || "";
-    const prId = document.getElementById("rfqLinkedPR")?.value || "";
+    const checkedPrIds = (window._rfqSelectedPRIds || []).map(it => it.id);
     const deadline = document.getElementById("rfqDeadline")?.value || "";
     const supplierId = document.getElementById("rfqSupplierId")?.value || "";
     const isManualSupplier =
@@ -42160,13 +42825,14 @@ Failure to submit the above requirements within the prescribed period shall cons
     // Read items from catalog selection
     const selectedItems = window._docSelectedItems["rfq"] || [];
     const items = selectedItems.map((si, idx) => ({
-      item_id: si.item_id,
-      item_code: si.item_code || "RFQ-ITEM-" + (idx + 1),
+      item_id: si.item_id || null,
+      item_code: si.item_code && !si.item_code.startsWith('RFQ-ITEM-') && !si.item_code.startsWith('PR-ITEM-')
+        ? si.item_code : (si.item_code || "RFQ-ITEM-" + (idx + 1)),
       item_name: si.item_name,
       item_description: si.description || si.item_description || si.item_name,
-      unit: si.item_unit,
+      unit: si.catalog_unit || si.resolved_unit || si.item_unit || si.unit || '',
       quantity: si.quantity,
-      abc_unit_cost: si.unit_price,
+      abc_unit_cost: si.catalog_unit_price || si.unit_price,
     }));
     const abcAmount = selectedItems.reduce(
       (sum, si) => sum + (si.total || 0),
@@ -42178,7 +42844,8 @@ Failure to submit the above requirements within the prescribed period shall cons
     try {
       const data = {
         rfq_number: rfqNumber,
-        pr_id: prId ? parseInt(prId) : null,
+        pr_id: checkedPrIds.length > 0 ? checkedPrIds[0] : null,
+        pr_ids: checkedPrIds.length > 0 ? checkedPrIds : undefined,
         date_prepared: rfqDate || null,
         submission_deadline: deadline || null,
         abc_amount: abcAmount,
@@ -53879,6 +54546,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? parseFloat(pr.total_amount)
           : grandTotal;
 
+      // Add NOTHING FOLLOWS row right after items
+      itemsHTML += `
+ <tr>
+ <td class="pr-cell-center" colspan="6" style="text-align:center; padding:12px 0; font-weight:bold; font-style:italic; font-size:11pt; color:red;">***NOTHING FOLLOWS***</td>
+ </tr>`;
+
       // Add empty rows to fill space (minimum ~15 visible rows for form look)
       const minRows = 15;
       const currentRows =
@@ -53888,7 +54561,8 @@ Failure to submit the above requirements within the prescribed period shall cons
             i.item_description &&
             i.item_description.trim().toLowerCase() !==
               (i.item_name || "").trim().toLowerCase(),
-        ).length;
+        ).length +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = currentRows; i < minRows; i++) {
         itemsHTML += `
  <tr>
@@ -54728,7 +55402,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="closing">Very truly yours,</div>
 
  <div class="sig-name">${rdName}</div>
- <div class="sig-title">OIC \u2013 Regional Director</div>
+ <div class="sig-title">Regional Director</div>
  <div class="sig-title">Head of the Procuring Entity</div>
  </div>
 
@@ -54814,27 +55488,79 @@ Failure to submit the above requirements within the prescribed period shall cons
       // Fetch RFQ items for detail table
       let rfqItems = [];
       let prItems = [];
+      let catalogItems = [];
       const rfqId = bacRes.rfq_id || abstract?.rfq_id;
       if (rfqId) {
         try {
           const rfq = await apiRequest("/rfqs/" + rfqId);
           if (rfq && rfq.items) rfqItems = rfq.items;
-          // Fetch PR items for unit fallback (rfq_items.unit is nullable; pr_items.unit is NOT NULL)
-          const prId = rfq?.pr_id;
-          if (prId) {
-            try {
-              const pr = await apiRequest("/purchase-requests/" + prId);
-              if (pr && pr.items) prItems = pr.items;
-            } catch (e) {}
+              // Fetch PR items from ALL linked PRs (bridge table) for unit fallback
+          // linked_prs is the array from pr_rfq_links returned by GET /rfqs/:id
+          const linkedPRIds = (rfq?.linked_prs || []).map(p => p.pr_id).filter(Boolean);
+          // Also include the legacy single pr_id if not already in bridge list
+          if (rfq?.pr_id && !linkedPRIds.includes(rfq.pr_id)) linkedPRIds.push(rfq.pr_id);
+          if (linkedPRIds.length > 0) {
+            const prFetches = linkedPRIds.map(pid =>
+              apiRequest("/purchase-requests/" + pid).catch(() => null)
+            );
+            const prs = await Promise.all(prFetches);
+            prs.forEach(pr => { if (pr && pr.items) prItems = prItems.concat(pr.items); });
           }
         } catch (e) {}
       }
-      // Resolve unit: rfq_item → pr_item match → "Lot"
+      // Pre-fetch items catalog for final unit fallback (keyed by item_code and name)
+      try {
+        const catalog = await apiRequest("/items");
+        if (Array.isArray(catalog)) catalogItems = catalog;
+      } catch (e) {}
+      // Resolve unit: rfq_item.unit → pr_item.unit → items catalog by item_code/name → ""
+      // "Lot"/"lot" is treated as a non-authoritative placeholder — catalog lookup overrides it.
+      const isLotPlaceholder = (u) => !u || u.toLowerCase() === "lot";
       const resolveUnit = (item, idx) => {
+        const code = item?.item_code || item?.catalog_code || "";
+        const name = item?.item_name || "";
+
+        // Priority 1: catalog_unit from server-side JOIN (most authoritative — already resolved)
+        if (item?.catalog_unit && !isLotPlaceholder(item.catalog_unit)) return item.catalog_unit;
+        // Priority 2: resolved_unit from server-side COALESCE (rfq unit || catalog unit)
+        if (item?.resolved_unit && !isLotPlaceholder(item.resolved_unit)) return item.resolved_unit;
+
+        // Priority 3: client-side catalog lookup by item_code then item_name
+        if (code || name) {
+          const catItem = catalogItems.find(c =>
+            (code && (c.code === code || c.stock_no === code)) ||
+            (name && c.name?.toLowerCase() === name.toLowerCase())
+          );
+          if (catItem?.unit && !isLotPlaceholder(catItem.unit)) return catItem.unit;
+        }
+
+        // Priority 4: rfq_item stored unit (skip "Lot" placeholder)
         const u = item?.unit || item?.item_unit || item?.uom || "";
-        if (u) return u;
-        const prItem = prItems[idx] || prItems.find(p => p.item_name === item?.item_name);
-        return prItem?.unit || prItem?.item_unit || "Lot";
+        if (u && !isLotPlaceholder(u)) return u;
+
+        // Priority 5: pr_item unit from any linked PR — search all fetched prItems
+        // Match by item_code first (most reliable), then by item_name
+        const prItem = (code
+          ? prItems.find(p => (p.item_code === code) || (p.item_name?.toLowerCase() === name.toLowerCase()))
+          : prItems.find(p => p.item_name?.toLowerCase() === name.toLowerCase())
+        ) || prItems[idx];
+
+        if (prItem) {
+          const prCode = prItem?.item_code || "";
+          // Try catalog lookup via PR's item_code if different from rfq item_code
+          if (prCode && prCode !== code) {
+            const catByPR = catalogItems.find(c =>
+              c.code === prCode || c.stock_no === prCode ||
+              (name && c.name?.toLowerCase() === name.toLowerCase())
+            );
+            if (catByPR?.unit && !isLotPlaceholder(catByPR.unit)) return catByPR.unit;
+          }
+          const prUnit = prItem?.unit || prItem?.item_unit || "";
+          if (prUnit && !isLotPlaceholder(prUnit)) return prUnit;
+        }
+
+        // Last resort: return whatever we have (even "Lot") or empty string
+        return u || "";
       };
 
       // Helper: format currency
@@ -55221,6 +55947,13 @@ Failure to submit the above requirements within the prescribed period shall cons
             mergedBidders.length > 0
               ? parseFloat(mergedBidders[0].amount || bidAmount)
               : bidAmount;
+          // contractUnitCost = bid total for this item ÷ qty
+          // contractTotalCost = bid total for this item (proportional share of total bid)
+          const itemShare = rfqItems.length > 1
+            ? (abcTotalCost / (rfqItems.reduce((s, i) => s + parseFloat(i.abc_unit_cost || i.unit_price || 0) * parseFloat(i.quantity || 0), 0) || abcAmount)) * bidAmount
+            : bidAmount;
+          const resolvedContractUnit = qty > 0 ? itemShare / qty : abcUnitCost;
+          const resolvedContractTotal = itemShare;
           detailTableRows +=
             "<tr>" +
             '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' +
@@ -55235,16 +55968,16 @@ Failure to submit the above requirements within the prescribed period shall cons
             '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
             resolveUnit(item, rfqItems.indexOf(item)) +
             "</td>" +
-            '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
+            '<td style="border:1px solid #000;padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
             (item.item_name ||
               item.item_description ||
               procurementDescription) +
             "</td>" +
             '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' +
-            fmtCurrency(contractUnitCost) +
+            fmtCurrency(resolvedContractUnit) +
             "</td>" +
             '<td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;">' +
-            fmtCurrency(contractTotalCost) +
+            fmtCurrency(resolvedContractTotal) +
             "</td>" +
             "</tr>";
         });
@@ -55259,7 +55992,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           "</td>" +
           '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">1</td>' +
           '<td style="border:1px solid #000;padding:4px;text-align:center;font-size:10pt;">' +
-          (prItems[0]?.unit || prItems[0]?.item_unit || "Lot") +
+          (() => { const pu = prItems[0]?.unit || prItems[0]?.item_unit || ""; const pcode = prItems[0]?.item_code || ""; const pname = prItems[0]?.item_name || ""; const cat = catalogItems.find(c => (pcode && c.code === pcode) || (pname && c.name?.toLowerCase() === pname.toLowerCase())); return (cat?.unit && cat.unit.toLowerCase() !== "lot") ? cat.unit : (pu && pu.toLowerCase() !== "lot" ? pu : (pu || "")); })() +
           "</td>" +
           '<td style="padding:4px;font-size:10pt;outline:none;" contenteditable="false">' +
           procurementDescription +
@@ -55431,7 +56164,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <tbody>
  ${detailTableRows}
  <tr>
- <td colspan="5" style="padding:4px;text-align:right;font-size:10pt;font-weight:bold;outline:none;">Total Contract Price</td>
+ <td colspan="5" style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">Total Contract Price</td>
  <td style="border:1px solid #000;padding:4px;"></td>
  <td style="border:1px solid #000;padding:4px;text-align:right;font-size:10pt;font-weight:bold;">${fmtCurrency(bidAmount)}</td>
  </tr>
@@ -55528,10 +56261,33 @@ Failure to submit the above requirements within the prescribed period shall cons
  </style>
  `;
 
-      const html = buildPrintHTML(
-        "BAC Resolution - " + (bacRes.resolution_number || ""),
-        customStyles + fullContent,
-      );
+      // Build the BAC Resolution HTML directly — bypassing buildPrintHTML's
+      // thead/tfoot table wrapper which causes a blank page 1 in Chromium print.
+      // Instead: header + content + footer all flow as normal body content.
+      const bacFooter = `<p style="text-align:center;font-size:8px;color:#888;margin-top:10px;">Generated by DMW Caraga Procurement System | ${new Date().toLocaleString('en-PH')}</p>`;
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>BAC Resolution - ${bacRes.resolution_number || ''}</title>
+  <style>
+    ${getPrintHeaderCSS()}
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: white !important; }
+    body { font-family: Arial, sans-serif; padding: 0; font-size: 10px; line-height: 1.4; color: #222; }
+    @page { size: A4 portrait; margin: 15mm 20mm; }
+    [contenteditable="true"] { background: #fffde7; padding: 1px 4px; border-radius: 2px; min-width: 50px; display: inline-block; }
+    [contenteditable="true"]:hover { background: #fff9c4; }
+    [contenteditable="true"]:focus { background: #fff59d; outline: 2px solid #ffc107; }
+    @media print { [contenteditable="true"] { background: transparent !important; } }
+  </style>
+</head>
+<body>
+  ${getPrintHeaderHTML()}
+  ${fullContent}
+  ${bacFooter}
+</body>
+</html>`;
       openPrintPreview(html, {
         title: toFilename("BAC_Resolution_" + (bacRes.resolution_number || "")),
         pageSize: "A4",
@@ -55758,7 +56514,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       } else if (po.item_specifications && items.length === 0) {
         items.push({
           quantity: 1,
-          unit: "Lot",
+          unit: "",
           item_name: po.item_specifications.split("\n")[0] || "",
           item_description: po.item_specifications,
           unit_price: po.total_amount || 0,
@@ -56219,14 +56975,10 @@ Failure to submit the above requirements within the prescribed period shall cons
         console.warn("Could not fetch BAC/employee data:", e);
       }
 
-      // Fetch Purpose from linked PR
-      if (rfq.pr_id) {
-        try {
-          const pr = await apiRequest("/purchase-requests/" + rfq.pr_id);
-          if (pr && pr.purpose) prPurpose = pr.purpose;
-        } catch (e) {
-          console.warn("Could not fetch PR purpose:", e);
-        }
+      // Fetch Purpose from first linked PR
+      {
+        const firstPR = await fetchFirstLinkedPR(rfq).catch(() => null);
+        if (firstPR && firstPR.purpose) prPurpose = firstPR.purpose;
       }
 
       const fmtDate = (d) => {
@@ -56318,6 +57070,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           '<tr><td colspan="6" style="text-align:center; padding:20px;">No items</td></tr>';
       }
 
+      // Add NOTHING FOLLOWS row right after items
+      itemsHTML += `
+ <tr>
+ <td class="rfq-cell-center" colspan="6" style="text-align:center; padding:12px 0; font-weight:bold; font-style:italic; font-size:11pt; color:red;">***NOTHING FOLLOWS***</td>
+ </tr>`;
+
       // Fill empty rows for form look
       const minRows = 12;
       const currentRows =
@@ -56329,7 +57087,8 @@ Failure to submit the above requirements within the prescribed period shall cons
               c +
               i.item_description.split(/\\n|\n/).filter((l) => l.trim()).length,
             0,
-          );
+          ) +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = currentRows; i < minRows; i++) {
         itemsHTML += `
  <tr>
@@ -56795,13 +57554,17 @@ Failure to submit the above requirements within the prescribed period shall cons
         });
       }
 
+      // Add NOTHING FOLLOWS row right after items/specs
+      itemsHTML += `<tr><td class="abs-td" colspan="10" style="text-align:center; padding:8px 0; font-weight:bold; font-style:italic; font-size:10pt; color:red;">***NOTHING FOLLOWS***</td></tr>`;
+
       // Empty filler rows
       const totalContentRows =
         abstractItems.length +
         (abs.item_specifications
           ? abs.item_specifications.split(/\n/).filter((l) => l.trim()).length +
             1
-          : 0);
+          : 0) +
+        1; // +1 for NOTHING FOLLOWS row
       for (let i = totalContentRows; i < 6; i++) {
         itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
       }
