@@ -7116,15 +7116,42 @@ function renderNOATable(noa) {
           ? "WITH NOA"
           : n.status === "awaiting_noa"
             ? "AWAITING NOA"
-            : n.status === "cancelled"
-              ? "CANCELLED"
-              : n.status.toUpperCase();
+            : n.status === "issued"
+              ? "ISSUED"
+              : n.status === "cancelled"
+                ? "CANCELLED"
+                : n.status.toUpperCase();
       const statusClass =
         n.status === "with_noa"
           ? "completed"
           : n.status === "awaiting_noa"
             ? "on_going"
-            : "cancelled";
+            : n.status === "issued"
+              ? "completed"
+              : "cancelled";
+
+      // ── Multi-stage approval chips (with_noa = pending, issued = approved) ──
+      let noaApprovalInfo = "";
+      if (n.status === "with_noa") {
+        const noaBudgetDone = n.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${n.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const noaHopeDone = n.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${n.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const noaChiefDone = n.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${n.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
+        noaApprovalInfo = `<div class="approval-status-row">${noaBudgetDone}${noaHopeDone}${noaChiefDone}</div>`;
+      }
+      const noaAlreadyApproved =
+        (userHasRole("hope") && !!n.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!n.approved_by_budget) ||
+        (userHasRole("bac_chair") && !!n.approved_by_chief);
+      const noaShowBtn = n.status === "with_noa" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !noaAlreadyApproved;
+
       return `<tr>
  <td>${n.noa_number || ""}</td>
  <td>${n.postqual_number || "-"}</td>
@@ -7134,11 +7161,12 @@ function renderNOATable(noa) {
  <td>${n.resolution_number || ""}</td>
  <td>₱${parseFloat(n.contract_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
  <td>${n.bidder_receipt_date ? new Date(n.bidder_receipt_date).toLocaleDateString() : "-"}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${noaApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewNOAModal(${n.id})"><i class="fas fa-eye"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditNOAModal(${n.id})"><i class="fas fa-edit"></i></button>` : ""}
+ ${noaShowBtn ? `<button class="btn-icon success" title="Approve NOA" onclick="showApproveDocModal('noa',${n.id},'${n.noa_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printNoticeOfAward(${n.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('NOA', ${n.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -7173,6 +7201,29 @@ function renderPOTable(po) {
           : p.status === "for_signing"
             ? "on_going"
             : "cancelled";
+
+      // ── Multi-stage approval chips (for_signing = pending, signed = approved) ──
+      let poApprovalInfo = "";
+      if (p.status === "for_signing") {
+        const poBudgetDone = p.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
+        const poHopeDone = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
+        const poChiefDone = p.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="Signed by Director: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> Director</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Director signature"><i class="fas fa-clock"></i> Director</span>`;
+        poApprovalInfo = `<div class="approval-status-row">${poBudgetDone}${poHopeDone}${poChiefDone}</div>`;
+      }
+      const poAlreadyApproved =
+        (userHasRole("hope") && !!p.approved_by_hope) ||
+        (userHasRole("budget_consultant") && !!p.approved_by_budget) ||
+        (userHasAnyRole(["hope","admin","system_admin"]) && !!p.approved_by_chief);
+      const poShowBtn = p.status === "for_signing" &&
+        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        !poAlreadyApproved;
+
       return `<tr>
  <td>${p.po_number || ""}</td>
  <td>${p.noa_number || "-"}</td>
@@ -7182,11 +7233,12 @@ function renderPOTable(po) {
  <td>${p.place_of_delivery || "DMW RO XIII"}</td>
 <td>${p.delivery_date || p.expected_delivery_date ? new Date(p.delivery_date || p.expected_delivery_date).toLocaleDateString("en-PH") : ""}</td>
  <td>₱${parseFloat(p.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
- <td>${statusBadge(statusLabel, statusClass)}</td>
+ <td>${statusBadge(statusLabel, statusClass)}${poApprovalInfo}</td>
  <td>
  <div class="action-buttons">
  <button class="btn-icon" title="View" onclick="showViewPOModal(${p.id})"><i class="fas fa-eye"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon" title="Edit" onclick="showEditPOModal(${p.id})"><i class="fas fa-edit"></i></button>` : ""}
+ ${poShowBtn ? `<button class="btn-icon success" title="Approve/Sign PO" onclick="showApproveDocModal('po',${p.id},'${p.po_number||''}')"><i class="fas fa-check"></i></button>` : ""}
  <button class="btn-icon" title="Print" onclick="printPurchaseOrder(${p.id})"><i class="fas fa-print"></i></button>
  ${!userHasAnyRole(["requester"]) ? `<button class="btn-icon danger" title="Delete" onclick="showDeleteConfirmModal('PO', ${p.id})"><i class="fas fa-trash"></i></button>` : ""}
  </div>
@@ -16128,7 +16180,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         pr_number: document.getElementById("editPrNumber").value,
         purpose: purpose,
         total_amount: totalAmount,
-        status: "draft",
+        status: "with_noa",  // Default: NOA created, pending approval stages
         dept_id: cachedRecord ? cachedRecord.dept_id : undefined,
         item_specifications:
           document.getElementById("editPrItemSpecs")?.value.trim() || null,
@@ -31587,16 +31639,23 @@ Failure to submit the above requirements within the prescribed period shall cons
       abstract:         "/abstracts/" + docId,
       bac_resolution:   "/bac-resolutions/" + docId,
       post_qualification: "/post-qualifications/" + docId,
+      noa:              "/notices-of-award/" + docId,
+      po:               "/purchase-orders/" + docId,
     };
     const titleMap = {
       rfq:              "Approve RFQ",
       abstract:         "Approve Abstract",
       bac_resolution:   "Approve BAC Resolution",
       post_qualification: "Approve Post-Qualification",
+      noa:              "Approve Notice of Award",
+      po:               "Sign Purchase Order",
     };
     let doc = null;
     try { doc = await apiRequest(endpointMap[docType]); } catch (e) {}
     if (!doc) { showNotification("Record not found.", "error"); return; }
+    // Each doc type has its own pending/completed status pair
+    const docPendingStatus   = docType === "noa" ? "with_noa"   : docType === "po" ? "for_signing" : "on_going";
+    const docCompletedStatus = docType === "noa" ? "issued"      : docType === "po" ? "signed"      : "completed";
 
     const chiefApproved  = !!doc.approved_by_chief;
     const hopeApproved   = !!doc.approved_by_hope;
@@ -31634,8 +31693,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">${budgetStatus}${hopeStatus}${chiefStatus}</div>
         ${allApproved
-          ? `<p style="margin-top:12px;color:#2e7d32;font-weight:bold;"><i class="fas fa-check-double"></i> All stages approved — document will be marked <strong>COMPLETED</strong></p>`
-          : `<p style="margin-top:10px;color:#636e78;font-size:12px;">All 3 stages must be approved to mark this document as completed.</p>`}
+          ? `<p style="margin-top:12px;color:#2e7d32;font-weight:bold;"><i class="fas fa-check-double"></i> All stages approved — document will be marked <strong>${docCompletedStatus.toUpperCase()}</strong></p>`
+          : `<p style="margin-top:10px;color:#636e78;font-size:12px;">All 3 stages must be approved to mark this document as ${docCompletedStatus}.</p>`}
       </div>
       <div style="text-align:right;margin-top:18px;display:flex;justify-content:flex-end;gap:10px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
@@ -31652,7 +31711,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.approveDoc = async function (docType, docId) {
     const isAdmin = userHasAnyRole(["admin", "system_admin"]);
     const confirmMsg = isAdmin
-      ? "Approve all stages (Budget, HOPE, BAC Chair) and mark this document as COMPLETED?"
+      ? `Approve all stages and mark this document as ${docType === "po" ? "SIGNED" : docType === "noa" ? "ISSUED" : "COMPLETED"}?`
       : "Confirm approval of this document for your stage?";
     if (!confirm(confirmMsg)) return;
     const endpointMap = {
@@ -31660,6 +31719,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       abstract:          "/abstracts/" + docId + "/approve",
       bac_resolution:    "/bac-resolutions/" + docId + "/approve",
       post_qualification: "/post-qualifications/" + docId + "/approve",
+      noa:               "/notices-of-award/" + docId + "/approve",
+      po:                "/purchase-orders/" + docId + "/approve",
     };
     const reloadFnMap = {
       rfq:               () => { if (typeof loadRFQ === "function") loadRFQ(); },
@@ -31668,6 +31729,8 @@ Failure to submit the above requirements within the prescribed period shall cons
                                    else if (typeof loadBAC === "function") loadBAC(); },
       post_qualification: () => { if (typeof loadPostQual === "function") loadPostQual();
                                     else if (typeof loadPostQualification === "function") loadPostQualification(); },
+      noa:               () => { if (typeof loadNOA === "function") loadNOA(); },
+      po:                () => { if (typeof loadPO === "function") loadPO(); },
     };
     try {
       const body = isAdmin ? { approve_all: true } : {};

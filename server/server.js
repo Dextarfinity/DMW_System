@@ -3614,7 +3614,7 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
 // SHARED MULTI-STAGE APPROVAL HELPER (Budget → HOPE → BAC Chair)
 // All 3 stages done → status = 'completed'
 // ==============================================================================
-function makeDocApproveHandler(tableName) {
+function makeDocApproveHandler(tableName, completedStatus = 'completed') {
   return async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3638,7 +3638,7 @@ function makeDocApproveHandler(tableName) {
         push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
         push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
         push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
-        push('status', 'completed');
+        push('status', completedStatus);
       } else if (userRoles.includes('budget_consultant') && !doc.approved_by_budget) {
         push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
       } else if (userRoles.includes('hope') && !doc.approved_by_hope) {
@@ -3655,13 +3655,13 @@ function makeDocApproveHandler(tableName) {
 
       const { rows: updated } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
       const u = updated[0];
-      if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== 'completed') {
-        await pool.query(`UPDATE ${tableName} SET status = 'completed', updated_at = NOW() WHERE id = $1`, [id]);
-        u.status = 'completed';
+      if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== completedStatus) {
+        await pool.query(`UPDATE ${tableName} SET status = '${completedStatus}', updated_at = NOW() WHERE id = $1`, [id]);
+        u.status = completedStatus;
       }
       res.json({
-        message: u.status === 'completed' ? 'All stages approved — document marked as completed.' : 'Stage approved successfully.',
-        status: u.status, completed: u.status === 'completed',
+        message: u.status === completedStatus ? `All stages approved — document marked as ${completedStatus}.` : 'Stage approved successfully.',
+        status: u.status, completed: u.status === completedStatus,
       });
     } catch (err) {
       console.error(`[APPROVE ${tableName}]`, err.message);
@@ -4384,7 +4384,7 @@ app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, supplier_name, rfq_id, contract_amount, date_issued, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount||0, date_issued, status||'issued', req.user.id]
+      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount||0, date_issued, status||'with_noa', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -4424,6 +4424,8 @@ app.put('/api/notices-of-award/:id/set-status', authenticateToken, async (req, r
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+app.put('/api/notices-of-award/:id/approve', authenticateToken, makeDocApproveHandler('notices_of_award', 'issued'));
 
 app.delete('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
   try {
@@ -4575,6 +4577,8 @@ app.put('/api/purchase-orders/:id/status', authenticateToken, async (req, res) =
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+app.put('/api/purchase-orders/:id/approve', authenticateToken, makeDocApproveHandler('purchaseorders', 'signed'));
 
 app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
@@ -7150,7 +7154,19 @@ async function runMigrations() {
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_id INTEGER`,
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_name TEXT`,
     // NOA default status
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'awaiting_noa'`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'with_noa'`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
     `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
@@ -7203,6 +7219,18 @@ async function runMigrations() {
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
