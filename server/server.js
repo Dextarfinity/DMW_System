@@ -3614,7 +3614,7 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
 // SHARED MULTI-STAGE APPROVAL HELPER (Budget → HOPE → BAC Chair)
 // All 3 stages done → status = 'completed'
 // ==============================================================================
-function makeDocApproveHandler(tableName, completedStatus = 'completed') {
+function makeDocApproveHandler(tableName, completedStatus = 'completed', twoStageOnly = false) {
   return async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3637,13 +3637,13 @@ function makeDocApproveHandler(tableName, completedStatus = 'completed') {
       if (approveAll) {
         push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
         push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-        push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+        if (!twoStageOnly) { push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now); }
         push('status', completedStatus);
       } else if (userRoles.includes('budget_consultant') && !doc.approved_by_budget) {
         push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
       } else if (userRoles.includes('hope') && !doc.approved_by_hope) {
         push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-      } else if (userRoles.some(r => ['bac_chair','bac_sec','chief_fad','chief_wrsd'].includes(r)) && !doc.approved_by_chief) {
+      } else if (!twoStageOnly && userRoles.some(r => ['bac_chair','bac_sec','chief_fad','chief_wrsd'].includes(r)) && !doc.approved_by_chief) {
         push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
       } else {
         return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
@@ -3655,8 +3655,12 @@ function makeDocApproveHandler(tableName, completedStatus = 'completed') {
 
       const { rows: updated } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
       const u = updated[0];
-      if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== completedStatus) {
-        await pool.query(`UPDATE ${tableName} SET status = '${completedStatus}', updated_at = NOW() WHERE id = $1`, [id]);
+      // For 2-stage: complete when budget+hope done; for 3-stage: complete when all three done
+      const allDone = twoStageOnly
+        ? (u.approved_by_budget && u.approved_by_hope)
+        : (u.approved_by_budget && u.approved_by_hope && u.approved_by_chief);
+      if (!approveAll && allDone && u.status !== completedStatus) {
+        await pool.query(`UPDATE ${tableName} SET status = $1, updated_at = NOW() WHERE id = $2`, [completedStatus, id]);
         u.status = completedStatus;
       }
       res.json({
@@ -4578,7 +4582,7 @@ app.put('/api/purchase-orders/:id/status', authenticateToken, async (req, res) =
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/purchase-orders/:id/approve', authenticateToken, makeDocApproveHandler('purchaseorders', 'signed'));
+app.put('/api/purchase-orders/:id/approve', authenticateToken, makeDocApproveHandler('purchaseorders', 'signed', true));
 
 app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
@@ -7227,10 +7231,6 @@ async function runMigrations() {
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
-    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
-    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
     `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,

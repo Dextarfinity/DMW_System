@@ -7203,25 +7203,22 @@ function renderPOTable(po) {
             : "cancelled";
 
       // ── Multi-stage approval chips (for_signing = pending, signed = approved) ──
+      // PO approval: Budget Consultant → HoPE only (HoPE IS the Director)
       let poApprovalInfo = "";
       if (p.status === "for_signing") {
         const poBudgetDone = p.approved_by_budget
           ? `<span class="approval-badge chief-done" title="Approved by Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
         const poHopeDone = p.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const poChiefDone = p.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Signed by Director: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> Director</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Director signature"><i class="fas fa-clock"></i> Director</span>`;
-        poApprovalInfo = `<div class="approval-status-row">${poBudgetDone}${poHopeDone}${poChiefDone}</div>`;
+          ? `<span class="approval-badge hope-done" title="Signed by HoPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HoPE signature"><i class="fas fa-clock"></i> HoPE</span>`;
+        poApprovalInfo = `<div class="approval-status-row">${poBudgetDone}${poHopeDone}</div>`;
       }
       const poAlreadyApproved =
         (userHasRole("hope") && !!p.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!p.approved_by_budget) ||
-        (userHasAnyRole(["hope","admin","system_admin"]) && !!p.approved_by_chief);
+        (userHasRole("budget_consultant") && !!p.approved_by_budget);
       const poShowBtn = p.status === "for_signing" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        userHasAnyRole(["hope","budget_consultant","admin","system_admin"]) &&
         !poAlreadyApproved;
 
       return `<tr>
