@@ -315,7 +315,12 @@ JWT_SECRET=your_secret_key_here
    - Added TCP port 3000 rule for Express API
    - Command: `New-NetFirewallRule -DisplayName "DMW Server Discovery UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 5555`
 
-4. **Comprehensive Deployment Documentation** ✅
+4. **Role-Aware Bulk Approval Workflow** ✅
+   - Added selection checkboxes and bulk approval toolbar support for approval-capable transaction tables from PPMP through Purchase Order
+   - Bulk actions reuse the existing per-document approve routes and respect role-based approval rules, including direct approve-all behavior where the backend already supports it
+   - The renderer rebuilds bulk controls after each table refresh so the selection UI stays in sync with filters and loaded data
+
+5. **Comprehensive Deployment Documentation** ✅
    - `SERVER_DISTRIBUTION_GUIDE.md` — USB distribution workflow
    - `DEPLOYMENT_CHECKLIST.md` — Admin quick reference
    - `DEPLOYMENT_WORKFLOW.md` — Real-time update examples

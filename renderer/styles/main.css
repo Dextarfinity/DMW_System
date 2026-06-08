@@ -1320,6 +1320,16 @@ body {
  color: #744210;
  border: 1px solid #f6e05e;
 }
+.approval-badge.twg-done {
+ background: #c6f6d5;
+ color: #22543d;
+ border: 1px solid #9ae6b4;
+}
+.approval-badge.twg-pending {
+ background: #fefcbf;
+ color: #744210;
+ border: 1px solid #f6e05e;
+}
 
 /* ==================== DIVISION BUDGET BREAKDOWN ==================== */
 .division-budget-row {

@@ -556,9 +556,11 @@ function getFiscalYearOptions(prefix = "FY", selectedYear = null) {
 
 /** Generate a dynamic document number with current year */
 function generateDocNumber(prefix) {
-  const yr = getCurrentFiscalYear();
+  const now = new Date();
+  const yr = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
   const rand = String(Math.floor(Math.random() * 9000) + 1000);
-  return `${prefix}-${yr}-${rand}`;
+  return `${prefix}-${yr}-${month}-${rand}`;
 }
 
 /** Format today as ISO date string (YYYY-MM-DD) */
@@ -2150,6 +2152,7 @@ async function loadPPMP() {
 
     // Render the filtered PPMP data to the table
     renderPPMPTable(filtered, ppmp);
+    syncApprovalBulkControls("ppmp", filtered);
 
     // Fetch and display available budget from APP
     const fy = window._ppmpFilterYear || getCurrentFiscalYear();
@@ -2955,6 +2958,7 @@ function filterPRTable() {
     });
   }
   renderPRTable(data);
+  syncApprovalBulkControls("pr", data);
 }
 
 async function loadRFQ() {
@@ -3015,6 +3019,7 @@ function filterRFQTable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderRFQTable(data);
+  syncApprovalBulkControls("rfq", data);
 }
 
 async function loadAbstract() {
@@ -3068,6 +3073,7 @@ function filterAbstractTable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderAbstractTable(data);
+  syncApprovalBulkControls("abstract", data);
 }
 
 async function loadPostQual() {
@@ -3123,6 +3129,7 @@ function filterPostQualTable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderPostQualTable(data);
+  syncApprovalBulkControls("postqual", data);
 }
 
 async function loadBACResolution() {
@@ -3177,6 +3184,7 @@ function filterBACResTable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderBACResolutionTable(data);
+  syncApprovalBulkControls("bacres", data);
 }
 
 async function loadNOA() {
@@ -3229,6 +3237,7 @@ function filterNOATable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderNOATable(data);
+  syncApprovalBulkControls("noa", data);
 }
 
 async function loadPO() {
@@ -3281,6 +3290,7 @@ function filterPOTable() {
   }
   if (statusVal) data = data.filter((r) => r.status === statusVal);
   renderPOTable(data);
+  syncApprovalBulkControls("po", data);
 }
 
 async function loadIAR() {
@@ -3977,6 +3987,44 @@ function determinePRStep(pr) {
 }
 
 function getTrackerStep(row) {
+  const source = (row.procurement_source || row.item_procurement_source || "").toUpperCase();
+
+  if (source === "PS-DBM") {
+    if (row.iar_acceptance || row.iar_inspection) {
+      if (row.iar_acceptance === "complete")
+        return {
+          label: "IAR — Complete",
+          color: "#38a169",
+          icon: "fa-clipboard-check",
+        };
+      if (row.iar_inspection === "verified")
+        return {
+          label: "IAR — Verified",
+          color: "#38a169",
+          icon: "fa-clipboard-check",
+        };
+      if (row.iar_inspection === "on_going")
+        return {
+          label: "IAR — On Going",
+          color: "#d69e2e",
+          icon: "fa-truck",
+        };
+      return {
+        label: "IAR — To Be Checked",
+        color: "#636e78",
+        icon: "fa-hourglass-half",
+      };
+    }
+
+    if ((row.pr_status || "").toLowerCase() === "approved") {
+      return {
+        label: "IAR — To Be Checked",
+        color: "#636e78",
+        icon: "fa-clipboard-check",
+      };
+    }
+  }
+
   // Walk the procurement chain from the end (IAR) back to PR
   // IAR — Inspection & Acceptance
   if (row.iar_acceptance || row.iar_inspection) {
@@ -4210,6 +4258,303 @@ function statusBadge(label, statusClass) {
   };
   const c = colorMap[statusClass] || colorMap["on_going"];
   return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:${c.color};background:${c.bg};padding:3px 10px;border-radius:12px;white-space:nowrap;"><i class="fas ${c.icon}" style="font-size:10px;"></i> ${label}</span>`;
+}
+
+const APPROVAL_BULK_CONFIG = {
+  ppmp: {
+    tableBodyId: "ppmpTableBody",
+    label: "PPMP entries",
+    endpoint: (id) => `/plans/${id}/approve`,
+    reload: () => (typeof loadPPMP === "function" ? loadPPMP() : null),
+    allowApproveAll: true,
+  },
+  pr: {
+    tableBodyId: "prTableBody",
+    label: "PR entries",
+    endpoint: (id) => `/purchase-requests/${id}/approve`,
+    reload: () => (typeof loadPR === "function" ? loadPR() : null),
+    allowApproveAll: true,
+  },
+  rfq: {
+    tableBodyId: "rfqTableBody",
+    label: "RFQ entries",
+    endpoint: (id) => `/rfqs/${id}/approve`,
+    reload: () => (typeof loadRFQ === "function" ? loadRFQ() : null),
+    allowApproveAll: true,
+  },
+  abstract: {
+    tableBodyId: "abstractTableBody",
+    label: "Abstract entries",
+    endpoint: (id) => `/abstracts/${id}/approve`,
+    reload: () => (typeof loadAbstract === "function" ? loadAbstract() : null),
+    allowApproveAll: true,
+  },
+  postqual: {
+    tableBodyId: "postQualTableBody",
+    label: "Post-Qualification entries",
+    endpoint: (id) => `/post-qualifications/${id}/approve`,
+    reload: () => (typeof loadPostQual === "function" ? loadPostQual() : null),
+    allowApproveAll: false,
+  },
+  bacres: {
+    tableBodyId: "bacResolutionTableBody",
+    label: "BAC Resolution entries",
+    endpoint: (id) => `/bac-resolutions/${id}/approve`,
+    reload: () => (typeof loadBACResolution === "function" ? loadBACResolution() : null),
+    allowApproveAll: true,
+  },
+  noa: {
+    tableBodyId: "noaTableBody",
+    label: "NOA entries",
+    endpoint: (id) => `/notices-of-award/${id}/approve`,
+    reload: () => (typeof loadNOA === "function" ? loadNOA() : null),
+    allowApproveAll: true,
+  },
+  po: {
+    tableBodyId: "poTableBody",
+    label: "PO entries",
+    endpoint: (id) => `/purchase-orders/${id}/approve`,
+    reload: () => (typeof loadPO === "function" ? loadPO() : null),
+    allowApproveAll: true,
+  },
+};
+
+const APPROVAL_BULK_STATE = {};
+
+function getApprovalBulkState(moduleKey) {
+  if (!APPROVAL_BULK_STATE[moduleKey]) {
+    APPROVAL_BULK_STATE[moduleKey] = new Set();
+  }
+  return APPROVAL_BULK_STATE[moduleKey];
+}
+
+function isAdminApprovalUser() {
+  return userHasAnyRole(["admin", "system_admin"]);
+}
+
+function getApprovalActionCell(row) {
+  if (!row) return null;
+  const buttonsCell = row.querySelector("td:last-child");
+  return buttonsCell || null;
+}
+
+function hasApproveAction(row) {
+  if (!row) return false;
+  return !!row.querySelector(
+    'button[data-action*="approve"], button[onclick*="showApprove"], button[onclick*="approve"], button[title*="Approve"]',
+  );
+}
+
+function updateApprovalBulkToolbar(moduleKey, eligibleCount) {
+  const cfg = APPROVAL_BULK_CONFIG[moduleKey];
+  if (!cfg) return;
+  const toolbarId = `approvalBulkToolbar-${moduleKey}`;
+  let toolbar = document.getElementById(toolbarId);
+
+  if (eligibleCount === 0) {
+    if (toolbar) toolbar.remove();
+    return;
+  }
+
+  if (!toolbar) {
+    toolbar = document.createElement("div");
+    toolbar.id = toolbarId;
+    toolbar.style.cssText =
+      "display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0;padding:10px 12px;border:1px solid #cbd5e0;border-radius:8px;background:#f8fafc;font-size:12px;";
+    toolbar.innerHTML = `
+      <div style="font-weight:700;color:#1a365d;">
+        <i class="fas fa-check-square" style="margin-right:6px;"></i>${cfg.label}
+      </div>
+      <div class="approval-bulk-summary" style="color:#4a5568;">0 selected</div>
+      <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;">
+        <button type="button" class="btn btn-sm btn-outline approval-bulk-select-all">Select All Eligible</button>
+        <button type="button" class="btn btn-sm btn-outline approval-bulk-clear">Clear Selection</button>
+        <button type="button" class="btn btn-sm btn-primary approval-bulk-approve-selected">Approve Selected</button>
+        <button type="button" class="btn btn-sm btn-success approval-bulk-approve-all">Approve All Eligible</button>
+      </div>
+    `;
+  }
+
+  const table = document.getElementById(cfg.tableBodyId)?.closest("table");
+  if (table && toolbar.parentElement !== table.parentElement) {
+    if (toolbar.parentElement) toolbar.remove();
+    table.insertAdjacentElement("beforebegin", toolbar);
+  } else if (table && !toolbar.parentElement) {
+    table.insertAdjacentElement("beforebegin", toolbar);
+  }
+
+  const approveAllButton = toolbar.querySelector(".approval-bulk-approve-all");
+  if (approveAllButton) {
+    approveAllButton.style.display = isAdminApprovalUser() && cfg.allowApproveAll ? "inline-flex" : "none";
+  }
+
+  const summary = toolbar.querySelector(".approval-bulk-summary");
+  if (summary) {
+    summary.textContent = `${getApprovalBulkState(moduleKey).size} selected of ${eligibleCount} eligible`;
+  }
+}
+
+async function runBulkApproval(moduleKey, recordIds, approveAll = false) {
+  const cfg = APPROVAL_BULK_CONFIG[moduleKey];
+  if (!cfg) return;
+  const ids = Array.from(new Set((recordIds || []).map((id) => String(id)).filter(Boolean)));
+  if (!ids.length) {
+    showNotification(`Select at least one ${cfg.label.toLowerCase()} first.`, "warning");
+    return;
+  }
+
+  const label = approveAll
+    ? `Approve all eligible ${cfg.label.toLowerCase()}?`
+    : `Approve ${ids.length} selected ${cfg.label.toLowerCase()}?`;
+  if (!confirm(label)) return;
+
+  const approveBody = approveAll && isAdminApprovalUser() && cfg.allowApproveAll
+    ? { approve_all: true }
+    : null;
+
+  let successCount = 0;
+  const errors = [];
+
+  for (const id of ids) {
+    try {
+      await apiRequest(cfg.endpoint(id), "PUT", approveBody);
+      successCount += 1;
+    } catch (err) {
+      errors.push(`ID ${id}: ${err.message}`);
+    }
+  }
+
+  getApprovalBulkState(moduleKey).clear();
+  if (typeof cfg.reload === "function") {
+    await cfg.reload();
+  }
+
+  if (errors.length) {
+    showNotification(
+      `Approved ${successCount} of ${ids.length} ${cfg.label.toLowerCase()} with ${errors.length} error(s).`,
+      "warning",
+    );
+    console.warn(`[BULK APPROVAL ${moduleKey}]`, errors.join(" | "));
+  } else {
+    showNotification(
+      `${successCount} ${cfg.label.toLowerCase()} approved successfully.`,
+      "success",
+    );
+  }
+}
+
+function syncApprovalBulkControls(moduleKey, records) {
+  const cfg = APPROVAL_BULK_CONFIG[moduleKey];
+  if (!cfg) return;
+
+  const tbody = document.getElementById(cfg.tableBodyId);
+  if (!tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const selectedSet = getApprovalBulkState(moduleKey);
+  let eligibleCount = 0;
+
+  rows.forEach((row, index) => {
+    const record = records && records[index];
+    if (!record) return;
+
+    row.dataset.approvalRecordId = String(record.id);
+    row.dataset.approvalModule = moduleKey;
+
+    const actionCell = getApprovalActionCell(row);
+    if (!actionCell) return;
+
+    const approveAvailable = hasApproveAction(actionCell);
+    const existingWrapper = actionCell.querySelector("[data-bulk-approval-wrapper='true']");
+
+    if (!approveAvailable) {
+      if (existingWrapper) existingWrapper.remove();
+      selectedSet.delete(String(record.id));
+      return;
+    }
+
+    eligibleCount += 1;
+
+    let wrapper = existingWrapper;
+    if (!wrapper) {
+      wrapper = document.createElement("label");
+      wrapper.dataset.bulkApprovalWrapper = "true";
+      wrapper.style.cssText =
+        "display:inline-flex;align-items:center;gap:4px;margin-right:10px;padding:4px 6px;border:1px solid #cbd5e0;border-radius:6px;background:#fff;cursor:pointer;font-size:11px;user-select:none;";
+      wrapper.title = "Select this entry for bulk approval";
+      wrapper.innerHTML = `<input type="checkbox" data-bulk-approval-checkbox="true" style="width:14px;height:14px;margin:0;cursor:pointer;">`;
+      actionCell.insertBefore(wrapper, actionCell.firstChild);
+    }
+
+    const checkbox = wrapper.querySelector('input[type="checkbox"]');
+    const recordId = String(record.id);
+    checkbox.checked = selectedSet.has(recordId);
+    checkbox.disabled = false;
+    checkbox.onchange = () => {
+      if (checkbox.checked) {
+        selectedSet.add(recordId);
+      } else {
+        selectedSet.delete(recordId);
+      }
+      updateApprovalBulkToolbar(moduleKey, eligibleCount);
+    };
+  });
+
+  const toolbarId = `approvalBulkToolbar-${moduleKey}`;
+  let toolbar = document.getElementById(toolbarId);
+  if (!toolbar) {
+    const table = tbody.closest("table");
+    if (table) {
+      updateApprovalBulkToolbar(moduleKey, eligibleCount);
+      toolbar = document.getElementById(toolbarId);
+    }
+  }
+
+  if (toolbar) {
+    const selectAllButton = toolbar.querySelector(".approval-bulk-select-all");
+    const clearButton = toolbar.querySelector(".approval-bulk-clear");
+    const approveSelectedButton = toolbar.querySelector(".approval-bulk-approve-selected");
+    const approveAllButton = toolbar.querySelector(".approval-bulk-approve-all");
+    const checkboxes = Array.from(tbody.querySelectorAll('[data-bulk-approval-checkbox="true"]'));
+
+    if (selectAllButton) {
+      selectAllButton.onclick = () => {
+        checkboxes.forEach((checkbox) => {
+          if (!checkbox.disabled) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event("change"));
+          }
+        });
+      };
+    }
+
+    if (clearButton) {
+      clearButton.onclick = () => {
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = false;
+          checkbox.dispatchEvent(new Event("change"));
+        });
+        selectedSet.clear();
+        updateApprovalBulkToolbar(moduleKey, eligibleCount);
+      };
+    }
+
+    if (approveSelectedButton) {
+      approveSelectedButton.onclick = () => runBulkApproval(moduleKey, [...selectedSet], false);
+    }
+
+    if (approveAllButton) {
+      approveAllButton.onclick = () => {
+        const eligibleIds = checkboxes
+          .filter((checkbox) => !checkbox.disabled)
+          .map((checkbox) => checkbox.closest("tr")?.dataset.approvalRecordId)
+          .filter(Boolean);
+        runBulkApproval(moduleKey, eligibleIds, true);
+      };
+    }
+  }
+
+  updateApprovalBulkToolbar(moduleKey, eligibleCount);
 }
 
 function stepBadge(status) {
@@ -4613,6 +4958,7 @@ function renderUsersTable(users) {
     viewer: "#6b7280",
     auditor: "#059669",
     ppmp_encoder: "#0d9488",
+    accountant: "#0f766e",
   };
 
   const roleLabels = {
@@ -4635,6 +4981,7 @@ function renderUsersTable(users) {
     viewer: "Viewer",
     auditor: "Auditor",
     ppmp_encoder: "PPMP Encoder",
+    accountant: "Accountant",
   };
 
   const isAdmin = userHasRole("admin");
@@ -5178,11 +5525,7 @@ function renderPPMPTable(ppmp, allPPMPItems) {
         const userRoles = currentUser.roles || [userRole];
         const isWRSDEntry = (p.department_code || deptCode) === "WRSD";
         // chief_wrsd can only approve WRSD entries; chief_fad/bac_chair can only approve non-WRSD entries
-        // EXCEPTION: MAKINANO can approve ALL entries regardless of division
-        const userNameUpper = (currentUser.full_name || "").toUpperCase();
-        const isMakinanoUser = userNameUpper.includes("MAKINANO");
         const chiefCanApprove =
-          isMakinanoUser ||
           (isWRSDEntry
             ? userHasRole("chief_wrsd")
             : userHasAnyRole(["chief_fad", "bac_chair"]));
@@ -6714,34 +7057,23 @@ function renderPRTable(pr) {
           })
         : "-";
       // ── Multi-stage approval chips (mirrors PPMP) ──
+      // PR: Stage 1 = Division Chief (budget col), Stage 2 = HoPE
       let prApprovalInfo = "";
       if (p.status === "pending_approval") {
-        const prIsWRSD = (p.department_code || "").toUpperCase() === "WRSD";
-        const prChiefLabel = prIsWRSD ? "Chief WRSD" : "Chief FAD";
-        const prBudgetDone = p.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget Consultant: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const prHopeDone = p.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const prChiefDone = p.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Approved by ${prChiefLabel}: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> ${prChiefLabel}</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting ${prChiefLabel}"><i class="fas fa-clock"></i> ${prChiefLabel}</span>`;
-        prApprovalInfo = `<div class="approval-status-row">${prBudgetDone}${prHopeDone}${prChiefDone}</div>`;
+        const prC1 = p.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Div. Chief: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Div. Chief</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Division Chief"><i class="fas fa-clock"></i> Div. Chief</span>`;
+        const prC2 = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="HoPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HoPE"><i class="fas fa-clock"></i> HoPE</span>`;
+        prApprovalInfo = `<div class="approval-status-row">${prC1}${prC2}</div>`;
       }
-
-      // ── Approve button visibility — uses the same userHasRole/userHasAnyRole helpers as PPMP ──
-      const prIsWRSD2 = (p.department_code || "").toUpperCase() === "WRSD";
-      const prUserNameUpper = (window.currentUser?.full_name || "").toUpperCase();
-      const prIsMakinano = prUserNameUpper.includes("MAKINANO");
-      const prChiefCanApprove = prIsMakinano ||
-        (prIsWRSD2 ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
+      const prDivChiefRoles = ["chief_fad","chief_wrsd","chief_mwpsd","chief_mwptd"];
       const prCanApprove = p.status === "pending_approval" &&
-        (prChiefCanApprove || userHasAnyRole(["hope", "budget_consultant", "admin"]));
+        (userHasAnyRole(prDivChiefRoles) || userHasRole("hope") || userHasAnyRole(["admin","system_admin"]));
       const prAlreadyApproved =
-        (prChiefCanApprove && !!p.approved_by_chief) ||
-        (userHasRole("hope") && !!p.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!p.approved_by_budget);
+        (userHasAnyRole(prDivChiefRoles) && !!p.approved_by_budget) ||
+        (userHasRole("hope") && !!p.approved_by_hope);
       const prShowApproveBtn = prCanApprove && !prAlreadyApproved;
 
       return `<tr>
@@ -6827,25 +7159,26 @@ function renderRFQTable(rfq) {
 
 
       // ── Multi-stage approval chips ──
+      // RFQ: Supply → BAC Sec → BAC Chair
       let rfqApprovalInfo = "";
       if (r.status === "on_going") {
-        const rfqBudgetDone = r.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${r.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const rfqHopeDone = r.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${r.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const rfqChiefDone = r.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${r.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+        const rfqC1 = r.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Supply: ${r.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Supply</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Supply Officer"><i class="fas fa-clock"></i> Supply</span>`;
+        const rfqC2 = r.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="BAC Sec: ${r.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Sec</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting BAC Secretariat"><i class="fas fa-clock"></i> BAC Sec</span>`;
+        const rfqC3 = r.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="BAC Chair: ${r.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
-        rfqApprovalInfo = `<div class="approval-status-row">${rfqBudgetDone}${rfqHopeDone}${rfqChiefDone}</div>`;
+        rfqApprovalInfo = `<div class="approval-status-row">${rfqC1}${rfqC2}${rfqC3}</div>`;
       }
       const rfqAlreadyApproved =
-        (userHasRole("hope") && !!r.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!r.approved_by_budget) ||
+        (userHasRole("supply_officer") && !!r.approved_by_budget) ||
+        (userHasRole("bac_secretariat") && !!r.approved_by_hope) ||
         (userHasRole("bac_chair") && !!r.approved_by_chief);
       const rfqShowBtn = r.status === "on_going" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        userHasAnyRole(["supply_officer","bac_secretariat","bac_chair","admin","system_admin"]) &&
         !rfqAlreadyApproved;
 
       return `<tr>
@@ -6912,25 +7245,26 @@ function renderAbstractTable(abstract) {
       }
 
       // ── Multi-stage approval chips ──
+      // Abstract: Supply → BAC Sec → BAC Chair
       let absApprovalInfo = "";
       if (a.status === "on_going") {
-        const absBudgetDone = a.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${a.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const absHopeDone = a.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${a.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const absChiefDone = a.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${a.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+        const absC1 = a.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Supply: ${a.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Supply</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Supply Officer"><i class="fas fa-clock"></i> Supply</span>`;
+        const absC2 = a.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="BAC Sec: ${a.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Sec</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting BAC Secretariat"><i class="fas fa-clock"></i> BAC Sec</span>`;
+        const absC3 = a.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="BAC Chair: ${a.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
-        absApprovalInfo = `<div class="approval-status-row">${absBudgetDone}${absHopeDone}${absChiefDone}</div>`;
+        absApprovalInfo = `<div class="approval-status-row">${absC1}${absC2}${absC3}</div>`;
       }
       const absAlreadyApproved =
-        (userHasRole("hope") && !!a.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!a.approved_by_budget) ||
+        (userHasRole("supply_officer") && !!a.approved_by_budget) ||
+        (userHasRole("bac_secretariat") && !!a.approved_by_hope) ||
         (userHasRole("bac_chair") && !!a.approved_by_chief);
       const absShowBtn = a.status === "on_going" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        userHasAnyRole(["supply_officer","bac_secretariat","bac_chair","admin","system_admin"]) &&
         !absAlreadyApproved;
 
       return `<tr>
@@ -6986,24 +7320,24 @@ function renderPostQualTable(postQual) {
       // ── Multi-stage approval chips ──
       let pqApprovalInfo = "";
       if (p.status === "on_going") {
-        const pqBudgetDone = p.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const pqHopeDone = p.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const pqChiefDone = p.approved_by_chief
+        const pqBacChairDone = p.approved_by_chief
           ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
-        pqApprovalInfo = `<div class="approval-status-row">${pqBudgetDone}${pqHopeDone}${pqChiefDone}</div>`;
+        const pqHopeDone = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Approved by HoPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HoPE"><i class="fas fa-clock"></i> HoPE</span>`;
+        const pqTwgHeadDone = p.approved_by_twg_head
+          ? `<span class="approval-badge twg-done" title="Approved by TWG Head: ${p.twg_head_approver_name || p.twg_head_name || ""}"><i class="fas fa-check-circle"></i> TWG head</span>`
+          : `<span class="approval-badge twg-pending" title="Awaiting TWG Head approval"><i class="fas fa-clock"></i> TWG head</span>`;
+        pqApprovalInfo = `<div class="approval-status-row">${pqBacChairDone}${pqHopeDone}${pqTwgHeadDone}</div>`;
       }
-      const pqAlreadyApproved =
-        (userHasRole("hope") && !!p.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!p.approved_by_budget) ||
-        (userHasRole("bac_chair") && !!p.approved_by_chief);
-      const pqShowBtn = p.status === "on_going" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
-        !pqAlreadyApproved;
+      const currentEmployeeId = Number(currentUser?.employee_id || 0);
+      const twgHeadEmployeeId = Number(p.twg_head_id || 0);
+      const pqShowBtn =
+        p.status === "on_going" &&
+        currentEmployeeId > 0 &&
+        twgHeadEmployeeId > 0 &&
+        currentEmployeeId === twgHeadEmployeeId;
 
       return `<tr>
  <td>${p.postqual_number || ""}</td>
@@ -7055,25 +7389,26 @@ function renderBACResolutionTable(bacRes) {
             : "cancelled";
 
       // ── Multi-stage approval chips ──
+      // BAC Res: Supply → BAC Sec → BAC Chair
       let bacApprovalInfo = "";
       if (b.status === "on_going") {
-        const bacBudgetDone = b.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${b.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const bacHopeDone = b.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${b.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const bacChiefDone = b.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${b.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
+        const bacC1 = b.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Supply: ${b.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Supply</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting Supply Officer"><i class="fas fa-clock"></i> Supply</span>`;
+        const bacC2 = b.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="BAC Sec: ${b.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Sec</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting BAC Secretariat"><i class="fas fa-clock"></i> BAC Sec</span>`;
+        const bacC3 = b.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="BAC Chair: ${b.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
-        bacApprovalInfo = `<div class="approval-status-row">${bacBudgetDone}${bacHopeDone}${bacChiefDone}</div>`;
+        bacApprovalInfo = `<div class="approval-status-row">${bacC1}${bacC2}${bacC3}</div>`;
       }
       const bacAlreadyApproved =
-        (userHasRole("hope") && !!b.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!b.approved_by_budget) ||
+        (userHasRole("supply_officer") && !!b.approved_by_budget) ||
+        (userHasRole("bac_secretariat") && !!b.approved_by_hope) ||
         (userHasRole("bac_chair") && !!b.approved_by_chief);
       const bacShowBtn = b.status === "on_going" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        userHasAnyRole(["supply_officer","bac_secretariat","bac_chair","admin","system_admin"]) &&
         !bacAlreadyApproved;
 
       return `<tr>
@@ -7131,25 +7466,17 @@ function renderNOATable(noa) {
               : "cancelled";
 
       // ── Multi-stage approval chips (with_noa = pending, issued = approved) ──
+      // NOA: HoPE only (1 stage → issued)
       let noaApprovalInfo = "";
       if (n.status === "with_noa") {
-        const noaBudgetDone = n.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${n.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const noaHopeDone = n.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Approved by HOPE: ${n.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HOPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HOPE"><i class="fas fa-clock"></i> HOPE</span>`;
-        const noaChiefDone = n.approved_by_chief
-          ? `<span class="approval-badge chief-done" title="Approved by BAC Chair: ${n.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> BAC Chair</span>`
-          : `<span class="approval-badge chief-pending" title="Awaiting BAC Chair"><i class="fas fa-clock"></i> BAC Chair</span>`;
-        noaApprovalInfo = `<div class="approval-status-row">${noaBudgetDone}${noaHopeDone}${noaChiefDone}</div>`;
+        const noaC1 = n.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="HoPE: ${n.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting HoPE"><i class="fas fa-clock"></i> HoPE</span>`;
+        noaApprovalInfo = `<div class="approval-status-row">${noaC1}</div>`;
       }
-      const noaAlreadyApproved =
-        (userHasRole("hope") && !!n.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!n.approved_by_budget) ||
-        (userHasRole("bac_chair") && !!n.approved_by_chief);
+      const noaAlreadyApproved = userHasRole("hope") && !!n.approved_by_hope;
       const noaShowBtn = n.status === "with_noa" &&
-        userHasAnyRole(["hope","budget_consultant","bac_chair","admin","system_admin"]) &&
+        userHasAnyRole(["hope","admin","system_admin"]) &&
         !noaAlreadyApproved;
 
       return `<tr>
@@ -7203,22 +7530,26 @@ function renderPOTable(po) {
             : "cancelled";
 
       // ── Multi-stage approval chips (for_signing = pending, signed = approved) ──
-      // PO approval: Budget Consultant → HoPE only (HoPE IS the Director)
+      // PO: Budget → Accountant (Bealah) → HoPE (3 stages → signed)
       let poApprovalInfo = "";
       if (p.status === "for_signing") {
-        const poBudgetDone = p.approved_by_budget
-          ? `<span class="approval-badge chief-done" title="Approved by Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
+        const poC1 = p.approved_by_budget
+          ? `<span class="approval-badge chief-done" title="Budget: ${p.budget_approver_name || ""}"><i class="fas fa-check-circle"></i> Budget</span>`
           : `<span class="approval-badge chief-pending" title="Awaiting Budget Consultant"><i class="fas fa-clock"></i> Budget</span>`;
-        const poHopeDone = p.approved_by_hope
-          ? `<span class="approval-badge hope-done" title="Signed by HoPE: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
-          : `<span class="approval-badge hope-pending" title="Awaiting HoPE signature"><i class="fas fa-clock"></i> HoPE</span>`;
-        poApprovalInfo = `<div class="approval-status-row">${poBudgetDone}${poHopeDone}</div>`;
+        const poC2 = p.approved_by_hope
+          ? `<span class="approval-badge hope-done" title="Accountant: ${p.hope_approver_name || ""}"><i class="fas fa-check-circle"></i> Accountant</span>`
+          : `<span class="approval-badge hope-pending" title="Awaiting Accountant (Bealah Joy Camarin)"><i class="fas fa-clock"></i> Accountant</span>`;
+        const poC3 = p.approved_by_chief
+          ? `<span class="approval-badge chief-done" title="HoPE: ${p.chief_approver_name || ""}"><i class="fas fa-check-circle"></i> HoPE</span>`
+          : `<span class="approval-badge chief-pending" title="Awaiting HoPE"><i class="fas fa-clock"></i> HoPE</span>`;
+        poApprovalInfo = `<div class="approval-status-row">${poC1}${poC2}${poC3}</div>`;
       }
       const poAlreadyApproved =
-        (userHasRole("hope") && !!p.approved_by_hope) ||
-        (userHasRole("budget_consultant") && !!p.approved_by_budget);
+        (userHasRole("budget_consultant") && !!p.approved_by_budget) ||
+        (userHasRole("accountant") && !!p.approved_by_hope) ||
+        (userHasRole("hope") && !!p.approved_by_chief);
       const poShowBtn = p.status === "for_signing" &&
-        userHasAnyRole(["hope","budget_consultant","admin","system_admin"]) &&
+        userHasAnyRole(["budget_consultant","accountant","hope","admin","system_admin"]) &&
         !poAlreadyApproved;
 
       return `<tr>
@@ -7309,6 +7640,7 @@ function renderIARTable(iar) {
 function renderPOPacketTable(rows) {
   const tbody = document.getElementById("poPacketTableBody");
   if (!tbody) return;
+  window._pktRowSource = {};
   if (!rows || !rows.length) {
     tbody.innerHTML =
       '<tr><td colspan="13" class="text-center">No transactions found for monitoring</td></tr>';
@@ -7375,27 +7707,38 @@ function renderPOPacketTable(rows) {
       return '<span class="status-badge approved">Signed</span>';
     if (r.packet_status === "for_signing")
       return '<span class="status-badge for-signing">For Signing</span>';
-    const has = [
-      r.pr_id,
-      r.rfq_id,
-      r.abstract_id,
-      r.bac_res_id,
-      r.postqual_id,
-      r.noa_id,
-      r.po_id,
-      r.iar_id,
-    ].filter(Boolean).length;
-    if (has >= 8) return '<span class="status-badge approved">Complete</span>';
+    const isPsDbm = (r.procurement_source || r.item_procurement_source || "")
+      .toString()
+      .toUpperCase() === "PS-DBM";
+    const requiredDocs = isPsDbm ? 2 : 8;
+    const has = isPsDbm
+      ? [r.pr_id, r.iar_id].filter(Boolean).length
+      : [
+          r.pr_id,
+          r.rfq_id,
+          r.abstract_id,
+          r.bac_res_id,
+          r.postqual_id,
+          r.noa_id,
+          r.po_id,
+          r.iar_id,
+        ].filter(Boolean).length;
+    if (has >= requiredDocs)
+      return '<span class="status-badge approved">Complete</span>';
     return (
-      '<span class="status-badge pending">Incomplete (' + has + "/8)</span>"
+      '<span class="status-badge pending">Incomplete (' + has + "/" + requiredDocs + ")</span>"
     );
-    /* iar_supporting column removed — 8 doc columns remain */
   }
 
   tbody.innerHTML = rows
     .map((r, idx) => {
       const rowId = "pr" + r.pr_id;
       const officeDisplay = r.division_name || r.division_code || "DMW Caraga";
+      const isPsDbm = (r.procurement_source || r.item_procurement_source || "")
+        .toString()
+        .toUpperCase() === "PS-DBM";
+      const requiredDocs = isPsDbm ? 2 : 8;
+      window._pktRowSource[rowId] = isPsDbm ? "PS-DBM" : "";
 
       const docCells = docCols
         .map((col) => {
@@ -7423,7 +7766,7 @@ function renderPOPacketTable(rows) {
  <td class="pkt-td-ref"><strong>${r.pr_number || "-"}</strong></td>
  <td class="pkt-td-div">${officeDisplay}</td>
  ${docCells}
- <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / 8</span></div></td>
+ <td class="pkt-td-status" id="pktStatus_${rowId}"><div class="pkt-status-wrapper"><span class="status-badge rejected">0 / ${requiredDocs}</span></div></td>
  <td class="pkt-td-actions" style="text-align:center;vertical-align:middle;">
  <button class="btn btn-primary" onclick="pktConsolidateFiles('${rowId}')" title="Consolidate all attached files" style="padding:5px 10px;font-size:10px;white-space:nowrap;"><i class="fas fa-folder-open" style="margin-right:4px;"></i> Consolidate Files</button>
  </td>
@@ -7540,16 +7883,18 @@ function pktUpdateRowStatus(rowId) {
   if (!statusCell) return;
   const count =
     (window._pktAttCounts[rowId] && window._pktAttCounts[rowId].total) || 0;
+  const isPsDbm = (window._pktRowSource && window._pktRowSource[rowId]) === "PS-DBM";
+  const requiredDocs = isPsDbm ? 2 : 8;
   let badgeClass, label;
-  if (count >= 8) {
+  if (count >= requiredDocs) {
     badgeClass = "approved";
     label = "Complete";
-  } else if (count >= 4) {
+  } else if (count >= Math.ceil(requiredDocs / 2)) {
     badgeClass = "pending";
-    label = count + " / 8";
+    label = count + " / " + requiredDocs;
   } else {
     badgeClass = "rejected";
-    label = count + " / 8";
+    label = count + " / " + requiredDocs;
   }
   const dlBtn =
     count > 0
@@ -7583,17 +7928,23 @@ function updatePOPacketSummary(rows) {
     inProgress = 0,
     notStarted = 0;
   rows.forEach((r) => {
-    const docs = [
-      r.pr_id,
-      r.rfq_id,
-      r.abstract_id,
-      r.bac_res_id,
-      r.postqual_id,
-      r.noa_id,
-      r.po_id,
-      r.iar_id,
-    ].filter(Boolean).length;
-    if (docs >= 8) complete++;
+    const isPsDbm = (r.procurement_source || r.item_procurement_source || "")
+      .toString()
+      .toUpperCase() === "PS-DBM";
+    const requiredDocs = isPsDbm ? 2 : 8;
+    const docs = isPsDbm
+      ? [r.pr_id, r.iar_id].filter(Boolean).length
+      : [
+          r.pr_id,
+          r.rfq_id,
+          r.abstract_id,
+          r.bac_res_id,
+          r.postqual_id,
+          r.noa_id,
+          r.po_id,
+          r.iar_id,
+        ].filter(Boolean).length;
+    if (docs >= requiredDocs) complete++;
     else if (docs >= 1) inProgress++;
     else notStarted++;
   });
@@ -7617,7 +7968,9 @@ function updatePOPacketSummaryFromCounts() {
     notStarted = 0;
   rowIds.forEach((id) => {
     const c = counts[id].total || 0;
-    if (c >= 7) complete++;
+    const isPsDbm = (window._pktRowSource && window._pktRowSource[id]) === "PS-DBM";
+    const requiredDocs = isPsDbm ? 2 : 8;
+    if (c >= requiredDocs) complete++;
     else if (c >= 1) inProgress++;
     else notStarted++;
   });
@@ -7686,72 +8039,94 @@ window.pktConsolidateFiles = async function (rowId) {
 
   // Document chain definition — entityType matches what view/edit modals use
   // altEntityType is the old DB-table-name convention some monitoring uploads used
-  const docChain = [
-    {
-      key: "pr",
-      label: "Purchase Request (PR)",
-      entityType: "purchase_request",
-      altEntityType: "purchaserequests",
-      id: r.pr_id,
-      number: r.pr_number,
-    },
-    {
-      key: "rfq",
-      label: "Request for Quotation (RFQ)",
-      entityType: "rfq",
-      altEntityType: "rfqs",
-      id: r.rfq_id,
-      number: r.rfq_number,
-    },
-    {
-      key: "abstract",
-      label: "Abstract of Quotation",
-      entityType: "abstract",
-      altEntityType: "abstracts",
-      id: r.abstract_id,
-      number: r.abstract_number,
-    },
-    {
-      key: "bac",
-      label: "BAC Resolution",
-      entityType: "bac_resolution",
-      altEntityType: "bac_resolutions",
-      id: r.bac_res_id,
-      number: r.resolution_number,
-    },
-    {
-      key: "pq",
-      label: "Post-Qualification",
-      entityType: "post_qualification",
-      altEntityType: "post_qualifications",
-      id: r.postqual_id,
-      number: r.postqual_number,
-    },
-    {
-      key: "noa",
-      label: "Notice of Award (NOA)",
-      entityType: "notice_of_award",
-      altEntityType: "notices_of_award",
-      id: r.noa_id,
-      number: r.noa_number,
-    },
-    {
-      key: "po",
-      label: "Purchase Order (PO)",
-      entityType: "purchase_order",
-      altEntityType: "purchaseorders",
-      id: r.po_id,
-      number: r.po_number,
-    },
-    {
-      key: "iar",
-      label: "Inspection & Acceptance (IAR)",
-      entityType: "iar",
-      altEntityType: "iars",
-      id: r.iar_id,
-      number: r.iar_number,
-    },
-  ];
+  const isPsDbm = (r.procurement_source || r.item_procurement_source || "")
+    .toString()
+    .toUpperCase() === "PS-DBM";
+  const docChain = isPsDbm
+    ? [
+        {
+          key: "pr",
+          label: "Purchase Request (PR)",
+          entityType: "purchase_request",
+          altEntityType: "purchaserequests",
+          id: r.pr_id,
+          number: r.pr_number,
+        },
+        {
+          key: "iar",
+          label: "Inspection & Acceptance (IAR)",
+          entityType: "iar",
+          altEntityType: "iars",
+          id: r.iar_id,
+          number: r.iar_number,
+        },
+      ]
+    : [
+        {
+          key: "pr",
+          label: "Purchase Request (PR)",
+          entityType: "purchase_request",
+          altEntityType: "purchaserequests",
+          id: r.pr_id,
+          number: r.pr_number,
+        },
+        {
+          key: "rfq",
+          label: "Request for Quotation (RFQ)",
+          entityType: "rfq",
+          altEntityType: "rfqs",
+          id: r.rfq_id,
+          number: r.rfq_number,
+        },
+        {
+          key: "abstract",
+          label: "Abstract of Quotation",
+          entityType: "abstract",
+          altEntityType: "abstracts",
+          id: r.abstract_id,
+          number: r.abstract_number,
+        },
+        {
+          key: "bac",
+          label: "BAC Resolution",
+          entityType: "bac_resolution",
+          altEntityType: "bac_resolutions",
+          id: r.bac_res_id,
+          number: r.resolution_number,
+        },
+        {
+          key: "pq",
+          label: "Post-Qualification",
+          entityType: "post_qualification",
+          altEntityType: "post_qualifications",
+          id: r.postqual_id,
+          number: r.postqual_number,
+        },
+        {
+          key: "noa",
+          label: "Notice of Award (NOA)",
+          entityType: "notice_of_award",
+          altEntityType: "notices_of_award",
+          id: r.noa_id,
+          number: r.noa_number,
+        },
+        {
+          key: "po",
+          label: "Purchase Order (PO)",
+          entityType: "purchase_order",
+          altEntityType: "purchaseorders",
+          id: r.po_id,
+          number: r.po_number,
+        },
+        {
+          key: "iar",
+          label: "Inspection & Acceptance (IAR)",
+          entityType: "iar",
+          altEntityType: "iars",
+          id: r.iar_id,
+          number: r.iar_number,
+        },
+      ];
 
   // Show loading modal immediately
   const loadingHtml = `<div style="text-align:center;padding:60px 30px;">
@@ -9062,7 +9437,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "purchase-requests": "Purchase Requests",
     rfq: "Request for Quotation",
     abstract: "Abstract of Quotation",
-    "post-qual": "Post-Qualification",
+    "post-qual": "BAC TWG Report",
     "bac-resolution": "BAC Resolution",
     noa: "Notice of Award",
     "purchase-orders": "Purchase Orders",
@@ -9449,7 +9824,7 @@ document.addEventListener("DOMContentLoaded", () => {
       canApproveAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: true,
-      canApprovePostQual: true,
+      canApprovePostQual: false,
       canViewPostQual: true,
       canCreateBACRes: true,
       canApproveBACRes: true,
@@ -9781,7 +10156,7 @@ document.addEventListener("DOMContentLoaded", () => {
       canApproveAbstract: true,
       canViewAbstract: true,
       canCreatePostQual: false,
-      canApprovePostQual: true,
+      canApprovePostQual: false,
       canViewPostQual: true,
       canCreateBACRes: false,
       canApproveBACRes: true,
@@ -11725,6 +12100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentUser.name = me.full_name || currentUser.name;
         currentUser.email = me.email || "";
         currentUser.dept_id = me.dept_id || null;
+        currentUser.employee_id = me.employee_id || currentUser.employee_id || null;
         currentUser.department = me.department_name || "";
         currentUser.department_code = me.department_code || "";
         currentUser.division = me.department_code || me.department_name || "";
@@ -12733,10 +13109,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Format currency
   function formatCurrency(amount) {
+    const normalizedAmount = typeof amount === "string" ? amount.replace(/,/g, "").trim() : amount;
+    const numericAmount = Number(normalizedAmount);
     return new Intl.NumberFormat("en-PH", {
       style: "currency",
       currency: "PHP",
-    }).format(amount);
+    }).format(Number.isFinite(numericAmount) ? numericAmount : 0);
   }
 
   // Format date
@@ -22929,14 +23307,23 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showNewStockCardModal = function () {
     const html = `
       <form id="stockCardForm" onsubmit="saveNewStockCard(event)">
+        <div class="info-banner" style="margin-bottom:12px;font-size:12px;">
+          <i class="fas fa-info-circle"></i>
+          <strong>Note:</strong> ICS, PAR, and PTR now automatically generate stock card entries.
+          Use this form only for manual corrections or adjustments.
+        </div>
         <div class="form-row">
-          <div class="form-group">
-            <label>Transaction No.</label>
-            <input type="text" id="scTransNo" placeholder="Auto-generated" readonly>
-          </div>
           <div class="form-group">
             <label>Date</label>
             <input type="date" id="scDate" value="${new Date().toISOString().split("T")[0]}" required>
+          </div>
+          <div class="form-group">
+            <label>Transaction Type</label>
+            <select class="form-select" id="scTxType" onchange="scToggleQtyFields(this.value)">
+              <option value="receipt">Receipt (add to stock)</option>
+              <option value="issue">Issue (deduct from stock)</option>
+              <option value="adjustment">Adjustment (both)</option>
+            </select>
           </div>
         </div>
         <div class="form-row">
@@ -22947,33 +23334,33 @@ Failure to submit the above requirements within the prescribed period shall cons
             </select>
           </div>
           <div class="form-group">
-            <label>Reference</label>
-            <input type="text" id="scReference" placeholder="e.g., IAR-${getCurrentFiscalYear()}-001">
+            <label>Reference / Source Document</label>
+            <input type="text" id="scReference" placeholder="e.g., IAR-2026-001, ICS-2026-001">
           </div>
         </div>
-        <div class="form-row">
+        <div id="scReceiptFields" class="form-row">
           <div class="form-group">
             <label>Receipt Qty</label>
             <input type="number" id="scReceiptQty" placeholder="0" min="0" value="0">
           </div>
           <div class="form-group">
-            <label>Receipt Unit Cost</label>
+            <label>Receipt Unit Cost (₱)</label>
             <input type="number" id="scReceiptUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
           </div>
         </div>
-        <div class="form-row">
+        <div id="scIssueFields" class="form-row" style="display:none;">
           <div class="form-group">
             <label>Issue Qty</label>
             <input type="number" id="scIssueQty" placeholder="0" min="0" value="0">
           </div>
           <div class="form-group">
-            <label>Issue Unit Cost</label>
+            <label>Issue Unit Cost (₱)</label>
             <input type="number" id="scIssueUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
           </div>
         </div>
         <div class="form-group">
           <label>Remarks</label>
-          <textarea id="scRemarks" rows="2" placeholder="Optional remarks"></textarea>
+          <textarea id="scRemarks" rows="2" placeholder="Reason for manual entry"></textarea>
         </div>
         <div class="form-group" style="text-align: right; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -22981,9 +23368,13 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
       </form>
     `;
-    openModal("New Stock Card Entry", html);
-    // Populate items dropdown
+    openModal("New Stock Card Entry (Manual)", html);
     loadItemsDropdown("scItemId");
+    // Init field visibility
+    window.scToggleQtyFields = function(type) {
+      document.getElementById('scReceiptFields').style.display = type === 'issue' ? 'none' : '';
+      document.getElementById('scIssueFields').style.display   = type === 'receipt' ? 'none' : '';
+    };
   };
 
   window.saveNewStockCard = async function (e) {
@@ -23127,7 +23518,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         <div class="form-row">
           <div class="form-group">
             <label>Property Card</label>
-            <select class="form-select" id="icsPropertyId" required>
+            <select class="form-select" id="icsPropertyId" required onchange="icsAutoFillFromPropertyCard(this)">
               <option value="">-- Select Property --</option>
             </select>
           </div>
@@ -23136,6 +23527,7 @@ Failure to submit the above requirements within the prescribed period shall cons
             <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
           </div>
         </div>
+        <input type="hidden" id="icsItemId">
         <div class="form-row">
           <div class="form-group">
             <label>Issued To (Employee)</label>
@@ -23152,15 +23544,15 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-group">
           <label>Description</label>
-          <textarea id="icsDescription" rows="2" placeholder="Item description"></textarea>
+          <textarea id="icsDescription" rows="2" placeholder="Item description (auto-filled from property card)"></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Quantity</label>
+            <label>Quantity Issued</label>
             <input type="number" id="icsQty" placeholder="1" min="1" value="1" required>
           </div>
           <div class="form-group">
-            <label>Unit Cost</label>
+            <label>Unit Cost (₱)</label>
             <input type="number" id="icsUnitCost" placeholder="0.00" step="0.01" min="0">
           </div>
         </div>
@@ -23180,26 +23572,44 @@ Failure to submit the above requirements within the prescribed period shall cons
     loadEmployeesDropdown("icsReceivedBy");
   };
 
+  // Auto-fill ICS form from selected property card
+  window.icsAutoFillFromPropertyCard = function (sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    const itemId   = opt.dataset.itemId;
+    const unitCost = opt.dataset.unitCost;
+    const desc     = opt.dataset.description;
+    if (itemId)   document.getElementById("icsItemId").value    = itemId;
+    if (unitCost) document.getElementById("icsUnitCost").value  = unitCost;
+    if (desc)     document.getElementById("icsDescription").value = desc;
+  };
+
   window.saveNewICS = async function (e) {
     e.preventDefault();
+    const sel = document.getElementById("icsPropertyId");
+    const opt = sel?.options[sel?.selectedIndex];
+    // Resolve item_id: from hidden field (set by auto-fill) or from selected option's data attr
+    const itemIdHidden = parseInt(document.getElementById("icsItemId")?.value) || null;
+    const itemIdOpt    = parseInt(opt?.dataset?.itemId) || null;
     const data = {
-      property_card_id: parseInt(
-        document.getElementById("icsPropertyId").value,
-      ),
-      date_of_issue: document.getElementById("icsDateOfIssue").value,
-      inventory_no: document.getElementById("icsInventoryNo").value,
-      description: document.getElementById("icsDescription").value,
-      quantity: parseInt(document.getElementById("icsQty").value) || 1,
-      unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
-      issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by:
-        parseInt(document.getElementById("icsReceivedBy").value) || null,
-      remarks: document.getElementById("icsRemarks").value,
+      property_card_id: parseInt(sel?.value) || null,
+      property_number:  opt?.dataset?.propertyNo || "",
+      ppe_no:           opt?.dataset?.ppeNo       || "",
+      item_id:          itemIdHidden || itemIdOpt || null,
+      date_of_issue:    document.getElementById("icsDateOfIssue").value,
+      inventory_no:     document.getElementById("icsInventoryNo").value,
+      description:      document.getElementById("icsDescription").value,
+      qty_issued:       parseInt(document.getElementById("icsQty").value)       || 1,
+      unit_cost:        parseFloat(document.getElementById("icsUnitCost").value) || 0,
+      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value) || null,
+      issued_to:        document.getElementById("icsIssuedTo")?.options[document.getElementById("icsIssuedTo")?.selectedIndex]?.text || "",
+      received_by_employee_id: parseInt(document.getElementById("icsReceivedBy").value) || null,
+      other_info:       document.getElementById("icsRemarks").value,
     };
-    if (!confirm("Are you sure you want to issue this ICS?")) return;
+    if (!confirm("Are you sure you want to issue this ICS? This will automatically update the stock card and inventory balance.")) return;
     try {
       await apiRequest("/ics", "POST", data);
-      alert("ICS issued successfully!");
+      alert("ICS issued successfully! Stock card and inventory updated.");
       closeModal();
       loadICS();
     } catch (err) {
@@ -23331,6 +23741,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         const opt = document.createElement("option");
         opt.value = card.id;
         opt.textContent = `${card.property_number} - ${card.description}`;
+        // Store extra data for auto-fill on selection
+        opt.dataset.itemId      = card.item_id      || "";
+        opt.dataset.unitCost    = card.unit_cost     || card.acquisition_cost || "";
+        opt.dataset.description = card.description   || "";
+        opt.dataset.propertyNo  = card.property_number || "";
+        opt.dataset.ppeNo       = card.ppe_no        || card.property_number || "";
         select.appendChild(opt);
       });
     } catch (err) {
@@ -23648,21 +24064,23 @@ Failure to submit the above requirements within the prescribed period shall cons
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Property Number</label>
-            <input type="text" id="parPropertyNo" placeholder="Property number" required>
+            <label>Property Number (PPE No.)</label>
+            <input type="text" id="parPropertyNo" placeholder="Property number" required
+              oninput="parAutoFillFromPropertyNo(this.value)">
           </div>
           <div class="form-group">
             <label>Description</label>
-            <input type="text" id="parDescription" placeholder="Item description" required>
+            <input type="text" id="parDescription" placeholder="Auto-filled or enter manually" required>
           </div>
         </div>
+        <input type="hidden" id="parItemId">
         <div class="form-row">
           <div class="form-group">
-            <label>Quantity</label>
+            <label>Quantity Issued</label>
             <input type="number" id="parQty" min="1" value="1" required>
           </div>
           <div class="form-group">
-            <label>Unit Cost</label>
+            <label>Unit Cost (₱)</label>
             <input type="number" id="parUnitCost" step="0.01" placeholder="0.00" required>
           </div>
         </div>
@@ -23686,26 +24104,41 @@ Failure to submit the above requirements within the prescribed period shall cons
     loadEmployeesDropdown("parReceivedBy");
     loadEmployeesDropdown("parIssuedBy");
   };
+
+  // Auto-fill PAR form by looking up property number in property_cards
+  window.parAutoFillFromPropertyNo = async function (ppeNo) {
+    if (!ppeNo || ppeNo.length < 3) return;
+    try {
+      const cards = await apiRequest("/property-cards");
+      const match = cards.find(c => (c.property_number || "").toUpperCase() === ppeNo.trim().toUpperCase());
+      if (!match) return;
+      if (match.item_id) document.getElementById("parItemId").value         = match.item_id;
+      if (match.description) document.getElementById("parDescription").value = match.description;
+      if (match.unit_cost || match.acquisition_cost) {
+        document.getElementById("parUnitCost").value = match.unit_cost || match.acquisition_cost;
+      }
+    } catch (e) { /* silently fail — user can still fill manually */ }
+  };
   window.saveNewPAR = async function (e) {
     e.preventDefault();
+    const parQty      = parseInt(document.getElementById("parQty").value)       || 1;
+    const parUnitCost = parseFloat(document.getElementById("parUnitCost").value) || 0;
     const data = {
-      date_issued: document.getElementById("parDate").value,
-      fund_cluster: document.getElementById("parFundCluster").value,
-      property_number: document.getElementById("parPropertyNo").value,
-      description: document.getElementById("parDescription").value,
-      quantity: parseInt(document.getElementById("parQty").value),
-      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
-      total_cost:
-        parseInt(document.getElementById("parQty").value) *
-        parseFloat(document.getElementById("parUnitCost").value),
-      received_by:
-        parseInt(document.getElementById("parReceivedBy").value) || null,
-      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
+      date_of_issue:         document.getElementById("parDate").value,
+      fund_cluster:          document.getElementById("parFundCluster").value,
+      ppe_no:                document.getElementById("parPropertyNo").value,
+      description:           document.getElementById("parDescription").value,
+      qty_issued:            parQty,
+      unit_cost:             parUnitCost,
+      item_id:               parseInt(document.getElementById("parItemId")?.value) || null,
+      issued_to:             document.getElementById("parReceivedBy")?.options[document.getElementById("parReceivedBy")?.selectedIndex]?.text || "",
+      issued_to_employee_id: parseInt(document.getElementById("parReceivedBy").value) || null,
+      received_from_id:      parseInt(document.getElementById("parIssuedBy").value)   || null,
     };
+    if (!confirm("Are you sure you want to save this PAR? This will automatically update the property ledger and stock card.")) return;
     try {
-      if (!confirm("Are you sure you want to save this PAR?")) return;
       await apiRequest("/pars", "POST", data);
-      alert("PAR saved!");
+      alert("PAR saved! Property ledger and stock card updated.");
       closeModal();
       loadPAR();
     } catch (err) {
@@ -31654,31 +32087,49 @@ Failure to submit the above requirements within the prescribed period shall cons
     const docPendingStatus   = docType === "noa" ? "with_noa"   : docType === "po" ? "for_signing" : "on_going";
     const docCompletedStatus = docType === "noa" ? "issued"      : docType === "po" ? "signed"      : "completed";
 
-    const chiefApproved  = !!doc.approved_by_chief;
-    const hopeApproved   = !!doc.approved_by_hope;
-    const budgetApproved = !!doc.approved_by_budget;
-
-    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
-    const isMakinano = userNameUpper.includes("MAKINANO");
-    const bacChairCanApprove = isMakinano || userHasAnyRole(["bac_chair", "admin", "system_admin"]);
-
+    // Per-docType stage definitions
+    const _docStages = {
+      rfq:              [{done:!!doc.approved_by_budget,name:doc.budget_approver_name,label:"Supply Officer",   role:"supply_officer",  cls:"chief"},
+                         {done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"BAC Secretariat", role:"bac_secretariat", cls:"hope"},
+                         {done:!!doc.approved_by_chief, name:doc.chief_approver_name, label:"BAC Chair",       role:"bac_chair",       cls:"chief"}],
+      abstract:         [{done:!!doc.approved_by_budget,name:doc.budget_approver_name,label:"Supply Officer",   role:"supply_officer",  cls:"chief"},
+                         {done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"BAC Secretariat", role:"bac_secretariat", cls:"hope"},
+                         {done:!!doc.approved_by_chief, name:doc.chief_approver_name, label:"BAC Chair",       role:"bac_chair",       cls:"chief"}],
+      bac_resolution:   [{done:!!doc.approved_by_budget,name:doc.budget_approver_name,label:"Supply Officer",   role:"supply_officer",  cls:"chief"},
+                         {done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"BAC Secretariat", role:"bac_secretariat", cls:"hope"},
+                         {done:!!doc.approved_by_chief, name:doc.chief_approver_name, label:"BAC Chair",       role:"bac_chair",       cls:"chief"}],
+      post_qualification:[
+             {done:!!doc.approved_by_chief, name:doc.chief_approver_name, label:"BAC Chair", role:"bac_chair", cls:"chief"},
+             {done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"HoPE",     role:"hope",      cls:"hope"},
+             {done:!!doc.approved_by_twg_head, name:doc.twg_head_approver_name || doc.twg_head_name, label:"TWG Head", role:"twg_head", cls:"twg"}
+            ],
+      po:               [{done:!!doc.approved_by_budget,name:doc.budget_approver_name,label:"Budget Consultant",role:"budget_consultant",cls:"chief"},
+                         {done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"Accountant",      role:"accountant",      cls:"hope"},
+                         {done:!!doc.approved_by_chief, name:doc.chief_approver_name, label:"HoPE",            role:"hope",            cls:"chief"}],
+      noa:              [{done:!!doc.approved_by_hope,  name:doc.hope_approver_name,  label:"HoPE",            role:"hope",            cls:"hope"}],
+    };
+    const docStages = _docStages[docType] || _docStages.rfq;
     let canUserApprove = false, approveLabel = "";
-    if (userHasRole("budget_consultant") && !budgetApproved) { canUserApprove = true; approveLabel = "Approve as Budget Consultant"; }
-    if (userHasRole("hope") && !hopeApproved)               { canUserApprove = true; approveLabel = "Approve as HOPE"; }
-    if (bacChairCanApprove && !chiefApproved)                { canUserApprove = true; approveLabel = "Approve as BAC Chair"; }
-    if (userHasAnyRole(["admin", "system_admin"]))           { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
-
-    const budgetStatus = budgetApproved
-      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Budget Consultant${doc.budget_approver_name ? " (" + doc.budget_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
-    const hopeStatus = hopeApproved
-      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> HOPE${doc.hope_approver_name ? " (" + doc.hope_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
-    const chiefStatus = chiefApproved
-      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> BAC Chair${doc.chief_approver_name ? " (" + doc.chief_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting BAC Chair</span>`;
-
-    const allApproved = budgetApproved && hopeApproved && chiefApproved;
+    if (docType === "post_qualification") {
+      const currentEmployeeId = Number(currentUser?.employee_id || 0);
+      const twgHeadEmployeeId = Number(doc.twg_head_id || 0);
+      canUserApprove =
+        currentEmployeeId > 0 &&
+        twgHeadEmployeeId > 0 &&
+        currentEmployeeId === twgHeadEmployeeId;
+      approveLabel = "Approve as TWG Head";
+    } else {
+      docStages.forEach(s => {
+        if (userHasRole(s.role) && !s.done) { canUserApprove = true; approveLabel = "Approve as " + s.label; }
+      });
+      if (userHasAnyRole(["admin","system_admin"])) { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
+    }
+    const budgetStatus = docStages.map(s =>
+      `<span class="approval-badge ${s.done ? s.cls+"-done" : s.cls+"-pending"}"><i class="fas fa-${s.done ? "check-circle" : "clock"}"></i> ${s.label}${s.done && s.name ? " (" + s.name + ")" : ""}</span>`
+    ).join("");
+    const hopeStatus = "";
+    const chiefStatus = "";
+    const allApproved = docStages.every(s => s.done);
     const html = `
       <div class="view-details">
         <div class="detail-row"><label>Document No.:</label><span><strong>${docLabel}</strong></span></div>
@@ -31688,7 +32139,7 @@ Failure to submit the above requirements within the prescribed period shall cons
       </div>
       <div style="margin-top:18px;padding:15px;background:#f0f4f8;border-radius:8px;border:1px solid #e2e8f0;">
         <h4 style="margin:0 0 12px;color:#1a365d;"><i class="fas fa-clipboard-check"></i> Approval Status</h4>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;">${budgetStatus}${hopeStatus}${chiefStatus}</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">${budgetStatus}</div>
         ${allApproved
           ? `<p style="margin-top:12px;color:#2e7d32;font-weight:bold;"><i class="fas fa-check-double"></i> All stages approved — document will be marked <strong>${docCompletedStatus.toUpperCase()}</strong></p>`
           : `<p style="margin-top:10px;color:#636e78;font-size:12px;">All 3 stages must be approved to mark this document as ${docCompletedStatus}.</p>`}
@@ -31764,31 +32215,22 @@ Failure to submit the above requirements within the prescribed period shall cons
     const hopeApproved   = !!pr.approved_by_hope;
     const budgetApproved = !!pr.approved_by_budget;
 
-    // What can this user approve? — uses app-wide userHasRole/userHasAnyRole helpers
-    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
-    const isMakinano = userNameUpper.includes("MAKINANO");
-    const chiefCanApprove = isMakinano ||
-      (isWRSD ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
-
-    let canUserApprove = false;
-    let approveLabel = "";
-    if (chiefCanApprove && !chiefApproved)                         { canUserApprove = true; approveLabel = "Approve as " + chiefLabel; }
-    if (userHasRole("hope") && !hopeApproved)                      { canUserApprove = true; approveLabel = "Approve as HOPE"; }
-    if (userHasRole("budget_consultant") && !budgetApproved)       { canUserApprove = true; approveLabel = "Approve as Budget Consultant"; }
-    if (userHasAnyRole(["admin", "system_admin"]))                 { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
+    // PR: Div Chief (budget col) → HoPE
+    const prDivRoles2 = ["chief_fad","chief_wrsd","chief_mwpsd","chief_mwptd"];
+    let canUserApprove = false, approveLabel = "";
+    if (userHasAnyRole(prDivRoles2) && !budgetApproved)  { canUserApprove = true; approveLabel = "Approve as Division Chief"; }
+    if (userHasRole("hope") && !hopeApproved)             { canUserApprove = true; approveLabel = "Approve as HoPE"; }
+    if (userHasAnyRole(["admin","system_admin"]))         { canUserApprove = true; approveLabel = "Approve All Stages (Admin)"; }
 
     // Build status badges
-    const chiefStatus  = chiefApproved
-      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by ${chiefLabel}${pr.chief_approver_name ? " (" + pr.chief_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting ${chiefLabel}</span>`;
-    const hopeStatus   = hopeApproved
-      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> Approved by HOPE${pr.hope_approver_name ? " (" + pr.hope_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HOPE</span>`;
-    const budgetStatus = budgetApproved
-      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Approved by Budget Consultant${pr.budget_approver_name ? " (" + pr.budget_approver_name + ")" : ""}</span>`
-      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Budget Consultant</span>`;
-
-    const allApproved = chiefApproved && hopeApproved && budgetApproved;
+    const chiefStatus = budgetApproved
+      ? `<span class="approval-badge chief-done"><i class="fas fa-check-circle"></i> Division Chief${pr.budget_approver_name ? " (" + pr.budget_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge chief-pending"><i class="fas fa-clock"></i> Awaiting Division Chief</span>`;
+    const hopeStatus = hopeApproved
+      ? `<span class="approval-badge hope-done"><i class="fas fa-check-circle"></i> HoPE${pr.hope_approver_name ? " (" + pr.hope_approver_name + ")" : ""}</span>`
+      : `<span class="approval-badge hope-pending"><i class="fas fa-clock"></i> Awaiting HoPE</span>`;
+    const budgetStatus = "";
+    const allApproved = budgetApproved && hopeApproved;
 
     const html = `
       <div class="view-details">
@@ -34295,9 +34737,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (wholePart === 0)
           return (
             "Zero Pesos Only (\u20b1" +
-            parseFloat(num).toLocaleString("en-PH", {
-              minimumFractionDigits: 2,
-            }) +
+            formatCurrency(num) +
             ")"
           );
         let words = "";
@@ -34322,20 +34762,12 @@ Failure to submit the above requirements within the prescribed period shall cons
             " Pesos and " +
             (centsPart < 10 ? "0" : "") +
             centsPart +
-            "/100 (\u20b1" +
-            parseFloat(num).toLocaleString("en-PH", {
-              minimumFractionDigits: 2,
-            }) +
-            ")"
+            "/100 (" + formatCurrency(num) + ")"
           );
         }
         return (
           words.trim() +
-          " Pesos Only (\u20b1" +
-          parseFloat(num).toLocaleString("en-PH", {
-            minimumFractionDigits: 2,
-          }) +
-          ")"
+          " Pesos Only (" + formatCurrency(num) + ")"
         );
       }
 
@@ -35825,6 +36257,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           .rfq-two-col {
             display: flex;
             justify-content: space-between;
+            align-items: flex-end;
           }
           .rfq-col-left { width: 48%; }
           .rfq-col-right { width: 48%; text-align: center; }
@@ -36102,6 +36535,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         }));
       }
 
+      const abcTotal = abstractItems.reduce(
+        (sum, item) => sum + parseFloat(item.abc || 0),
+        0,
+      );
+
       // Supplier header row — no colors
       let supplierHeaders = "";
       let supplierSubHeaders = "";
@@ -36159,8 +36597,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         });
       }
 
-      // Add NOTHING FOLLOWS row right after items/specs
-      itemsHTML += `<tr><td class="abs-td" colspan="10" style="text-align:center; padding:8px 0; font-weight:bold; font-style:italic; font-size:10pt; color:red;">***NOTHING FOLLOWS***</td></tr>`;
+      // Add TOTAL row right after items/specs
+      itemsHTML += `<tr><td class="abs-td" colspan="3" style="font-weight:bold;text-align:right;">TOTAL</td><td class="abs-td abs-r" style="font-weight:bold;">${fmtCurrency(abcTotal)}</td>${"<td class=\"abs-td abs-r\"></td>".repeat(6)}</tr>`;
 
       // Empty filler rows
       const totalContentRows =
@@ -36169,7 +36607,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? abs.item_specifications.split(/\n/).filter((l) => l.trim()).length +
             1
           : 0) +
-        1; // +1 for NOTHING FOLLOWS row
+        1; // +1 for TOTAL row
       for (let i = totalContentRows; i < 6; i++) {
         itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
       }
@@ -44638,14 +45076,22 @@ Failure to submit the above requirements within the prescribed period shall cons
   window.showNewStockCardModal = function () {
     const html = `
  <form id="stockCardForm" onsubmit="saveNewStockCard(event)">
- <div class="form-row">
- <div class="form-group">
- <label>Transaction No.</label>
- <input type="text" id="scTransNo" placeholder="Auto-generated" readonly>
+ <div class="info-banner" style="margin-bottom:12px;font-size:12px;">
+ <i class="fas fa-info-circle"></i>
+ <strong>Note:</strong> ICS, PAR, and PTR now automatically generate stock card entries. Use this form only for manual corrections or adjustments.
  </div>
+ <div class="form-row">
  <div class="form-group">
  <label>Date</label>
  <input type="date" id="scDate" value="${new Date().toISOString().split("T")[0]}" required>
+ </div>
+ <div class="form-group">
+ <label>Transaction Type</label>
+ <select class="form-select" id="scTxType" onchange="scToggleQtyFields(this.value)">
+ <option value="receipt">Receipt (add to stock)</option>
+ <option value="issue">Issue (deduct from stock)</option>
+ <option value="adjustment">Adjustment (both)</option>
+ </select>
  </div>
  </div>
  <div class="form-row">
@@ -44656,33 +45102,33 @@ Failure to submit the above requirements within the prescribed period shall cons
  </select>
  </div>
  <div class="form-group">
- <label>Reference</label>
- <input type="text" id="scReference" placeholder="e.g., IAR-${getCurrentFiscalYear()}-001">
+ <label>Reference / Source Document</label>
+ <input type="text" id="scReference" placeholder="e.g., IAR-2026-001, ICS-2026-001">
  </div>
  </div>
- <div class="form-row">
+ <div id="scReceiptFields" class="form-row">
  <div class="form-group">
  <label>Receipt Qty</label>
  <input type="number" id="scReceiptQty" placeholder="0" min="0" value="0">
  </div>
  <div class="form-group">
- <label>Receipt Unit Cost</label>
+ <label>Receipt Unit Cost (₱)</label>
  <input type="number" id="scReceiptUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
  </div>
  </div>
- <div class="form-row">
+ <div id="scIssueFields" class="form-row" style="display:none;">
  <div class="form-group">
  <label>Issue Qty</label>
  <input type="number" id="scIssueQty" placeholder="0" min="0" value="0">
  </div>
  <div class="form-group">
- <label>Issue Unit Cost</label>
+ <label>Issue Unit Cost (₱)</label>
  <input type="number" id="scIssueUnitCost" placeholder="0.00" step="0.01" min="0" value="0">
  </div>
  </div>
  <div class="form-group">
  <label>Remarks</label>
- <textarea id="scRemarks" rows="2" placeholder="Optional remarks"></textarea>
+ <textarea id="scRemarks" rows="2" placeholder="Reason for manual entry"></textarea>
  </div>
  <div class="form-group" style="text-align: right; margin-top: 20px;">
  <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -44690,9 +45136,12 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  </form>
  `;
-    openModal("New Stock Card Entry", html);
-    // Populate items dropdown
+    openModal("New Stock Card Entry (Manual)", html);
     loadItemsDropdown("scItemId");
+    window.scToggleQtyFields = function(type) {
+      document.getElementById('scReceiptFields').style.display = type === 'issue' ? 'none' : '';
+      document.getElementById('scIssueFields').style.display   = type === 'receipt' ? 'none' : '';
+    };
   };
 
   window.saveNewStockCard = async function (e) {
@@ -44836,7 +45285,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-row">
  <div class="form-group">
  <label>Property Card</label>
- <select class="form-select" id="icsPropertyId" required>
+ <select class="form-select" id="icsPropertyId" required onchange="icsAutoFillFromPropertyCard(this)">
  <option value="">-- Select Property --</option>
  </select>
  </div>
@@ -44845,6 +45294,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  <input type="text" id="icsInventoryNo" placeholder="e.g., INV-${getCurrentFiscalYear()}-001">
  </div>
  </div>
+ <input type="hidden" id="icsItemId">
  <div class="form-row">
  <div class="form-group">
  <label>Issued To (Employee)</label>
@@ -44861,15 +45311,15 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-group">
  <label>Description</label>
- <textarea id="icsDescription" rows="2" placeholder="Item description"></textarea>
+ <textarea id="icsDescription" rows="2" placeholder="Auto-filled from property card"></textarea>
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Quantity</label>
+ <label>Quantity Issued</label>
  <input type="number" id="icsQty" placeholder="1" min="1" value="1" required>
  </div>
  <div class="form-group">
- <label>Unit Cost</label>
+ <label>Unit Cost (₱)</label>
  <input type="number" id="icsUnitCost" placeholder="0.00" step="0.01" min="0">
  </div>
  </div>
@@ -44891,24 +45341,29 @@ Failure to submit the above requirements within the prescribed period shall cons
 
   window.saveNewICS = async function (e) {
     e.preventDefault();
+    const sel = document.getElementById("icsPropertyId");
+    const opt = sel?.options[sel?.selectedIndex];
+    const itemIdHidden = parseInt(document.getElementById("icsItemId")?.value) || null;
+    const itemIdOpt    = parseInt(opt?.dataset?.itemId) || null;
     const data = {
-      property_card_id: parseInt(
-        document.getElementById("icsPropertyId").value,
-      ),
-      date_of_issue: document.getElementById("icsDateOfIssue").value,
-      inventory_no: document.getElementById("icsInventoryNo").value,
-      description: document.getElementById("icsDescription").value,
-      quantity: parseInt(document.getElementById("icsQty").value) || 1,
-      unit_cost: parseFloat(document.getElementById("icsUnitCost").value) || 0,
-      issued_to: parseInt(document.getElementById("icsIssuedTo").value),
-      received_by:
-        parseInt(document.getElementById("icsReceivedBy").value) || null,
-      remarks: document.getElementById("icsRemarks").value,
+      property_card_id:      parseInt(sel?.value) || null,
+      property_number:       opt?.dataset?.propertyNo || "",
+      ppe_no:                opt?.dataset?.ppeNo      || "",
+      item_id:               itemIdHidden || itemIdOpt || null,
+      date_of_issue:         document.getElementById("icsDateOfIssue").value,
+      inventory_no:          document.getElementById("icsInventoryNo").value,
+      description:           document.getElementById("icsDescription").value,
+      qty_issued:            parseInt(document.getElementById("icsQty").value)       || 1,
+      unit_cost:             parseFloat(document.getElementById("icsUnitCost").value) || 0,
+      issued_to_employee_id: parseInt(document.getElementById("icsIssuedTo").value)   || null,
+      issued_to:             document.getElementById("icsIssuedTo")?.options[document.getElementById("icsIssuedTo")?.selectedIndex]?.text || "",
+      received_by_employee_id: parseInt(document.getElementById("icsReceivedBy").value) || null,
+      other_info:            document.getElementById("icsRemarks").value,
     };
-    if (!confirm("Are you sure you want to issue this ICS?")) return;
+    if (!confirm("Are you sure you want to issue this ICS? This will automatically update the stock card and inventory balance.")) return;
     try {
       await apiRequest("/ics", "POST", data);
-      alert("ICS issued successfully!");
+      alert("ICS issued successfully! Stock card and inventory updated.");
       closeModal();
       loadICS();
     } catch (err) {
@@ -45040,6 +45495,12 @@ Failure to submit the above requirements within the prescribed period shall cons
         const opt = document.createElement("option");
         opt.value = card.id;
         opt.textContent = `${card.property_number} - ${card.description}`;
+        // Store extra data for auto-fill on selection
+        opt.dataset.itemId      = card.item_id      || "";
+        opt.dataset.unitCost    = card.unit_cost     || card.acquisition_cost || "";
+        opt.dataset.description = card.description   || "";
+        opt.dataset.propertyNo  = card.property_number || "";
+        opt.dataset.ppeNo       = card.ppe_no        || card.property_number || "";
         select.appendChild(opt);
       });
     } catch (err) {
@@ -45357,21 +45818,23 @@ Failure to submit the above requirements within the prescribed period shall cons
  </div>
  <div class="form-row">
  <div class="form-group">
- <label>Property Number</label>
- <input type="text" id="parPropertyNo" placeholder="Property number" required>
+ <label>Property Number (PPE No.)</label>
+ <input type="text" id="parPropertyNo" placeholder="Property number" required
+ oninput="parAutoFillFromPropertyNo(this.value)">
  </div>
  <div class="form-group">
  <label>Description</label>
- <input type="text" id="parDescription" placeholder="Item description" required>
+ <input type="text" id="parDescription" placeholder="Auto-filled or enter manually" required>
  </div>
  </div>
+ <input type="hidden" id="parItemId">
  <div class="form-row">
  <div class="form-group">
- <label>Quantity</label>
+ <label>Quantity Issued</label>
  <input type="number" id="parQty" min="1" value="1" required>
  </div>
  <div class="form-group">
- <label>Unit Cost</label>
+ <label>Unit Cost (₱)</label>
  <input type="number" id="parUnitCost" step="0.01" placeholder="0.00" required>
  </div>
  </div>
@@ -45397,22 +45860,22 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
   window.saveNewPAR = async function (e) {
     e.preventDefault();
+    const parQty2      = parseInt(document.getElementById("parQty").value)       || 1;
+    const parUnitCost2 = parseFloat(document.getElementById("parUnitCost").value) || 0;
     const data = {
-      date_issued: document.getElementById("parDate").value,
-      fund_cluster: document.getElementById("parFundCluster").value,
-      property_number: document.getElementById("parPropertyNo").value,
-      description: document.getElementById("parDescription").value,
-      quantity: parseInt(document.getElementById("parQty").value),
-      unit_cost: parseFloat(document.getElementById("parUnitCost").value),
-      total_cost:
-        parseInt(document.getElementById("parQty").value) *
-        parseFloat(document.getElementById("parUnitCost").value),
-      received_by:
-        parseInt(document.getElementById("parReceivedBy").value) || null,
-      issued_by: parseInt(document.getElementById("parIssuedBy").value) || null,
+      date_of_issue:         document.getElementById("parDate").value,
+      fund_cluster:          document.getElementById("parFundCluster").value,
+      ppe_no:                document.getElementById("parPropertyNo").value,
+      description:           document.getElementById("parDescription").value,
+      qty_issued:            parQty2,
+      unit_cost:             parUnitCost2,
+      item_id:               parseInt(document.getElementById("parItemId")?.value) || null,
+      issued_to:             document.getElementById("parReceivedBy")?.options[document.getElementById("parReceivedBy")?.selectedIndex]?.text || "",
+      issued_to_employee_id: parseInt(document.getElementById("parReceivedBy").value) || null,
+      received_from_id:      parseInt(document.getElementById("parIssuedBy").value)   || null,
     };
     try {
-      if (!confirm("Are you sure you want to save this PAR?")) return;
+      if (!confirm("Are you sure you want to save this PAR? This will automatically update the property ledger and stock card.")) return;
       await apiRequest("/pars", "POST", data);
       alert("PAR saved!");
       closeModal();
@@ -53609,9 +54072,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const chiefApproved  = !!pr.approved_by_chief;
     const hopeApproved   = !!pr.approved_by_hope;
     const budgetApproved = !!pr.approved_by_budget;
-    const userNameUpper = (window.currentUser?.full_name || "").toUpperCase();
-    const isMakinano = userNameUpper.includes("MAKINANO");
-    const chiefCanApprove = isMakinano ||
+    const chiefCanApprove =
       (isWRSD ? userHasRole("chief_wrsd") : userHasAnyRole(["chief_fad", "bac_chair"]));
     let canUserApprove = false, approveLabel = "";
     if (chiefCanApprove && !chiefApproved)                           { canUserApprove = true; approveLabel = "Approve as " + chiefLabel; }
@@ -56052,9 +56513,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         if (wholePart === 0)
           return (
             "Zero Pesos Only (\u20b1" +
-            parseFloat(num).toLocaleString("en-PH", {
-              minimumFractionDigits: 2,
-            }) +
+            formatCurrency(num) +
             ")"
           );
         let words = "";
@@ -56079,20 +56538,12 @@ Failure to submit the above requirements within the prescribed period shall cons
             " Pesos and " +
             (centsPart < 10 ? "0" : "") +
             centsPart +
-            "/100 (\u20b1" +
-            parseFloat(num).toLocaleString("en-PH", {
-              minimumFractionDigits: 2,
-            }) +
-            ")"
+            "/100 (" + formatCurrency(num) + ")"
           );
         }
         return (
           words.trim() +
-          " Pesos Only (\u20b1" +
-          parseFloat(num).toLocaleString("en-PH", {
-            minimumFractionDigits: 2,
-          }) +
-          ")"
+          " Pesos Only (" + formatCurrency(num) + ")"
         );
       }
 
@@ -57578,6 +58029,7 @@ Failure to submit the above requirements within the prescribed period shall cons
  .rfq-two-col {
  display: flex;
  justify-content: space-between;
+ align-items: flex-end;
  }
  .rfq-col-left { width: 48%; }
  .rfq-col-right { width: 48%; text-align: center; }
@@ -57686,9 +58138,9 @@ Failure to submit the above requirements within the prescribed period shall cons
 
  <div class="rfq-two-col" style="margin-top:30px;">
  <div class="rfq-col-left rfq-sig-section" style="text-align:center;">
- <div class="rfq-sig-line" style="margin:25px auto 3px auto;"></div>
- <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase;">${markName}</div>
+ <div style="font-weight:bold; font-size:9.5pt; text-transform:uppercase; text-decoration:underline;">${markName}</div>
  <div style="font-size:9pt; color:#444;">AO I / SUPPLY OFFICER I</div>
+ <div style="font-size:8.5pt; color:#444; margin-top:2px;">Affix Signature</div>
  </div>
  <div class="rfq-col-right rfq-conforme" style="margin-top:0;">
  <div>Conforme:</div>
@@ -57855,6 +58307,11 @@ Failure to submit the above requirements within the prescribed period shall cons
         }));
       }
 
+      const abcTotal = abstractItems.reduce(
+        (sum, item) => sum + parseFloat(item.abc || 0),
+        0,
+      );
+
       // Supplier header row — no colors
       let supplierHeaders = "";
       let supplierSubHeaders = "";
@@ -57912,8 +58369,8 @@ Failure to submit the above requirements within the prescribed period shall cons
         });
       }
 
-      // Add NOTHING FOLLOWS row right after items/specs
-      itemsHTML += `<tr><td class="abs-td" colspan="10" style="text-align:center; padding:8px 0; font-weight:bold; font-style:italic; font-size:10pt; color:red;">***NOTHING FOLLOWS***</td></tr>`;
+      // Add TOTAL row right after items/specs
+      itemsHTML += `<tr><td class="abs-td" colspan="3" style="font-weight:bold;text-align:right;">TOTAL</td><td class="abs-td abs-r" style="font-weight:bold;">${fmtCurrency(abcTotal)}</td>${"<td class=\"abs-td abs-r\"></td>".repeat(6)}</tr>`;
 
       // Empty filler rows
       const totalContentRows =
@@ -57922,7 +58379,7 @@ Failure to submit the above requirements within the prescribed period shall cons
           ? abs.item_specifications.split(/\n/).filter((l) => l.trim()).length +
             1
           : 0) +
-        1; // +1 for NOTHING FOLLOWS row
+        1; // +1 for TOTAL row
       for (let i = totalContentRows; i < 6; i++) {
         itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
       }
@@ -59059,6 +59516,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         department: data.user.department || "",
         department_code: data.user.department_code || "",
         dept_id: data.user.dept_id || null,
+        employee_id: data.user.employee_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
       };
@@ -59297,6 +59755,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         department: data.user.department || "",
         department_code: data.user.department_code || "",
         dept_id: data.user.dept_id || null,
+        employee_id: data.user.employee_id || null,
         designation: data.user.designation || "",
         managed_dept_ids: data.user.managed_dept_ids || null,
       };

@@ -53,10 +53,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per file
+  limits: { fileSize: 25 * 1024 * 1024 }, /* 25MB per file */
   fileFilter: (req, file, cb) => {
     const allowed = [
-      'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
@@ -649,7 +648,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined }
+      user: { id: user.id, username: user.username, full_name: user.full_name, email: user.email, role: user.role, secondary_role: user.secondary_role || null, roles, dept_id: user.dept_id, employee_id: user.employee_id || null, department: user.department_name, department_code: user.department_code, designation: user.designation_name, managed_dept_ids: managed_dept_ids.length ? managed_dept_ids : undefined }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -684,7 +683,7 @@ app.post('/api/auth/register', async (req, res) => {
     );
     res.status(201).json({
       token,
-      user: { id: newUser.id, username: newUser.username, full_name: newUser.full_name, role: newUser.role }
+      user: { id: newUser.id, username: newUser.username, full_name: newUser.full_name, role: newUser.role, employee_id: null }
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -695,7 +694,7 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.full_name, u.role, u.secondary_role, u.email, u.dept_id, d.name as department_name, d.code as department_code,
+      `SELECT u.id, u.username, u.full_name, u.role, u.secondary_role, u.email, u.dept_id, u.employee_id, d.name as department_name, d.code as department_code,
               des.name as designation_name
        FROM users u 
        LEFT JOIN departments d ON u.dept_id = d.id 
@@ -2236,6 +2235,24 @@ app.put('/api/plans/:id/decline', authenticateToken, async (req, res) => {
       });
     }
 
+    // Broadcast decline notification to all active users so everyone is aligned
+    try {
+      const ppmpNoAll = p.ppmp_no || `PPMP-${req.params.id}`;
+      await broadcastNotification({
+        type: 'warning',
+        icon: 'fas fa-exclamation-triangle',
+        title: 'PPMP Declined — Needs Revision',
+        message: `PPMP entry ${ppmpNoAll} was declined by ${roleLabel}. Reason: "${reason.trim()}". Please review.`,
+        reference_type: 'ppmp',
+        reference_id: p.id,
+        reference_code: ppmpNoAll
+      });
+      // Emit notification change for clients to refresh their notification lists
+      if (global.io) global.io.emit('data_changed', { resource: 'notifications', action: 'create' });
+    } catch (bErr) {
+      console.error('Broadcast decline notification error:', bErr);
+    }
+
     // Emit real-time event so other clients refresh
     if (global.io) {
       global.io.emit('data_changed', { resource: 'plans', action: 'update', id: p.id });
@@ -3611,10 +3628,18 @@ app.put('/api/purchase-requests/:id', authenticateToken, async (req, res) => {
 });
 
 // ==============================================================================
-// SHARED MULTI-STAGE APPROVAL HELPER (Budget → HOPE → BAC Chair)
-// All 3 stages done → status = 'completed'
+// SHARED MULTI-STAGE APPROVAL HELPER
+// stageConfig: array of stage objects — each maps a DB column to a set of roles
+// completedStatus: what status to set when all stages done ('completed','signed','issued')
 // ==============================================================================
-function makeDocApproveHandler(tableName, completedStatus = 'completed', twoStageOnly = false) {
+function makeDocApproveHandler(tableName, completedStatus = 'completed', stageConfig = null) {
+  const defaultStages = [
+    { col:'approved_by_budget', nameCol:'budget_approver_name', idCol:'budget_approver_id', tsCol:'budget_approved_at', roles:['supply_officer'] },
+    { col:'approved_by_hope',   nameCol:'hope_approver_name',   idCol:'hope_approver_id',   tsCol:'hope_approved_at',   roles:['bac_secretariat'] },
+    { col:'approved_by_chief',  nameCol:'chief_approver_name',  idCol:'chief_approver_id',  tsCol:'chief_approved_at',  roles:['bac_chair'] },
+  ];
+  const stages = Array.isArray(stageConfig) ? stageConfig : defaultStages;
+
   return async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3633,21 +3658,25 @@ function makeDocApproveHandler(tableName, completedStatus = 'completed', twoStag
 
       let fields = [], values = [], p = 1;
       const push = (col, val) => { fields.push(`${col} = $${p++}`); values.push(val); };
+      let matched = false;
 
       if (approveAll) {
-        push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
-        push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-        if (!twoStageOnly) { push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now); }
+        stages.forEach(s => {
+          push(s.col, true); push(s.nameCol, userName); push(s.idCol, userId); push(s.tsCol, now);
+        });
         push('status', completedStatus);
-      } else if (userRoles.includes('budget_consultant') && !doc.approved_by_budget) {
-        push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
-      } else if (userRoles.includes('hope') && !doc.approved_by_hope) {
-        push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-      } else if (!twoStageOnly && userRoles.some(r => ['bac_chair','bac_sec','chief_fad','chief_wrsd'].includes(r)) && !doc.approved_by_chief) {
-        push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
+        matched = true;
       } else {
-        return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
+        for (const s of stages) {
+          if (userRoles.some(r => s.roles.includes(r)) && !doc[s.col]) {
+            push(s.col, true); push(s.nameCol, userName); push(s.idCol, userId); push(s.tsCol, now);
+            matched = true;
+            break;
+          }
+        }
       }
+
+      if (!matched) return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
 
       fields.push('updated_at = NOW()');
       values.push(id);
@@ -3655,10 +3684,7 @@ function makeDocApproveHandler(tableName, completedStatus = 'completed', twoStag
 
       const { rows: updated } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
       const u = updated[0];
-      // For 2-stage: complete when budget+hope done; for 3-stage: complete when all three done
-      const allDone = twoStageOnly
-        ? (u.approved_by_budget && u.approved_by_hope)
-        : (u.approved_by_budget && u.approved_by_hope && u.approved_by_chief);
+      const allDone = stages.every(s => u[s.col]);
       if (!approveAll && allDone && u.status !== completedStatus) {
         await pool.query(`UPDATE ${tableName} SET status = $1, updated_at = NOW() WHERE id = $2`, [completedStatus, id]);
         u.status = completedStatus;
@@ -3674,7 +3700,65 @@ function makeDocApproveHandler(tableName, completedStatus = 'completed', twoStag
   };
 }
 
+function makeTwgHeadApproveHandler(tableName, completedStatus = 'completed') {
+  return async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid ID' });
+
+      const userId = req.user.id;
+
+      const { rows: approverRows } = await pool.query(
+        'SELECT u.id, u.username, u.full_name, u.employee_id FROM users u WHERE u.id = $1',
+        [userId]
+      );
+      const approver = approverRows[0];
+      if (!approver) return res.status(401).json({ error: 'User not found' });
+
+      const { rows } = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
+      if (!rows.length) return res.status(404).json({ error: 'Record not found' });
+      const doc = rows[0];
+
+      if (!doc.twg_head_id) {
+        return res.status(400).json({ error: 'TWG head is not assigned for this record' });
+      }
+      if (!approver.employee_id || Number(approver.employee_id) !== Number(doc.twg_head_id)) {
+        return res.status(403).json({ error: 'Only the assigned TWG head can approve this record' });
+      }
+      if (doc.status === completedStatus) {
+        return res.status(400).json({ error: 'This record is already fully approved' });
+      }
+
+      const approverName = approver.full_name || approver.username || 'Unknown';
+      const now = new Date();
+
+      await pool.query(
+        `UPDATE ${tableName}
+         SET approved_by_twg_head = TRUE,
+             twg_head_approver_id = $1,
+             twg_head_approver_name = $2,
+             twg_head_approved_at = $3,
+             status = $4,
+             updated_at = NOW()
+         WHERE id = $5`,
+        [userId, approverName, now, completedStatus, id]
+      );
+
+      res.json({
+        message: `Post-Qualification approved by TWG Head and marked as ${completedStatus}.`,
+        status: completedStatus,
+        completed: true,
+      });
+    } catch (err) {
+      console.error(`[TWG APPROVE ${tableName}]`, err.message);
+      res.status(500).json({ error: err.message });
+    }
+  };
+}
+
 app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res) => {
+  // Stage 1: Division Chief (chief_fad/wrsd/mwpsd/mwptd) — stored in approved_by_budget col
+  // Stage 2: HoPE — stored in approved_by_hope col
   try {
     const id = parseInt(req.params.id);
     const userRoles = [req.user.role, req.user.secondary_role].filter(Boolean);
@@ -3683,6 +3767,7 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
     const now = new Date();
     const isAdmin    = userRoles.some(r => ['admin','system_admin'].includes(r));
     const approveAll = isAdmin && req.body && req.body.approve_all === true;
+    const divChief   = ['chief_fad','chief_wrsd','chief_mwpsd','chief_mwptd'];
 
     const { rows } = await pool.query('SELECT * FROM purchaserequests WHERE id = $1', [id]);
     if (!rows.length) return res.status(404).json({ error: 'PR not found' });
@@ -3694,14 +3779,11 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
     if (approveAll) {
       push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
       push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-      push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
       push('status', 'approved');
-    } else if (userRoles.includes('budget_consultant') && !pr.approved_by_budget) {
+    } else if (userRoles.some(r => divChief.includes(r)) && !pr.approved_by_budget) {
       push('approved_by_budget',true); push('budget_approver_name',userName); push('budget_approver_id',userId); push('budget_approved_at',now);
     } else if (userRoles.includes('hope') && !pr.approved_by_hope) {
       push('approved_by_hope',  true); push('hope_approver_name',  userName); push('hope_approver_id',  userId); push('hope_approved_at',  now);
-    } else if (userRoles.some(r => ['chief_fad','chief_wrsd','bac_chair'].includes(r)) && !pr.approved_by_chief) {
-      push('approved_by_chief', true); push('chief_approver_name', userName); push('chief_approver_id', userId); push('chief_approved_at', now);
     } else {
       return res.status(403).json({ error: 'Already approved at your stage or insufficient role' });
     }
@@ -3712,17 +3794,14 @@ app.put('/api/purchase-requests/:id/approve', authenticateToken, async (req, res
 
     const { rows: updated } = await pool.query('SELECT * FROM purchaserequests WHERE id = $1', [id]);
     const u = updated[0];
-    if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.approved_by_chief && u.status !== 'approved') {
-      await pool.query(`UPDATE purchaserequests SET status = 'approved', approved_at = NOW(), updated_at = NOW() WHERE id = $1`, [id]);
+    if (!approveAll && u.approved_by_budget && u.approved_by_hope && u.status !== 'approved') {
+      await pool.query(`UPDATE purchaserequests SET status='approved', approved_at=NOW(), updated_at=NOW() WHERE id=$1`, [id]);
       u.status = 'approved';
-      if (u.requested_by) {
-        createNotification(u.requested_by, {
-          type: 'approval', icon: 'fas fa-check-circle',
-          title: `${u.pr_number} Approved`,
-          message: 'Your purchase request has been approved',
-          reference_type: 'purchase_request', reference_id: u.id, reference_code: u.pr_number
-        });
-      }
+      if (u.requested_by) createNotification(u.requested_by, {
+        type:'approval', icon:'fas fa-check-circle', title:`${u.pr_number} Approved`,
+        message:'Your purchase request has been approved',
+        reference_type:'purchase_request', reference_id:u.id, reference_code:u.pr_number
+      });
     }
     res.json({ message: u.status === 'approved' ? 'PR fully approved!' : 'Stage approved successfully.', status: u.status });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3931,7 +4010,7 @@ app.put('/api/rfqs/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
-app.put('/api/rfqs/:id/approve', authenticateToken, makeDocApproveHandler('rfqs'));
+app.put('/api/rfqs/:id/approve', authenticateToken, makeDocApproveHandler('rfqs','completed',[{col:'approved_by_budget',nameCol:'budget_approver_name',idCol:'budget_approver_id',tsCol:'budget_approved_at',roles:['supply_officer']},{col:'approved_by_hope',nameCol:'hope_approver_name',idCol:'hope_approver_id',tsCol:'hope_approved_at',roles:['bac_secretariat']},{col:'approved_by_chief',nameCol:'chief_approver_name',idCol:'chief_approver_id',tsCol:'chief_approved_at',roles:['bac_chair']}]));
 
 app.delete('/api/rfqs/:id', authenticateToken, async (req, res) => {
   try {
@@ -4070,7 +4149,7 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   finally { client.release(); }
 });
 
-app.put('/api/abstracts/:id/approve', authenticateToken, makeDocApproveHandler('abstracts'));
+app.put('/api/abstracts/:id/approve', authenticateToken, makeDocApproveHandler('abstracts','completed',[{col:'approved_by_budget',nameCol:'budget_approver_name',idCol:'budget_approver_id',tsCol:'budget_approved_at',roles:['supply_officer']},{col:'approved_by_hope',nameCol:'hope_approver_name',idCol:'hope_approver_id',tsCol:'hope_approved_at',roles:['bac_secretariat']},{col:'approved_by_chief',nameCol:'chief_approver_name',idCol:'chief_approver_id',tsCol:'chief_approved_at',roles:['bac_chair']}]));
 
 app.delete('/api/abstracts/:id', authenticateToken, async (req, res) => {
   try {
@@ -4159,7 +4238,41 @@ app.post('/api/post-qualifications', authenticateToken, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
       [postqual_number, abstract_id, bidder_name, documents_verified||'{}', technical_compliance||'{}', financial_validation||'{}', twg_result, findings, status||'on_going', req.user.id, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, bidder1_name||null, bidder2_name||null, bidder3_name||null]
     );
-    res.status(201).json(result.rows[0]);
+    const pq = result.rows[0];
+
+    // Notify BAC Chair and HoPE, and the assigned TWG Head (if any)
+    try {
+      broadcastNotification({
+        type: 'post_qual_submitted',
+        icon: 'file-alt',
+        title: 'TWG Report Submitted',
+        message: `TWG Report ${pq.postqual_number || pq.id} has been submitted.`,
+        reference_type: 'post_qualifications',
+        reference_id: pq.id,
+        reference_code: pq.postqual_number || null,
+        roles: ['bac_chair', 'hope']
+      });
+
+      if (pq.twg_head_id) {
+        const { rows: twgUsers } = await pool.query('SELECT id FROM users WHERE employee_id = $1', [pq.twg_head_id]);
+        if (twgUsers.length) {
+          const userId = twgUsers[0].id;
+          createNotification(userId, {
+            type: 'post_qual_assigned',
+            icon: 'user-check',
+            title: 'Assigned as TWG Head',
+            message: `You have been assigned as TWG Head for TWG Report ${pq.postqual_number || pq.id}.`,
+            reference_type: 'post_qualifications',
+            reference_id: pq.id,
+            reference_code: pq.postqual_number || null,
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('[NOTIFY TWG SUBMIT]', notifErr.message);
+    }
+
+    res.status(201).json(pq);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4171,7 +4284,43 @@ app.put('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
        WHERE id=$21 RETURNING *`,
       [postqual_number, abstract_id, bidder_name, documents_verified, technical_compliance, financial_validation, twg_result, findings, status, twg_head_id||null, twg_member1_id||null, twg_member2_id||null, twg_member3_id||null, twg_member4_id||null, bidder1_supplier_id||null, bidder2_supplier_id||null, bidder3_supplier_id||null, bidder1_name||null, bidder2_name||null, bidder3_name||null, req.params.id]
     );
-    res.json(result.rows[0]);
+    const pq = result.rows[0];
+
+    // If status changed to on_going/ready, notify approvers
+    try {
+      const status = pq.status || '';
+      if (['on_going', 'submitted', 'ready'].includes(status)) {
+        broadcastNotification({
+          type: 'post_qual_updated',
+          icon: 'file-alt',
+          title: 'TWG Report Updated',
+          message: `TWG Report ${pq.postqual_number || pq.id} was updated and may require attention.`,
+          reference_type: 'post_qualifications',
+          reference_id: pq.id,
+          reference_code: pq.postqual_number || null,
+          roles: ['bac_chair', 'hope']
+        });
+
+        if (pq.twg_head_id) {
+          const { rows: twgUsers } = await pool.query('SELECT id FROM users WHERE employee_id = $1', [pq.twg_head_id]);
+          if (twgUsers.length) {
+            createNotification(twgUsers[0].id, {
+              type: 'post_qual_assigned',
+              icon: 'user-check',
+              title: 'Assigned as TWG Head',
+              message: `You are assigned as TWG Head for TWG Report ${pq.postqual_number || pq.id}.`,
+              reference_type: 'post_qualifications',
+              reference_id: pq.id,
+              reference_code: pq.postqual_number || null,
+            });
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.error('[NOTIFY TWG UPDATE]', notifErr.message);
+    }
+
+    res.json(pq);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -4184,7 +4333,7 @@ app.put('/api/post-qualifications/:id/set-status', authenticateToken, async (req
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/post-qualifications/:id/approve', authenticateToken, makeDocApproveHandler('post_qualifications'));
+app.put('/api/post-qualifications/:id/approve', authenticateToken, makeTwgHeadApproveHandler('post_qualifications','completed'));
 
 app.delete('/api/post-qualifications/:id', authenticateToken, async (req, res) => {
   try {
@@ -4295,7 +4444,7 @@ app.put('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/bac-resolutions/:id/approve', authenticateToken, makeDocApproveHandler('bac_resolutions'));
+app.put('/api/bac-resolutions/:id/approve', authenticateToken, makeDocApproveHandler('bac_resolutions','completed',[{col:'approved_by_budget',nameCol:'budget_approver_name',idCol:'budget_approver_id',tsCol:'budget_approved_at',roles:['supply_officer']},{col:'approved_by_hope',nameCol:'hope_approver_name',idCol:'hope_approver_id',tsCol:'hope_approved_at',roles:['bac_secretariat']},{col:'approved_by_chief',nameCol:'chief_approver_name',idCol:'chief_approver_id',tsCol:'chief_approved_at',roles:['bac_chair']}]));
 
 app.delete('/api/bac-resolutions/:id', authenticateToken, async (req, res) => {
   try {
@@ -4388,7 +4537,7 @@ app.post('/api/notices-of-award', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO notices_of_award (noa_number, bac_resolution_id, supplier_id, supplier_name, rfq_id, contract_amount, date_issued, status, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount||0, date_issued, status||'with_noa', req.user.id]
+      [noa_number, bac_resolution_id, resolvedSupplierId, supplier_name||null, rfq_id, contract_amount||0, date_issued, status||'issued', req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -4429,7 +4578,7 @@ app.put('/api/notices-of-award/:id/set-status', authenticateToken, async (req, r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/notices-of-award/:id/approve', authenticateToken, makeDocApproveHandler('notices_of_award', 'issued'));
+app.put('/api/notices-of-award/:id/approve', authenticateToken, makeDocApproveHandler('notices_of_award','issued',[{col:'approved_by_hope',nameCol:'hope_approver_name',idCol:'hope_approver_id',tsCol:'hope_approved_at',roles:['hope']}]));
 
 app.delete('/api/notices-of-award/:id', authenticateToken, async (req, res) => {
   try {
@@ -4582,7 +4731,7 @@ app.put('/api/purchase-orders/:id/status', authenticateToken, async (req, res) =
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/purchase-orders/:id/approve', authenticateToken, makeDocApproveHandler('purchaseorders', 'signed', true));
+app.put('/api/purchase-orders/:id/approve', authenticateToken, makeDocApproveHandler('purchaseorders','signed',[{col:'approved_by_budget',nameCol:'budget_approver_name',idCol:'budget_approver_id',tsCol:'budget_approved_at',roles:['budget_consultant']},{col:'approved_by_hope',nameCol:'hope_approver_name',idCol:'hope_approver_id',tsCol:'hope_approved_at',roles:['accountant']},{col:'approved_by_chief',nameCol:'chief_approver_name',idCol:'chief_approver_id',tsCol:'chief_approved_at',roles:['hope']}]));
 
 app.delete('/api/purchase-orders/:id', authenticateToken, async (req, res) => {
   try {
@@ -7158,35 +7307,19 @@ async function runMigrations() {
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_id INTEGER`,
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS noted_by_name TEXT`,
     // NOA default status
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'with_noa'`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
-    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'awaiting_noa'`,
     `ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS recommended_supplier_name TEXT`,
     `ALTER TABLE abstract_quotations ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
     `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS supplier_name TEXT`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder1_name TEXT`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
-    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    // Multi-stage approval columns for all procurement documents
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
     `ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
@@ -7223,6 +7356,27 @@ async function runMigrations() {
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
     `ALTER TABLE bac_resolutions ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS approved_by_twg_head BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS twg_head_approver_id INTEGER`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS twg_head_approver_name TEXT`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS twg_head_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE notices_of_award ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'with_noa'`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
@@ -7231,18 +7385,13 @@ async function runMigrations() {
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
     `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_budget BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_id INTEGER`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approver_name TEXT`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS budget_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_hope BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_id INTEGER`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approver_name TEXT`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS hope_approved_at TIMESTAMP WITHOUT TIME ZONE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
-    `ALTER TABLE purchaserequests ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS approved_by_chief BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_id INTEGER`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approver_name TEXT`,
+    `ALTER TABLE purchaseorders ADD COLUMN IF NOT EXISTS chief_approved_at TIMESTAMP WITHOUT TIME ZONE`,
+    // Set Bealah Joy Camarin (employee_id=2) as accountant
+    `UPDATE users SET role = 'accountant' WHERE employee_id = 2 AND (role = 'requester' OR role IS NULL)`,
+    `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder1_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder2_name TEXT`,
     `ALTER TABLE post_qualifications ADD COLUMN IF NOT EXISTS bidder3_name TEXT`,
     // IAR new fields for requisitioning office, property custodian, inspector name

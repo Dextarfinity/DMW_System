@@ -69,7 +69,7 @@
  </li>
  <li class="nav-item" data-page="post-qual" data-section-item="transactions">
  <i class="fas fa-check-circle"></i>
- <span>Post-Qualification</span>
+ <span>BAC TWG Report</span>
  </li>
  <li class="nav-item" data-page="noa" data-section-item="transactions">
  <i class="fas fa-award"></i>
@@ -363,7 +363,7 @@
  <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
  <div class="pipeline-stage"><div class="stage-count" id="pipelineBAC">--</div><div class="stage-label">BAC Res</div></div>
  <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
- <div class="pipeline-stage"><div class="stage-count" id="pipelineTWG">--</div><div class="stage-label">Post-Qual</div></div>
+ <div class="pipeline-stage"><div class="stage-count" id="pipelineTWG">--</div><div class="stage-label">BAC TWG</div></div>
  <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
  <div class="pipeline-stage"><div class="stage-count" id="pipelineNOA">--</div><div class="stage-label">NOA</div></div>
  <div class="pipeline-arrow"><i class="fas fa-chevron-right"></i></div>
@@ -380,7 +380,7 @@
  <!-- SLA Targets -->
  <div class="info-banner kpi-banner" style="margin-bottom: 16px;">
  <i class="fas fa-clock"></i>
- <strong>SLA Targets:</strong> PR Approval 5d &nbsp;|&nbsp; RFQ 3d &nbsp;|&nbsp; Abstract 1d &nbsp;|&nbsp; BAC Res 2d &nbsp;|&nbsp; Post-Qual 3d &nbsp;|&nbsp; NOA 1d &nbsp;|&nbsp; PO Approval 1d &nbsp;|&nbsp; Supplier Sign 7d &nbsp;|&nbsp; COA 5d
+ <strong>SLA Targets:</strong> PR Approval 5d &nbsp;|&nbsp; RFQ 3d &nbsp;|&nbsp; Abstract 1d &nbsp;|&nbsp; BAC Res 2d &nbsp;|&nbsp; BAC TWG 3d &nbsp;|&nbsp; NOA 1d &nbsp;|&nbsp; PO Approval 1d &nbsp;|&nbsp; Supplier Sign 7d &nbsp;|&nbsp; COA 5d
  </div>
 
  </div><!-- /dashAdminOnlyStats -->
@@ -949,13 +949,13 @@
  <section class="page" id="post-qual">
  <div class="gov-form-header">
  <div class="agency-name">Republic of the Philippines &bull; Department of Migrant Workers &bull; Regional Office XIII</div>
- <div class="form-title">Post-Qualification Report</div>
+ <div class="form-title">BAC TWG Report</div>
  <div class="form-subtitle">Fiscal Year <span class="fiscal-year-display"></div>
  </div>
 
  <div class="page-actions">
  <button class="btn btn-primary" data-action="create-postqual" onclick="showNewPostQualModal()">
- <i class="fas fa-plus"></i> Start Post-Qualification
+ <i class="fas fa-plus"></i> Start BAC TWG Report
  </button>
  <button class="btn btn-outline" data-action="export-reports" onclick="exportToExcel('PostQual')">
  <i class="fas fa-file-excel"></i> Export
@@ -970,8 +970,8 @@
  <div class="filter-group">
  <select class="form-select" id="postQualStatusFilter" onchange="filterPostQualTable()">
  <option value="">All Status</option>
- <option value="on_going">Post-Qualification On-Going</option>
- <option value="completed">Post-Qualification Completed</option>
+ <option value="on_going">BAC TWG On-Going</option>
+ <option value="completed">BAC TWG Completed</option>
  <option value="cancelled">Cancelled</option>
  </select>
  </div>
