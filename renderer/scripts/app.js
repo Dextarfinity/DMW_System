@@ -2348,8 +2348,6 @@ function updatePPMPDivisionBudgetBreakdown(budgetSummary) {
 // Check if PPMP creation is within deadline window
 function checkPPMPDeadline(fiscalYear) {
   const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
 
   const fyNum = parseInt(fiscalYear);
   const deadlineYear = fyNum - 1;
@@ -2358,15 +2356,15 @@ function checkPPMPDeadline(fiscalYear) {
 
   if (today < creationStartDate) {
     return {
-      allowed: false,
-      message: `Cannot create PPMP ${fyNum} yet. Deadline: September 30, ${deadlineYear}`
+      allowed: true,
+      message: `PPMP ${fyNum} is outside the planning window (Jan-Sep ${deadlineYear}), but creation is still allowed.`
     };
   }
 
   if (today > deadlineDate) {
     return {
-      allowed: false,
-      message: `PPMP creation deadline passed (Sep 30, ${deadlineYear}). Next deadline: September 30, ${deadlineYear + 1}`
+      allowed: true,
+      message: `PPMP ${fyNum} is beyond the planning deadline (Sep 30, ${deadlineYear}), but creation is still allowed.`
     };
   }
 
@@ -19031,12 +19029,8 @@ Failure to submit the above requirements within the prescribed period shall cons
       document.getElementById("ppmpFiscalYear")?.value ||
       new Date().getFullYear();
 
-    // Check deadline for PPMP creation
-    const deadlineCheck = checkPPMPDeadline(fiscalYear);
-    if (!deadlineCheck.allowed) {
-      alert(deadlineCheck.message);
-      return;
-    }
+    // Deadline info is advisory only; do not block save.
+    checkPPMPDeadline(fiscalYear);
 
     const division =
       document.getElementById("ppmpDivisionSelect")?.value ||
