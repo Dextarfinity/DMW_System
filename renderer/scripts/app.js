@@ -1229,7 +1229,8 @@ async function populateSignupDivision() {
 }
 
 // API Helper Functions
-async function apiRequest(endpoint, method = "GET", data = null) {
+async function apiRequest(endpoint, method = "GET", data = null, options = {}) {
+  const silentErrorMessages = new Set(options.silentErrorMessages || []);
   // NEW: Guard clause - ensure API_URL is set before making requests
   if (!API_URL) {
     console.warn(
@@ -1265,11 +1266,17 @@ async function apiRequest(endpoint, method = "GET", data = null) {
       const error = await response.json().catch(() => ({
         error: "Network error",
       }));
-      throw new Error(error.error || "Request failed");
+      const requestError = new Error(error.error || "Request failed");
+      if (silentErrorMessages.has(requestError.message)) {
+        requestError.silent = true;
+      }
+      throw requestError;
     }
     return await response.json();
   } catch (err) {
-    console.error(`API Error (${endpoint}):`, err);
+    if (!err?.silent) {
+      console.error(`API Error (${endpoint}):`, err);
+    }
     throw err;
   }
 }
@@ -4368,15 +4375,31 @@ async function runBulkApproval(moduleKey, recordIds, approveAll = false) {
     ? { approve_all: true }
     : null;
 
+  const alreadyApprovedMessages = [
+    "PPMP is already fully approved",
+    "This record is already fully approved",
+    "Already approved by Chief FAD / BAC Chair",
+    "Already approved by Chief WRSD",
+    "Already approved by HOPE",
+    "Already approved by Budget Consultant",
+  ];
+
   let successCount = 0;
+  let skippedCount = 0;
   const errors = [];
 
   for (const id of ids) {
     try {
-      await apiRequest(cfg.endpoint(id), "PUT", approveBody);
+      await apiRequest(cfg.endpoint(id), "PUT", approveBody, {
+        silentErrorMessages: alreadyApprovedMessages,
+      });
       successCount += 1;
     } catch (err) {
-      errors.push(`ID ${id}: ${err.message}`);
+      if (alreadyApprovedMessages.includes(err.message)) {
+        skippedCount += 1;
+      } else {
+        errors.push(`ID ${id}: ${err.message}`);
+      }
     }
   }
 
@@ -4387,10 +4410,15 @@ async function runBulkApproval(moduleKey, recordIds, approveAll = false) {
 
   if (errors.length) {
     showNotification(
-      `Approved ${successCount} of ${ids.length} ${cfg.label.toLowerCase()} with ${errors.length} error(s).`,
+      `Approved ${successCount} of ${ids.length} ${cfg.label.toLowerCase()} with ${errors.length} error(s)${skippedCount ? ` and ${skippedCount} skipped already-approved item(s)` : ""}.`,
       "warning",
     );
     console.warn(`[BULK APPROVAL ${moduleKey}]`, errors.join(" | "));
+  } else if (skippedCount > 0) {
+    showNotification(
+      `Approved ${successCount} ${cfg.label.toLowerCase()} and skipped ${skippedCount} already-approved item(s).`,
+      "info",
+    );
   } else {
     showNotification(
       `${successCount} ${cfg.label.toLowerCase()} approved successfully.`,
