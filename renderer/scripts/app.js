@@ -255,83 +255,39 @@ function disconnectSocket() {
  * Map Socket.IO resource names → loadPageData page IDs
  * so we know which page to refresh when a resource changes.
  */
-const RESOURCE_TO_PAGE = {
-  departments: "divisions",
-  divisions: "divisions",
-  offices: "offices",
-  users: "users",
-  designations: "designations",
-  employees: "employees",
-  "fund-clusters": "fund-clusters",
-  "procurement-modes": "procurement-modes",
-  "uacs-codes": "uacs-codes",
-  uoms: "uoms",
-  suppliers: "suppliers",
-  items: "items",
-  plans: "ppmp",
-  "plan-items": "ppmp",
-  paps: "ppmp",
-  "app-settings": "app",
-  "app-budget-summary": "app",
-  "purchase-requests": "purchase-requests",
-  rfqs: "rfq",
-  abstracts: "abstract",
-  "post-qualifications": "post-qual",
-  "bac-resolutions": "bac-resolution",
-  "notices-of-award": "noa",
-  "purchase-orders": "purchase-orders",
-  iars: "iar",
-  "stock-cards": "stock-cards",
-  "supplies-ledger-cards": "supplies-ledger",
-  "property-cards": "property-cards",
-  "property-ledger-cards": "property-cards",
-  ics: "ics",
-  pars: "par",
-  ptrs: "ptr",
-  ris: "ris",
-  "received-semi-expendable": "semi-expendable",
-  "received-capital-outlay": "capital-outlay",
-  "trip-tickets": "trip-tickets",
-  "po-packets": "po-packet",
-  "coa-submissions": "coa",
-  settings: "settings",
-  notifications: null, // handled separately
-  attachments: null, // no specific page
-};
-
-/** Handle a real-time data_changed event from the server */
 function handleRealtimeDataChange(event) {
-  // Check if a modal is open - if so, don't refresh the page
-  const modalOverlay = document.querySelector(".modal-overlay");
-  const isModalOpen = modalOverlay && modalOverlay.style.display !== "none";
-
-  if (isModalOpen) {
-    console.log(
-      "[SYNC] ️ Modal is open - skipping page refresh to preserve modal state",
-    );
-    // Only update cache, don't reload page
-    window._appData = null;
-    window._appItems = null;
-    window._appStatus = null;
-    window._ppmpData = null;
-    return;
-  }
+  const resource = event?.resource || event?.resource_name || "";
+  const action = event?.action || "";
+  const user = event?.user || null;
+  const targetPageId = (function (r) {
+    const m = {
+      departments: "divisions",
+      divisions: "divisions",
+      offices: "offices",
+      users: "users",
+      designations: "designations",
+      employees: "employees",
+      "fund-clusters": "fund-clusters",
+      "procurement-modes": "procurement-modes",
+      "uacs-codes": "uacs-codes",
+      uoms: "uoms",
+      suppliers: "suppliers",
+      items: "items",
+      plans: "ppmp",
+      "plan-items": "ppmp",
+      paps: "ppmp",
+      "app-settings": "app",
+      "app-budget-summary": "app",
+      "purchase-requests": "purchase-requests",
+      rfqs: "rfq",
+    };
+    return m[r] || null;
+  })(resource);
 
   const activePage = document.querySelector(".page.active");
   const activePageId = activePage ? activePage.id : null;
-  const resource = (
-    event && event.resource ? String(event.resource) : ""
-  ).toLowerCase();
-  const targetPageId = RESOURCE_TO_PAGE[event.resource];
 
-  console.log(
-    "[SYNC] Resource:",
-    resource,
-    "| Active Page:",
-    activePageId,
-    "| Target Page:",
-    targetPageId,
-  );
+
 
   // ALWAYS clear caches so next load gets fresh data
   window._appData = null;
@@ -14947,6 +14903,36 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Abstract of Quotations (AOQ)", html, {
       preventOutsideClose: true,
     });
+    // Prevent selecting the same employee for BAC Chairperson and BAC Secretariat (2)
+    try {
+      const chairSel = document.getElementById("absBacChairpersonId");
+      const sec2Sel = document.getElementById("absBacSecretariat2Id");
+      function updateExclusions() {
+        if (!chairSel || !sec2Sel) return;
+        const chairVal = chairSel.value;
+        const sec2Val = sec2Sel.value;
+        // Enable all first
+        [chairSel, sec2Sel].forEach((sel) => {
+          Array.from(sel.options).forEach((o) => (o.disabled = false));
+        });
+        if (chairVal) {
+          const opt = sec2Sel.querySelector(`option[value="${chairVal}"]`);
+          if (opt) opt.disabled = true;
+        }
+        if (sec2Val) {
+          const opt2 = chairSel.querySelector(`option[value="${sec2Val}"]`);
+          if (opt2) opt2.disabled = true;
+        }
+      }
+      if (chairSel && sec2Sel) {
+        addTrackedListener(chairSel, "change", updateExclusions);
+        addTrackedListener(sec2Sel, "change", updateExclusions);
+        // Initialize exclusions immediately
+        updateExclusions();
+      }
+    } catch (e) {
+      console.warn("Failed to initialize AOQ signatory exclusions", e);
+    }
   };
 
   // When user selects an RFQ in the Abstract form, auto-fill items, purpose, ABC, specs from that RFQ + linked PR
@@ -22025,6 +22011,13 @@ Failure to submit the above requirements within the prescribed period shall cons
       q.rank_no = idx + 1;
     });
 
+    // Validate distinct signatories: BAC Chairperson vs BAC Secretariat (2)
+    const _bacChairpersonId = document.getElementById("absBacChairpersonId")?.value || null;
+    const _bacSecretariat2Id = document.getElementById("absBacSecretariat2Id")?.value || null;
+    if (_bacChairpersonId && _bacSecretariat2Id && _bacChairpersonId === _bacSecretariat2Id) {
+      alert("BAC Chairperson and Chairperson, BAC Secretariat (2) cannot be the same person.\nPlease choose different employees.");
+      return;
+    }
     if (!confirm("Save this Abstract of Quotations as draft?")) return;
 
     try {
@@ -32740,10 +32733,12 @@ Failure to submit the above requirements within the prescribed period shall cons
           </tbody>
         </table>
         <p style="margin-top:20px;"><strong>Award Recommendation:</strong> Award to lowest calculated responsive quotation</p>
-        <div class="signature-box">
+        <div style="height:12px;"></div>
+        <div class="signature-box" style="margin-top:0;margin-bottom:12px;">
           <div class="sig-line"><span>Prepared by:</span><div class="sig-space"></div><p>BAC Secretariat</p></div>
           <div class="sig-line"><span>Certified Correct:</span><div class="sig-space"></div><p>BAC Chairman</p></div>
-        </div>`,
+        </div>
+        <div style="height:12px;"></div>`,
       NOA: `
         <div class="doc-title">NOTICE OF AWARD</div>
         <table class="info-table">
@@ -36639,12 +36634,13 @@ Failure to submit the above requirements within the prescribed period shall cons
           .abs-r { text-align: right; }
           .abs-cert { font-size: 8pt; line-height: 1.4; margin-top: 4px; }
           .abs-cert p { margin: 2px 0; }
-          .abs-sigs { margin-top: 6px; font-size: 8pt; }
-          .abs-sig-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
-          .abs-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 2px; }
-          .abs-sl { border-bottom: 1px solid #000; height: 18px; margin: 8px auto 1px auto; width: 80%; }
-          .abs-sn { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
-          .abs-st { font-size: 7pt; color: #333; }
+          .abs-sigs { margin-top: 12px; font-size: 8pt; }
+          .abs-sig-layout { display: grid; grid-template-columns: 23% 54% 23%; gap: 12px; align-items: start; }
+          .abs-sig-col { text-align: center; }
+          .abs-sig-line { display: none; }
+          .abs-sig-name { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-decoration: underline; }
+          .abs-sig-title { font-size: 7pt; color: #333; line-height: 1.15; }
+          .abs-sig-note { font-size: 7pt; color: #444; margin-top: 2px; font-style: italic; }
           .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
         </style>
 
@@ -36693,24 +36689,53 @@ Failure to submit the above requirements within the prescribed period shall cons
           </div>
 
           <div class="abs-sigs">
-            <div class="abs-lbl">Recommended By:</div>
-            <div style="text-align:center;margin-bottom:6px;">
-              <div class="abs-sn" style="text-decoration:underline;">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div>
-            </div>
-            <div class="abs-sig-row">
-              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
-              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
-            </div>
-            <div class="abs-sig-row">
-              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
-              <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
-            </div>
+            <div class="abs-sig-layout">
+              <div class="abs-sig-col">
+                <div class="abs-lbl">Prepared By:</div>
+                <br/>
+                <div class="abs-sig-name">${bacChairName}</div>
+                <div class="abs-sig-title">${bacChairDesignation}</div>
+              </div>
 
-            <div style="margin-top:8px;">
-              <div class="abs-lbl">Approved By:</div>
-              <div style="text-align:center;">
-                <div class="abs-sn" style="text-decoration:underline;">${rdName}</div><div class="abs-st">${rdTitle}</div>
-                <div class="abs-st" style="font-style:italic;">Head of the Procuring Entity</div>
+              <div class="abs-sig-col">
+                <div class="abs-lbl" style="text-align:center;">Recommended By:</div>
+                <br/>
+                <div style="display:grid; gap:10px;">
+                  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
+                    <div>
+                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
+                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${bacViceChairName || ''}</div>
+                      <div class="abs-sig-title">${bacViceChairDesignation || ''}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
+                    </div>
+                  </div>
+                  <br/>
+                  <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[2] && bacMembers[2].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || ''}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="abs-sig-col">
+                <div class="abs-lbl">Approved By:</div>
+                <br/>
+                <div class="abs-sig-line"></div>
+                <div class="abs-sig-name">${rdName}</div>
+                <div class="abs-sig-title">${rdTitle}</div>
+                <div class="abs-sig-title" style="font-style:italic;">Head of the Procuring Entity</div>
               </div>
             </div>
           </div>
@@ -54575,10 +54600,12 @@ Failure to submit the above requirements within the prescribed period shall cons
  </tbody>
  </table>
  <p style="margin-top:20px;"><strong>Award Recommendation:</strong> Award to lowest calculated responsive quotation</p>
- <div class="signature-box">
+ <div style="height:12px;"></div>
+ <div class="signature-box" style="margin-top:0;margin-bottom:12px;">
  <div class="sig-line"><span>Prepared by:</span><div class="sig-space"></div><p>BAC Secretariat</p></div>
  <div class="sig-line"><span>Certified Correct:</span><div class="sig-space"></div><p>BAC Chairman</p></div>
- </div>`,
+ </div>
+ <div style="height:12px;"></div>`,
       NOA: `
  <div class="doc-title">NOTICE OF AWARD</div>
  <table class="info-table">
@@ -58411,13 +58438,14 @@ Failure to submit the above requirements within the prescribed period shall cons
  .abs-r { text-align: right; }
  .abs-cert { font-size: 8pt; line-height: 1.4; margin-top: 4px; }
  .abs-cert p { margin: 2px 0; }
- .abs-sigs { margin-top: 6px; font-size: 8pt; }
- .abs-sig-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
- .abs-sb { display: inline-block; width: 45%; text-align: center; vertical-align: top; margin-bottom: 2px; }
- .abs-sl { border-bottom: 1px solid #000; height: 18px; margin: 8px auto 1px auto; width: 80%; }
- .abs-sn { font-weight: bold; font-size: 7.5pt; text-transform: uppercase; }
- .abs-st { font-size: 7pt; color: #333; }
- .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
+          .abs-sigs { margin-top: 12px; font-size: 8pt; }
+          .abs-sig-layout { display: grid; grid-template-columns: 23% 54% 23%; gap: 12px; align-items: start; }
+          .abs-sig-col { text-align: center; }
+          .abs-sig-line { display: none; }
+          .abs-sig-name { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-decoration: underline; }
+          .abs-sig-title { font-size: 7pt; color: #333; line-height: 1.15; }
+          .abs-sig-note { font-size: 7pt; color: #444; margin-top: 2px; font-style: italic; }
+          .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
  </style>
 
  <div class="abs-wrap">
@@ -58464,28 +58492,57 @@ Failure to submit the above requirements within the prescribed period shall cons
  <p>We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
  </div>
 
- <div class="abs-sigs">
- <div class="abs-lbl">Recommended By:</div>
- <div style="text-align:center;margin-bottom:6px;">
- <div class="abs-sn" style="text-decoration:underline;">${bacChairName}</div><div class="abs-st">${bacChairDesignation}</div>
- </div>
- <div class="abs-sig-row">
- <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacViceChairName}</div><div class="abs-st">${bacViceChairDesignation}</div></div>
- <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[0].name}</div><div class="abs-st">${bacMembers[0].title}</div></div>
- </div>
- <div class="abs-sig-row">
- <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[1].name}</div><div class="abs-st">${bacMembers[1].title}</div></div>
- <div class="abs-sb"><div class="abs-sn" style="text-decoration:underline;">${bacMembers[2].name}</div><div class="abs-st">${bacMembers[2].title}</div></div>
- </div>
+          <div class="abs-sigs">
+            <div class="abs-sig-layout">
+              <div class="abs-sig-col">
+                <div class="abs-lbl">Prepared By:</div>
+                <br/>
+                <div class="abs-sig-name">${bacChairName}</div>
+                <div class="abs-sig-title">${bacChairDesignation}</div>
+              </div>
 
- <div style="margin-top:8px;">
- <div class="abs-lbl">Approved By:</div>
- <div style="text-align:center;">
- <div class="abs-sn" style="text-decoration:underline;">${rdName}</div><div class="abs-st">${rdTitle}</div>
- <div class="abs-st" style="font-style:italic;">Head of the Procuring Entity</div>
- </div>
- </div>
- </div>
+              <div class="abs-sig-col">
+                <div class="abs-lbl" style="text-align:center;">Recommended By:</div>
+                <br/>
+                <div style="display:grid; gap:10px;">
+                  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
+                    <div>
+                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
+                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${bacViceChairName}</div>
+                      <div class="abs-sig-title">${bacViceChairDesignation}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
+                    </div>
+                  </div>
+                  <br/>
+                  <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
+                    </div>
+                    <div>
+                      <div class="abs-sig-name">${(bacMembers[2] && bacMembers[2].name) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || ''}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="abs-sig-col">
+                <div class="abs-lbl">Approved By:</div>
+                <br/>
+                <div class="abs-sig-line"></div>
+                <div class="abs-sig-name">${rdName}</div>
+                <div class="abs-sig-title">${rdTitle}</div>
+                <div class="abs-sig-title" style="font-style:italic;">Head of the Procuring Entity</div>
+              </div>
+            </div>
+          </div>
  </div>
  `;
 

@@ -4087,6 +4087,16 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
+    // Defensive validation: ensure BAC Chairperson and BAC Secretariat (2) are different
+    try {
+      const _chair = bac_chairperson_id ? String(bac_chairperson_id) : null;
+      const _sec2 = bac_secretariat2_id ? String(bac_secretariat2_id) : null;
+      if (_chair && _sec2 && _chair === _sec2) {
+        return res.status(400).json({ error: 'BAC Chairperson and Chairperson, BAC Secretariat (2) must be different employees.' });
+      }
+    } catch (vErr) {
+      // ignore and continue; validation above is best-effort
+    }
     const absResult = await client.query(
       `INSERT INTO abstracts (abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, created_by, item_specifications, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
@@ -4116,6 +4126,16 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { abstract_number, rfq_id, date_prepared, purpose, status, recommended_supplier_id, recommended_supplier_name, recommended_amount, item_specifications, quotations, vice_chairperson_id, bac_member1_id, bac_member2_id, bac_member3_id, bac_secretariat_id, bac_chairperson_id, regional_director_id, bac_secretariat2_id } = req.body;
+    // Defensive validation: ensure BAC Chairperson and BAC Secretariat (2) are different
+    try {
+      const _chair = bac_chairperson_id ? String(bac_chairperson_id) : null;
+      const _sec2 = bac_secretariat2_id ? String(bac_secretariat2_id) : null;
+      if (_chair && _sec2 && _chair === _sec2) {
+        return res.status(400).json({ error: 'BAC Chairperson and Chairperson, BAC Secretariat (2) must be different employees.' });
+      }
+    } catch (vErr) {
+      // ignore and continue; validation above is best-effort
+    }
     const result = await client.query(
       `UPDATE abstracts SET abstract_number=$1, rfq_id=$2, date_prepared=$3, purpose=$4, status=$5, recommended_supplier_id=$6, recommended_supplier_name=$7, recommended_amount=$8, item_specifications=$9, vice_chairperson_id=$10, bac_member1_id=$11, bac_member2_id=$12, bac_member3_id=$13, bac_secretariat_id=$14, bac_chairperson_id=$15, regional_director_id=$16, bac_secretariat2_id=$17, updated_at=CURRENT_TIMESTAMP
        WHERE id=$18 RETURNING *`,
