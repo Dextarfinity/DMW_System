@@ -1254,14 +1254,14 @@ async function apiRequest(endpoint, method = "GET", data = null, options = {}) {
   };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-  const options = {
+  const requestOptions = {
     method,
     headers,
   };
-  if (data && method !== "GET") options.body = JSON.stringify(data);
+  if (data && method !== "GET") requestOptions.body = JSON.stringify(data);
 
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, options);
+    const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
     if (!response.ok) {
       const error = await response.json().catch(() => ({
         error: "Network error",
