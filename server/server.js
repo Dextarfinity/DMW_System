@@ -4065,7 +4065,7 @@ app.post('/api/abstracts', authenticateToken, async (req, res) => {
       const _chair = bac_chairperson_id ? String(bac_chairperson_id) : null;
       const _sec2 = bac_secretariat2_id ? String(bac_secretariat2_id) : null;
       if (_chair && _sec2 && _chair === _sec2) {
-        return res.status(400).json({ error: 'BAC Chairperson and Chairperson, BAC Secretariat (2) must be different employees.' });
+        return res.status(400).json({ error: 'BAC Chairperson and BAC Secretariat (2) must be different employees.' });
       }
     } catch (vErr) {
       // ignore and continue; validation above is best-effort
@@ -4104,7 +4104,7 @@ app.put('/api/abstracts/:id', authenticateToken, async (req, res) => {
       const _chair = bac_chairperson_id ? String(bac_chairperson_id) : null;
       const _sec2 = bac_secretariat2_id ? String(bac_secretariat2_id) : null;
       if (_chair && _sec2 && _chair === _sec2) {
-        return res.status(400).json({ error: 'BAC Chairperson and Chairperson, BAC Secretariat (2) must be different employees.' });
+        return res.status(400).json({ error: 'BAC Chairperson and BAC Secretariat (2) must be different employees.' });
       }
     } catch (vErr) {
       // ignore and continue; validation above is best-effort

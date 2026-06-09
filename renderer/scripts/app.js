@@ -14866,7 +14866,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  <div class="form-row">
  <div class="form-group" style="margin-bottom: 8px;">
- <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat</label>
+ <label style="font-size: 12px; font-weight: 600;">BAC Secretariat</label>
  <select id="absBacSecretariatId" class="form-select">
  <option value="">-- Select Employee --</option>
  ${empOptions}
@@ -14889,7 +14889,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </select>
  </div>
  <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat (2)</label>
+ <label style="font-size: 12px; font-weight: 600;">BAC Secretariat (2)</label>
  <select id="absBacSecretariat2Id" class="form-select">
  <option value="">-- Select Employee --</option>
  ${empOptions}
@@ -22037,7 +22037,7 @@ Failure to submit the above requirements within the prescribed period shall cons
     const _bacChairpersonId = document.getElementById("absBacChairpersonId")?.value || null;
     const _bacSecretariat2Id = document.getElementById("absBacSecretariat2Id")?.value || null;
     if (_bacChairpersonId && _bacSecretariat2Id && _bacChairpersonId === _bacSecretariat2Id) {
-      alert("BAC Chairperson and Chairperson, BAC Secretariat (2) cannot be the same person.\nPlease choose different employees.");
+      alert("BAC Chairperson and BAC Secretariat (2) cannot be the same person.\nPlease choose different employees.");
       return;
     }
     if (!confirm("Save this Abstract of Quotations as draft?")) return;
@@ -36457,7 +36457,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         },
       ];
       let bacSecName = "_______________",
-        bacSecTitle = "Chairperson, BAC Secretariat";
+        bacSecTitle = "BAC Secretariat";
       let bacSec2Name = "";
       let rdName = "_______________",
         rdTitle = "Regional Director";
@@ -36715,8 +36715,8 @@ Failure to submit the above requirements within the prescribed period shall cons
               <div class="abs-sig-col">
                 <div class="abs-lbl">Prepared By:</div>
                 <br/>
-                <div class="abs-sig-name">${bacChairName}</div>
-                <div class="abs-sig-title">${bacChairDesignation}</div>
+                <div class="abs-sig-name">${bacSecName || bacSec2Name}</div>
+                <div class="abs-sig-title">${bacSecTitle || 'BAC Secretariat'}</div>
               </div>
 
               <div class="abs-sig-col">
@@ -36725,27 +36725,27 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <div style="display:grid; gap:10px;">
                   <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
                     <div>
-                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
-                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
+                      <div class="abs-sig-name">${bacChairName || ''}</div>
+                      <div class="abs-sig-title">${bacChairDesignation || 'BAC Chairperson'}</div>
                     </div>
                     <div>
                       <div class="abs-sig-name">${bacViceChairName || ''}</div>
-                      <div class="abs-sig-title">${bacViceChairDesignation || ''}</div>
+                      <div class="abs-sig-title">${bacViceChairDesignation || 'BAC Vice-Chairperson'}</div>
                     </div>
                     <div>
                       <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || 'BAC Member'}</div>
                     </div>
                   </div>
                   <br/>
                   <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
                     <div>
                       <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || 'BAC Member'}</div>
                     </div>
                     <div>
                       <div class="abs-sig-name">${(bacMembers[2] && bacMembers[2].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || ''}</div>
+                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || 'BAC Member'}</div>
                     </div>
                   </div>
                 </div>
@@ -58261,7 +58261,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         },
       ];
       let bacSecName = "_______________",
-        bacSecTitle = "Chairperson, BAC Secretariat";
+        bacSecTitle = "BAC Secretariat";
       let bacSec2Name = "";
       let rdName = "_______________",
         rdTitle = "Regional Director";
@@ -58529,8 +58529,8 @@ Failure to submit the above requirements within the prescribed period shall cons
                 <div style="display:grid; gap:10px;">
                   <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
                     <div>
-                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
-                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
+                      <div class="abs-sig-name">${bacChairName || ''}</div>
+                      <div class="abs-sig-title">${bacChairDesignation || 'BAC Chairperson'}</div>
                     </div>
                     <div>
                       <div class="abs-sig-name">${bacViceChairName}</div>
@@ -58539,10 +58539,10 @@ Failure to submit the above requirements within the prescribed period shall cons
                     <div>
                       <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
                       <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
+                    <div>
+                      <div class="abs-sig-name">${bacChairName || ''}</div>
+                      <div class="abs-sig-title">${bacChairDesignation || 'BAC Chairperson'}</div>
                     </div>
-                  </div>
-                  <br/>
-                  <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
                     <div>
                       <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
                       <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
