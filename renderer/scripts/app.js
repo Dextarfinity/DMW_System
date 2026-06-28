@@ -14866,7 +14866,7 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  </div>
  <div class="form-row">
  <div class="form-group" style="margin-bottom: 8px;">
- <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat</label>
+ <label style="font-size: 12px; font-weight: 600;">BAC Secretariat</label>
  <select id="absBacSecretariatId" class="form-select">
  <option value="">-- Select Employee --</option>
  ${empOptions}
@@ -14884,13 +14884,6 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
  <div class="form-group" style="margin-bottom: 8px;">
  <label style="font-size: 12px; font-weight: 600;">Regional Director</label>
  <select id="absRegionalDirectorId" class="form-select">
- <option value="">-- Select Employee --</option>
- ${empOptions}
- </select>
- </div>
- <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 12px; font-weight: 600;">Chairperson, BAC Secretariat (2)</label>
- <select id="absBacSecretariat2Id" class="form-select">
  <option value="">-- Select Employee --</option>
  ${empOptions}
  </select>
@@ -14929,31 +14922,29 @@ Example:\nSecurity Guard 12hrs shift\nWith complete uniform\nLicensed and bonded
     openModal("Create Abstract of Quotations (AOQ)", html, {
       preventOutsideClose: true,
     });
-    // Prevent selecting the same employee for BAC Chairperson and BAC Secretariat (2)
+    // Prevent selecting the same employee for BAC Chairperson and BAC Secretariat
     try {
       const chairSel = document.getElementById("absBacChairpersonId");
-      const sec2Sel = document.getElementById("absBacSecretariat2Id");
+      const secSel = document.getElementById("absBacSecretariatId");
       function updateExclusions() {
-        if (!chairSel || !sec2Sel) return;
+        if (!chairSel || !secSel) return;
         const chairVal = chairSel.value;
-        const sec2Val = sec2Sel.value;
-        // Enable all first
-        [chairSel, sec2Sel].forEach((sel) => {
+        const secVal = secSel.value;
+        [chairSel, secSel].forEach((sel) => {
           Array.from(sel.options).forEach((o) => (o.disabled = false));
         });
         if (chairVal) {
-          const opt = sec2Sel.querySelector(`option[value="${chairVal}"]`);
+          const opt = secSel.querySelector(`option[value="${chairVal}"]`);
           if (opt) opt.disabled = true;
         }
-        if (sec2Val) {
-          const opt2 = chairSel.querySelector(`option[value="${sec2Val}"]`);
+        if (secVal) {
+          const opt2 = chairSel.querySelector(`option[value="${secVal}"]`);
           if (opt2) opt2.disabled = true;
         }
       }
-      if (chairSel && sec2Sel) {
+      if (chairSel && secSel) {
         addTrackedListener(chairSel, "change", updateExclusions);
-        addTrackedListener(sec2Sel, "change", updateExclusions);
-        // Initialize exclusions immediately
+        addTrackedListener(secSel, "change", updateExclusions);
         updateExclusions();
       }
     } catch (e) {
@@ -16854,391 +16845,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       showToast("RFQ updated successfully!", "success");
       closeModal();
       loadRFQ();
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
-  };
-
-  // --- EDIT ABSTRACT ---
-  window.showEditAbstractModal = async function (id) {
-    let a;
-    try {
-      a = await apiRequest("/abstracts/" + id);
-    } catch (e) {}
-    if (!a) {
-      a = (cachedAbstract || []).find((x) => x.id === id);
-    }
-    if (!a) {
-      alert("Record not found");
-      return;
-    }
-
-    // Load suppliers from DB
-    let suppliers = [];
-    try {
-      suppliers = await apiRequest("/suppliers");
-    } catch (e) {}
-    const supplierOptions = suppliers
-      .map(
-        (s) =>
-          `<option value="${s.id}">${s.name || s.company_name || ""}</option>`,
-      )
-      .join("");
-
-    // Load employees for signatory dropdowns
-    let employees = [];
-    try {
-      employees = await apiRequest("/employees");
-    } catch (e) {}
-    const buildEmpOpts = (selectedId) => {
-      return (
-        '<option value="">-- Select --</option>' +
-        employees
-          .map(
-            (emp) =>
-              `<option value="${emp.id}" ${parseInt(selectedId) === emp.id ? "selected" : ""}>${emp.full_name || ""} ${emp.designation_name ? "(" + emp.designation_name + ")" : ""}</option>`,
-          )
-          .join("")
-      );
-    };
-
-    // Load existing quotations for this abstract
-    let absDetail = null;
-    try {
-      absDetail = await apiRequest("/abstracts/" + id);
-    } catch (e) {}
-    const existingQuotations = absDetail ? absDetail.quotations || [] : [];
-
-    // Map existing quotations to 3 slots
-    const slot = [null, null, null];
-    existingQuotations.forEach((q, idx) => {
-      if (idx < 3) slot[idx] = q;
-    });
-
-    // Build supplier text input with pre-filled value
-    function buildSupplierInput(slotNum, existingName) {
-      return `<input type="text" id="editAbsSupplier${slotNum}Id" class="form-select" style="width: 100%; font-size: 11px;" placeholder="Enter Bidder ${slotNum} name" value="${escapeHtml(existingName || "")}" oninput="onEditAbsSupplierChange(${slotNum}, this)">`;
-    }
-
-    // Build header labels
-    const s1Label = slot[0]
-      ? slot[0].supplier_name || "Supplier 1"
-      : "NO BIDDER";
-    const s2Label = slot[1]
-      ? slot[1].supplier_name || "Supplier 2"
-      : "NO BIDDER";
-    const s3Label = slot[2]
-      ? slot[2].supplier_name || "Supplier 3"
-      : "NO BIDDER";
-
-    // Build items rows from existing quotation data
-    let itemsHTML = "";
-    // Merge items from all quotation slots — use slot[0] items as base (they share same item descriptions)
-    const baseItems = slot[0] && slot[0].items ? slot[0].items : [];
-    const s2Items = slot[1] && slot[1].items ? slot[1].items : [];
-    const s3Items = slot[2] && slot[2].items ? slot[2].items : [];
-
-    if (baseItems.length > 0) {
-      baseItems.forEach((item, idx) => {
-        const s2item = s2Items[idx] || {};
-        const s3item = s3Items[idx] || {};
-        const qty = item.quantity || 0;
-        const s1up = parseFloat(item.unit_price) || 0;
-        const s2up = parseFloat(s2item.unit_price) || 0;
-        const s3up = parseFloat(s3item.unit_price) || 0;
-        itemsHTML += `<tr>
-          <td><input type="number" value="${qty}" style="width: 45px; font-size: 11px;" min="0"></td>
-          <td><select class="form-select" style="width: 50px; font-size: 11px;">
-            ${["Lot", "Pax", "Pcs", "Unit", "Ltrs", "Gal", "Set", "Box", "Ream"].map((u) => `<option value="${u}" ${(item.unit || "").toLowerCase() === u.toLowerCase() ? "selected" : ""}>${u}</option>`).join("")}
-          </select></td>
-          <td><input type="text" value="${(item.item_description || "").replace(/"/g, "&quot;")}" style="width: 100%; font-size: 11px;"></td>
-          <td><input type="number" value="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
-          <td style="background: #f5f9ff;"><input type="number" value="${s1up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-          <td style="background: #f5f9ff;"><input type="number" value="${(qty * s1up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-          <td style="background: #dce9fc;"><input type="number" value="${s2up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-          <td style="background: #dce9fc;"><input type="number" value="${(qty * s2up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-          <td style="background: #cddff5;"><input type="number" value="${s3up.toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-          <td style="background: #cddff5;"><input type="number" value="${(qty * s3up).toFixed(2)}" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-        </tr>`;
-      });
-    } else {
-      // Default empty row
-      itemsHTML = `<tr>
-        <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
-        <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
-        <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
-        <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
-        <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-        <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-        <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-        <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-        <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-        <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-      </tr>`;
-    }
-
-    const html = `
-      <form id="editAbstractForm" onsubmit="saveEditAbstract(event, ${id})">
-        <input type="hidden" id="editAbsRfqId" value="${a.rfq_id || ""}">
-        <div class="info-banner" style="margin-bottom:15px;"><i class="fas fa-edit"></i> <strong>Edit Abstract of Quotations</strong></div>
-        <div class="form-row">
-          <div class="form-group"><label>Abstract Number</label><input type="text" id="editAbsNumber" value="${a.abstract_number || ""}" required></div>
-          <div class="form-group"><label>RFQ Reference</label><input type="text" id="editAbsRfqRef" value="${a.rfq_number || ""}" readonly></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Date Prepared</label><input type="date" id="editAbsDate" value="${a.date_prepared ? a.date_prepared.substring(0, 10) : ""}"></div>
-          <div class="form-group">
-            <label>Status</label>
-            <select id="editAbsStatus" class="form-select">
-              <option value="on_going" ${a.status === "on_going" ? "selected" : ""}>ON-GOING</option>
-              <option value="completed" ${a.status === "completed" ? "selected" : ""}>COMPLETED</option>
-              <option value="cancelled" ${a.status === "cancelled" ? "selected" : ""}>CANCELLED</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group"><label>Purpose</label><input type="text" id="editAbsPurpose" value="${(a.purpose || "").replace(/"/g, "&quot;")}"></div>
-
-        <div class="form-section-header section-items"><i class="fas fa-table"></i> Particulars & Supplier Quotations</div>
-        <div class="form-items-section">
-        <div style="overflow-x: auto;">
-          <table class="data-table" style="font-size: 11px; margin-bottom: 10px; min-width: 900px;">
-            <thead>
-              <tr>
-                <th rowspan="2" style="width: 50px;">Qty</th>
-                <th rowspan="2" style="width: 50px;">Unit</th>
-                <th rowspan="2">Items</th>
-                <th rowspan="2" style="width: 100px;">ABC</th>
-                <th colspan="2" style="text-align: center; background: #e3f2fd;" id="editAbsSupplier1Header">${s1Label}</th>
-                <th colspan="2" style="text-align: center; background: #d0e8ff;" id="editAbsSupplier2Header">${s2Label}</th>
-                <th colspan="2" style="text-align: center; background: #bbdefb;" id="editAbsSupplier3Header">${s3Label}</th>
-              </tr>
-              <tr>
-                <th style="width: 90px; background: #e3f2fd;">Unit Price</th>
-                <th style="width: 90px; background: #e3f2fd;">Total Price</th>
-                <th style="width: 90px; background: #d0e8ff;">Unit Price</th>
-                <th style="width: 90px; background: #d0e8ff;">Total Price</th>
-                <th style="width: 90px; background: #bbdefb;">Unit Price</th>
-                <th style="width: 90px; background: #bbdefb;">Total Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colspan="4" style="padding: 4px;"><strong>Supplier Names:</strong></td>
-                <td colspan="2" style="background: #e3f2fd;">${buildSupplierInput(1, slot[0] ? slot[0].supplier_name : "")}</td>
-                <td colspan="2" style="background: #d0e8ff;">${buildSupplierInput(2, slot[1] ? slot[1].supplier_name : "")}</td>
-                <td colspan="2" style="background: #bbdefb;">${buildSupplierInput(3, slot[2] ? slot[2].supplier_name : "")}</td>
-              </tr>
-            </tbody>
-            <tbody id="editAbstractItemsBody">
-              ${itemsHTML}
-            </tbody>
-          </table>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline" onclick="addEditAbstractItemRow()"><i class="fas fa-plus"></i> Add Item Row</button>
-        </div>
-
-        <div class="form-group">
-          <label>Item Specifications <small style="color:#666;">(one per line, will appear as bullet points)</small></label>
-          <textarea rows="4" id="editAbsItemSpecs" placeholder="Enter specifications, one per line...">${(a.item_specifications || "").replace(/</g, "&lt;")}</textarea>
-        </div>
-
-        <div class="form-section-header"><i class="fas fa-user-tie"></i> BAC Signatories</div>
-        <div class="form-row">
-          <div class="form-group"><label>BAC Chairperson</label><select id="editAbsBacChair" class="form-select">${buildEmpOpts(a.bac_chairperson_id)}</select></div>
-          <div class="form-group"><label>Vice-Chairperson</label><select id="editAbsViceChair" class="form-select">${buildEmpOpts(a.vice_chairperson_id)}</select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>BAC Member 1</label><select id="editAbsMember1" class="form-select">${buildEmpOpts(a.bac_member1_id)}</select></div>
-          <div class="form-group"><label>BAC Member 2</label><select id="editAbsMember2" class="form-select">${buildEmpOpts(a.bac_member2_id)}</select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>BAC Member 3</label><select id="editAbsMember3" class="form-select">${buildEmpOpts(a.bac_member3_id)}</select></div>
-          <div class="form-group"><label>BAC Secretariat</label><select id="editAbsSecretariat" class="form-select">${buildEmpOpts(a.bac_secretariat_id)}</select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>BAC Secretariat 2</label><select id="editAbsSecretariat2" class="form-select">${buildEmpOpts(a.bac_secretariat2_id)}</select></div>
-          <div class="form-group"><label>Regional Director / Head</label><select id="editAbsRD" class="form-select">${buildEmpOpts(a.regional_director_id)}</select></div>
-        </div>
-
-        ${getEditAttachmentSectionHTML("abstract", id, "editAbsAttachment")}
-        <div class="form-group" style="text-align:right;margin-top:20px;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
-        </div>
-      </form>`;
-    openModal("Edit Abstract of Quotations", html, {
-      preventOutsideClose: true,
-    });
-  };
-
-  // Add item row for edit abstract modal
-  window.addEditAbstractItemRow = function () {
-    const tbody = document.getElementById("editAbstractItemsBody");
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td><input type="number" placeholder="0" style="width: 45px; font-size: 11px;" min="0"></td>
-      <td><select class="form-select" style="width: 50px; font-size: 11px;"><option>Lot</option><option>Pax</option><option>Pcs</option><option>Unit</option><option>Ltrs</option><option>Gal</option><option>Set</option></select></td>
-      <td><input type="text" placeholder="Item description..." style="width: 100%; font-size: 11px;"></td>
-      <td><input type="number" placeholder="0.00" step="0.01" style="width: 90px; font-size: 11px;" min="0"></td>
-      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #f5f9ff;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #dce9fc;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" min="0" onchange="calcAbstractTotal(this)"></td>
-      <td style="background: #cddff5;"><input type="number" placeholder="0.00" step="0.01" style="width: 80px; font-size: 11px;" readonly></td>
-    `;
-    tbody.appendChild(row);
-  };
-
-  window.saveEditAbstract = async function (e, id) {
-    e.preventDefault();
-    if (!confirm("Are you sure you want to save these changes?")) return;
-    const rfqIdVal = document.getElementById("editAbsRfqId")?.value || null;
-
-    // Gather supplier names from text inputs
-    const supplier1Name =
-      document.getElementById("editAbsSupplier1Id")?.value?.trim() || "";
-    const supplier2Name =
-      document.getElementById("editAbsSupplier2Id")?.value?.trim() || "";
-    const supplier3Name =
-      document.getElementById("editAbsSupplier3Id")?.value?.trim() || "";
-
-    // Gather items from table rows
-    const itemRows = document.querySelectorAll("#editAbstractItemsBody tr");
-    const itemsData = [];
-    itemRows.forEach((row) => {
-      const cells = row.querySelectorAll("td");
-      if (cells.length < 10) return;
-      const qty = parseFloat(cells[0]?.querySelector("input")?.value) || 0;
-      const unit = cells[1]?.querySelector("select")?.value || "";
-      const desc = cells[2]?.querySelector("input")?.value || "";
-      const s1UnitPrice =
-        parseFloat(cells[4]?.querySelector("input")?.value) || 0;
-      const s1Total = parseFloat(cells[5]?.querySelector("input")?.value) || 0;
-      const s2UnitPrice =
-        parseFloat(cells[6]?.querySelector("input")?.value) || 0;
-      const s2Total = parseFloat(cells[7]?.querySelector("input")?.value) || 0;
-      const s3UnitPrice =
-        parseFloat(cells[8]?.querySelector("input")?.value) || 0;
-      const s3Total = parseFloat(cells[9]?.querySelector("input")?.value) || 0;
-      if (desc.trim()) {
-        itemsData.push({
-          qty,
-          unit,
-          desc,
-          s1UnitPrice,
-          s1Total,
-          s2UnitPrice,
-          s2Total,
-          s3UnitPrice,
-          s3Total,
-        });
-      }
-    });
-
-    // Calculate totals per supplier
-    let s1Total = 0,
-      s2Total = 0,
-      s3Total = 0;
-    itemsData.forEach((it) => {
-      s1Total += it.s1Total;
-      s2Total += it.s2Total;
-      s3Total += it.s3Total;
-    });
-
-    // Build quotations array
-    const quotations = [];
-    const supplierBids = [];
-    const supplierSlots = [
-      {
-        name: supplier1Name,
-        total: s1Total,
-        items: itemsData,
-        priceKey: "s1UnitPrice",
-      },
-      {
-        name: supplier2Name,
-        total: s2Total,
-        items: itemsData,
-        priceKey: "s2UnitPrice",
-      },
-      {
-        name: supplier3Name,
-        total: s3Total,
-        items: itemsData,
-        priceKey: "s3UnitPrice",
-      },
-    ];
-    supplierSlots.forEach((slot, idx) => {
-      if (slot.name) {
-        const qItems = slot.items.map((it) => ({
-          item_description: it.desc,
-          quantity: it.qty,
-          unit: it.unit,
-          unit_price: it[slot.priceKey],
-        }));
-        quotations.push({
-          supplier_name: slot.name,
-          bid_amount: slot.total,
-          is_compliant: true,
-          remarks: null,
-          rank_no: idx + 1,
-          items: qItems,
-        });
-        supplierBids.push({
-          name: slot.name,
-          total: slot.total,
-        });
-      }
-    });
-
-    // Determine recommended (lowest total) supplier
-    supplierBids.sort((a, b) => a.total - b.total);
-    const recommendedSupplier =
-      supplierBids.length > 0 ? supplierBids[0] : null;
-
-    // Update rank_no based on bid amount
-    const sortedQuotations = [...quotations].sort(
-      (a, b) => a.bid_amount - b.bid_amount,
-    );
-    sortedQuotations.forEach((q, idx) => {
-      q.rank_no = idx + 1;
-    });
-
-    const data = {
-      abstract_number: document.getElementById("editAbsNumber").value,
-      rfq_id: rfqIdVal ? parseInt(rfqIdVal) : null,
-      date_prepared: document.getElementById("editAbsDate").value || null,
-      purpose: document.getElementById("editAbsPurpose").value,
-      recommended_supplier_name: recommendedSupplier
-        ? recommendedSupplier.name
-        : null,
-      recommended_amount: recommendedSupplier
-        ? recommendedSupplier.total
-        : null,
-      status: document.getElementById("editAbsStatus").value,
-      item_specifications:
-        document.getElementById("editAbsItemSpecs")?.value.trim() || null,
-      bac_chairperson_id:
-        document.getElementById("editAbsBacChair")?.value || null,
-      vice_chairperson_id:
-        document.getElementById("editAbsViceChair")?.value || null,
-      bac_member1_id: document.getElementById("editAbsMember1")?.value || null,
-      bac_member2_id: document.getElementById("editAbsMember2")?.value || null,
-      bac_member3_id: document.getElementById("editAbsMember3")?.value || null,
-      bac_secretariat_id:
-        document.getElementById("editAbsSecretariat")?.value || null,
-      bac_secretariat2_id:
-        document.getElementById("editAbsSecretariat2")?.value || null,
-      regional_director_id: document.getElementById("editAbsRD")?.value || null,
-      quotations: sortedQuotations,
-    };
-    try {
-      await apiRequest("/abstracts/" + id, "PUT", data);
-      await uploadEditAttachments("abstract", id, "editAbsAttachment");
-      showToast("Abstract updated successfully!", "success");
-      closeModal();
-      loadAbstract();
     } catch (err) {
       alert("Error: " + err.message);
     }
@@ -21911,194 +21517,6 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   /**
-   * Save New Abstract of Quotations
-   */
-  window.saveNewAbstract = async function (e) {
-    e.preventDefault();
-    const abstractNumber =
-      document.getElementById("abstractNumber")?.value || "";
-    const abstractDate = document.getElementById("abstractDate")?.value || "";
-    const rfqId = document.getElementById("abstractLinkedRFQ")?.value || "";
-    const purpose = document.getElementById("abstractPurpose")?.value || "";
-
-    // Gather supplier names from text inputs
-    const supplier1Name =
-      document.getElementById("absSupplier1Id")?.value.trim() || "";
-    const supplier2Name =
-      document.getElementById("absSupplier2Id")?.value.trim() || "";
-    const supplier3Name =
-      document.getElementById("absSupplier3Id")?.value.trim() || "";
-
-    // Gather items from table rows
-    const itemRows = document.querySelectorAll("#abstractItemsBody tr");
-    const itemsData = [];
-    itemRows.forEach((row) => {
-      const cells = row.querySelectorAll("td");
-      if (cells.length < 10) return;
-      const qty = parseFloat(cells[0]?.querySelector("input")?.value) || 0;
-      const unit = cells[1]?.querySelector("select")?.value || "";
-      const desc = cells[2]?.querySelector("input")?.value || "";
-      const abc = parseFloat(cells[3]?.querySelector("input")?.value) || 0;
-      const s1UnitPrice =
-        parseFloat(cells[4]?.querySelector("input")?.value) || 0;
-      const s1Total = parseFloat(cells[5]?.querySelector("input")?.value) || 0;
-      const s2UnitPrice =
-        parseFloat(cells[6]?.querySelector("input")?.value) || 0;
-      const s2Total = parseFloat(cells[7]?.querySelector("input")?.value) || 0;
-      const s3UnitPrice =
-        parseFloat(cells[8]?.querySelector("input")?.value) || 0;
-      const s3Total = parseFloat(cells[9]?.querySelector("input")?.value) || 0;
-      if (desc.trim()) {
-        itemsData.push({
-          qty,
-          unit,
-          desc,
-          abc,
-          s1UnitPrice,
-          s1Total,
-          s2UnitPrice,
-          s2Total,
-          s3UnitPrice,
-          s3Total,
-        });
-      }
-    });
-
-    // Calculate totals per supplier
-    let s1Total = 0,
-      s2Total = 0,
-      s3Total = 0;
-    itemsData.forEach((it) => {
-      s1Total += it.s1Total;
-      s2Total += it.s2Total;
-      s3Total += it.s3Total;
-    });
-
-    // Build quotations array (only for selected suppliers)
-    const quotations = [];
-    const supplierBids = [];
-    const supplierSlots = [
-      {
-        name: supplier1Name,
-        total: s1Total,
-        items: itemsData,
-        priceKey: "s1UnitPrice",
-      },
-      {
-        name: supplier2Name,
-        total: s2Total,
-        items: itemsData,
-        priceKey: "s2UnitPrice",
-      },
-      {
-        name: supplier3Name,
-        total: s3Total,
-        items: itemsData,
-        priceKey: "s3UnitPrice",
-      },
-    ];
-    supplierSlots.forEach((slot, idx) => {
-      if (slot.name) {
-        const qItems = slot.items.map((it) => ({
-          item_description: it.desc,
-          quantity: it.qty,
-          unit: it.unit,
-          unit_price: it[slot.priceKey],
-        }));
-        quotations.push({
-          supplier_name: slot.name,
-          bid_amount: slot.total,
-          is_compliant: true,
-          remarks: null,
-          rank_no: idx + 1,
-          items: qItems,
-        });
-        supplierBids.push({
-          name: slot.name,
-          total: slot.total,
-        });
-      }
-    });
-
-    // Determine recommended (lowest total) supplier
-    supplierBids.sort((a, b) => a.total - b.total);
-    const recommendedSupplier =
-      supplierBids.length > 0 ? supplierBids[0] : null;
-
-    // Update rank_no based on bid amount (lowest = 1)
-    const sortedQuotations = [...quotations].sort(
-      (a, b) => a.bid_amount - b.bid_amount,
-    );
-    sortedQuotations.forEach((q, idx) => {
-      q.rank_no = idx + 1;
-    });
-
-    // Validate distinct signatories: BAC Chairperson vs BAC Secretariat (2)
-    const _bacChairpersonId = document.getElementById("absBacChairpersonId")?.value || null;
-    const _bacSecretariat2Id = document.getElementById("absBacSecretariat2Id")?.value || null;
-    if (_bacChairpersonId && _bacSecretariat2Id && _bacChairpersonId === _bacSecretariat2Id) {
-      alert("BAC Chairperson and Chairperson, BAC Secretariat (2) cannot be the same person.\nPlease choose different employees.");
-      return;
-    }
-    if (!confirm("Save this Abstract of Quotations as draft?")) return;
-
-    try {
-      const data = {
-        abstract_number: abstractNumber,
-        rfq_id: rfqId ? parseInt(rfqId) : null,
-        date_prepared: abstractDate || null,
-        purpose: purpose,
-        status: "draft",
-        item_specifications:
-          document.getElementById("abstractItemSpecs")?.value.trim() || null,
-        recommended_supplier_name: recommendedSupplier
-          ? recommendedSupplier.name
-          : null,
-        recommended_amount: recommendedSupplier
-          ? recommendedSupplier.total
-          : null,
-        vice_chairperson_id:
-          document.getElementById("absViceChairpersonId")?.value || null,
-        bac_member1_id:
-          document.getElementById("absBacMember1Id")?.value || null,
-        bac_member2_id:
-          document.getElementById("absBacMember2Id")?.value || null,
-        bac_member3_id:
-          document.getElementById("absBacMember3Id")?.value || null,
-        bac_secretariat_id:
-          document.getElementById("absBacSecretariatId")?.value || null,
-        bac_chairperson_id:
-          document.getElementById("absBacChairpersonId")?.value || null,
-        regional_director_id:
-          document.getElementById("absRegionalDirectorId")?.value || null,
-        bac_secretariat2_id:
-          document.getElementById("absBacSecretariat2Id")?.value || null,
-        quotations: sortedQuotations,
-      };
-      const result = await apiRequest("/abstracts", "POST", data);
-      const absId = result.id || result.abstract_id;
-      if (absId) {
-        await uploadAttachments("abstract", absId, [
-          {
-            inputId: "abstractDocument",
-            description: "Abstract of Quotations (Signed)",
-          },
-          {
-            inputId: "supplierQuotations",
-            description: "Supplier Quotations (Scanned)",
-          },
-        ]);
-      }
-      alert("Abstract of Quotations saved as draft!");
-      closeModal();
-      if (typeof loadAbstract === "function") loadAbstract();
-      else if (typeof loadPageData === "function") loadPageData("abstract");
-    } catch (err) {
-      alert("Error saving Abstract: " + err.message);
-    }
-  };
-
-  /**
    * Save New Notice of Award
    */
   window.saveNewNOA = async function (e) {
@@ -22623,6 +22041,20 @@ Failure to submit the above requirements within the prescribed period shall cons
     sortedQuotations.forEach((q, idx) => {
       q.rank_no = idx + 1;
     });
+    const _bacChairpersonId =
+      document.getElementById("absBacChairpersonId")?.value || null;
+    const _bacSecretariatId =
+      document.getElementById("absBacSecretariatId")?.value || null;
+    if (
+      _bacChairpersonId &&
+      _bacSecretariatId &&
+      _bacChairpersonId === _bacSecretariatId
+    ) {
+      alert(
+        "BAC Chairperson and BAC Secretariat cannot be the same person. Please choose different employees.",
+      );
+      return;
+    }
     if (
       !confirm("Are you sure you want to submit this Abstract of Quotations?")
     )
@@ -22656,8 +22088,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           document.getElementById("absBacChairpersonId")?.value || null,
         regional_director_id:
           document.getElementById("absRegionalDirectorId")?.value || null,
-        bac_secretariat2_id:
-          document.getElementById("absBacSecretariat2Id")?.value || null,
         quotations: sortedQuotations,
       };
       const result = await apiRequest("/abstracts", "POST", data);
@@ -36457,8 +35887,7 @@ Failure to submit the above requirements within the prescribed period shall cons
         },
       ];
       let bacSecName = "_______________",
-        bacSecTitle = "Chairperson, BAC Secretariat";
-      let bacSec2Name = "";
+        bacSecTitle = "BAC Secretariat";
       let rdName = "_______________",
         rdTitle = "Regional Director";
       try {
@@ -36486,8 +35915,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           bacMembers[2].name = getEmpNameUpper(abs.bac_member3_id);
         if (abs.bac_secretariat_id)
           bacSecName = getEmpNameUpper(abs.bac_secretariat_id);
-        if (abs.bac_secretariat2_id)
-          bacSec2Name = getEmpNameUpper(abs.bac_secretariat2_id);
         if (abs.regional_director_id)
           rdName = getEmpNameUpper(abs.regional_director_id);
       } catch (e) {}
@@ -36659,11 +36086,20 @@ Failure to submit the above requirements within the prescribed period shall cons
           .abs-sigs { margin-top: 12px; font-size: 8pt; }
           .abs-sig-layout { display: grid; grid-template-columns: 23% 54% 23%; gap: 12px; align-items: start; }
           .abs-sig-col { text-align: center; }
-          .abs-sig-line { display: none; }
-          .abs-sig-name { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-decoration: underline; }
-          .abs-sig-title { font-size: 7pt; color: #333; line-height: 1.15; }
-          .abs-sig-note { font-size: 7pt; color: #444; margin-top: 2px; font-style: italic; }
+          .abs-sig-name { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-decoration: underline; display: block; }
+          .abs-sig-title { font-size: 7pt; color: #333; line-height: 1.15; display: block; text-align: center; }
+          .abs-sig-person { margin-top: 6px; text-align: center; }
           .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
+          .abs-lbl-center { text-align: center; }
+          .abs-sig-layout { display: grid; grid-template-columns: 25% 50% 25%; gap: 8px; align-items: start; }
+          .abs-sig-col { padding: 0 4px; min-height: 120px; }
+          .abs-sig-col-center { text-align: center; }
+          .abs-sig-col-right { text-align: right; }
+          .abs-sig-col-left { text-align: left; }
+          .recommended-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+          .recommended-person { min-width: 130px; max-width: 170px; text-align: center; }
+          .recommended-grid.bottom-row { margin-top: 8px; }
+          .recommended-bottom-item { flex: 0 0 32%; }
         </style>
 
         <div class="abs-wrap">
@@ -36712,52 +36148,52 @@ Failure to submit the above requirements within the prescribed period shall cons
 
           <div class="abs-sigs">
             <div class="abs-sig-layout">
-              <div class="abs-sig-col">
+              <div class="abs-sig-col abs-sig-col-left">
                 <div class="abs-lbl">Prepared By:</div>
                 <br/>
-                <div class="abs-sig-name">${bacChairName}</div>
-                <div class="abs-sig-title">${bacChairDesignation}</div>
+                <div class="abs-sig-person">
+                  <div class="abs-sig-name">${bacSecName}</div>
+                  <div class="abs-sig-title">${bacSecTitle}</div>
+                </div>
               </div>
 
-              <div class="abs-sig-col">
-                <div class="abs-lbl" style="text-align:center;">Recommended By:</div>
+              <div class="abs-sig-col abs-sig-col-center">
+                <div class="abs-lbl abs-lbl-center">Recommended By:</div>
                 <br/>
-                <div style="display:grid; gap:10px;">
-                  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
-                    <div>
-                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
-                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${bacViceChairName || ''}</div>
-                      <div class="abs-sig-title">${bacViceChairDesignation || ''}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
-                    </div>
+                <div class="recommended-grid">
+                  <div class="recommended-person">
+                    <div class="abs-sig-name">${bacChairName}</div>
+                    <div class="abs-sig-title">${bacChairDesignation}</div>
                   </div>
-                  <br/>
-                  <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[2] && bacMembers[2].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || ''}</div>
-                    </div>
+                  <div class="recommended-person">
+                    <div class="abs-sig-name">${bacViceChairName}</div>
+                    <div class="abs-sig-title">BAC Vice-Chairperson</div>
+                  </div>
+                  <div class="recommended-person">
+                    <div class="abs-sig-name">${bacMembers[0].name}</div>
+                    <div class="abs-sig-title">BAC Member</div>
+                  </div>
+                </div>
+                <div class="recommended-grid bottom-row">
+                  <div class="recommended-person recommended-bottom-item">
+                    <div class="abs-sig-name">${bacMembers[1].name}</div>
+                    <div class="abs-sig-title">BAC Member</div>
+                  </div>
+                  <div class="recommended-person recommended-bottom-item">
+                    <div class="abs-sig-name">${bacMembers[2].name}</div>
+                    <div class="abs-sig-title">BAC Member</div>
                   </div>
                 </div>
               </div>
 
-              <div class="abs-sig-col">
+              <div class="abs-sig-col abs-sig-col-right">
                 <div class="abs-lbl">Approved By:</div>
                 <br/>
-                <div class="abs-sig-line"></div>
-                <div class="abs-sig-name">${rdName}</div>
-                <div class="abs-sig-title">${rdTitle}</div>
-                <div class="abs-sig-title" style="font-style:italic;">Head of the Procuring Entity</div>
+                <div class="abs-sig-person">
+                  <div class="abs-sig-name">${rdName}</div>
+                  <div class="abs-sig-title">${rdTitle}</div>
+                  <div class="abs-sig-title" style="font-style:italic;">Head of the Procuring Entity</div>
+                </div>
               </div>
             </div>
           </div>
@@ -38913,7 +38349,6 @@ Failure to submit the above requirements within the prescribed period shall cons
  <div class="form-group"><label>BAC Secretariat</label><select id="editAbsSecretariat" class="form-select">${buildEmpOpts(a.bac_secretariat_id)}</select></div>
  </div>
  <div class="form-row">
- <div class="form-group"><label>BAC Secretariat 2</label><select id="editAbsSecretariat2" class="form-select">${buildEmpOpts(a.bac_secretariat2_id)}</select></div>
  <div class="form-group"><label>Regional Director / Head</label><select id="editAbsRD" class="form-select">${buildEmpOpts(a.regional_director_id)}</select></div>
  </div>
 
@@ -39062,6 +38497,19 @@ Failure to submit the above requirements within the prescribed period shall cons
       q.rank_no = idx + 1;
     });
 
+    const _editChairpersonId = document.getElementById("editAbsBacChair")?.value || null;
+    const _editSecretariatId = document.getElementById("editAbsSecretariat")?.value || null;
+    if (
+      _editChairpersonId &&
+      _editSecretariatId &&
+      _editChairpersonId === _editSecretariatId
+    ) {
+      alert(
+        "BAC Chairperson and BAC Secretariat cannot be the same person. Please choose different employees.",
+      );
+      return;
+    }
+
     const data = {
       abstract_number: document.getElementById("editAbsNumber").value,
       rfq_id: rfqIdVal ? parseInt(rfqIdVal) : null,
@@ -39085,8 +38533,6 @@ Failure to submit the above requirements within the prescribed period shall cons
       bac_member3_id: document.getElementById("editAbsMember3")?.value || null,
       bac_secretariat_id:
         document.getElementById("editAbsSecretariat")?.value || null,
-      bac_secretariat2_id:
-        document.getElementById("editAbsSecretariat2")?.value || null,
       regional_director_id: document.getElementById("editAbsRD")?.value || null,
       quotations: sortedQuotations,
     };
@@ -43841,6 +43287,21 @@ Failure to submit the above requirements within the prescribed period shall cons
       q.rank_no = idx + 1;
     });
 
+    const _bacChairpersonId =
+      document.getElementById("absBacChairpersonId")?.value || null;
+    const _bacSecretariatId =
+      document.getElementById("absBacSecretariatId")?.value || null;
+    if (
+      _bacChairpersonId &&
+      _bacSecretariatId &&
+      _bacChairpersonId === _bacSecretariatId
+    ) {
+      alert(
+        "BAC Chairperson and BAC Secretariat cannot be the same person. Please choose different employees.",
+      );
+      return;
+    }
+
     if (!confirm("Save this Abstract of Quotations as draft?")) return;
 
     try {
@@ -43872,8 +43333,6 @@ Failure to submit the above requirements within the prescribed period shall cons
           document.getElementById("absBacChairpersonId")?.value || null,
         regional_director_id:
           document.getElementById("absRegionalDirectorId")?.value || null,
-        bac_secretariat2_id:
-          document.getElementById("absBacSecretariat2Id")?.value || null,
         quotations: sortedQuotations,
       };
       const result = await apiRequest("/abstracts", "POST", data);
@@ -44318,173 +43777,7 @@ Failure to submit the above requirements within the prescribed period shall cons
   // SUBMIT (NON-DRAFT) HANDLER FUNCTIONS
   // ============================================================
 
-  window.submitAbstract = async function () {
-    const abstractNumber =
-      document.getElementById("abstractNumber")?.value || "";
-    const abstractDate = document.getElementById("abstractDate")?.value || "";
-    const rfqId = document.getElementById("abstractLinkedRFQ")?.value || "";
-    const purpose = document.getElementById("abstractPurpose")?.value || "";
-    const supplier1Name =
-      document.getElementById("absSupplier1Id")?.value.trim() || "";
-    const supplier2Name =
-      document.getElementById("absSupplier2Id")?.value.trim() || "";
-    const supplier3Name =
-      document.getElementById("absSupplier3Id")?.value.trim() || "";
-    const itemRows = document.querySelectorAll("#abstractItemsBody tr");
-    const itemsData = [];
-    itemRows.forEach((row) => {
-      const cells = row.querySelectorAll("td");
-      if (cells.length < 10) return;
-      const qty = parseFloat(cells[0]?.querySelector("input")?.value) || 0;
-      const unit = cells[1]?.querySelector("select")?.value || "";
-      const desc = cells[2]?.querySelector("input")?.value || "";
-      const abc = parseFloat(cells[3]?.querySelector("input")?.value) || 0;
-      const s1UnitPrice =
-        parseFloat(cells[4]?.querySelector("input")?.value) || 0;
-      const s1Total = parseFloat(cells[5]?.querySelector("input")?.value) || 0;
-      const s2UnitPrice =
-        parseFloat(cells[6]?.querySelector("input")?.value) || 0;
-      const s2Total = parseFloat(cells[7]?.querySelector("input")?.value) || 0;
-      const s3UnitPrice =
-        parseFloat(cells[8]?.querySelector("input")?.value) || 0;
-      const s3Total = parseFloat(cells[9]?.querySelector("input")?.value) || 0;
-      if (desc.trim()) {
-        itemsData.push({
-          qty,
-          unit,
-          desc,
-          abc,
-          s1UnitPrice,
-          s1Total,
-          s2UnitPrice,
-          s2Total,
-          s3UnitPrice,
-          s3Total,
-        });
-      }
-    });
-    let s1Total = 0,
-      s2Total = 0,
-      s3Total = 0;
-    itemsData.forEach((it) => {
-      s1Total += it.s1Total;
-      s2Total += it.s2Total;
-      s3Total += it.s3Total;
-    });
-    const quotations = [];
-    const supplierBids = [];
-    const supplierSlots = [
-      {
-        name: supplier1Name,
-        total: s1Total,
-        items: itemsData,
-        priceKey: "s1UnitPrice",
-      },
-      {
-        name: supplier2Name,
-        total: s2Total,
-        items: itemsData,
-        priceKey: "s2UnitPrice",
-      },
-      {
-        name: supplier3Name,
-        total: s3Total,
-        items: itemsData,
-        priceKey: "s3UnitPrice",
-      },
-    ];
-    supplierSlots.forEach((slot, idx) => {
-      if (slot.name) {
-        const qItems = slot.items.map((it) => ({
-          item_description: it.desc,
-          quantity: it.qty,
-          unit: it.unit,
-          unit_price: it[slot.priceKey],
-        }));
-        quotations.push({
-          supplier_name: slot.name,
-          bid_amount: slot.total,
-          is_compliant: true,
-          remarks: null,
-          rank_no: idx + 1,
-          items: qItems,
-        });
-        supplierBids.push({
-          name: slot.name,
-          total: slot.total,
-        });
-      }
-    });
-    supplierBids.sort((a, b) => a.total - b.total);
-    const recommendedSupplier =
-      supplierBids.length > 0 ? supplierBids[0] : null;
-    const sortedQuotations = [...quotations].sort(
-      (a, b) => a.bid_amount - b.bid_amount,
-    );
-    sortedQuotations.forEach((q, idx) => {
-      q.rank_no = idx + 1;
-    });
-    if (
-      !confirm("Are you sure you want to submit this Abstract of Quotations?")
-    )
-      return;
-    try {
-      const data = {
-        abstract_number: abstractNumber,
-        rfq_id: rfqId ? parseInt(rfqId) : null,
-        date_prepared: abstractDate || null,
-        purpose: purpose,
-        status: "on_going",
-        item_specifications:
-          document.getElementById("abstractItemSpecs")?.value.trim() || null,
-        recommended_supplier_name: recommendedSupplier
-          ? recommendedSupplier.name
-          : null,
-        recommended_amount: recommendedSupplier
-          ? recommendedSupplier.total
-          : null,
-        vice_chairperson_id:
-          document.getElementById("absViceChairpersonId")?.value || null,
-        bac_member1_id:
-          document.getElementById("absBacMember1Id")?.value || null,
-        bac_member2_id:
-          document.getElementById("absBacMember2Id")?.value || null,
-        bac_member3_id:
-          document.getElementById("absBacMember3Id")?.value || null,
-        bac_secretariat_id:
-          document.getElementById("absBacSecretariatId")?.value || null,
-        bac_chairperson_id:
-          document.getElementById("absBacChairpersonId")?.value || null,
-        regional_director_id:
-          document.getElementById("absRegionalDirectorId")?.value || null,
-        bac_secretariat2_id:
-          document.getElementById("absBacSecretariat2Id")?.value || null,
-        quotations: sortedQuotations,
-      };
-      const result = await apiRequest("/abstracts", "POST", data);
-      const absId = result.id || result.abstract_id;
-      if (absId) {
-        await uploadAttachments("abstract", absId, [
-          {
-            inputId: "abstractDocument",
-            description: "Abstract of Quotations (Signed)",
-          },
-          {
-            inputId: "supplierQuotations",
-            description: "Supplier Quotations (Scanned)",
-          },
-        ]);
-      }
-      alert("Abstract of Quotations submitted successfully!");
-      closeModal();
-      if (typeof loadAbstract === "function") loadAbstract();
-      else if (typeof loadPageData === "function") loadPageData("abstract");
-    } catch (err) {
-      alert("Error submitting Abstract: " + err.message);
-    }
-  };
-
-  window.issueNOA = async function () {
+    window.issueNOA = async function () {
     const noaNumber = document.getElementById("noaNumber")?.value || "";
     const noaDate = document.getElementById("noaDate")?.value || "";
     const bacResId = document.getElementById("noaLinkedBAC")?.value || "";
@@ -58213,377 +57506,6 @@ Failure to submit the above requirements within the prescribed period shall cons
   };
 
   // Print Abstract of Quotation — matching government AOQ form (ABS JAN 2026.xlsx template)
-  window.printAbstract = async function (abstractId) {
-    try {
-      showNotification("Loading Abstract data for print...", "info");
-      const abs = await apiRequest("/abstracts/" + abstractId);
-      if (!abs) {
-        showNotification("Abstract not found", "error");
-        return;
-      }
-
-      // Fetch RFQ details for ABC amount and items
-      let rfqData = null;
-      let prPurpose = abs.purpose || "";
-      if (abs.rfq_id) {
-        try {
-          rfqData = await apiRequest("/rfqs/" + abs.rfq_id);
-          if (rfqData && rfqData.pr_id) {
-            try {
-              const pr = await apiRequest(
-                "/purchase-requests/" + rfqData.pr_id,
-              );
-              if (pr && pr.purpose) prPurpose = pr.purpose;
-            } catch (e) {}
-          }
-        } catch (e) {
-          console.warn("Could not fetch RFQ data:", e);
-        }
-      }
-
-      // BAC members — use signatories saved on the abstract record
-      let bacChairName = "_______________",
-        bacChairDesignation = "BAC Chairperson";
-      let bacViceChairName = "_______________",
-        bacViceChairDesignation = "BAC Vice-Chairperson";
-      let bacMembers = [
-        {
-          name: "_______________",
-          title: "BAC Member",
-        },
-        {
-          name: "_______________",
-          title: "BAC Member",
-        },
-        {
-          name: "_______________",
-          title: "BAC Member",
-        },
-      ];
-      let bacSecName = "_______________",
-        bacSecTitle = "Chairperson, BAC Secretariat";
-      let bacSec2Name = "";
-      let rdName = "_______________",
-        rdTitle = "Regional Director";
-      try {
-        const allEmployees = await apiRequest("/employees");
-        const getEmpNameUpper = (empId) => {
-          if (!empId) return "_______________";
-          const emp = allEmployees.find((e) => e.id === parseInt(empId));
-          return emp ? (emp.full_name || "").toUpperCase() : "_______________";
-        };
-        const getEmpDesig = (empId, fallback) => {
-          if (!empId) return fallback;
-          const emp = allEmployees.find((e) => e.id === parseInt(empId));
-          return emp && emp.designation_name ? emp.designation_name : fallback;
-        };
-        // Use saved signatory IDs from the abstract record
-        if (abs.bac_chairperson_id)
-          bacChairName = getEmpNameUpper(abs.bac_chairperson_id);
-        if (abs.vice_chairperson_id)
-          bacViceChairName = getEmpNameUpper(abs.vice_chairperson_id);
-        if (abs.bac_member1_id)
-          bacMembers[0].name = getEmpNameUpper(abs.bac_member1_id);
-        if (abs.bac_member2_id)
-          bacMembers[1].name = getEmpNameUpper(abs.bac_member2_id);
-        if (abs.bac_member3_id)
-          bacMembers[2].name = getEmpNameUpper(abs.bac_member3_id);
-        if (abs.bac_secretariat_id)
-          bacSecName = getEmpNameUpper(abs.bac_secretariat_id);
-        if (abs.bac_secretariat2_id)
-          bacSec2Name = getEmpNameUpper(abs.bac_secretariat2_id);
-        if (abs.regional_director_id)
-          rdName = getEmpNameUpper(abs.regional_director_id);
-      } catch (e) {}
-
-      const fmtDate = (d) => {
-        if (!d) return "";
-        const dt = new Date(d);
-        const months = [
-          "Jan.",
-          "Feb.",
-          "Mar.",
-          "Apr.",
-          "May",
-          "Jun.",
-          "Jul.",
-          "Aug.",
-          "Sep.",
-          "Oct.",
-          "Nov.",
-          "Dec.",
-        ];
-        return (
-          months[dt.getMonth()] + " " + dt.getDate() + ", " + dt.getFullYear()
-        );
-      };
-      const fmtCurrency = (v) => {
-        const num = parseFloat(v || 0);
-        return num.toLocaleString("en-PH", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        });
-      };
-
-      // Quotations — pad to 3 suppliers
-      const quotations = abs.quotations || [];
-      while (quotations.length < 3)
-        quotations.push({
-          supplier_name: "",
-          items: [],
-          bid_amount: 0,
-        });
-
-      // Items from RFQ or first quotation
-      let abstractItems = [];
-      if (rfqData && rfqData.items && rfqData.items.length > 0) {
-        abstractItems = rfqData.items.map((it) => ({
-          qty: parseFloat(it.quantity || 0),
-          unit: it.unit || "",
-          description: it.item_name || it.item_description || "",
-          abc: parseFloat(it.abc_total_cost || it.abc_unit_cost || 0),
-        }));
-      } else if (
-        quotations[0] &&
-        quotations[0].items &&
-        quotations[0].items.length > 0
-      ) {
-        abstractItems = quotations[0].items.map((it) => ({
-          qty: parseFloat(it.quantity || 0),
-          unit: it.unit || "",
-          description: it.item_description || "",
-          abc: 0,
-        }));
-      }
-
-      const abcTotal = abstractItems.reduce(
-        (sum, item) => sum + parseFloat(item.abc || 0),
-        0,
-      );
-
-      // Supplier header row — no colors
-      let supplierHeaders = "";
-      let supplierSubHeaders = "";
-      for (let si = 0; si < 3; si++) {
-        const sName =
-          quotations[si] && quotations[si].supplier_name
-            ? quotations[si].supplier_name.toUpperCase()
-            : "";
-        supplierHeaders += `<th colspan="2" class="abs-th">${sName}</th>`;
-        supplierSubHeaders += `<th class="abs-th" style="width:9%;">Unit Price</th><th class="abs-th" style="width:9%;">Total Price</th>`;
-      }
-
-      // Item rows
-      let itemsHTML = "";
-      abstractItems.forEach((item) => {
-        let supplierCells = "";
-        for (let si = 0; si < 3; si++) {
-          const q = quotations[si];
-          let unitPrice = "",
-            totalPrice = "";
-          if (q && q.items && q.items.length > 0) {
-            const matchItem =
-              q.items.find(
-                (qi) =>
-                  qi.item_description &&
-                  item.description &&
-                  qi.item_description
-                    .toLowerCase()
-                    .includes(item.description.toLowerCase().substring(0, 15)),
-              ) || q.items[0];
-            if (matchItem) {
-              unitPrice = fmtCurrency(matchItem.unit_price || 0);
-              totalPrice = fmtCurrency(matchItem.total_price || 0);
-            }
-          }
-          supplierCells += `<td class="abs-td abs-r">${unitPrice}</td><td class="abs-td abs-r">${totalPrice}</td>`;
-        }
-        itemsHTML += `<tr>
- <td class="abs-td abs-c">${item.qty}</td>
- <td class="abs-td abs-c">${item.unit}</td>
- <td class="abs-td">${item.description}</td>
- <td class="abs-td abs-r">${fmtCurrency(item.abc)}</td>
- ${supplierCells}
- </tr>`;
-      });
-
-      // Notes / specs rows
-      if (abs.item_specifications) {
-        const specs = abs.item_specifications
-          .split(/\n|\r\n/)
-          .filter((l) => l.trim());
-        itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8" style="font-weight:bold;">Note:</td></tr>`;
-        specs.forEach((spec, i) => {
-          itemsHTML += `<tr><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td" colspan="8">${i + 1}. ${spec.trim()}</td></tr>`;
-        });
-      }
-
-      // Add TOTAL row right after items/specs
-      itemsHTML += `<tr><td class="abs-td" colspan="3" style="font-weight:bold;text-align:right;">TOTAL</td><td class="abs-td abs-r" style="font-weight:bold;">${fmtCurrency(abcTotal)}</td>${"<td class=\"abs-td abs-r\"></td>".repeat(6)}</tr>`;
-
-      // Empty filler rows
-      const totalContentRows =
-        abstractItems.length +
-        (abs.item_specifications
-          ? abs.item_specifications.split(/\n/).filter((l) => l.trim()).length +
-            1
-          : 0) +
-        1; // +1 for TOTAL row
-      for (let i = totalContentRows; i < 6; i++) {
-        itemsHTML += `<tr><td class="abs-td">&nbsp;</td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td><td class="abs-td"></td></tr>`;
-      }
-
-      // PURPOSE row with supplier totals
-      let purposeTotalCells = "";
-      for (let si = 0; si < 3; si++) {
-        const q = quotations[si];
-        const total = q ? parseFloat(q.bid_amount || 0) : 0;
-        purposeTotalCells += `<td class="abs-td"></td><td class="abs-td abs-r" style="font-weight:bold;">${total > 0 ? fmtCurrency(total) : ""}</td>`;
-      }
-
-      const recommendedName =
-        abs.recommended_supplier_name ||
-        (quotations[0] ? quotations[0].supplier_name : "");
-      const recommendedAmount = fmtCurrency(abs.recommended_amount || 0);
-
-      const bodyContent = `
- <style>
- @page { size: A4 landscape; margin: 8mm 10mm; }
- .abs-wrap { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; line-height: 1.3; }
- .abs-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 2px 0 6px 0; letter-spacing: 0.5px; }
- .abs-info { font-size: 9pt; margin: 2px 0; }
- .abs-info b { min-width: 70px; display: inline-block; }
- .abs-tbl { width: 100%; border-collapse: collapse; margin: 4px 0 0 0; }
- .abs-th { border: 1px solid #000; padding: 2px 3px; font-size: 7.5pt; font-weight: bold; text-align: center; vertical-align: middle; }
- .abs-td { border: 1px solid #000; padding: 1px 3px; font-size: 8pt; vertical-align: top; }
- .abs-c { text-align: center; }
- .abs-r { text-align: right; }
- .abs-cert { font-size: 8pt; line-height: 1.4; margin-top: 4px; }
- .abs-cert p { margin: 2px 0; }
-          .abs-sigs { margin-top: 12px; font-size: 8pt; }
-          .abs-sig-layout { display: grid; grid-template-columns: 23% 54% 23%; gap: 12px; align-items: start; }
-          .abs-sig-col { text-align: center; }
-          .abs-sig-line { display: none; }
-          .abs-sig-name { font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-decoration: underline; }
-          .abs-sig-title { font-size: 7pt; color: #333; line-height: 1.15; }
-          .abs-sig-note { font-size: 7pt; color: #444; margin-top: 2px; font-style: italic; }
-          .abs-lbl { font-size: 7.5pt; font-style: italic; margin-bottom: 1px; text-align: left; }
- </style>
-
- <div class="abs-wrap">
- <div class="abs-title">ABSTRACT OF QUOTATION</div>
-
- <div style="display:flex; justify-content:space-between;">
- <div>
- <div class="abs-info"><b>AOQ No.:</b> ${abs.abstract_number || ""}</div>
- </div>
- <div>
- <div class="abs-info"><b>DATE:</b> ${fmtDate(abs.date_prepared)}</div>
- </div>
- </div>
-
- <table class="abs-tbl">
- <thead>
- <tr>
- <th colspan="3" class="abs-th">PARTICULARS</th>
- <th rowspan="2" class="abs-th" style="width:10%;">ABC</th>
- ${supplierHeaders}
- </tr>
- <tr>
- <th class="abs-th" style="width:5%;">Qty.</th>
- <th class="abs-th" style="width:4%;">Unit</th>
- <th class="abs-th" style="width:18%;">Items</th>
- ${supplierSubHeaders}
- </tr>
- </thead>
- <tbody>
- ${itemsHTML}
- <tr>
- <td class="abs-td"></td>
- <td class="abs-td"></td>
- <td class="abs-td" style="font-weight:bold;">PURPOSE: ${prPurpose}</td>
- <td class="abs-td"></td>
- ${purposeTotalCells}
- </tr>
- </tbody>
- </table>
-
- <div class="abs-cert">
- <p>We <b>CERTIFY</b> that we opened and recorded herein quotations received in respond to the RFQ.</p>
- <p>We therefore <b>RECOMMEND</b> to award to <b><u>${recommendedName}</u></b> with a total bid price of <b><u>₱${recommendedAmount}</u></b> having submitted the most responsive quotation.</p>
- <p>We also certify that the lowest and responsive quotation recommended for this award is within the ABC.</p>
- </div>
-
-          <div class="abs-sigs">
-            <div class="abs-sig-layout">
-              <div class="abs-sig-col">
-                <div class="abs-lbl">Prepared By:</div>
-                <br/>
-                <div class="abs-sig-name">${bacChairName}</div>
-                <div class="abs-sig-title">${bacChairDesignation}</div>
-              </div>
-
-              <div class="abs-sig-col">
-                <div class="abs-lbl" style="text-align:center;">Recommended By:</div>
-                <br/>
-                <div style="display:grid; gap:10px;">
-                  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items:start;">
-                    <div>
-                      <div class="abs-sig-name">${bacSec2Name || ''}</div>
-                      <div class="abs-sig-title">${bacSec2Name ? 'Chairperson, BAC Secretariat (2)' : ''}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${bacViceChairName}</div>
-                      <div class="abs-sig-title">${bacViceChairDesignation}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[0] && bacMembers[0].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[0] && bacMembers[0].title) || ''}</div>
-                    </div>
-                  </div>
-                  <br/>
-                  <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; justify-content:center;">
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[1] && bacMembers[1].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[1] && bacMembers[1].title) || ''}</div>
-                    </div>
-                    <div>
-                      <div class="abs-sig-name">${(bacMembers[2] && bacMembers[2].name) || ''}</div>
-                      <div class="abs-sig-title">${(bacMembers[2] && bacMembers[2].title) || ''}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="abs-sig-col">
-                <div class="abs-lbl">Approved By:</div>
-                <br/>
-                <div class="abs-sig-line"></div>
-                <div class="abs-sig-name">${rdName}</div>
-                <div class="abs-sig-title">${rdTitle}</div>
-                <div class="abs-sig-title" style="font-style:italic;">Head of the Procuring Entity</div>
-              </div>
-            </div>
-          </div>
- </div>
- `;
-
-      const html = buildPrintHTML(
-        "Abstract of Quotation - " + abs.abstract_number,
-        bodyContent,
-      );
-      openPrintPreview(html, {
-        title: toFilename("AOQ_" + abs.abstract_number),
-        pageSize: "A4",
-        landscape: true,
-        editable: true,
-      });
-    } catch (err) {
-      console.error("Print Abstract error:", err);
-      showNotification("Failed to print Abstract: " + err.message, "error");
-    }
-  };
-
   // ==================== PRINT RIS (REQUISITION AND ISSUE SLIP - APPENDIX 50) ====================
   window.printRIS = async function (risId) {
     try {

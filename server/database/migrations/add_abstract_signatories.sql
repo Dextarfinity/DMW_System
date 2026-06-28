@@ -6,7 +6,6 @@ ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS bac_member3_id INTEGER REFERENCES
 ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS bac_secretariat_id INTEGER REFERENCES employees(id);
 ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS bac_chairperson_id INTEGER REFERENCES employees(id);
 ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS regional_director_id INTEGER REFERENCES employees(id);
-ALTER TABLE abstracts ADD COLUMN IF NOT EXISTS bac_secretariat2_id INTEGER REFERENCES employees(id);
 
 -- Add supplier details columns to rfqs table for manual supplier entry
 ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS manual_supplier_name TEXT;
